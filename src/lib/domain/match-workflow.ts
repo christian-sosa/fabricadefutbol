@@ -38,6 +38,21 @@ type CreateDraftInput = {
 const PLAYER_PREFIX = "player:";
 const GUEST_PREFIX = "guest:";
 
+function isGuestSchemaMissing(message: string) {
+  const normalized = message.toLowerCase();
+  const mentionsGuestTables =
+    normalized.includes("match_guests") || normalized.includes("team_option_guests");
+  const indicatesSchemaIssue =
+    normalized.includes("schema cache") ||
+    normalized.includes("does not exist") ||
+    normalized.includes("relation");
+  return mentionsGuestTables && indicatesSchemaIssue;
+}
+
+function buildGuestSchemaErrorMessage(baseMessage: string) {
+  return `${baseMessage} Falta actualizar Supabase con las tablas de invitados (\`match_guests\` y \`team_option_guests\`). Ejecuta \`supabase/schema.sql\` y \`supabase/policies.sql\` y luego refresca el schema cache con: NOTIFY pgrst, 'reload schema';`;
+}
+
 function expectedPlayers(modality: MatchModality) {
   return TEAM_SIZE_BY_MODALITY[modality] * 2;
 }
@@ -213,6 +228,9 @@ async function insertTeamOptions(
   if (guestRows.length) {
     const { error: insertGuestsError } = await supabase.from("team_option_guests").insert(guestRows);
     if (insertGuestsError) {
+      if (isGuestSchemaMissing(insertGuestsError.message)) {
+        throw new Error(buildGuestSchemaErrorMessage("No se pudieron guardar invitados en opciones."));
+      }
       throw new Error(`No se pudieron guardar invitados en opciones: ${insertGuestsError.message}`);
     }
   }
@@ -262,6 +280,9 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
     : { data: [], error: null };
 
   if (guestsError) {
+    if (isGuestSchemaMissing(guestsError.message)) {
+      throw new Error(buildGuestSchemaErrorMessage("No se pudieron guardar invitados del partido."));
+    }
     throw new Error(`No se pudieron guardar invitados del partido: ${guestsError.message}`);
   }
 
@@ -301,7 +322,12 @@ export async function regenerateDraftTeamOptions(params: {
       supabase.from("match_guests").select("id, guest_name, guest_rating").eq("match_id", matchId)
     ]);
   if (matchPlayersError) throw new Error(`No se pudieron leer convocados: ${matchPlayersError.message}`);
-  if (matchGuestsError) throw new Error(`No se pudieron leer invitados: ${matchGuestsError.message}`);
+  if (matchGuestsError) {
+    if (isGuestSchemaMissing(matchGuestsError.message)) {
+      throw new Error(buildGuestSchemaErrorMessage("No se pudieron leer invitados."));
+    }
+    throw new Error(`No se pudieron leer invitados: ${matchGuestsError.message}`);
+  }
 
   const playerIds = (matchPlayers ?? []).map((row) => row.player_id);
   validatePlayerCount(match.modality, playerIds.length, (matchGuests ?? []).length);
@@ -423,6 +449,9 @@ async function loadConfirmedTeams(
     throw new Error(`No se pudieron leer jugadores de la opcion confirmada: ${optionPlayersError.message}`);
   }
   if (optionGuestsError) {
+    if (isGuestSchemaMissing(optionGuestsError.message)) {
+      throw new Error(buildGuestSchemaErrorMessage("No se pudieron leer invitados de la opcion confirmada."));
+    }
     throw new Error(`No se pudieron leer invitados de la opcion confirmada: ${optionGuestsError.message}`);
   }
 
@@ -442,6 +471,9 @@ async function loadConfirmedTeams(
     throw new Error(`No se pudieron leer ratings de jugadores: ${playersError.message}`);
   }
   if (guestsError) {
+    if (isGuestSchemaMissing(guestsError.message)) {
+      throw new Error(buildGuestSchemaErrorMessage("No se pudieron leer ratings de invitados."));
+    }
     throw new Error(`No se pudieron leer ratings de invitados: ${guestsError.message}`);
   }
 

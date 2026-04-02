@@ -64,7 +64,7 @@ export function TeamOptionCard({
                     </span>
                   ) : null}
                 </span>
-                <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span>
+                {!player.is_guest ? <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span> : null}
               </li>
             ))}
           </ul>
@@ -83,7 +83,7 @@ export function TeamOptionCard({
                     </span>
                   ) : null}
                 </span>
-                <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span>
+                {!player.is_guest ? <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span> : null}
               </li>
             ))}
           </ul>

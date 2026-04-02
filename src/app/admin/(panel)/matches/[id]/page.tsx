@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import {
   confirmOptionAction,
+  deleteMatchAction,
   regenerateOptionsAction,
   saveResultAction,
   updateMatchAction
@@ -37,6 +38,11 @@ export default async function AdminMatchDetailPage({
   const regenerateAction = regenerateOptionsAction.bind(null, params.id);
   const resultAction = saveResultAction.bind(null, params.id);
   const matchUpdateAction = updateMatchAction.bind(null, params.id);
+  const deleteAction = deleteMatchAction.bind(null, params.id);
+  const canDeleteMatch =
+    details.match.status === "draft" ||
+    (details.match.status === "confirmed" && !details.result);
+  const canManageResult = details.match.status === "confirmed" || details.match.status === "finished";
 
   return (
     <div className="space-y-4">
@@ -96,11 +102,25 @@ export default async function AdminMatchDetailPage({
                   </span>
                 ) : null}
               </span>
-              <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span>
+              {!player.is_guest ? <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span> : null}
             </div>
           ))}
         </div>
       </Card>
+
+      {canDeleteMatch ? (
+        <Card>
+          <CardTitle>Eliminar partido</CardTitle>
+          <CardDescription>
+            Disponible solo para partidos en borrador o confirmados que todavia no tengan resultado.
+          </CardDescription>
+          <form action={deleteAction} className="mt-4">
+            <Button type="submit" variant="danger">
+              Borrar partido
+            </Button>
+          </form>
+        </Card>
+      ) : null}
 
       <Card>
         <div className="mb-4 flex items-center justify-between">
@@ -135,18 +155,27 @@ export default async function AdminMatchDetailPage({
         </div>
       </Card>
 
-      <Card>
-        <CardTitle>Cargar o corregir resultado</CardTitle>
-        <CardDescription>Al guardar, se recalculan ratings y estadisticas del partido.</CardDescription>
-        <form action={resultAction} className="mt-4 grid gap-3 md:grid-cols-4">
-          <Input defaultValue={details.result?.score_a ?? 0} min={0} name="scoreA" required type="number" />
-          <Input defaultValue={details.result?.score_b ?? 0} min={0} name="scoreB" required type="number" />
-          <Textarea className="md:col-span-2" defaultValue={details.result?.notes ?? ""} name="notes" placeholder="Notas opcionales" rows={3} />
-          <div className="md:col-span-4">
-            <Button type="submit">{details.result ? "Corregir resultado" : "Guardar resultado"}</Button>
-          </div>
-        </form>
-      </Card>
+      {canManageResult ? (
+        <Card>
+          <CardTitle>{details.result ? "Corregir resultado" : "Cargar resultado"}</CardTitle>
+          <CardDescription>
+            El partido puede quedar confirmado sin resultado. Cargalo cuando se juegue para finalizar y actualizar ratings.
+          </CardDescription>
+          <form action={resultAction} className="mt-4 grid gap-3 md:grid-cols-4">
+            <Input defaultValue={details.result?.score_a ?? 0} min={0} name="scoreA" required type="number" />
+            <Input defaultValue={details.result?.score_b ?? 0} min={0} name="scoreB" required type="number" />
+            <Textarea className="md:col-span-2" defaultValue={details.result?.notes ?? ""} name="notes" placeholder="Notas opcionales" rows={3} />
+            <div className="md:col-span-4">
+              <Button type="submit">{details.result ? "Guardar correccion" : "Guardar resultado y finalizar"}</Button>
+            </div>
+          </form>
+        </Card>
+      ) : (
+        <Card>
+          <CardTitle>Resultado</CardTitle>
+          <CardDescription>Confirma una opcion de equipos para habilitar la carga de resultado cuando se juegue.</CardDescription>
+        </Card>
+      )}
     </div>
   );
 }
