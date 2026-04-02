@@ -163,3 +163,62 @@ export async function updateMatchAction(matchId: string, formData: FormData) {
     redirect(buildPath(matchId, message));
   }
 }
+
+export async function deleteMatchAction(matchId: string) {
+  try {
+    await assertAdminAction();
+
+    const supabase = await createSupabaseServerClient();
+    const { data: match, error: matchError } = await supabase
+      .from("matches")
+      .select("id, status")
+      .eq("id", matchId)
+      .maybeSingle();
+
+    if (matchError) {
+      redirect(buildPath(matchId, matchError.message));
+    }
+
+    if (!match) {
+      redirect(buildPath(matchId, "No se encontro el partido."));
+    }
+
+    const isDraft = match.status === "draft";
+    const isConfirmed = match.status === "confirmed";
+    if (!isDraft && !isConfirmed) {
+      redirect(buildPath(matchId, "Solo puedes borrar partidos en borrador o confirmados sin jugar."));
+    }
+
+    if (isConfirmed) {
+      const { data: result, error: resultError } = await supabase
+        .from("match_result")
+        .select("id")
+        .eq("match_id", matchId)
+        .maybeSingle();
+
+      if (resultError) {
+        redirect(buildPath(matchId, resultError.message));
+      }
+
+      if (result) {
+        redirect(buildPath(matchId, "No puedes borrar un partido confirmado que ya tiene resultado."));
+      }
+    }
+
+    const { error: deleteError } = await supabase.from("matches").delete().eq("id", matchId);
+    if (deleteError) {
+      redirect(buildPath(matchId, deleteError.message));
+    }
+
+    revalidatePath("/admin");
+    revalidatePath("/matches");
+    revalidatePath("/upcoming");
+    revalidatePath("/players");
+    revalidatePath("/ranking");
+    redirect("/admin");
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    const message = error instanceof Error ? error.message : "No se pudo borrar partido.";
+    redirect(buildPath(matchId, message));
+  }
+}

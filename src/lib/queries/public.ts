@@ -233,7 +233,6 @@ export async function getUpcomingConfirmedMatches() {
     .from("matches")
     .select("*")
     .eq("status", "confirmed")
-    .gte("scheduled_at", new Date().toISOString())
     .order("scheduled_at", { ascending: true });
   if (error) throw new Error(error.message);
 
