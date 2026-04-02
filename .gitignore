@@ -31,7 +31,6 @@ pnpm-debug.log*
 # project-specific private files
 /supabase/seed.sql
 /README.md
-/public/players/
 
 # local data/backups
 *.dump
