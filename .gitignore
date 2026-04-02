@@ -1,0 +1,42 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# local env files
+.env*.local
+.env
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+
+# project-specific private files
+/supabase/seed.sql
+/README.md
+/public/players/
+
+# local data/backups
+*.dump
+*.sql.bak
+*.sql.backup
+*.db
+*.sqlite
+*.sqlite3

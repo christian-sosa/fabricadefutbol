@@ -1,0 +1,61 @@
+import type { TeamSide, WinnerTeam } from "@/types/domain";
+
+type RatingPlayer = {
+  id: string;
+  rating: number;
+};
+
+type CalculateRatingInput = {
+  teamA: RatingPlayer[];
+  teamB: RatingPlayer[];
+  winnerTeam: WinnerTeam;
+  deltaPerMatch?: number;
+};
+
+export type RatingAdjustment = {
+  playerId: string;
+  team: TeamSide;
+  ratingBefore: number;
+  delta: number;
+  ratingAfter: number;
+};
+
+const DEFAULT_DELTA_PER_MATCH = 10;
+
+export function deriveWinnerTeam(scoreA: number, scoreB: number): WinnerTeam {
+  if (scoreA === scoreB) return "DRAW";
+  return scoreA > scoreB ? "A" : "B";
+}
+
+function resolveDelta(team: TeamSide, winnerTeam: WinnerTeam, deltaPerMatch: number) {
+  if (winnerTeam === "DRAW") return 0;
+  return winnerTeam === team ? deltaPerMatch : -deltaPerMatch;
+}
+
+export function calculateMatchRatingAdjustments(input: CalculateRatingInput): RatingAdjustment[] {
+  const { teamA, teamB, winnerTeam, deltaPerMatch = DEFAULT_DELTA_PER_MATCH } = input;
+  if (!teamA.length || !teamB.length) {
+    throw new Error("No se pueden calcular ratings sin ambos equipos.");
+  }
+
+  const teamADelta = resolveDelta("A", winnerTeam, deltaPerMatch);
+  const teamBDelta = resolveDelta("B", winnerTeam, deltaPerMatch);
+
+  const mappedA = teamA.map<RatingAdjustment>((player) => ({
+    playerId: player.id,
+    team: "A",
+    ratingBefore: player.rating,
+    delta: teamADelta,
+    ratingAfter: Number((player.rating + teamADelta).toFixed(2))
+  }));
+
+  const mappedB = teamB.map<RatingAdjustment>((player) => ({
+    playerId: player.id,
+    team: "B",
+    ratingBefore: player.rating,
+    delta: teamBDelta,
+    ratingAfter: Number((player.rating + teamBDelta).toFixed(2))
+  }));
+
+  return [...mappedA, ...mappedB];
+}
