@@ -14,8 +14,7 @@ export const PUBLIC_NAV_ITEMS = [
   { href: "/ranking", label: "Ranking" },
   { href: "/players", label: "Jugadores" },
   { href: "/matches", label: "Historial" },
-  { href: "/upcoming", label: "Próximos" },
-  { href: "/demo", label: "Demo" }
+  { href: "/upcoming", label: "Próximos" }
 ];
 
 export const ADMIN_NAV_ITEMS = [
