@@ -472,3 +472,4 @@ select
   m.organization_id
 from public.matches m
 left join public.match_result mr on mr.match_id = m.id;
+
