@@ -4,7 +4,7 @@ create extension if not exists "pgcrypto";
 do $$
 begin
   if not exists (select 1 from pg_type where typname = 'match_modality') then
-    create type public.match_modality as enum ('5v5', '6v6', '7v7');
+    create type public.match_modality as enum ('5v5', '6v6', '7v7', '9v9', '11v11');
   end if;
   if not exists (select 1 from pg_type where typname = 'match_status') then
     create type public.match_status as enum ('draft', 'confirmed', 'finished', 'cancelled');
@@ -15,12 +15,19 @@ begin
   if not exists (select 1 from pg_type where typname = 'winner_team') then
     create type public.winner_team as enum ('A', 'B', 'DRAW');
   end if;
+  if not exists (select 1 from pg_type where typname = 'invite_status') then
+    create type public.invite_status as enum ('pending', 'accepted', 'revoked');
+  end if;
 end
 $$;
 
 do $$
 begin
   alter type public.match_modality add value if not exists '5v5';
+  alter type public.match_modality add value if not exists '6v6';
+  alter type public.match_modality add value if not exists '7v7';
+  alter type public.match_modality add value if not exists '9v9';
+  alter type public.match_modality add value if not exists '11v11';
 end
 $$;
 
@@ -30,10 +37,89 @@ create table if not exists public.admins (
   created_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.organizations (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  slug text not null,
+  is_public boolean not null default true,
+  created_by uuid references public.admins(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_schema = 'public'
+      and table_name = 'organizations'
+      and constraint_name = 'organizations_is_public_true_check'
+  ) then
+    alter table public.organizations
+      add constraint organizations_is_public_true_check
+      check (is_public = true);
+  end if;
+end
+$$;
+
+create unique index if not exists idx_organizations_name on public.organizations (lower(name));
+create unique index if not exists idx_organizations_slug on public.organizations (lower(slug));
+
+create table if not exists public.organization_admins (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  admin_id uuid not null references public.admins(id) on delete cascade,
+  created_by uuid references public.admins(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  unique (organization_id, admin_id)
+);
+
+create table if not exists public.organization_invites (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  email text not null,
+  invite_token uuid not null default gen_random_uuid(),
+  invited_by uuid not null references public.admins(id) on delete cascade,
+  status public.invite_status not null default 'pending',
+  accepted_by uuid references public.admins(id) on delete set null,
+  accepted_at timestamptz,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'organization_invites'
+      and column_name = 'invite_token'
+  ) then
+    alter table public.organization_invites
+      add column invite_token uuid;
+    update public.organization_invites
+    set invite_token = gen_random_uuid()
+    where invite_token is null;
+    alter table public.organization_invites
+      alter column invite_token set not null;
+    alter table public.organization_invites
+      alter column invite_token set default gen_random_uuid();
+  end if;
+end
+$$;
+
+create unique index if not exists idx_org_invites_unique_pending
+  on public.organization_invites (organization_id, lower(email))
+  where status = 'pending';
+create unique index if not exists idx_org_invites_token
+  on public.organization_invites (invite_token);
+
 create table if not exists public.players (
   id uuid primary key default gen_random_uuid(),
-  full_name text not null unique,
-  initial_rank integer not null unique check (initial_rank > 0),
+  organization_id uuid references public.organizations(id) on delete cascade,
+  full_name text not null,
+  initial_rank integer not null check (initial_rank > 0),
   current_rating numeric(8,2) not null default 1000.00 check (current_rating > 0),
   active boolean not null default true,
   notes text,
@@ -43,6 +129,7 @@ create table if not exists public.players (
 
 create table if not exists public.matches (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid references public.organizations(id) on delete cascade,
   scheduled_at timestamptz not null,
   modality public.match_modality not null,
   status public.match_status not null default 'draft',
@@ -151,11 +238,102 @@ create table if not exists public.match_player_stats (
   unique (match_id, player_id)
 );
 
-create index if not exists idx_players_current_rating on public.players(current_rating desc);
-create index if not exists idx_players_active on public.players(active);
+insert into public.organizations (id, name, slug, is_public, created_by)
+select '00000000-0000-0000-0000-000000000001'::uuid, 'Fabrica Base', 'fabrica-base', true, null
+where not exists (
+  select 1
+  from public.organizations
+  where id = '00000000-0000-0000-0000-000000000001'::uuid
+);
 
-create index if not exists idx_matches_status_scheduled_at on public.matches(status, scheduled_at desc);
-create index if not exists idx_matches_scheduled_at on public.matches(scheduled_at desc);
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public' and table_name = 'players' and column_name = 'organization_id'
+  ) then
+    alter table public.players add column organization_id uuid;
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public' and table_name = 'matches' and column_name = 'organization_id'
+  ) then
+    alter table public.matches add column organization_id uuid;
+  end if;
+end
+$$;
+
+update public.players
+set organization_id = '00000000-0000-0000-0000-000000000001'::uuid
+where organization_id is null;
+
+update public.matches
+set organization_id = '00000000-0000-0000-0000-000000000001'::uuid
+where organization_id is null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where constraint_name = 'players_organization_id_fkey'
+      and table_schema = 'public'
+      and table_name = 'players'
+  ) then
+    alter table public.players
+      add constraint players_organization_id_fkey
+      foreign key (organization_id) references public.organizations(id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where constraint_name = 'matches_organization_id_fkey'
+      and table_schema = 'public'
+      and table_name = 'matches'
+  ) then
+    alter table public.matches
+      add constraint matches_organization_id_fkey
+      foreign key (organization_id) references public.organizations(id) on delete cascade;
+  end if;
+end
+$$;
+
+alter table public.players alter column organization_id set not null;
+alter table public.matches alter column organization_id set not null;
+
+do $$
+begin
+  if exists (select 1 from pg_constraint where conname = 'players_full_name_key') then
+    alter table public.players drop constraint players_full_name_key;
+  end if;
+  if exists (select 1 from pg_constraint where conname = 'players_initial_rank_key') then
+    alter table public.players drop constraint players_initial_rank_key;
+  end if;
+end
+$$;
+
+create unique index if not exists idx_players_org_full_name on public.players (organization_id, lower(full_name));
+create unique index if not exists idx_players_org_initial_rank on public.players (organization_id, initial_rank);
+
+insert into public.organization_admins (organization_id, admin_id, created_by)
+select '00000000-0000-0000-0000-000000000001'::uuid, a.id, a.id
+from public.admins a
+on conflict (organization_id, admin_id) do nothing;
+
+create index if not exists idx_org_admins_org on public.organization_admins(organization_id);
+create index if not exists idx_org_admins_admin on public.organization_admins(admin_id);
+create index if not exists idx_org_invites_org on public.organization_invites(organization_id);
+create index if not exists idx_org_invites_email on public.organization_invites(lower(email));
+
+create index if not exists idx_players_org_rating on public.players(organization_id, current_rating desc);
+create index if not exists idx_players_org_active on public.players(organization_id, active);
+
+create index if not exists idx_matches_org_status_scheduled_at on public.matches(organization_id, status, scheduled_at desc);
+create index if not exists idx_matches_org_scheduled_at on public.matches(organization_id, scheduled_at desc);
 create index if not exists idx_matches_created_by on public.matches(created_by);
 
 create index if not exists idx_match_players_match_id on public.match_players(match_id);
@@ -188,11 +366,52 @@ begin
 end;
 $$;
 
+create or replace function public.enforce_max_players_per_org()
+returns trigger
+language plpgsql
+as $$
+declare
+  current_count integer;
+begin
+  if tg_op = 'INSERT' then
+    select count(*) into current_count
+    from public.players p
+    where p.organization_id = new.organization_id;
+
+    if current_count >= 30 then
+      raise exception 'Cada organizacion admite un maximo de 30 jugadores.';
+    end if;
+  elsif tg_op = 'UPDATE' and new.organization_id is distinct from old.organization_id then
+    select count(*) into current_count
+    from public.players p
+    where p.organization_id = new.organization_id;
+
+    if current_count >= 30 then
+      raise exception 'Cada organizacion admite un maximo de 30 jugadores.';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_organizations_updated_at on public.organizations;
+create trigger trg_organizations_updated_at
+before update on public.organizations
+for each row
+execute function public.set_updated_at();
+
 drop trigger if exists trg_players_updated_at on public.players;
 create trigger trg_players_updated_at
 before update on public.players
 for each row
 execute function public.set_updated_at();
+
+drop trigger if exists trg_players_max_per_org on public.players;
+create trigger trg_players_max_per_org
+before insert or update of organization_id on public.players
+for each row
+execute function public.enforce_max_players_per_org();
 
 drop trigger if exists trg_matches_updated_at on public.matches;
 create trigger trg_matches_updated_at
@@ -249,6 +468,7 @@ select
   ) as team_b_players,
   mr.score_a,
   mr.score_b,
-  mr.winner_team
+  mr.winner_team,
+  m.organization_id
 from public.matches m
 left join public.match_result mr on mr.match_id = m.id;

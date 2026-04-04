@@ -4,15 +4,17 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { assertAdminAction } from "@/lib/auth/admin";
+import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/lib/auth/admin";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { createDraftMatchWithOptions } from "@/lib/domain/match-workflow";
 import { isNextRedirectError } from "@/lib/next-redirect";
+import { withOrgQuery } from "@/lib/org";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const schema = z.object({
+  organizationId: z.string().uuid(),
   scheduledAt: z.string().min(1, "La fecha es obligatoria."),
-  modality: z.enum(["5v5", "6v6", "7v7"]),
+  modality: z.enum(["5v5", "6v6", "7v7", "9v9", "11v11"]),
   location: z.string().optional(),
   playerIds: z.array(z.string().uuid())
 });
@@ -22,8 +24,10 @@ type GuestDraftInput = {
   rating: number;
 };
 
-function withError(error: string) {
-  return `/admin/matches/new?error=${encodeURIComponent(error)}`;
+function withError(organizationId: string, error: string) {
+  const basePath = withOrgQuery("/admin/matches/new", organizationId);
+  const separator = basePath.includes("?") ? "&" : "?";
+  return `${basePath}${separator}error=${encodeURIComponent(error)}`;
 }
 
 function parseGuestsFromForm(formData: FormData): GuestDraftInput[] {
@@ -59,23 +63,31 @@ function parseGuestsFromForm(formData: FormData): GuestDraftInput[] {
 
 export async function createMatchAction(formData: FormData) {
   try {
-    const admin = await assertAdminAction();
     const parsed = schema.safeParse({
+      organizationId: formData.get("organizationId"),
       scheduledAt: formData.get("scheduledAt"),
       modality: formData.get("modality"),
       location: formData.get("location"),
       playerIds: formData.getAll("playerIds")
     });
     if (!parsed.success) {
-      redirect(withError(parsed.error.issues[0]?.message ?? "Datos invalidos."));
+      redirect(
+        withError(
+          String(formData.get("organizationId") ?? ""),
+          parsed.error.issues[0]?.message ?? "Datos invalidos."
+        )
+      );
     }
 
+    const admin = await assertOrganizationAdminAction(parsed.data.organizationId);
+    const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
     const invitedGuests = parseGuestsFromForm(formData);
     const expected = TEAM_SIZE_BY_MODALITY[parsed.data.modality] * 2;
     const totalParticipants = parsed.data.playerIds.length + invitedGuests.length;
     if (totalParticipants !== expected) {
       redirect(
         withError(
+          organizationQueryKey,
           `Para ${parsed.data.modality} debes convocar exactamente ${expected} jugadores en total. Actualmente hay ${totalParticipants}.`
         )
       );
@@ -85,6 +97,7 @@ export async function createMatchAction(formData: FormData) {
     const matchId = await createDraftMatchWithOptions({
       supabase,
       adminId: admin.userId,
+      organizationId: parsed.data.organizationId,
       scheduledAt: new Date(parsed.data.scheduledAt).toISOString(),
       modality: parsed.data.modality,
       location: parsed.data.location ?? "",
@@ -95,10 +108,11 @@ export async function createMatchAction(formData: FormData) {
     revalidatePath("/admin");
     revalidatePath("/admin/matches/new");
     revalidatePath(`/admin/matches/${matchId}`);
-    redirect(`/admin/matches/${matchId}`);
+    redirect(withOrgQuery(`/admin/matches/${matchId}`, organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo crear el partido.";
-    redirect(withError(message));
+    const organizationId = String(formData.get("organizationId") ?? "");
+    redirect(withError(organizationId, message));
   }
 }

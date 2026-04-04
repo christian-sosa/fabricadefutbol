@@ -58,8 +58,15 @@ export function PlayerPhotoModalTrigger({
             >
               X
             </button>
-            <div className="relative mx-auto mt-4 h-72 w-72 overflow-hidden rounded-xl border border-slate-700 bg-slate-950">
-              <Image alt={`Foto de ${playerName}`} className="object-cover" fill sizes="(max-width: 768px) 288px, 288px" src={imageSrc} />
+            <div className="mx-auto mt-4 h-72 w-72 overflow-hidden rounded-xl border border-slate-700 bg-slate-950">
+              <Image
+                alt={`Foto de ${playerName}`}
+                className="h-full w-full object-cover"
+                height={288}
+                sizes="(max-width: 768px) 288px, 288px"
+                src={imageSrc}
+                width={288}
+              />
             </div>
             <p className="mt-3 text-center text-lg font-bold text-slate-100">{playerName}</p>
           </div>

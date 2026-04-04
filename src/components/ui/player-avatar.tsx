@@ -14,6 +14,11 @@ const sizeClasses: Record<NonNullable<PlayerAvatarProps["size"]>, string> = {
   md: "h-12 w-12",
   lg: "h-14 w-14"
 };
+const sizePixels: Record<NonNullable<PlayerAvatarProps["size"]>, number> = {
+  sm: 40,
+  md: 48,
+  lg: 56
+};
 
 function getInitials(name: string) {
   const trimmed = name.trim();
@@ -29,6 +34,7 @@ export function getPlayerPhotoSrc(playerId?: string) {
 
 export function PlayerAvatar({ playerId, name, size = "md", className }: PlayerAvatarProps) {
   const src = getPlayerPhotoSrc(playerId);
+  const pixelSize = sizePixels[size];
   return (
     <div
       className={cn(
@@ -36,8 +42,19 @@ export function PlayerAvatar({ playerId, name, size = "md", className }: PlayerA
         sizeClasses[size],
         className
       )}
+      style={{
+        height: `${pixelSize}px`,
+        width: `${pixelSize}px`
+      }}
     >
-      <Image alt={`Avatar de ${name}`} className="object-cover" fill sizes="56px" src={src} />
+      <Image
+        alt={`Avatar de ${name}`}
+        className="h-full w-full object-cover"
+        height={pixelSize}
+        sizes={`${pixelSize}px`}
+        src={src}
+        width={pixelSize}
+      />
       {!playerId ? (
         <span className="absolute inset-0 flex items-center justify-center text-xs font-bold tracking-wide text-slate-100">
           {getInitials(name)}

@@ -16,7 +16,7 @@ Objetivo del documento
 - guest_rating:
   "rank equivalente" que se asigna manualmente a invitados para poder balancearlos.
 - modality:
-  5v5, 6v6 o 7v7.
+  5v5, 6v6, 7v7, 9v9 o 11v11.
 - team option:
   una propuesta de equipos A/B para un partido.
 
@@ -35,6 +35,8 @@ Para crear o regenerar opciones:
   - 5v5 => 10
   - 6v6 => 12
   - 7v7 => 14
+  - 9v9 => 18
+  - 11v11 => 22
 - La suma es: jugadores registrados + invitados.
 - No se aceptan jugadores duplicados.
 - Jugadores registrados deben existir y estar activos.
@@ -66,7 +68,7 @@ Funcion central: generateBalancedTeamOptions(...)
 
 Parametros relevantes:
 - players: lista de participantes con id, fullName, rating (aca rating = balanceScore).
-- modality: 5v5 / 6v6 / 7v7.
+- modality: 5v5 / 6v6 / 7v7 / 9v9 / 11v11.
 - requestedOptions:
   default 3, minimo 1, maximo 6.
 - seed:
@@ -249,4 +251,3 @@ Preguntas utiles para pedirle:
 - src/lib/constants.ts
 - src/lib/queries/public.ts
 - supabase/schema.sql
-

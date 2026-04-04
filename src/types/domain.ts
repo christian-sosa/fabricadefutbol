@@ -1,5 +1,5 @@
 export type MatchStatus = "draft" | "confirmed" | "finished" | "cancelled";
-export type MatchModality = "5v5" | "6v6" | "7v7";
+export type MatchModality = "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
 export type TeamSide = "A" | "B";
 export type WinnerTeam = TeamSide | "DRAW";
 

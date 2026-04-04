@@ -28,6 +28,7 @@ type ConfirmedParticipant = {
 type CreateDraftInput = {
   supabase: DbClient;
   adminId: string;
+  organizationId: string;
   scheduledAt: string;
   modality: MatchModality;
   location?: string;
@@ -89,12 +90,33 @@ function parseParticipantId(participantId: string): { source: "player" | "guest"
   throw new Error("Participante invalido dentro de la opcion de equipos.");
 }
 
-async function fetchSelectedPlayers(supabase: DbClient, playerIds: string[]) {
+async function assertMatchBelongsToOrganization(params: {
+  supabase: DbClient;
+  matchId: string;
+  organizationId?: string;
+}) {
+  const { supabase, matchId, organizationId } = params;
+  if (!organizationId) return;
+
+  const { data: match, error } = await supabase
+    .from("matches")
+    .select("id")
+    .eq("id", matchId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (error || !match) {
+    throw new Error("No se encontro el partido para la organizacion seleccionada.");
+  }
+}
+
+async function fetchSelectedPlayers(supabase: DbClient, organizationId: string, playerIds: string[]) {
   if (!playerIds.length) return [];
 
   const { data, error } = await supabase
     .from("players")
     .select("id, full_name, initial_rank, active")
+    .eq("organization_id", organizationId)
     .in("id", playerIds)
     .order("initial_rank", { ascending: true });
 
@@ -237,14 +259,15 @@ async function insertTeamOptions(
 }
 
 export async function createDraftMatchWithOptions(input: CreateDraftInput) {
-  const { supabase, adminId, scheduledAt, modality, location, selectedPlayerIds, invitedGuests } = input;
+  const { supabase, adminId, organizationId, scheduledAt, modality, location, selectedPlayerIds, invitedGuests } = input;
   validatePlayerCount(modality, selectedPlayerIds.length, invitedGuests.length);
 
-  const players = await fetchSelectedPlayers(supabase, selectedPlayerIds);
+  const players = await fetchSelectedPlayers(supabase, organizationId, selectedPlayerIds);
 
   const { data: match, error: createMatchError } = await supabase
     .from("matches")
     .insert({
+      organization_id: organizationId,
       scheduled_at: scheduledAt,
       modality,
       status: "draft",
@@ -302,12 +325,15 @@ export async function regenerateDraftTeamOptions(params: {
   supabase: DbClient;
   adminId: string;
   matchId: string;
+  organizationId?: string;
 }) {
-  const { supabase, adminId, matchId } = params;
+  const { supabase, adminId, matchId, organizationId } = params;
+
+  await assertMatchBelongsToOrganization({ supabase, matchId, organizationId });
 
   const { data: match, error: matchError } = await supabase
     .from("matches")
-    .select("id, modality, status")
+    .select("id, modality, status, organization_id")
     .eq("id", matchId)
     .single();
 
@@ -332,7 +358,7 @@ export async function regenerateDraftTeamOptions(params: {
   const playerIds = (matchPlayers ?? []).map((row) => row.player_id);
   validatePlayerCount(match.modality, playerIds.length, (matchGuests ?? []).length);
 
-  const players = await fetchSelectedPlayers(supabase, playerIds);
+  const players = await fetchSelectedPlayers(supabase, match.organization_id, playerIds);
   const participants = toBalancePlayers(players, matchGuests ?? []);
 
   const { data: existingOptions, error: existingOptionsError } = await supabase
@@ -366,8 +392,11 @@ export async function confirmTeamOption(params: {
   supabase: DbClient;
   matchId: string;
   optionId: string;
+  organizationId?: string;
 }) {
-  const { supabase, matchId, optionId } = params;
+  const { supabase, matchId, optionId, organizationId } = params;
+
+  await assertMatchBelongsToOrganization({ supabase, matchId, organizationId });
 
   const { error: resetError } = await supabase
     .from("team_options")
@@ -518,13 +547,16 @@ export async function saveMatchResult(params: {
   adminId: string;
   matchId: string;
   resultInput: MatchResultInput;
+  organizationId?: string;
 }) {
-  const { supabase, adminId, matchId, resultInput } = params;
+  const { supabase, adminId, matchId, resultInput, organizationId } = params;
   const { scoreA, scoreB, notes } = resultInput;
 
   if (scoreA < 0 || scoreB < 0) {
     throw new Error("El resultado no puede tener goles negativos.");
   }
+
+  await assertMatchBelongsToOrganization({ supabase, matchId, organizationId });
 
   const winnerTeam = deriveWinnerTeam(scoreA, scoreB);
 

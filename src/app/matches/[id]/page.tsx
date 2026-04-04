@@ -4,16 +4,23 @@ import { notFound } from "next/navigation";
 import { MatchStatusBadge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import { withOrgQuery } from "@/lib/org";
 import { getMatchDetails } from "@/lib/queries/public";
 import { formatDateTime } from "@/lib/utils";
 
-export default async function MatchDetailPage({ params }: { params: { id: string } }) {
-  const details = await getMatchDetails(params.id);
+export default async function MatchDetailPage({
+  params,
+  searchParams
+}: {
+  params: { id: string };
+  searchParams: { org?: string };
+}) {
+  const details = await getMatchDetails(params.id, searchParams.org);
   if (!details) notFound();
 
   return (
     <div className="space-y-4">
-      <Link className="text-sm font-semibold text-emerald-300 hover:underline" href="/matches">
+      <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery("/matches", searchParams.org)}>
         Volver al historial
       </Link>
       <Card>

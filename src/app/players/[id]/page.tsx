@@ -3,16 +3,23 @@ import { notFound } from "next/navigation";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import { withOrgQuery } from "@/lib/org";
 import { getPlayerDetails } from "@/lib/queries/public";
 import { formatDateTime, formatPercent } from "@/lib/utils";
 
-export default async function PlayerDetailPage({ params }: { params: { id: string } }) {
-  const details = await getPlayerDetails(params.id);
+export default async function PlayerDetailPage({
+  params,
+  searchParams
+}: {
+  params: { id: string };
+  searchParams: { org?: string };
+}) {
+  const details = await getPlayerDetails(params.id, searchParams.org);
   if (!details) notFound();
 
   return (
     <div className="space-y-4">
-      <Link className="text-sm font-semibold text-emerald-300 hover:underline" href="/players">
+      <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery("/players", searchParams.org)}>
         Volver a jugadores
       </Link>
 
