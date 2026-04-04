@@ -1,8 +1,30 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import { calculatePlayerStats, type MatchWithTeams } from "@/lib/domain/stats";
+import { normalizeEmail } from "@/lib/org";
 import type { Database } from "@/types/database";
 
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
+
+type PublicOrganization = {
+  id: string;
+  name: string;
+  slug: string;
+  is_public: boolean;
+  created_at: string;
+};
+
+function findOrganizationByKey(organizations: PublicOrganization[], organizationKey?: string | null) {
+  if (!organizationKey) return null;
+  const normalizedKey = organizationKey.trim().toLowerCase();
+  if (!normalizedKey) return null;
+
+  return (
+    organizations.find(
+      (organization) => organization.slug.toLowerCase() === normalizedKey || organization.id === organizationKey
+    ) ?? null
+  );
+}
 
 function indexBy<T extends { id: string }>(rows: T[]) {
   return new Map(rows.map((row) => [row.id, row]));
@@ -26,6 +48,73 @@ type MatchParticipantDisplay = {
 
 function sortParticipantsByRating(players: MatchParticipantDisplay[]) {
   return [...players].sort((a, b) => Number(b.current_rating) - Number(a.current_rating));
+}
+
+export async function getPublicOrganizations(): Promise<PublicOrganization[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id, name, slug, is_public, created_at")
+    .eq("is_public", true)
+    .order("name", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function getViewerAdminOrganizations(): Promise<PublicOrganization[]> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user?.id || !user.email) return [];
+
+  const normalizedEmail = normalizeEmail(user.email);
+  if (normalizedEmail === SUPER_ADMIN_EMAIL) {
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("id, name, slug, is_public, created_at")
+      .order("name", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  }
+
+  const { data, error } = await supabase
+    .from("organization_admins")
+    .select("organizations(id, name, slug, is_public, created_at)")
+    .eq("admin_id", user.id);
+
+  if (error) throw new Error(error.message);
+
+  const organizations = (data ?? [])
+    .map((row) => {
+      const relation = row.organizations;
+      if (Array.isArray(relation)) return relation[0] ?? null;
+      return relation ?? null;
+    })
+    .filter(
+      (value): value is PublicOrganization =>
+        Boolean(value && typeof value.id === "string" && typeof value.name === "string" && typeof value.slug === "string")
+    );
+
+  return organizations.sort((a, b) => a.name.localeCompare(b.name, "es"));
+}
+
+export async function resolvePublicOrganization(preferredOrganizationKey?: string | null) {
+  const organizations = await getPublicOrganizations();
+  const selectedOrganization = findOrganizationByKey(organizations, preferredOrganizationKey) ?? organizations[0] ?? null;
+
+  return {
+    organizations,
+    selectedOrganization
+  };
+}
+
+async function resolvePublicOrganizationId(organizationKey?: string | null) {
+  const organizations = await getPublicOrganizations();
+  return findOrganizationByKey(organizations, organizationKey)?.id ?? null;
 }
 
 async function fetchMatchTeams(matchIds: string[]) {
@@ -94,14 +183,28 @@ async function fetchMatchTeams(matchIds: string[]) {
     .filter((item): item is MatchWithTeams => item !== null);
 }
 
-export async function getHomeSummary() {
+export async function getHomeSummary(organizationId: string | null) {
+  if (!organizationId) {
+    return {
+      totalPlayers: 0,
+      totalFinishedMatches: 0,
+      upcomingMatches: [],
+      topPlayers: []
+    };
+  }
+
   const supabase = await createSupabaseServerClient();
 
   const [playersRes, upcomingRes, finishedRes] = await Promise.all([
-    supabase.from("players").select("id", { count: "exact", head: true }).eq("active", true),
+    supabase
+      .from("players")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("active", true),
     supabase
       .from("matches")
       .select("id, scheduled_at, modality, status")
+      .eq("organization_id", organizationId)
       .eq("status", "confirmed")
       .gt("scheduled_at", new Date().toISOString())
       .order("scheduled_at", { ascending: true })
@@ -109,6 +212,7 @@ export async function getHomeSummary() {
     supabase
       .from("matches")
       .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
       .eq("status", "finished")
   ]);
 
@@ -119,6 +223,7 @@ export async function getHomeSummary() {
   const { data: topPlayers, error: topPlayersError } = await supabase
     .from("players")
     .select("id, full_name, current_rating, initial_rank")
+    .eq("organization_id", organizationId)
     .eq("active", true)
     .order("current_rating", { ascending: false })
     .limit(5);
@@ -132,11 +237,14 @@ export async function getHomeSummary() {
   };
 }
 
-export async function getRankingPlayers() {
+export async function getRankingPlayers(organizationId: string | null) {
+  if (!organizationId) return [];
+
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("players")
     .select("id, full_name, current_rating, initial_rank")
+    .eq("organization_id", organizationId)
     .eq("active", true)
     .order("current_rating", { ascending: false })
     .order("initial_rank", { ascending: true });
@@ -144,11 +252,14 @@ export async function getRankingPlayers() {
   return data ?? [];
 }
 
-export async function getPlayersWithStats() {
+export async function getPlayersWithStats(organizationId: string | null) {
+  if (!organizationId) return [];
+
   const supabase = await createSupabaseServerClient();
   const { data: players, error: playersError } = await supabase
     .from("players")
     .select("*")
+    .eq("organization_id", organizationId)
     .eq("active", true)
     .order("current_rating", { ascending: false })
     .order("initial_rank", { ascending: true });
@@ -157,6 +268,7 @@ export async function getPlayersWithStats() {
   const { data: finishedMatches, error: matchesError } = await supabase
     .from("matches")
     .select("*")
+    .eq("organization_id", organizationId)
     .eq("status", "finished")
     .order("scheduled_at", { ascending: true });
   if (matchesError) throw new Error(matchesError.message);
@@ -177,13 +289,21 @@ export async function getPlayersWithStats() {
   });
 }
 
-export async function getPlayerDetails(playerId: string) {
+export async function getPlayerDetails(playerId: string, organizationKey?: string | null) {
   const supabase = await createSupabaseServerClient();
-  const { data: player, error: playerError } = await supabase.from("players").select("*").eq("id", playerId).maybeSingle();
+  let query = supabase.from("players").select("*").eq("id", playerId);
+
+  if (organizationKey) {
+    const organizationId = await resolvePublicOrganizationId(organizationKey);
+    if (!organizationId) return null;
+    query = query.eq("organization_id", organizationId);
+  }
+
+  const { data: player, error: playerError } = await query.maybeSingle();
   if (playerError) throw new Error(playerError.message);
   if (!player) return null;
 
-  const allStats = await getPlayersWithStats();
+  const allStats = await getPlayersWithStats(player.organization_id);
   const playerStats = allStats.find((item) => item.playerId === playerId);
 
   const { data: ratingHistory, error: ratingHistoryError } = await supabase
@@ -213,11 +333,14 @@ function normalizeMatchCard(match: MatchRow, result?: Database["public"]["Tables
   };
 }
 
-export async function getMatchHistoryCards() {
+export async function getMatchHistoryCards(organizationId: string | null) {
+  if (!organizationId) return [];
+
   const supabase = await createSupabaseServerClient();
   const { data: finishedMatches, error } = await supabase
     .from("matches")
     .select("*")
+    .eq("organization_id", organizationId)
     .in("status", ["finished", "cancelled"])
     .order("scheduled_at", { ascending: false });
   if (error) throw new Error(error.message);
@@ -227,11 +350,14 @@ export async function getMatchHistoryCards() {
   return withTeams.map((row) => normalizeMatchCard(row.match, row.result));
 }
 
-export async function getUpcomingConfirmedMatches() {
+export async function getUpcomingConfirmedMatches(organizationId: string | null) {
+  if (!organizationId) return [];
+
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("matches")
     .select("*")
+    .eq("organization_id", organizationId)
     .eq("status", "confirmed")
     .order("scheduled_at", { ascending: true });
   if (error) throw new Error(error.message);
@@ -242,7 +368,11 @@ export async function getUpcomingConfirmedMatches() {
   const optionIds = matchesWithTeams.map((match) => match.match.confirmed_option_id).filter(notNull);
 
   const { data: players, error: playersError } = playerIds.length
-    ? await supabase.from("players").select("id, full_name, current_rating").in("id", playerIds)
+    ? await supabase
+        .from("players")
+        .select("id, full_name, current_rating")
+        .eq("organization_id", organizationId)
+        .in("id", playerIds)
     : { data: [], error: null };
   if (playersError) throw new Error(playersError.message);
 
@@ -302,9 +432,17 @@ export async function getUpcomingConfirmedMatches() {
   }));
 }
 
-export async function getMatchDetails(matchId: string) {
+export async function getMatchDetails(matchId: string, organizationKey?: string | null) {
   const supabase = await createSupabaseServerClient();
-  const { data: match, error: matchError } = await supabase.from("matches").select("*").eq("id", matchId).maybeSingle();
+  let query = supabase.from("matches").select("*").eq("id", matchId);
+
+  if (organizationKey) {
+    const organizationId = await resolvePublicOrganizationId(organizationKey);
+    if (!organizationId) return null;
+    query = query.eq("organization_id", organizationId);
+  }
+
+  const { data: match, error: matchError } = await query.maybeSingle();
   if (matchError) throw new Error(matchError.message);
   if (!match) return null;
 
@@ -321,7 +459,11 @@ export async function getMatchDetails(matchId: string) {
 
   const playerIds = [...details.teamAPlayerIds, ...details.teamBPlayerIds];
   const { data: players, error: playersError } = playerIds.length
-    ? await supabase.from("players").select("id, full_name, current_rating").in("id", playerIds)
+    ? await supabase
+        .from("players")
+        .select("id, full_name, current_rating")
+        .eq("organization_id", match.organization_id)
+        .in("id", playerIds)
     : { data: [], error: null };
   if (playersError) throw new Error(playersError.message);
 

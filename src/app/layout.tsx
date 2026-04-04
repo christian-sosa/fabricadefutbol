@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import "@/app/globals.css";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -12,7 +13,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es">
       <body>
-        <SiteHeader />
+        <Suspense fallback={<div className="sticky top-0 z-30 h-[57px] border-b border-slate-800 bg-slate-950/85" />}>
+          <SiteHeader />
+        </Suspense>
         <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8">{children}</main>
       </body>
     </html>

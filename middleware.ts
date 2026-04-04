@@ -23,9 +23,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (pathname.startsWith("/admin/login")) {
-    if (!user) return response;
-    const { data: admin } = await supabase.from("admins").select("id").eq("id", user.id).maybeSingle();
-    if (admin) {
+    if (user) {
       const url = request.nextUrl.clone();
       url.pathname = "/admin";
       return NextResponse.redirect(url);
@@ -34,11 +32,6 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!user) {
-    return redirectToLogin(request);
-  }
-
-  const { data: admin, error: adminError } = await supabase.from("admins").select("id").eq("id", user.id).maybeSingle();
-  if (adminError || !admin) {
     return redirectToLogin(request);
   }
 

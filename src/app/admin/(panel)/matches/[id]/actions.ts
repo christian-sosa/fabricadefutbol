@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { assertAdminAction } from "@/lib/auth/admin";
+import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/lib/auth/admin";
 import { confirmTeamOption, regenerateDraftTeamOptions, saveMatchResult } from "@/lib/domain/match-workflow";
 import { isNextRedirectError } from "@/lib/next-redirect";
+import { withOrgQuery } from "@/lib/org";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const confirmSchema = z.object({
@@ -25,9 +26,11 @@ const updateMatchSchema = z.object({
   status: z.enum(["draft", "confirmed", "finished", "cancelled"])
 });
 
-function buildPath(matchId: string, error?: string) {
-  if (!error) return `/admin/matches/${matchId}`;
-  return `/admin/matches/${matchId}?error=${encodeURIComponent(error)}`;
+function buildPath(matchId: string, organizationKey: string, error?: string) {
+  const basePath = withOrgQuery(`/admin/matches/${matchId}`, organizationKey);
+  if (!error) return basePath;
+  const separator = basePath.includes("?") ? "&" : "?";
+  return `${basePath}${separator}error=${encodeURIComponent(error)}`;
 }
 
 function revalidateMatchPaths(matchId: string) {
@@ -40,60 +43,65 @@ function revalidateMatchPaths(matchId: string) {
   revalidatePath("/ranking");
 }
 
-export async function regenerateOptionsAction(matchId: string) {
+export async function regenerateOptionsAction(matchId: string, organizationId: string) {
+  const organizationQueryKey = await getOrganizationQueryKeyById(organizationId);
   try {
-    const admin = await assertAdminAction();
+    const admin = await assertOrganizationAdminAction(organizationId);
     const supabase = await createSupabaseServerClient();
     await regenerateDraftTeamOptions({
       supabase,
       adminId: admin.userId,
-      matchId
+      matchId,
+      organizationId
     });
     revalidateMatchPaths(matchId);
-    redirect(buildPath(matchId));
+    redirect(buildPath(matchId, organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo regenerar equipos.";
-    redirect(buildPath(matchId, message));
+    redirect(buildPath(matchId, organizationQueryKey, message));
   }
 }
 
-export async function confirmOptionAction(matchId: string, formData: FormData) {
+export async function confirmOptionAction(matchId: string, organizationId: string, formData: FormData) {
+  const organizationQueryKey = await getOrganizationQueryKeyById(organizationId);
   try {
-    await assertAdminAction();
+    await assertOrganizationAdminAction(organizationId);
     const parsed = confirmSchema.safeParse({
       optionId: formData.get("optionId")
     });
     if (!parsed.success) {
-      redirect(buildPath(matchId, parsed.error.issues[0]?.message ?? "Opción inválida."));
+      redirect(buildPath(matchId, organizationQueryKey, parsed.error.issues[0]?.message ?? "Opcion invalida."));
     }
 
     const supabase = await createSupabaseServerClient();
     await confirmTeamOption({
       supabase,
       matchId,
-      optionId: parsed.data.optionId
+      optionId: parsed.data.optionId,
+      organizationId
     });
 
     revalidateMatchPaths(matchId);
-    redirect(buildPath(matchId));
+    redirect(buildPath(matchId, organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    const message = error instanceof Error ? error.message : "No se pudo confirmar la opción.";
-    redirect(buildPath(matchId, message));
+    const message = error instanceof Error ? error.message : "No se pudo confirmar la opcion.";
+    redirect(buildPath(matchId, organizationQueryKey, message));
   }
 }
 
-export async function saveResultAction(matchId: string, formData: FormData) {
+export async function saveResultAction(matchId: string, organizationId: string, formData: FormData) {
+  const organizationQueryKey = await getOrganizationQueryKeyById(organizationId);
   try {
-    const admin = await assertAdminAction();
+    const admin = await assertOrganizationAdminAction(organizationId);
     const parsed = resultSchema.safeParse({
       scoreA: formData.get("scoreA"),
       scoreB: formData.get("scoreB"),
       notes: formData.get("notes")
     });
     if (!parsed.success) {
-      redirect(buildPath(matchId, parsed.error.issues[0]?.message ?? "Resultado inválido."));
+      redirect(buildPath(matchId, organizationQueryKey, parsed.error.issues[0]?.message ?? "Resultado invalido."));
     }
 
     const supabase = await createSupabaseServerClient();
@@ -101,6 +109,7 @@ export async function saveResultAction(matchId: string, formData: FormData) {
       supabase,
       adminId: admin.userId,
       matchId,
+      organizationId,
       resultInput: {
         scoreA: parsed.data.scoreA,
         scoreB: parsed.data.scoreB,
@@ -109,17 +118,18 @@ export async function saveResultAction(matchId: string, formData: FormData) {
     });
 
     revalidateMatchPaths(matchId);
-    redirect(buildPath(matchId));
+    redirect(buildPath(matchId, organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo guardar resultado.";
-    redirect(buildPath(matchId, message));
+    redirect(buildPath(matchId, organizationQueryKey, message));
   }
 }
 
-export async function updateMatchAction(matchId: string, formData: FormData) {
+export async function updateMatchAction(matchId: string, organizationId: string, formData: FormData) {
+  const organizationQueryKey = await getOrganizationQueryKeyById(organizationId);
   try {
-    await assertAdminAction();
+    await assertOrganizationAdminAction(organizationId);
     const parsed = updateMatchSchema.safeParse({
       scheduledAt: formData.get("scheduledAt"),
       location: formData.get("location"),
@@ -127,7 +137,7 @@ export async function updateMatchAction(matchId: string, formData: FormData) {
     });
 
     if (!parsed.success) {
-      redirect(buildPath(matchId, parsed.error.issues[0]?.message ?? "Datos inválidos."));
+      redirect(buildPath(matchId, organizationQueryKey, parsed.error.issues[0]?.message ?? "Datos invalidos."));
     }
 
     const supabase = await createSupabaseServerClient();
@@ -150,43 +160,49 @@ export async function updateMatchAction(matchId: string, formData: FormData) {
       payload.finished_at = null;
     }
 
-    const { error } = await supabase.from("matches").update(payload).eq("id", matchId);
+    const { error } = await supabase
+      .from("matches")
+      .update(payload)
+      .eq("id", matchId)
+      .eq("organization_id", organizationId);
     if (error) {
-      redirect(buildPath(matchId, error.message));
+      redirect(buildPath(matchId, organizationQueryKey, error.message));
     }
 
     revalidateMatchPaths(matchId);
-    redirect(buildPath(matchId));
+    redirect(buildPath(matchId, organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo actualizar partido.";
-    redirect(buildPath(matchId, message));
+    redirect(buildPath(matchId, organizationQueryKey, message));
   }
 }
 
-export async function deleteMatchAction(matchId: string) {
+export async function deleteMatchAction(matchId: string, organizationId: string) {
+  const organizationQueryKey = await getOrganizationQueryKeyById(organizationId);
   try {
-    await assertAdminAction();
+    await assertOrganizationAdminAction(organizationId);
 
     const supabase = await createSupabaseServerClient();
     const { data: match, error: matchError } = await supabase
       .from("matches")
       .select("id, status")
       .eq("id", matchId)
+      .eq("organization_id", organizationId)
       .maybeSingle();
 
     if (matchError) {
-      redirect(buildPath(matchId, matchError.message));
+      redirect(buildPath(matchId, organizationQueryKey, matchError.message));
     }
 
     if (!match) {
-      redirect(buildPath(matchId, "No se encontro el partido."));
+      redirect(buildPath(matchId, organizationQueryKey, "No se encontro el partido."));
     }
 
     const isDraft = match.status === "draft";
     const isConfirmed = match.status === "confirmed";
     if (!isDraft && !isConfirmed) {
-      redirect(buildPath(matchId, "Solo puedes borrar partidos en borrador o confirmados sin jugar."));
+      redirect(buildPath(matchId, organizationQueryKey, "Solo puedes borrar partidos en borrador o confirmados sin jugar."));
     }
 
     if (isConfirmed) {
@@ -197,17 +213,21 @@ export async function deleteMatchAction(matchId: string) {
         .maybeSingle();
 
       if (resultError) {
-        redirect(buildPath(matchId, resultError.message));
+        redirect(buildPath(matchId, organizationQueryKey, resultError.message));
       }
 
       if (result) {
-        redirect(buildPath(matchId, "No puedes borrar un partido confirmado que ya tiene resultado."));
+        redirect(buildPath(matchId, organizationQueryKey, "No puedes borrar un partido confirmado que ya tiene resultado."));
       }
     }
 
-    const { error: deleteError } = await supabase.from("matches").delete().eq("id", matchId);
+    const { error: deleteError } = await supabase
+      .from("matches")
+      .delete()
+      .eq("id", matchId)
+      .eq("organization_id", organizationId);
     if (deleteError) {
-      redirect(buildPath(matchId, deleteError.message));
+      redirect(buildPath(matchId, organizationQueryKey, deleteError.message));
     }
 
     revalidatePath("/admin");
@@ -215,10 +235,10 @@ export async function deleteMatchAction(matchId: string) {
     revalidatePath("/upcoming");
     revalidatePath("/players");
     revalidatePath("/ranking");
-    redirect("/admin");
+    redirect(withOrgQuery("/admin", organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo borrar partido.";
-    redirect(buildPath(matchId, message));
+    redirect(buildPath(matchId, organizationQueryKey, message));
   }
 }

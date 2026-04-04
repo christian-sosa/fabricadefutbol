@@ -62,7 +62,7 @@ export type Database = {
           finished_at: string | null;
           id: string;
           location: string | null;
-          modality: "5v5" | "6v6" | "7v7";
+          modality: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           scheduled_at: string;
           status: "draft" | "confirmed" | "finished" | "cancelled";
           updated_at: string;
@@ -74,7 +74,7 @@ export type Database = {
           finished_at?: string | null;
           id?: string;
           location?: string | null;
-          modality: "5v5" | "6v6" | "7v7";
+          modality: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           scheduled_at: string;
           status?: "draft" | "confirmed" | "finished" | "cancelled";
           updated_at?: string;
@@ -86,7 +86,7 @@ export type Database = {
           finished_at?: string | null;
           id?: string;
           location?: string | null;
-          modality?: "5v5" | "6v6" | "7v7";
+          modality?: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           scheduled_at?: string;
           status?: "draft" | "confirmed" | "finished" | "cancelled";
           updated_at?: string;
@@ -326,7 +326,7 @@ export type Database = {
       public_match_cards: {
         Row: {
           id: string | null;
-          modality: "5v5" | "6v6" | "7v7" | null;
+          modality: "5v5" | "6v6" | "7v7" | "9v9" | "11v11" | null;
           scheduled_at: string | null;
           status: "draft" | "confirmed" | "finished" | "cancelled" | null;
           team_a_players: string[] | null;
@@ -337,7 +337,7 @@ export type Database = {
         };
         Insert: {
           id?: string | null;
-          modality?: "5v5" | "6v6" | "7v7" | null;
+          modality?: "5v5" | "6v6" | "7v7" | "9v9" | "11v11" | null;
           scheduled_at?: string | null;
           status?: "draft" | "confirmed" | "finished" | "cancelled" | null;
           team_a_players?: string[] | null;
@@ -348,7 +348,7 @@ export type Database = {
         };
         Update: {
           id?: string | null;
-          modality?: "5v5" | "6v6" | "7v7" | null;
+          modality?: "5v5" | "6v6" | "7v7" | "9v9" | "11v11" | null;
           scheduled_at?: string | null;
           status?: "draft" | "confirmed" | "finished" | "cancelled" | null;
           team_a_players?: string[] | null;
@@ -367,7 +367,7 @@ export type Database = {
       };
     };
     Enums: {
-      match_modality: "5v5" | "6v6" | "7v7";
+      match_modality: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
       match_status: "draft" | "confirmed" | "finished" | "cancelled";
       winner_team: "A" | "B" | "DRAW";
       team_side: "A" | "B";

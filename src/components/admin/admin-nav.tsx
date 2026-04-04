@@ -2,14 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { ADMIN_NAV_ITEMS } from "@/lib/constants";
+import { withOrgQuery } from "@/lib/org";
 import { cn } from "@/lib/utils";
 
 export function AdminNav() {
   const pathname = usePathname();
   const safePathname = pathname ?? "";
+  const searchParams = useSearchParams();
+  const organizationId = searchParams.get("org");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -20,6 +23,7 @@ export function AdminNav() {
     <nav className="flex flex-wrap items-center gap-2">
       {ADMIN_NAV_ITEMS.map((item) => {
         const active = mounted && (safePathname === item.href || safePathname.startsWith(`${item.href}/`));
+        const href = withOrgQuery(item.href, organizationId);
         return (
           <Link
             className={cn(
@@ -28,7 +32,7 @@ export function AdminNav() {
                 ? "border-emerald-400/50 bg-accent text-white shadow-[0_10px_20px_-14px_rgba(16,185,129,1)]"
                 : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
             )}
-            href={item.href}
+            href={href}
             key={item.href}
           >
             {item.label}

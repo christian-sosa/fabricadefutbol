@@ -1,19 +1,11 @@
-type PublicKey = "NEXT_PUBLIC_SUPABASE_URL";
-
-function getEnvValue(key: string) {
-  const value = process.env[key];
+export function getSupabaseUrl() {
+  const value = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   if (!value) {
-    throw new Error(`Falta la variable de entorno ${key}`);
+    throw new Error(
+      "Falta la URL de Supabase. Defini NEXT_PUBLIC_SUPABASE_URL (recomendado) o SUPABASE_URL."
+    );
   }
   return value;
-}
-
-export function getPublicEnv(key: PublicKey) {
-  return getEnvValue(key);
-}
-
-export function getSupabaseUrl() {
-  return getPublicEnv("NEXT_PUBLIC_SUPABASE_URL");
 }
 
 export function getSupabaseAnonKey() {
@@ -23,7 +15,7 @@ export function getSupabaseAnonKey() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     (() => {
       throw new Error(
-        "Falta clave pública de Supabase. Definí NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY o NEXT_PUBLIC_SUPABASE_ANON_KEY."
+        "Falta clave publica de Supabase. Defini NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY o NEXT_PUBLIC_SUPABASE_ANON_KEY."
       );
     })()
   );

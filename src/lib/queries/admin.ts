@@ -9,20 +9,37 @@ function isGuestSchemaMissing(error: { message: string } | null) {
   return /match_guests|team_option_guests/i.test(error.message);
 }
 
-export async function getAdminDashboardData() {
+export async function getAdminDashboardData(organizationId: string) {
   const supabase = await createSupabaseServerClient();
 
-  const [{ count: draftsCount, error: draftsError }, { count: confirmedCount, error: confirmedError }, { count: finishedCount, error: finishedError }, { data: latestMatches, error: latestMatchesError }] =
-    await Promise.all([
-      supabase.from("matches").select("id", { count: "exact", head: true }).eq("status", "draft"),
-      supabase.from("matches").select("id", { count: "exact", head: true }).eq("status", "confirmed"),
-      supabase.from("matches").select("id", { count: "exact", head: true }).eq("status", "finished"),
-      supabase
-        .from("matches")
-        .select("id, scheduled_at, modality, status")
-        .order("scheduled_at", { ascending: false })
-        .limit(8)
-    ]);
+  const [
+    { count: draftsCount, error: draftsError },
+    { count: confirmedCount, error: confirmedError },
+    { count: finishedCount, error: finishedError },
+    { data: latestMatches, error: latestMatchesError }
+  ] = await Promise.all([
+    supabase
+      .from("matches")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("status", "draft"),
+    supabase
+      .from("matches")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("status", "confirmed"),
+    supabase
+      .from("matches")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("status", "finished"),
+    supabase
+      .from("matches")
+      .select("id, scheduled_at, modality, status")
+      .eq("organization_id", organizationId)
+      .order("scheduled_at", { ascending: false })
+      .limit(8)
+  ]);
 
   if (draftsError) throw new Error(draftsError.message);
   if (confirmedError) throw new Error(confirmedError.message);
@@ -37,31 +54,83 @@ export async function getAdminDashboardData() {
   };
 }
 
-export async function getAdminPlayers() {
+export async function getOrganizationAdminData(organizationId: string) {
+  const supabase = await createSupabaseServerClient();
+
+  const [{ data: adminsData, error: adminsError }, { data: invitesData, error: invitesError }] = await Promise.all([
+    supabase
+      .from("organization_admins")
+      .select("id, admin_id, created_at, admins!organization_admins_admin_id_fkey(id, display_name)")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("organization_invites")
+      .select("id, email, invite_token, status, created_at")
+      .eq("organization_id", organizationId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+  ]);
+
+  if (adminsError) throw new Error(adminsError.message);
+  if (invitesError) throw new Error(invitesError.message);
+
+  const admins = (adminsData ?? []).map((row) => {
+    const relation = row.admins;
+    const adminRow = Array.isArray(relation) ? relation[0] : relation;
+
+    return {
+      id: row.admin_id,
+      displayName: adminRow?.display_name ?? "Admin",
+      createdAt: row.created_at
+    };
+  });
+
+  const pendingInvites = (invitesData ?? []).map((row) => ({
+    id: row.id,
+    email: row.email,
+    inviteToken: row.invite_token,
+    status: row.status,
+    createdAt: row.created_at
+  }));
+
+  return {
+    admins,
+    pendingInvites
+  };
+}
+
+export async function getAdminPlayers(organizationId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("players")
     .select("*")
+    .eq("organization_id", organizationId)
     .order("initial_rank", { ascending: true });
   if (error) throw new Error(error.message);
   return data ?? [];
 }
 
-export async function getSelectablePlayers() {
+export async function getSelectablePlayers(organizationId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("players")
     .select("id, full_name, current_rating, initial_rank")
+    .eq("organization_id", organizationId)
     .eq("active", true)
     .order("initial_rank", { ascending: true });
   if (error) throw new Error(error.message);
   return data ?? [];
 }
 
-export async function getAdminMatchDetails(matchId: string) {
+export async function getAdminMatchDetails(matchId: string, organizationId: string) {
   const supabase = await createSupabaseServerClient();
 
-  const { data: match, error: matchError } = await supabase.from("matches").select("*").eq("id", matchId).maybeSingle();
+  const { data: match, error: matchError } = await supabase
+    .from("matches")
+    .select("*")
+    .eq("id", matchId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
   if (matchError) throw new Error(matchError.message);
   if (!match) return null;
 
@@ -76,7 +145,11 @@ export async function getAdminMatchDetails(matchId: string) {
 
   const playerIds = (matchPlayers ?? []).map((row) => row.player_id);
   const { data: players, error: playersError } = playerIds.length
-    ? await supabase.from("players").select("id, full_name, current_rating").in("id", playerIds)
+    ? await supabase
+        .from("players")
+        .select("id, full_name, current_rating")
+        .eq("organization_id", organizationId)
+        .in("id", playerIds)
     : { data: [], error: null };
   if (playersError) throw new Error(playersError.message);
   const playersById = new Map((players ?? []).map((player) => [player.id, player]));

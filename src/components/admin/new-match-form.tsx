@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
+import type { MatchModality } from "@/types/domain";
 
 type SelectablePlayer = {
   id: string;
@@ -21,20 +22,24 @@ type GuestRow = {
   rating: string;
 };
 
-const EXPECTED_PLAYERS: Record<"5v5" | "6v6" | "7v7", number> = {
+const EXPECTED_PLAYERS: Record<MatchModality, number> = {
   "5v5": 10,
   "6v6": 12,
-  "7v7": 14
+  "7v7": 14,
+  "9v9": 18,
+  "11v11": 22
 };
 
 export function NewMatchForm({
+  organizationId,
   players,
   error
 }: {
+  organizationId: string;
   players: SelectablePlayer[];
   error?: string;
 }) {
-  const [modality, setModality] = useState<"5v5" | "6v6" | "7v7">("6v6");
+  const [modality, setModality] = useState<MatchModality>("6v6");
   const [selectedPlayers, setSelectedPlayers] = useState<Record<string, boolean>>({});
   const [guestRows, setGuestRows] = useState<GuestRow[]>([]);
 
@@ -73,6 +78,7 @@ export function NewMatchForm({
 
   return (
     <form action={createMatchAction} className="mt-4 space-y-4">
+      <input name="organizationId" type="hidden" value={organizationId} />
       <div className="grid gap-3 md:grid-cols-3">
         <div>
           <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="scheduledAt">
@@ -84,10 +90,12 @@ export function NewMatchForm({
           <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="modality">
             Modalidad
           </label>
-          <Select id="modality" name="modality" onChange={(event) => setModality(event.target.value as "5v5" | "6v6" | "7v7")} value={modality}>
+          <Select id="modality" name="modality" onChange={(event) => setModality(event.target.value as MatchModality)} value={modality}>
             <option value="5v5">5 vs 5 (10 jugadores)</option>
             <option value="6v6">6 vs 6 (12 jugadores)</option>
             <option value="7v7">7 vs 7 (14 jugadores)</option>
+            <option value="9v9">9 vs 9 (18 jugadores)</option>
+            <option value="11v11">11 vs 11 (22 jugadores)</option>
           </Select>
         </div>
         <div>

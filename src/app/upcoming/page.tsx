@@ -1,16 +1,40 @@
 import Link from "next/link";
 
+import { AdPlaceholder } from "@/components/layout/ad-placeholder";
+import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
-import { getUpcomingConfirmedMatches } from "@/lib/queries/public";
+import { withOrgQuery } from "@/lib/org";
+import { getUpcomingConfirmedMatches, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
 import { formatDateTime } from "@/lib/utils";
 
-export default async function UpcomingPage() {
-  const upcoming = await getUpcomingConfirmedMatches();
+export default async function UpcomingPage({
+  searchParams
+}: {
+  searchParams: { org?: string };
+}) {
+  const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
+    resolvePublicOrganization(searchParams.org),
+    getViewerAdminOrganizations()
+  ]);
+  const upcoming = await getUpcomingConfirmedMatches(selectedOrganization?.id ?? null);
 
   return (
     <div className="space-y-4">
-      <h1 className="text-3xl font-black text-slate-100">Proximos Partidos Confirmados</h1>
+      <h1 className="text-3xl font-black text-slate-100">
+        Proximos Partidos Confirmados {selectedOrganization ? `- ${selectedOrganization.name}` : ""}
+      </h1>
+
+      <OrganizationSwitcher
+        basePath="/upcoming"
+        currentOrganizationSlug={selectedOrganization?.slug}
+        label="Elegir organizacion"
+        organizations={organizations}
+        quickOrganizations={viewerAdminOrganizations}
+      />
+
+      <AdPlaceholder slot="upcoming-top" />
+
       {upcoming.length ? (
         <div className="space-y-4">
           {upcoming.map((item) => (
@@ -63,7 +87,10 @@ export default async function UpcomingPage() {
                   </ul>
                 </div>
               </div>
-              <Link className="mt-4 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href={`/matches/${item.match.id}`}>
+              <Link
+                className="mt-4 inline-flex text-sm font-semibold text-emerald-300 hover:underline"
+                href={withOrgQuery(`/matches/${item.match.id}`, selectedOrganization?.slug)}
+              >
                 Ver detalle completo
               </Link>
             </Card>

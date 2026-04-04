@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
@@ -7,6 +8,7 @@ import {
   saveResultAction,
   updateMatchAction
 } from "@/app/admin/(panel)/matches/[id]/actions";
+import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { TeamOptionCard } from "@/components/matches/team-option-card";
 import { MatchStatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,8 @@ import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { requireAdminOrganization } from "@/lib/auth/admin";
+import { withOrgQuery } from "@/lib/org";
 import { getAdminMatchDetails } from "@/lib/queries/admin";
 import { formatDateTime } from "@/lib/utils";
 
@@ -29,16 +33,17 @@ export default async function AdminMatchDetailPage({
   searchParams
 }: {
   params: { id: string };
-  searchParams: { error?: string };
+  searchParams: { org?: string; error?: string };
 }) {
-  const details = await getAdminMatchDetails(params.id);
+  const { organizations, selectedOrganization } = await requireAdminOrganization(searchParams.org);
+  const details = await getAdminMatchDetails(params.id, selectedOrganization.id);
   if (!details) notFound();
 
-  const confirmAction = confirmOptionAction.bind(null, params.id);
-  const regenerateAction = regenerateOptionsAction.bind(null, params.id);
-  const resultAction = saveResultAction.bind(null, params.id);
-  const matchUpdateAction = updateMatchAction.bind(null, params.id);
-  const deleteAction = deleteMatchAction.bind(null, params.id);
+  const confirmAction = confirmOptionAction.bind(null, params.id, selectedOrganization.id);
+  const regenerateAction = regenerateOptionsAction.bind(null, params.id, selectedOrganization.id);
+  const resultAction = saveResultAction.bind(null, params.id, selectedOrganization.id);
+  const matchUpdateAction = updateMatchAction.bind(null, params.id, selectedOrganization.id);
+  const deleteAction = deleteMatchAction.bind(null, params.id, selectedOrganization.id);
   const canDeleteMatch =
     details.match.status === "draft" ||
     (details.match.status === "confirmed" && !details.result);
@@ -46,6 +51,18 @@ export default async function AdminMatchDetailPage({
 
   return (
     <div className="space-y-4">
+      <Card>
+        <CardTitle>Organizacion activa: {selectedOrganization.name}</CardTitle>
+        <div className="mt-3">
+          <OrganizationSwitcher
+            basePath={`/admin/matches/${params.id}`}
+            currentOrganizationSlug={selectedOrganization.slug}
+            label="Cambiar organizacion"
+            organizations={organizations}
+          />
+        </div>
+      </Card>
+
       <Card>
         <CardTitle>Partido {formatDateTime(details.match.scheduled_at)}</CardTitle>
         <CardDescription className="mt-1">
@@ -176,6 +193,10 @@ export default async function AdminMatchDetailPage({
           <CardDescription>Confirma una opcion de equipos para habilitar la carga de resultado cuando se juegue.</CardDescription>
         </Card>
       )}
+
+      <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery("/admin", selectedOrganization.slug)}>
+        Volver al panel de organizacion
+      </Link>
     </div>
   );
 }
