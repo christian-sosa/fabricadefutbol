@@ -17,7 +17,29 @@ const confirmSchema = z.object({
 const resultSchema = z.object({
   scoreA: z.coerce.number().int().nonnegative(),
   scoreB: z.coerce.number().int().nonnegative(),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  lineupPayload: z.string().optional()
+});
+
+const lineupSchema = z.object({
+  assignments: z
+    .array(
+      z.object({
+        participantId: z.string().min(1),
+        team: z.enum(["A", "B", "OUT"])
+      })
+    )
+    .min(1),
+  newGuests: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1),
+        rating: z.coerce.number().positive(),
+        team: z.enum(["A", "B"])
+      })
+    )
+    .optional(),
+  handicapTeam: z.union([z.enum(["A", "B"]), z.null()]).optional()
 });
 
 const updateMatchSchema = z.object({
@@ -98,10 +120,33 @@ export async function saveResultAction(matchId: string, organizationId: string, 
     const parsed = resultSchema.safeParse({
       scoreA: formData.get("scoreA"),
       scoreB: formData.get("scoreB"),
-      notes: formData.get("notes")
+      notes: formData.get("notes"),
+      lineupPayload: formData.get("lineupPayload")
     });
     if (!parsed.success) {
       redirect(buildPath(matchId, organizationQueryKey, parsed.error.issues[0]?.message ?? "Resultado invalido."));
+    }
+
+    let parsedLineup: z.infer<typeof lineupSchema> | undefined;
+    if (parsed.data.lineupPayload) {
+      let rawPayload: unknown;
+      try {
+        rawPayload = JSON.parse(parsed.data.lineupPayload);
+      } catch {
+        redirect(buildPath(matchId, organizationQueryKey, "La formacion final enviada es invalida."));
+      }
+
+      const parsedPayload = lineupSchema.safeParse(rawPayload);
+      if (!parsedPayload.success) {
+        redirect(
+          buildPath(
+            matchId,
+            organizationQueryKey,
+            parsedPayload.error.issues[0]?.message ?? "La formacion final enviada es invalida."
+          )
+        );
+      }
+      parsedLineup = parsedPayload.data;
     }
 
     const supabase = await createSupabaseServerClient();
@@ -113,7 +158,8 @@ export async function saveResultAction(matchId: string, organizationId: string, 
       resultInput: {
         scoreA: parsed.data.scoreA,
         scoreB: parsed.data.scoreB,
-        notes: parsed.data.notes
+        notes: parsed.data.notes,
+        lineup: parsedLineup
       }
     });
 

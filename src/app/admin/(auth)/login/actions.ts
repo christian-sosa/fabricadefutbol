@@ -94,26 +94,32 @@ export async function registerAdminAction(_: RegisterState, formData: FormData):
       }
     });
 
-    if (createUserError) {
+    const isInvalidAdminKey = String(createUserError?.message ?? "")
+      .toLowerCase()
+      .includes("invalid api key");
+
+    if (createUserError && !isInvalidAdminKey) {
       return {
         error: createUserError.message,
         success: null
       };
     }
 
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: parsed.data.email,
-      password: parsed.data.password
-    });
+    if (!isInvalidAdminKey) {
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: parsed.data.email,
+        password: parsed.data.password
+      });
 
-    if (signInError || !signInData.user) {
-      return {
-        error: signInError?.message ?? "No se pudo iniciar sesion luego del registro.",
-        success: null
-      };
+      if (signInError || !signInData.user) {
+        return {
+          error: signInError?.message ?? "No se pudo iniciar sesion luego del registro.",
+          success: null
+        };
+      }
+
+      redirect("/admin");
     }
-
-    redirect("/admin");
   }
 
   const { data, error } = await supabase.auth.signUp({

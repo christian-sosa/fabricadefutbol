@@ -3,6 +3,7 @@ import {
   createPlayerAction,
   uploadPlayerPhotoAction
 } from "@/app/admin/(panel)/players/actions";
+import { PhotoUploadInput } from "@/components/admin/photo-upload-input";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -57,7 +58,7 @@ export default async function AdminPlayersPage({
 
       <Card>
         <CardTitle>Subir foto de jugador</CardTitle>
-        <CardDescription>La imagen se guarda en el servidor y reemplaza la foto anterior del jugador.</CardDescription>
+        <CardDescription>La imagen se optimiza y se guarda en Supabase Storage, reemplazando la foto anterior.</CardDescription>
         <form action={uploadPlayerPhotoAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
           <input name="organizationId" type="hidden" value={selectedOrganization.id} />
           <Select name="playerId" required>
@@ -68,7 +69,7 @@ export default async function AdminPlayersPage({
               </option>
             ))}
           </Select>
-          <Input accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" name="photo" required type="file" />
+          <PhotoUploadInput />
           <Button type="submit" variant="secondary">
             Subir foto
           </Button>

@@ -2,7 +2,7 @@ import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { calculateMatchRatingAdjustments, deriveWinnerTeam } from "@/lib/domain/rating";
 import { generateBalancedTeamOptions } from "@/lib/domain/team-generator";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { MatchModality, MatchResultInput } from "@/types/domain";
+import type { MatchModality, MatchResultInput, ResultAssignmentTeam, TeamSide } from "@/types/domain";
 
 type DbClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
@@ -23,6 +23,24 @@ type ConfirmedParticipant = {
   entityId: string;
   full_name: string;
   current_rating: number;
+};
+
+type LineupAssignmentInput = {
+  participantId: string;
+  team: ResultAssignmentTeam;
+};
+
+type NewGuestLineupInput = {
+  name: string;
+  rating: number;
+  team: TeamSide;
+};
+
+type ResolvedMatchLineup = {
+  optionId: string;
+  teamA: ConfirmedParticipant[];
+  teamB: ConfirmedParticipant[];
+  handicapTeam: TeamSide | null;
 };
 
 type CreateDraftInput = {
@@ -542,6 +560,216 @@ async function loadConfirmedTeams(
   return { teamA, teamB, optionId };
 }
 
+function normalizeLineupAssignments(
+  rawAssignments: LineupAssignmentInput[] | undefined,
+  participantsById: Map<string, ConfirmedParticipant>
+) {
+  const assignmentMap = new Map<string, ResultAssignmentTeam>();
+
+  for (const assignment of rawAssignments ?? []) {
+    if (!participantsById.has(assignment.participantId)) {
+      throw new Error("La formacion final incluye un participante inexistente.");
+    }
+    assignmentMap.set(assignment.participantId, assignment.team);
+  }
+
+  return assignmentMap;
+}
+
+function normalizeLineupGuests(rawGuests: NewGuestLineupInput[] | undefined) {
+  return (rawGuests ?? []).map((guest) => {
+    const normalizedName = guest.name.trim();
+    const normalizedRating = Number(guest.rating);
+
+    if (!normalizedName) {
+      throw new Error("Los invitados agregados deben tener nombre.");
+    }
+    if (!Number.isFinite(normalizedRating) || normalizedRating <= 0) {
+      throw new Error(`El invitado ${normalizedName} tiene un rating invalido.`);
+    }
+
+    return {
+      name: normalizedName,
+      rating: Number(normalizedRating.toFixed(2)),
+      team: guest.team
+    };
+  });
+}
+
+async function insertNewLineupGuests(params: {
+  supabase: DbClient;
+  matchId: string;
+  guests: Array<{ name: string; rating: number; team: TeamSide }>;
+}) {
+  const { supabase, matchId, guests } = params;
+  if (!guests.length) return [];
+
+  const insertedGuests: ConfirmedParticipant[] = [];
+  for (const guest of guests) {
+    const { data, error } = await supabase
+      .from("match_guests")
+      .insert({
+        match_id: matchId,
+        guest_name: guest.name,
+        guest_rating: guest.rating
+      })
+      .select("id, guest_name, guest_rating")
+      .single();
+
+    if (error || !data) {
+      if (error && isGuestSchemaMissing(error.message)) {
+        throw new Error(buildGuestSchemaErrorMessage("No se pudieron guardar invitados agregados al resultado."));
+      }
+      throw new Error(`No se pudieron guardar invitados agregados al resultado: ${error?.message ?? "sin detalle"}`);
+    }
+
+    insertedGuests.push({
+      id: toGuestParticipantId(data.id),
+      source: "guest",
+      entityId: data.id,
+      full_name: data.guest_name,
+      current_rating: Number(data.guest_rating)
+    });
+  }
+
+  return insertedGuests;
+}
+
+async function persistConfirmedLineup(params: {
+  supabase: DbClient;
+  optionId: string;
+  teamA: ConfirmedParticipant[];
+  teamB: ConfirmedParticipant[];
+}) {
+  const { supabase, optionId, teamA, teamB } = params;
+  const allMembers = [
+    ...teamA.map((member) => ({ ...member, team: "A" as TeamSide })),
+    ...teamB.map((member) => ({ ...member, team: "B" as TeamSide }))
+  ];
+
+  const { error: deletePlayersError } = await supabase
+    .from("team_option_players")
+    .delete()
+    .eq("team_option_id", optionId);
+  if (deletePlayersError) {
+    throw new Error(`No se pudo actualizar la formacion confirmada: ${deletePlayersError.message}`);
+  }
+
+  const { error: deleteGuestsError } = await supabase
+    .from("team_option_guests")
+    .delete()
+    .eq("team_option_id", optionId);
+  if (deleteGuestsError) {
+    if (isGuestSchemaMissing(deleteGuestsError.message)) {
+      throw new Error(buildGuestSchemaErrorMessage("No se pudo actualizar la formacion confirmada."));
+    }
+    throw new Error(`No se pudo actualizar la formacion confirmada: ${deleteGuestsError.message}`);
+  }
+
+  const playerRows = allMembers
+    .filter((member) => member.source === "player")
+    .map((member) => ({
+      team_option_id: optionId,
+      player_id: member.entityId,
+      team: member.team
+    }));
+  const guestRows = allMembers
+    .filter((member) => member.source === "guest")
+    .map((member) => ({
+      team_option_id: optionId,
+      guest_id: member.entityId,
+      team: member.team
+    }));
+
+  if (playerRows.length) {
+    const { error: insertPlayersError } = await supabase.from("team_option_players").insert(playerRows);
+    if (insertPlayersError) {
+      throw new Error(`No se pudieron guardar jugadores en la formacion confirmada: ${insertPlayersError.message}`);
+    }
+  }
+
+  if (guestRows.length) {
+    const { error: insertGuestsError } = await supabase.from("team_option_guests").insert(guestRows);
+    if (insertGuestsError) {
+      if (isGuestSchemaMissing(insertGuestsError.message)) {
+        throw new Error(buildGuestSchemaErrorMessage("No se pudieron guardar invitados en la formacion confirmada."));
+      }
+      throw new Error(`No se pudieron guardar invitados en la formacion confirmada: ${insertGuestsError.message}`);
+    }
+  }
+}
+
+async function resolveLineupForResult(params: {
+  supabase: DbClient;
+  matchId: string;
+  resultInput: MatchResultInput;
+}) {
+  const { supabase, matchId, resultInput } = params;
+  const confirmed = await loadConfirmedTeams(supabase, matchId);
+  const participants = [...confirmed.teamA, ...confirmed.teamB];
+  const participantsById = new Map(participants.map((participant) => [participant.id, participant]));
+  const lineupInput = resultInput.lineup;
+
+  if (!lineupInput) {
+    return {
+      optionId: confirmed.optionId,
+      teamA: confirmed.teamA,
+      teamB: confirmed.teamB,
+      handicapTeam: null
+    } satisfies ResolvedMatchLineup;
+  }
+
+  const assignmentMap = normalizeLineupAssignments(lineupInput.assignments, participantsById);
+  const teamA: ConfirmedParticipant[] = [];
+  const teamB: ConfirmedParticipant[] = [];
+
+  for (const participant of participants) {
+    const team = assignmentMap.get(participant.id) ?? "OUT";
+    if (team === "A") teamA.push(participant);
+    if (team === "B") teamB.push(participant);
+  }
+
+  const normalizedGuests = normalizeLineupGuests(lineupInput.newGuests);
+  const insertedGuests = await insertNewLineupGuests({
+    supabase,
+    matchId,
+    guests: normalizedGuests
+  });
+
+  insertedGuests.forEach((guest, index) => {
+    const targetTeam = normalizedGuests[index]?.team;
+    if (targetTeam === "A") teamA.push(guest);
+    if (targetTeam === "B") teamB.push(guest);
+  });
+
+  if (!teamA.length || !teamB.length) {
+    throw new Error("Cada equipo debe tener al menos un participante en la formacion final.");
+  }
+
+  const handicapTeam = lineupInput.handicapTeam ?? null;
+  if (handicapTeam) {
+    const handicapCount = handicapTeam === "A" ? teamA.length : teamB.length;
+    const otherCount = handicapTeam === "A" ? teamB.length : teamA.length;
+    if (handicapCount >= otherCount) {
+      throw new Error("El equipo marcado con desventaja debe tener menos jugadores que el rival.");
+    }
+  }
+
+  await persistConfirmedLineup({
+    supabase,
+    optionId: confirmed.optionId,
+    teamA,
+    teamB
+  });
+
+  return {
+    optionId: confirmed.optionId,
+    teamA,
+    teamB,
+    handicapTeam
+  } satisfies ResolvedMatchLineup;
+}
+
 export async function saveMatchResult(params: {
   supabase: DbClient;
   adminId: string;
@@ -561,11 +789,16 @@ export async function saveMatchResult(params: {
   const winnerTeam = deriveWinnerTeam(scoreA, scoreB);
 
   await rollbackPreviousRatingHistory(supabase, matchId);
-  const { teamA, teamB } = await loadConfirmedTeams(supabase, matchId);
+  const { teamA, teamB, handicapTeam } = await resolveLineupForResult({
+    supabase,
+    matchId,
+    resultInput
+  });
   const adjustments = calculateMatchRatingAdjustments({
     teamA: teamA.map((player) => ({ id: player.id, rating: player.current_rating })),
     teamB: teamB.map((player) => ({ id: player.id, rating: player.current_rating })),
-    winnerTeam
+    winnerTeam,
+    shortHandedTeam: handicapTeam
   });
 
   const { error: upsertResultError } = await supabase.from("match_result").upsert(

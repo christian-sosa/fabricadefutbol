@@ -9,26 +9,34 @@ import { withOrgQuery } from "@/lib/org";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-export function SiteHeader() {
+type SiteHeaderProps = {
+  initialIsAuthenticated?: boolean;
+};
+
+export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) {
   const pathname = usePathname();
   const safePathname = pathname ?? "";
   const router = useRouter();
   const searchParams = useSearchParams();
   const organizationId = searchParams.get("org");
   const [mounted, setMounted] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(initialIsAuthenticated);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
+    setIsAuthenticated(initialIsAuthenticated);
+  }, [initialIsAuthenticated]);
+
+  useEffect(() => {
     const supabase = createSupabaseBrowserClient();
 
     let active = true;
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
-      setIsAuthenticated(Boolean(data.user));
+      setIsAuthenticated(Boolean(data.session?.user));
     });
 
     const {

@@ -356,6 +356,19 @@ create index if not exists idx_rating_history_player_id_created_at on public.rat
 create index if not exists idx_rating_history_match_id on public.rating_history(match_id);
 create index if not exists idx_match_player_stats_match_player on public.match_player_stats(match_id, player_id);
 
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'player-photos',
+  'player-photos',
+  true,
+  10485760,
+  array['image/webp']::text[]
+)
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -472,4 +485,3 @@ select
   m.organization_id
 from public.matches m
 left join public.match_result mr on mr.match_id = m.id;
-

@@ -22,5 +22,16 @@ export function getSupabaseAnonKey() {
 }
 
 export function getSupabaseServiceRoleKey() {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? null;
+  const value = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!value) return null;
+
+  const normalized = value.toLowerCase();
+  const isPlaceholder =
+    normalized === "your-service-role-key-optional" ||
+    normalized === "your-service-role-key" ||
+    normalized.includes("your-service-role-key") ||
+    normalized.includes("replace-with-service-role-key");
+
+  if (isPlaceholder) return null;
+  return value;
 }

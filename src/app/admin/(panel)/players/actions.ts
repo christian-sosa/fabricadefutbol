@@ -1,10 +1,8 @@
 "use server";
 
-import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
-import path from "node:path";
-
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import sharp from "sharp";
 import { z } from "zod";
 
 import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/lib/auth/admin";
@@ -31,7 +29,10 @@ const rowSchema = z.object({
   active: z.boolean()
 });
 
-const MAX_PHOTO_SIZE_MB = 5;
+const MAX_PHOTO_SIZE_MB = 20;
+const PLAYER_PHOTOS_BUCKET = "player-photos";
+const PLAYER_AVATAR_SIZE_PX = 400;
+const PLAYER_AVATAR_QUALITY = 80;
 
 const CONTENT_TYPE_EXTENSION: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -62,6 +63,21 @@ function inferFileExtension(file: File) {
   if (!ext) return null;
   if (["jpg", "jpeg", "png", "webp"].includes(ext)) return ext;
   return null;
+}
+
+function getPlayerPhotoObjectPath(organizationId: string, playerId: string) {
+  return `${organizationId}/${playerId}.webp`;
+}
+
+async function optimizePlayerAvatarImage(file: File) {
+  const sourceBuffer = Buffer.from(await file.arrayBuffer());
+  const optimized = await sharp(sourceBuffer)
+    .rotate()
+    .resize(PLAYER_AVATAR_SIZE_PX, PLAYER_AVATAR_SIZE_PX, { fit: "cover", position: "center" })
+    .webp({ quality: PLAYER_AVATAR_QUALITY })
+    .toBuffer();
+
+  return optimized;
 }
 
 async function ensureSequentialRanks(rows: Array<z.infer<typeof rowSchema>>) {
@@ -275,26 +291,26 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
       redirect(withMessage(organizationQueryKey, "No se encontro el jugador en la organizacion seleccionada."));
     }
 
-    const playersDir = path.join(process.cwd(), "public", "players");
-    await mkdir(playersDir, { recursive: true });
+    const optimizedBuffer = await optimizePlayerAvatarImage(file);
+    const objectPath = getPlayerPhotoObjectPath(parsed.data.organizationId, parsed.data.playerId);
+    const { error: uploadError } = await supabase.storage
+      .from(PLAYER_PHOTOS_BUCKET)
+      .upload(objectPath, optimizedBuffer, {
+        upsert: true,
+        contentType: "image/webp",
+        cacheControl: "31536000"
+      });
 
-    const existingFiles = await readdir(playersDir);
-    const filePrefix = `${parsed.data.playerId}.`;
-    const deleteTargets = existingFiles.filter((fileName) => fileName.startsWith(filePrefix));
-
-    for (const target of deleteTargets) {
-      await unlink(path.join(playersDir, target));
+    if (uploadError) {
+      redirect(withMessage(organizationQueryKey, `No se pudo guardar la foto en Storage: ${uploadError.message}`));
     }
-
-    const bytes = Buffer.from(await file.arrayBuffer());
-    const outputPath = path.join(playersDir, `${parsed.data.playerId}.${extension}`);
-    await writeFile(outputPath, bytes);
 
     revalidatePath("/admin/players");
     revalidatePath("/players");
     revalidatePath("/ranking");
     revalidatePath(`/players/${parsed.data.playerId}`);
-    redirect(withSuccess(organizationQueryKey, "Foto actualizada correctamente."));
+    revalidatePath(`/api/player-photo/${parsed.data.playerId}`);
+    redirect(withSuccess(organizationQueryKey, "Foto actualizada correctamente en Supabase Storage."));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo subir la foto.";

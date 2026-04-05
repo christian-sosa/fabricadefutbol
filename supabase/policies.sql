@@ -37,6 +37,12 @@ as $$
       from public.organization_admins oa
       where oa.organization_id = org_id
         and oa.admin_id = auth.uid()
+    )
+    or exists (
+      select 1
+      from public.organizations o
+      where o.id = org_id
+        and o.created_by = auth.uid()
     );
 $$;
 
@@ -63,12 +69,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select public.is_super_admin()
-    or not exists (
-      select 1
-      from public.organizations o
-      where o.created_by = auth.uid()
-    );
+  select auth.uid() is not null;
 $$;
 
 create or replace function public.org_has_admin_slot(org_id uuid)
@@ -200,7 +201,6 @@ with check (
   )
   or (
     admin_id = auth.uid()
-    and public.org_has_admin_slot(organization_id)
     and exists (
       select 1
       from public.organization_invites i
@@ -629,4 +629,67 @@ with check (
     where m.id = match_player_stats.match_id
       and public.is_org_admin(m.organization_id)
   )
+);
+
+create or replace function public.can_manage_player_photo_object(object_name text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.players p
+    where p.organization_id::text = split_part(object_name, '/', 1)
+      and p.id::text = split_part(split_part(object_name, '/', 2), '.', 1)
+      and split_part(object_name, '/', 2) <> ''
+      and public.is_org_admin(p.organization_id)
+  );
+$$;
+
+revoke all on function public.can_manage_player_photo_object(text) from public;
+grant execute on function public.can_manage_player_photo_object(text) to anon, authenticated;
+
+drop policy if exists storage_player_photos_public_read on storage.objects;
+create policy storage_player_photos_public_read
+on storage.objects
+for select
+to public
+using (bucket_id = 'player-photos');
+
+drop policy if exists storage_player_photos_insert_admin on storage.objects;
+create policy storage_player_photos_insert_admin
+on storage.objects
+for insert
+to authenticated
+with check (
+  bucket_id = 'player-photos'
+  and lower(right(name, 5)) = '.webp'
+  and public.can_manage_player_photo_object(name)
+);
+
+drop policy if exists storage_player_photos_update_admin on storage.objects;
+create policy storage_player_photos_update_admin
+on storage.objects
+for update
+to authenticated
+using (
+  bucket_id = 'player-photos'
+  and public.can_manage_player_photo_object(name)
+)
+with check (
+  bucket_id = 'player-photos'
+  and lower(right(name, 5)) = '.webp'
+  and public.can_manage_player_photo_object(name)
+);
+
+drop policy if exists storage_player_photos_delete_admin on storage.objects;
+create policy storage_player_photos_delete_admin
+on storage.objects
+for delete
+to authenticated
+using (
+  bucket_id = 'player-photos'
+  and public.can_manage_player_photo_object(name)
 );

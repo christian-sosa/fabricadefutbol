@@ -2,6 +2,7 @@ export type MatchStatus = "draft" | "confirmed" | "finished" | "cancelled";
 export type MatchModality = "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
 export type TeamSide = "A" | "B";
 export type WinnerTeam = TeamSide | "DRAW";
+export type ResultAssignmentTeam = TeamSide | "OUT";
 
 export type PlayerRatingInput = {
   id: string;
@@ -37,4 +38,16 @@ export type MatchResultInput = {
   scoreA: number;
   scoreB: number;
   notes?: string;
+  lineup?: {
+    assignments: Array<{
+      participantId: string;
+      team: ResultAssignmentTeam;
+    }>;
+    newGuests?: Array<{
+      name: string;
+      rating: number;
+      team: TeamSide;
+    }>;
+    handicapTeam?: TeamSide | null;
+  };
 };
