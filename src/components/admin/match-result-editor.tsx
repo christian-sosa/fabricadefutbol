@@ -24,7 +24,24 @@ type GuestDraft = {
 };
 
 type MatchResultEditorProps = {
-  action: (formData: FormData) => void | Promise<void>;
+  action?: (formData: FormData) => void | Promise<void>;
+  onSubmit?: (payload: {
+    scoreA: number;
+    scoreB: number;
+    notes?: string;
+    lineup?: {
+      assignments: Array<{
+        participantId: string;
+        team: "A" | "B" | "OUT";
+      }>;
+      newGuests?: Array<{
+        name: string;
+        rating: number;
+        team: "A" | "B";
+      }>;
+      handicapTeam?: TeamSide | null;
+    };
+  }) => Promise<void>;
   existingParticipants: ExistingParticipant[];
   defaultScoreA: number;
   defaultScoreB: number;
@@ -39,6 +56,7 @@ function isValidGuest(guest: GuestDraft) {
 
 export function MatchResultEditor({
   action,
+  onSubmit,
   existingParticipants,
   defaultScoreA,
   defaultScoreB,
@@ -56,6 +74,8 @@ export function MatchResultEditor({
   const [newGuests, setNewGuests] = useState<GuestDraft[]>([]);
   const [handicapEnabled, setHandicapEnabled] = useState(false);
   const [handicapTeam, setHandicapTeam] = useState<TeamSide>("A");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const validNewGuests = useMemo(() => newGuests.filter((guest) => isValidGuest(guest)), [newGuests]);
   const teamACount = useMemo(() => {
@@ -92,8 +112,50 @@ export function MatchResultEditor({
     [assignments, existingParticipants, handicapEnabled, handicapTeam, validNewGuests]
   );
 
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    if (!onSubmit) return;
+    event.preventDefault();
+    setSubmitError(null);
+    setIsSubmitting(true);
+
+    try {
+      const formData = new FormData(event.currentTarget);
+      const scoreA = Number(formData.get("scoreA"));
+      const scoreB = Number(formData.get("scoreB"));
+      const notesRaw = formData.get("notes");
+      const notes = typeof notesRaw === "string" ? notesRaw : "";
+
+      if (!Number.isFinite(scoreA) || !Number.isFinite(scoreB)) {
+        throw new Error("Los puntajes deben ser numeros validos.");
+      }
+
+      await onSubmit({
+        scoreA,
+        scoreB,
+        notes,
+        lineup: {
+          assignments: existingParticipants.map((participant) => ({
+            participantId: participant.participantId,
+            team: assignments[participant.participantId] ?? "OUT"
+          })),
+          newGuests: validNewGuests.map((guest) => ({
+            name: guest.name.trim(),
+            rating: Number(guest.rating),
+            team: guest.team
+          })),
+          handicapTeam: handicapEnabled ? handicapTeam : null
+        }
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo guardar resultado.";
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
-    <form action={action} className="mt-4 space-y-4">
+    <form action={onSubmit ? undefined : action} className="mt-4 space-y-4" onSubmit={onSubmit ? handleSubmit : undefined}>
       <input name="lineupPayload" type="hidden" value={lineupPayload} />
 
       <div className="grid gap-3 md:grid-cols-4">
@@ -239,7 +301,10 @@ export function MatchResultEditor({
       </div>
 
       <div>
-        <Button type="submit">{submitLabel}</Button>
+        <Button disabled={isSubmitting} type="submit">
+          {isSubmitting ? "Guardando..." : submitLabel}
+        </Button>
+        {submitError ? <p className="mt-2 text-sm font-semibold text-danger">{submitError}</p> : null}
       </div>
     </form>
   );

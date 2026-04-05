@@ -5,10 +5,9 @@ import {
   confirmOptionAction,
   deleteMatchAction,
   regenerateOptionsAction,
-  saveResultAction,
   updateMatchAction
 } from "@/app/admin/(panel)/matches/[id]/actions";
-import { MatchResultEditor } from "@/components/admin/match-result-editor";
+import { MatchResultEditorQuery } from "@/components/admin/match-result-editor-query";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { TeamOptionCard } from "@/components/matches/team-option-card";
 import { MatchStatusBadge } from "@/components/ui/badge";
@@ -48,7 +47,6 @@ export default async function AdminMatchDetailPage({
 
   const confirmAction = confirmOptionAction.bind(null, params.id, selectedOrganization.id);
   const regenerateAction = regenerateOptionsAction.bind(null, params.id, selectedOrganization.id);
-  const resultAction = saveResultAction.bind(null, params.id, selectedOrganization.id);
   const matchUpdateAction = updateMatchAction.bind(null, params.id, selectedOrganization.id);
   const deleteAction = deleteMatchAction.bind(null, params.id, selectedOrganization.id);
   const canDeleteMatch =
@@ -205,12 +203,13 @@ export default async function AdminMatchDetailPage({
             El partido puede quedar confirmado sin resultado. Cargalo cuando se juegue para finalizar y actualizar ratings.
           </CardDescription>
           {editableParticipants.length ? (
-            <MatchResultEditor
-              action={resultAction}
+            <MatchResultEditorQuery
               defaultNotes={details.result?.notes ?? ""}
               defaultScoreA={details.result?.score_a ?? 0}
               defaultScoreB={details.result?.score_b ?? 0}
               existingParticipants={editableParticipants}
+              matchId={params.id}
+              organizationId={selectedOrganization.id}
               submitLabel={details.result ? "Guardar correccion" : "Guardar resultado y finalizar"}
             />
           ) : (
