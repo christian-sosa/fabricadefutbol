@@ -9,6 +9,10 @@ type ConfirmSubmitButtonProps = {
   label: string;
   className?: string;
   variant?: "primary" | "secondary" | "ghost" | "danger";
+  setHiddenField?: {
+    name: string;
+    value: string;
+  };
 } & Pick<
   ButtonHTMLAttributes<HTMLButtonElement>,
   "name" | "value" | "formAction" | "formNoValidate" | "title" | "disabled"
@@ -19,6 +23,7 @@ export function ConfirmSubmitButton({
   label,
   className,
   variant = "danger",
+  setHiddenField,
   name,
   value,
   formAction,
@@ -35,7 +40,18 @@ export function ConfirmSubmitButton({
       name={name}
       onClick={(event) => {
         const confirmed = window.confirm(confirmMessage);
-        if (!confirmed) event.preventDefault();
+        if (!confirmed) {
+          event.preventDefault();
+          return;
+        }
+
+        if (setHiddenField) {
+          const form = event.currentTarget.form;
+          const field = form?.elements.namedItem(setHiddenField.name);
+          if (field instanceof HTMLInputElement) {
+            field.value = setHiddenField.value;
+          }
+        }
       }}
       title={title}
       type="submit"
