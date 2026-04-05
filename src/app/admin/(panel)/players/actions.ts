@@ -17,6 +17,11 @@ const createSchema = z.object({
   initialRank: z.coerce.number().int().positive().max(999)
 });
 
+const deleteSchema = z.object({
+  organizationId: z.string().uuid(),
+  deletePlayerId: z.string().uuid()
+});
+
 const photoSchema = z.object({
   organizationId: z.string().uuid(),
   playerId: z.string().uuid()
@@ -242,6 +247,90 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo guardar la planilla.";
     redirect(withMessage(organizationId, message));
+  }
+}
+
+export async function deletePlayerAction(formData: FormData) {
+  try {
+    const parsed = deleteSchema.safeParse({
+      organizationId: formData.get("organizationId"),
+      deletePlayerId: formData.get("deletePlayerId")
+    });
+
+    if (!parsed.success) {
+      redirect(
+        withMessage(
+          String(formData.get("organizationId") ?? ""),
+          parsed.error.issues[0]?.message ?? "Datos invalidos."
+        )
+      );
+    }
+
+    await assertOrganizationAdminAction(parsed.data.organizationId);
+    const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
+    const supabase = await createSupabaseServerClient();
+
+    const { data: playerToDelete, error: playerError } = await supabase
+      .from("players")
+      .select("id, initial_rank, full_name")
+      .eq("id", parsed.data.deletePlayerId)
+      .eq("organization_id", parsed.data.organizationId)
+      .maybeSingle();
+
+    if (playerError || !playerToDelete) {
+      redirect(withMessage(organizationQueryKey, "No se encontro el jugador seleccionado."));
+    }
+
+    const { error: deleteError } = await supabase
+      .from("players")
+      .delete()
+      .eq("id", parsed.data.deletePlayerId)
+      .eq("organization_id", parsed.data.organizationId);
+
+    if (deleteError) {
+      const cannotDeleteDueToHistory = deleteError.code === "23503";
+      redirect(
+        withMessage(
+          organizationQueryKey,
+          cannotDeleteDueToHistory
+            ? "No se puede eliminar este jugador porque esta vinculado a partidos ya registrados."
+            : deleteError.message
+        )
+      );
+    }
+
+    const { data: playersToShift, error: shiftCandidatesError } = await supabase
+      .from("players")
+      .select("id, initial_rank")
+      .eq("organization_id", parsed.data.organizationId)
+      .gt("initial_rank", playerToDelete.initial_rank)
+      .order("initial_rank", { ascending: true });
+
+    if (shiftCandidatesError) {
+      redirect(withMessage(organizationQueryKey, shiftCandidatesError.message));
+    }
+
+    for (const player of playersToShift ?? []) {
+      const { error: shiftError } = await supabase
+        .from("players")
+        .update({ initial_rank: player.initial_rank - 1 })
+        .eq("id", player.id)
+        .eq("organization_id", parsed.data.organizationId);
+
+      if (shiftError) {
+        redirect(withMessage(organizationQueryKey, shiftError.message));
+      }
+    }
+
+    revalidatePath("/admin/players");
+    revalidatePath("/players");
+    revalidatePath("/ranking");
+    revalidatePath("/");
+    redirect(withSuccess(organizationQueryKey, `Jugador ${playerToDelete.full_name} eliminado y ranking reordenado.`));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    const message = error instanceof Error ? error.message : "No se pudo eliminar el jugador.";
+    redirect(withMessage(String(formData.get("organizationId") ?? ""), message));
   }
 }
 
