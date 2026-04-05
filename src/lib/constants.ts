@@ -1,4 +1,4 @@
-import type { MatchModality, MatchStatus } from "@/types/domain";
+﻿import type { MatchModality, MatchStatus } from "@/types/domain";
 
 export const MATCH_MODALITIES: MatchModality[] = ["5v5", "6v6", "7v7", "9v9", "11v11"];
 export const MATCH_STATUSES: MatchStatus[] = ["draft", "confirmed", "finished", "cancelled"];
@@ -17,7 +17,8 @@ export const PUBLIC_NAV_ITEMS = [
   { href: "/ranking", label: "Ranking" },
   { href: "/players", label: "Jugadores" },
   { href: "/matches", label: "Historial" },
-  { href: "/upcoming", label: "Próximos" }
+  { href: "/upcoming", label: "Proximos" },
+  { href: "/help", label: "Ayuda" }
 ];
 
 export const ADMIN_NAV_ITEMS = [

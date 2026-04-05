@@ -51,6 +51,12 @@ export default async function HomePage({
           >
             Ver ranking
           </Link>
+          <Link
+            className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
+            href={withOrgQuery("/help", selectedOrganization?.slug)}
+          >
+            Ayuda / FAQ
+          </Link>
         </div>
       </section>
 
