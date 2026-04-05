@@ -133,6 +133,46 @@ function buildRankAssignments(params: {
   });
 }
 
+async function persistRankAssignments(params: {
+  organizationId: string;
+  organizationQueryKey: string;
+  assignments: ReturnType<typeof buildRankAssignments>;
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+}) {
+  const { assignments, organizationId, organizationQueryKey, supabase } = params;
+
+  for (let index = 0; index < assignments.length; index += 1) {
+    const row = assignments[index].row;
+    const { error: tempError } = await supabase
+      .from("players")
+      .update({ initial_rank: 10000 + index })
+      .eq("id", row.id)
+      .eq("organization_id", organizationId);
+
+    if (tempError) {
+      redirect(withMessage(organizationQueryKey, tempError.message));
+    }
+  }
+
+  for (const assignment of assignments) {
+    const row = assignment.row;
+    const { error: saveError } = await supabase
+      .from("players")
+      .update({
+        full_name: row.fullName,
+        initial_rank: assignment.finalRank,
+        current_rating: Number(row.currentRating.toFixed(2)),
+        active: row.active
+      })
+      .eq("id", row.id)
+      .eq("organization_id", organizationId);
+
+    if (saveError) {
+      redirect(withMessage(organizationQueryKey, saveError.message));
+    }
+  }
+}
+
 export async function createPlayerAction(formData: FormData) {
   try {
     const parsed = createSchema.safeParse({
@@ -268,35 +308,35 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
       ({ row, finalRank }) => (originalRankById.get(row.id) ?? finalRank) !== finalRank
     );
 
-    for (let index = 0; index < assignments.length; index += 1) {
-      const row = assignments[index].row;
-      const { error: tempError } = await supabase
-        .from("players")
-        .update({ initial_rank: 10000 + index })
-        .eq("id", row.id)
-        .eq("organization_id", organizationId);
+    await persistRankAssignments({
+      assignments,
+      organizationId,
+      organizationQueryKey,
+      supabase
+    });
 
-      if (tempError) {
-        redirect(withMessage(organizationQueryKey, tempError.message));
-      }
+    // Safeguard: if any rank was persisted incorrectly, force the canonical order.
+    const { data: persistedRows, error: persistedRowsError } = await supabase
+      .from("players")
+      .select("id, initial_rank")
+      .eq("organization_id", organizationId);
+
+    if (persistedRowsError) {
+      redirect(withMessage(organizationQueryKey, persistedRowsError.message));
     }
 
-    for (const assignment of assignments) {
-      const row = assignment.row;
-      const { error: saveError } = await supabase
-        .from("players")
-        .update({
-          full_name: row.fullName,
-          initial_rank: assignment.finalRank,
-          current_rating: Number(row.currentRating.toFixed(2)),
-          active: row.active
-        })
-        .eq("id", row.id)
-        .eq("organization_id", organizationId);
+    const persistedRankById = new Map((persistedRows ?? []).map((row) => [row.id, row.initial_rank]));
+    const mismatchDetected = assignments.some(
+      (assignment) => persistedRankById.get(assignment.row.id) !== assignment.finalRank
+    );
 
-      if (saveError) {
-        redirect(withMessage(organizationQueryKey, saveError.message));
-      }
+    if (mismatchDetected) {
+      await persistRankAssignments({
+        assignments,
+        organizationId,
+        organizationQueryKey,
+        supabase
+      });
     }
 
     revalidatePath("/admin/players");

@@ -8,12 +8,15 @@ import { ADMIN_NAV_ITEMS } from "@/lib/constants";
 import { withOrgQuery } from "@/lib/org";
 import { cn } from "@/lib/utils";
 
-export function AdminNav() {
+export function AdminNav({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const pathname = usePathname();
   const safePathname = pathname ?? "";
   const searchParams = useSearchParams();
   const organizationId = searchParams.get("org");
   const [mounted, setMounted] = useState(false);
+  const navItems = isSuperAdmin
+    ? [...ADMIN_NAV_ITEMS, { href: "/admin/super", label: "Super Admin" }]
+    : ADMIN_NAV_ITEMS;
 
   useEffect(() => {
     setMounted(true);
@@ -21,7 +24,7 @@ export function AdminNav() {
 
   return (
     <nav className="flex flex-wrap items-center gap-2">
-      {ADMIN_NAV_ITEMS.map((item) => {
+      {navItems.map((item) => {
         const active = mounted && (safePathname === item.href || safePathname.startsWith(`${item.href}/`));
         const href = withOrgQuery(item.href, organizationId);
         return (

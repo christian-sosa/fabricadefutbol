@@ -17,7 +17,7 @@ export default async function AdminPanelLayout({ children }: { children: React.R
           <SignOutButton />
         </div>
         <div className="mt-4">
-          <AdminNav />
+          <AdminNav isSuperAdmin={admin.isSuperAdmin} />
         </div>
       </section>
 
