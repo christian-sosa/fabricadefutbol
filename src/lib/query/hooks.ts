@@ -4,7 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { fetchOrganizationMatches, fetchOrganizationStandings, updateMatchResult } from "@/lib/query/client";
 import { organizationQueryKeys } from "@/lib/query/keys";
-import type { MatchHistoryItem, UpdateMatchResultPayload } from "@/lib/query/types";
+import type { OrganizationMatchesResponse, UpdateMatchResultPayload } from "@/lib/query/types";
 import type { PlayerComputedStats } from "@/types/domain";
 
 const ORGANIZATION_QUERY_STALE_TIME = 60_000;
@@ -27,13 +27,24 @@ export function useOrganizationStandingsQuery(params: {
 
 export function useOrganizationMatchesQuery(params: {
   organizationId: string | null | undefined;
-  initialData?: MatchHistoryItem[];
+  page: number;
+  pageSize?: number;
+  initialData?: OrganizationMatchesResponse;
 }) {
   const organizationId = params.organizationId ?? null;
+  const page = params.page;
+  const pageSize = params.pageSize ?? 10;
 
   return useQuery({
-    queryKey: organizationId ? organizationQueryKeys.matches(organizationId) : ["organizations", "none", "matches"],
-    queryFn: () => fetchOrganizationMatches(organizationId as string),
+    queryKey: organizationId
+      ? organizationQueryKeys.matchesPage(organizationId, page, pageSize)
+      : ["organizations", "none", "matches", page, pageSize],
+    queryFn: () =>
+      fetchOrganizationMatches({
+        organizationId: organizationId as string,
+        page,
+        pageSize
+      }),
     enabled: Boolean(organizationId),
     initialData: params.initialData,
     staleTime: ORGANIZATION_QUERY_STALE_TIME,
@@ -55,8 +66,7 @@ export function useUpdateMatchResultMutation(params: { organizationId: string; m
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: organizationQueryKeys.matches(organizationId),
-          exact: true
+          queryKey: organizationQueryKeys.matches(organizationId)
         }),
         queryClient.invalidateQueries({
           queryKey: organizationQueryKeys.standings(organizationId),

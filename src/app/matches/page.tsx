@@ -1,7 +1,7 @@
 import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { MatchesHistoryQueryTable } from "@/components/matches/matches-history-query-table";
-import { getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
+import { getMatchHistoryCardsPage, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
 
 export default async function MatchesPage({
   searchParams
@@ -12,6 +12,10 @@ export default async function MatchesPage({
     resolvePublicOrganization(searchParams.org),
     getViewerAdminOrganizations()
   ]);
+  const initialMatchesData = await getMatchHistoryCardsPage(selectedOrganization?.id ?? null, {
+    page: 1,
+    pageSize: 10
+  });
 
   return (
     <div className="space-y-4">
@@ -30,8 +34,11 @@ export default async function MatchesPage({
       <AdPlaceholder slot="matches-top" />
 
       <MatchesHistoryQueryTable
+        initialData={initialMatchesData}
+        initialPage={1}
         organizationId={selectedOrganization?.id ?? null}
         organizationSlug={selectedOrganization?.slug}
+        pageSize={10}
       />
     </div>
   );

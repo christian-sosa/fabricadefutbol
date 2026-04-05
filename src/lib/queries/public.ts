@@ -50,6 +50,27 @@ function sortParticipantsByRating(players: MatchParticipantDisplay[]) {
   return [...players].sort((a, b) => Number(b.current_rating) - Number(a.current_rating));
 }
 
+function hashString(input: string) {
+  let hash = 0;
+  for (let index = 0; index < input.length; index += 1) {
+    hash = (hash * 31 + input.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function getDefaultOrganizationIndex(organizations: PublicOrganization[], context?: "home" | "ranking") {
+  if (!organizations.length) return -1;
+  if (!context) return 0;
+  if (organizations.length === 1) return 0;
+
+  const dayKey = new Date().toISOString().slice(0, 10);
+  const baseIndex = hashString(dayKey) % organizations.length;
+
+  if (context === "home") return baseIndex;
+  if (context === "ranking") return (baseIndex + 1) % organizations.length;
+  return 0;
+}
+
 export async function getPublicOrganizations(): Promise<PublicOrganization[]> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
@@ -102,9 +123,17 @@ export async function getViewerAdminOrganizations(): Promise<PublicOrganization[
   return organizations.sort((a, b) => a.name.localeCompare(b.name, "es"));
 }
 
-export async function resolvePublicOrganization(preferredOrganizationKey?: string | null) {
+export async function resolvePublicOrganization(
+  preferredOrganizationKey?: string | null,
+  options?: {
+    defaultContext?: "home" | "ranking";
+  }
+) {
   const organizations = await getPublicOrganizations();
-  const selectedOrganization = findOrganizationByKey(organizations, preferredOrganizationKey) ?? organizations[0] ?? null;
+  const selectedOrganization =
+    findOrganizationByKey(organizations, preferredOrganizationKey) ??
+    organizations[getDefaultOrganizationIndex(organizations, options?.defaultContext)] ??
+    null;
 
   return {
     organizations,
@@ -333,21 +362,73 @@ function normalizeMatchCard(match: MatchRow, result?: Database["public"]["Tables
   };
 }
 
-export async function getMatchHistoryCards(organizationId: string | null) {
-  if (!organizationId) return [];
+function normalizePositiveInteger(value: number | undefined, fallback: number) {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(1, Math.floor(value as number));
+}
+
+export async function getMatchHistoryCardsPage(
+  organizationId: string | null,
+  params?: {
+    page?: number;
+    pageSize?: number;
+  }
+) {
+  const page = normalizePositiveInteger(params?.page, 1);
+  const pageSize = Math.min(10, normalizePositiveInteger(params?.pageSize, 10));
+
+  if (!organizationId) {
+    return {
+      organizationId: null,
+      matches: [],
+      pagination: {
+        page,
+        pageSize,
+        totalCount: 0,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: page > 1
+      }
+    };
+  }
 
   const supabase = await createSupabaseServerClient();
-  const { data: finishedMatches, error } = await supabase
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const { data: finishedMatches, error, count } = await supabase
     .from("matches")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("organization_id", organizationId)
     .in("status", ["finished", "cancelled"])
-    .order("scheduled_at", { ascending: false });
+    .order("scheduled_at", { ascending: false })
+    .range(from, to);
   if (error) throw new Error(error.message);
 
   const ids = (finishedMatches ?? []).map((match) => match.id);
   const withTeams = await fetchMatchTeams(ids);
-  return withTeams.map((row) => normalizeMatchCard(row.match, row.result));
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return {
+    organizationId,
+    matches: withTeams.map((row) => normalizeMatchCard(row.match, row.result)),
+    pagination: {
+      page,
+      pageSize,
+      totalCount: total,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1
+    }
+  };
+}
+
+export async function getMatchHistoryCards(organizationId: string | null) {
+  const data = await getMatchHistoryCardsPage(organizationId, {
+    page: 1,
+    pageSize: 10
+  });
+  return data.matches;
 }
 
 export async function getUpcomingConfirmedMatches(organizationId: string | null) {

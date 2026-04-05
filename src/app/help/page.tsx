@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 
 const faqItems = [
@@ -22,16 +23,6 @@ const faqItems = [
     question: "Cuantos admins puede tener una organizacion?",
     answer:
       "Cada organizacion admite hasta 4 administradores activos o pendientes de invitacion (por ejemplo 1 creador + 3 invitados)."
-  },
-  {
-    question: "Como se maneja el super admin?",
-    answer:
-      "El super admin puede administrar todas las organizaciones del sistema, incluyendo acciones globales como eliminarlas desde el panel."
-  },
-  {
-    question: "Como funciona la carga de fotos?",
-    answer:
-      "Las fotos de jugadores se guardan en Supabase Storage. Esto permite escalar mejor que guardar archivos dentro del repo o del servidor web."
   }
 ];
 
@@ -82,6 +73,8 @@ export default function HelpPage() {
         </Card>
       </section>
 
+      <AdPlaceholder slot="help-top-banner" />
+
       <section className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">FAQ</p>
         <div className="space-y-3">
@@ -93,6 +86,8 @@ export default function HelpPage() {
           ))}
         </div>
       </section>
+
+      <AdPlaceholder slot="help-bottom-banner" />
     </div>
   );
 }

@@ -16,8 +16,16 @@ export type MatchHistoryItem = {
 };
 
 export type OrganizationMatchesResponse = {
-  organizationId: string;
+  organizationId: string | null;
   matches: MatchHistoryItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
 };
 
 export type UpdateMatchResultPayload = {

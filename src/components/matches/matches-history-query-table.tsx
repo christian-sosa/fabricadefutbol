@@ -1,30 +1,44 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { MatchStatusBadge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { useOrganizationMatchesQuery } from "@/lib/query/hooks";
-import type { MatchHistoryItem } from "@/lib/query/types";
+import type { OrganizationMatchesResponse } from "@/lib/query/types";
 import { withOrgQuery } from "@/lib/org";
 import { formatDateTime } from "@/lib/utils";
 
 type MatchesHistoryQueryTableProps = {
   organizationId: string | null;
   organizationSlug?: string | null;
-  initialMatches?: MatchHistoryItem[];
+  initialPage?: number;
+  pageSize?: number;
+  initialData?: OrganizationMatchesResponse;
 };
 
 export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) {
-  const { organizationId, organizationSlug, initialMatches } = params;
+  const { organizationId, organizationSlug, initialData } = params;
+  const pageSize = params.pageSize ?? 10;
+  const [page, setPage] = useState(params.initialPage ?? initialData?.pagination.page ?? 1);
+  const initialPage = params.initialPage ?? initialData?.pagination.page ?? 1;
+
+  useEffect(() => {
+    setPage(initialPage);
+  }, [initialPage, organizationId]);
+
   const { data, isFetching } = useOrganizationMatchesQuery({
     organizationId,
-    initialData: initialMatches
+    page,
+    pageSize,
+    initialData: page === initialPage ? initialData : undefined
   });
 
-  const matches = useMemo(() => data ?? initialMatches ?? [], [data, initialMatches]);
+  const matches = useMemo(() => data?.matches ?? initialData?.matches ?? [], [data, initialData]);
+  const pagination = data?.pagination ?? initialData?.pagination;
 
   return (
     <Card>
@@ -69,6 +83,31 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
           </TBody>
         </Table>
       </div>
+      {pagination ? (
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-800 pt-3">
+          <p className="text-xs text-slate-400">
+            Pagina {pagination.page} de {Math.max(1, pagination.totalPages)} · {pagination.totalCount} partidos
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              disabled={!pagination.hasPreviousPage || isFetching}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              type="button"
+              variant="ghost"
+            >
+              Anterior
+            </Button>
+            <Button
+              disabled={!pagination.hasNextPage || isFetching}
+              onClick={() => setPage((current) => current + 1)}
+              type="button"
+              variant="ghost"
+            >
+              Siguiente
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </Card>
   );
 }
