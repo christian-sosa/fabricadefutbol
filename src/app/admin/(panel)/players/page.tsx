@@ -89,6 +89,7 @@ export default async function AdminPlayersPage({
 
         <form action={bulkUpdatePlayersAction} className="mt-4 space-y-3">
           <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+          <input name="deletePlayerId" type="hidden" value="" />
 
           <div className="hidden grid-cols-[2.2fr_0.8fr_1fr_0.8fr_1.2fr] gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 md:grid">
             <span>Jugador</span>
@@ -132,8 +133,7 @@ export default async function AdminPlayersPage({
                 formAction={deletePlayerAction}
                 formNoValidate
                 label="Eliminar jugador"
-                name="deletePlayerId"
-                value={player.id}
+                setHiddenField={{ name: "deletePlayerId", value: player.id }}
                 variant="danger"
               />
             </div>
