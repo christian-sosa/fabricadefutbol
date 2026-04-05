@@ -4,9 +4,9 @@ import path from "node:path";
 
 import { NextResponse } from "next/server";
 
+import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const PLAYER_PHOTOS_BUCKET = "player-photos";
 const PHOTO_EXTENSIONS = ["jpg", "jpeg", "png", "webp"] as const;
 
 const CONTENT_TYPE_BY_EXTENSION: Record<(typeof PHOTO_EXTENSIONS)[number], string> = {
@@ -24,8 +24,8 @@ function getPlaceholderPath() {
   return path.join(process.cwd(), "public", "avatar-placeholder.svg");
 }
 
-function getStorageObjectPath(organizationId: string, playerId: string) {
-  return `${organizationId}/${playerId}.webp`;
+function getStorageObjectPath(schema: string, organizationId: string, playerId: string) {
+  return `${schema}/${organizationId}/${playerId}.webp`;
 }
 
 async function fileExists(filePath: string) {
@@ -70,6 +70,8 @@ export async function GET(
 ) {
   const playerId = context.params.id;
   const supabase = await createSupabaseServerClient();
+  const bucketName = getPlayerPhotosBucket();
+  const schemaName = getSupabaseDbSchema();
 
   const { data: player, error: playerError } = await supabase
     .from("players")
@@ -78,19 +80,25 @@ export async function GET(
     .maybeSingle();
 
   if (!playerError && player?.organization_id) {
-    const objectPath = getStorageObjectPath(player.organization_id, playerId);
-    const { data: photoFile, error: photoError } = await supabase.storage
-      .from(PLAYER_PHOTOS_BUCKET)
-      .download(objectPath);
+    const objectPaths = [
+      getStorageObjectPath(schemaName, player.organization_id, playerId),
+      `${player.organization_id}/${playerId}.webp`
+    ];
 
-    if (!photoError && photoFile) {
-      const fileBuffer = Buffer.from(await photoFile.arrayBuffer());
-      return new NextResponse(fileBuffer, {
-        headers: {
-          "content-type": "image/webp",
-          "cache-control": "public, max-age=300"
-        }
-      });
+    for (const objectPath of objectPaths) {
+      const { data: photoFile, error: photoError } = await supabase.storage
+        .from(bucketName)
+        .download(objectPath);
+
+      if (!photoError && photoFile) {
+        const fileBuffer = Buffer.from(await photoFile.arrayBuffer());
+        return new NextResponse(fileBuffer, {
+          headers: {
+            "content-type": "image/webp",
+            "cache-control": "public, max-age=300"
+          }
+        });
+      }
     }
   }
 

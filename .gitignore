@@ -29,7 +29,8 @@ pnpm-debug.log*
 *.tsbuildinfo
 
 # project-specific private files
-/supabase/seed.sql
+/supabase/
+/public/players/
 /README.md
 
 # local data/backups

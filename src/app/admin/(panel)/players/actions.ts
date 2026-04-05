@@ -6,6 +6,7 @@ import sharp from "sharp";
 import { z } from "zod";
 
 import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/lib/auth/admin";
+import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -30,7 +31,6 @@ const rowSchema = z.object({
 });
 
 const MAX_PHOTO_SIZE_MB = 20;
-const PLAYER_PHOTOS_BUCKET = "player-photos";
 const PLAYER_AVATAR_SIZE_PX = 400;
 const PLAYER_AVATAR_QUALITY = 80;
 
@@ -65,8 +65,8 @@ function inferFileExtension(file: File) {
   return null;
 }
 
-function getPlayerPhotoObjectPath(organizationId: string, playerId: string) {
-  return `${organizationId}/${playerId}.webp`;
+function getPlayerPhotoObjectPath(schema: string, organizationId: string, playerId: string) {
+  return `${schema}/${organizationId}/${playerId}.webp`;
 }
 
 async function optimizePlayerAvatarImage(file: File) {
@@ -292,9 +292,14 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
     }
 
     const optimizedBuffer = await optimizePlayerAvatarImage(file);
-    const objectPath = getPlayerPhotoObjectPath(parsed.data.organizationId, parsed.data.playerId);
+    const objectPath = getPlayerPhotoObjectPath(
+      getSupabaseDbSchema(),
+      parsed.data.organizationId,
+      parsed.data.playerId
+    );
+    const bucketName = getPlayerPhotosBucket();
     const { error: uploadError } = await supabase.storage
-      .from(PLAYER_PHOTOS_BUCKET)
+      .from(bucketName)
       .upload(objectPath, optimizedBuffer, {
         upsert: true,
         contentType: "image/webp",
