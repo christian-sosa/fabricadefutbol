@@ -1,10 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import type { NextRequest, NextResponse } from "next/server";
 
-import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/env";
+import { getSupabaseAnonKey, getSupabaseDbSchema, getSupabaseUrl } from "@/lib/env";
 
 export function createSupabaseMiddlewareClient(request: NextRequest, response: NextResponse) {
   return createServerClient(getSupabaseUrl(), getSupabaseAnonKey(), {
+    db: {
+      schema: getSupabaseDbSchema()
+    },
     cookies: {
       getAll() {
         return request.cookies.getAll();

@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "clean": "rimraf .next"
+    "clean": "rimraf .next",
+    "sql:build-schema": "node scripts/build-schema-sql.mjs",
+    "storage:copy": "node scripts/copy-storage-bucket.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
