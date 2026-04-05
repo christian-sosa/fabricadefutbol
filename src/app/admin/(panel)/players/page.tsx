@@ -1,12 +1,14 @@
 import {
   bulkUpdatePlayersAction,
   createPlayerAction,
+  deletePlayerAction,
   uploadPlayerPhotoAction
 } from "@/app/admin/(panel)/players/actions";
 import { PhotoUploadInput } from "@/components/admin/photo-upload-input";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
@@ -124,6 +126,16 @@ export default async function AdminPlayersPage({
                 <br />
                 Creado {new Date(player.created_at).toLocaleDateString("es-AR")}
               </p>
+              <ConfirmSubmitButton
+                className="mt-2 h-8 px-3 text-xs"
+                confirmMessage={`Estas seguro de eliminar a ${player.full_name}? El ranking se reordenara automaticamente.`}
+                formAction={deletePlayerAction}
+                formNoValidate
+                label="Eliminar jugador"
+                name="deletePlayerId"
+                value={player.id}
+                variant="danger"
+              />
             </div>
           ))}
 
