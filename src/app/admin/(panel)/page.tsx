@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import {
   createOrganizationAction,
+  deleteOrganizationAction,
   inviteOrganizationAdminAction,
   revokeOrganizationInviteAction
 } from "@/app/admin/(panel)/actions";
@@ -120,6 +121,21 @@ export default async function AdminDashboardPage({
                 <p className="text-sm text-slate-400">No hay partidos todavia para esta organizacion.</p>
               ) : null}
             </div>
+
+            {admin.isSuperAdmin ? (
+              <div className="mt-4 rounded-xl border border-danger/40 bg-danger/10 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-danger">Zona super admin</p>
+                <p className="mt-1 text-sm text-slate-200">
+                  Esta accion elimina la organizacion y todos sus datos asociados.
+                </p>
+                <form action={deleteOrganizationAction} className="mt-3">
+                  <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+                  <Button type="submit" variant="danger">
+                    Borrar organizacion
+                  </Button>
+                </form>
+              </div>
+            ) : null}
           </Card>
 
           <Card>

@@ -92,7 +92,7 @@ export function OrganizationSwitcher({
         <input
           className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/30"
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Buscar organizacion por nombre o slug..."
+          placeholder="Buscar organizacion por nombre..."
           type="search"
           value={query}
         />

@@ -30,6 +30,10 @@ const revokeInviteSchema = z.object({
   inviteId: z.string().uuid()
 });
 
+const deleteOrganizationSchema = z.object({
+  organizationId: z.string().uuid()
+});
+
 function buildAdminPath(organizationKey?: string, error?: string) {
   const basePath = withOrgQuery("/admin", organizationKey ?? null);
   if (!error) return basePath;
@@ -213,6 +217,59 @@ export async function revokeOrganizationInviteAction(formData: FormData) {
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo cancelar la invitacion.";
+    redirect(buildAdminPath(undefined, message));
+  }
+}
+
+export async function deleteOrganizationAction(formData: FormData) {
+  try {
+    const admin = await assertAdminAction();
+    if (!admin.isSuperAdmin) {
+      redirect(buildAdminPath(undefined, "Solo el super admin puede borrar organizaciones."));
+    }
+
+    const parsed = deleteOrganizationSchema.safeParse({
+      organizationId: formData.get("organizationId")
+    });
+
+    if (!parsed.success) {
+      redirect(buildAdminPath(undefined, parsed.error.issues[0]?.message ?? "Datos invalidos."));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { data: organization, error: organizationError } = await supabase
+      .from("organizations")
+      .select("id")
+      .eq("id", parsed.data.organizationId)
+      .maybeSingle();
+
+    if (organizationError) {
+      redirect(buildAdminPath(undefined, organizationError.message));
+    }
+
+    if (!organization) {
+      redirect(buildAdminPath(undefined, "La organizacion ya no existe."));
+    }
+
+    const { error: deleteError } = await supabase
+      .from("organizations")
+      .delete()
+      .eq("id", parsed.data.organizationId);
+
+    if (deleteError) {
+      redirect(buildAdminPath(undefined, deleteError.message));
+    }
+
+    revalidatePath("/admin");
+    revalidatePath("/");
+    revalidatePath("/ranking");
+    revalidatePath("/players");
+    revalidatePath("/matches");
+    revalidatePath("/upcoming");
+    redirect("/admin");
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    const message = error instanceof Error ? error.message : "No se pudo borrar la organizacion.";
     redirect(buildAdminPath(undefined, message));
   }
 }
