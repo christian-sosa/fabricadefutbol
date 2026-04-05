@@ -8,6 +8,7 @@ import {
   saveResultAction,
   updateMatchAction
 } from "@/app/admin/(panel)/matches/[id]/actions";
+import { MatchResultEditor } from "@/components/admin/match-result-editor";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { TeamOptionCard } from "@/components/matches/team-option-card";
 import { MatchStatusBadge } from "@/components/ui/badge";
@@ -16,7 +17,6 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { requireAdminOrganization } from "@/lib/auth/admin";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminMatchDetails } from "@/lib/queries/admin";
@@ -27,6 +27,13 @@ function toInputDateTime(isoDate: string) {
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
+
+type OptionMember = {
+  id: string;
+  full_name: string;
+  current_rating: number;
+  is_guest: boolean;
+};
 
 export default async function AdminMatchDetailPage({
   params,
@@ -48,6 +55,25 @@ export default async function AdminMatchDetailPage({
     details.match.status === "draft" ||
     (details.match.status === "confirmed" && !details.result);
   const canManageResult = details.match.status === "confirmed" || details.match.status === "finished";
+  const confirmedOption = details.options.find((option) => option.is_confirmed) ?? null;
+  const editableParticipants = confirmedOption
+    ? [
+        ...confirmedOption.teamA.map((member: OptionMember) => ({
+          participantId: `${member.is_guest ? "guest" : "player"}:${member.id}`,
+          fullName: member.full_name,
+          rating: Number(member.current_rating),
+          source: member.is_guest ? "guest" : "player",
+          initialTeam: "A" as const
+        })),
+        ...confirmedOption.teamB.map((member: OptionMember) => ({
+          participantId: `${member.is_guest ? "guest" : "player"}:${member.id}`,
+          fullName: member.full_name,
+          rating: Number(member.current_rating),
+          source: member.is_guest ? "guest" : "player",
+          initialTeam: "B" as const
+        }))
+      ]
+    : [];
 
   return (
     <div className="space-y-4">
@@ -178,14 +204,20 @@ export default async function AdminMatchDetailPage({
           <CardDescription>
             El partido puede quedar confirmado sin resultado. Cargalo cuando se juegue para finalizar y actualizar ratings.
           </CardDescription>
-          <form action={resultAction} className="mt-4 grid gap-3 md:grid-cols-4">
-            <Input defaultValue={details.result?.score_a ?? 0} min={0} name="scoreA" required type="number" />
-            <Input defaultValue={details.result?.score_b ?? 0} min={0} name="scoreB" required type="number" />
-            <Textarea className="md:col-span-2" defaultValue={details.result?.notes ?? ""} name="notes" placeholder="Notas opcionales" rows={3} />
-            <div className="md:col-span-4">
-              <Button type="submit">{details.result ? "Guardar correccion" : "Guardar resultado y finalizar"}</Button>
-            </div>
-          </form>
+          {editableParticipants.length ? (
+            <MatchResultEditor
+              action={resultAction}
+              defaultNotes={details.result?.notes ?? ""}
+              defaultScoreA={details.result?.score_a ?? 0}
+              defaultScoreB={details.result?.score_b ?? 0}
+              existingParticipants={editableParticipants}
+              submitLabel={details.result ? "Guardar correccion" : "Guardar resultado y finalizar"}
+            />
+          ) : (
+            <p className="mt-3 text-sm text-slate-400">
+              Falta una opcion confirmada para poder definir la formacion final y guardar resultado.
+            </p>
+          )}
         </Card>
       ) : (
         <Card>

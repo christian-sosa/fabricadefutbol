@@ -59,20 +59,6 @@ export async function createOrganizationAction(formData: FormData) {
     }
 
     const supabase = await createSupabaseServerClient();
-    if (!admin.isSuperAdmin) {
-      const { count: createdCount, error: createdCountError } = await supabase
-        .from("organizations")
-        .select("id", { count: "exact", head: true })
-        .eq("created_by", admin.userId);
-
-      if (createdCountError) {
-        redirect(buildAdminPath(undefined, createdCountError.message));
-      }
-
-      if ((createdCount ?? 0) >= 1) {
-        redirect(buildAdminPath(undefined, "Cada usuario puede crear solo 1 organizacion."));
-      }
-    }
 
     const baseSlug = slugifyOrganizationName(parsed.data.name) || `organizacion-${Date.now()}`;
     const { data: existingSlugsRows, error: existingSlugsError } = await supabase

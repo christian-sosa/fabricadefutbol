@@ -193,25 +193,34 @@ export async function getAdminOrganizations(admin: AdminSession): Promise<AdminO
     return data ?? [];
   }
 
-  const { data, error } = await supabase
-    .from("organization_admins")
-    .select("organizations(id, name, slug, is_public, created_at)")
-    .eq("admin_id", admin.userId);
+  const [{ data: createdOrganizations, error: createdOrganizationsError }, { data, error }] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("id, name, slug, is_public, created_at")
+      .eq("created_by", admin.userId),
+    supabase
+      .from("organization_admins")
+      .select("organizations(id, name, slug, is_public, created_at)")
+      .eq("admin_id", admin.userId)
+  ]);
 
+  if (createdOrganizationsError) throw new Error(createdOrganizationsError.message);
   if (error) throw new Error(error.message);
 
-  const organizations = (data ?? [])
-    .map((row) => {
-      const relation = row.organizations;
-      if (Array.isArray(relation)) return relation[0] ?? null;
-      return relation ?? null;
-    })
-    .filter(
-      (value): value is AdminOrganization =>
-        Boolean(value && typeof value.id === "string" && typeof value.name === "string")
-    );
+  const organizationsById = new Map<string, AdminOrganization>();
+  for (const organization of createdOrganizations ?? []) {
+    organizationsById.set(organization.id, organization);
+  }
 
-  return organizations.sort((a, b) => a.name.localeCompare(b.name, "es"));
+  for (const row of data ?? []) {
+    const relation = row.organizations;
+    const value = Array.isArray(relation) ? relation[0] ?? null : relation ?? null;
+    if (value && typeof value.id === "string" && typeof value.name === "string") {
+      organizationsById.set(value.id, value as AdminOrganization);
+    }
+  }
+
+  return Array.from(organizationsById.values()).sort((a, b) => a.name.localeCompare(b.name, "es"));
 }
 
 export async function getOrganizationQueryKeyById(organizationId: string) {
@@ -260,14 +269,28 @@ export async function assertOrganizationAdminAction(organizationId: string) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("organization_admins")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("admin_id", admin.userId)
-    .maybeSingle();
+  const [{ data: membership, error: membershipError }, { data: createdByUser, error: creatorError }] =
+    await Promise.all([
+      supabase
+        .from("organization_admins")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("admin_id", admin.userId)
+        .maybeSingle(),
+      supabase
+        .from("organizations")
+        .select("id")
+        .eq("id", organizationId)
+        .eq("created_by", admin.userId)
+        .maybeSingle()
+    ]);
 
-  if (error || !data) {
+  const hasAccess = Boolean(membership || createdByUser);
+  if (!hasAccess && (membershipError || creatorError)) {
+    throw new Error(membershipError?.message ?? creatorError?.message ?? "No autorizado para administrar esta organizacion.");
+  }
+
+  if (!hasAccess) {
     throw new Error("No autorizado para administrar esta organizacion.");
   }
 
