@@ -18,13 +18,14 @@ import { getAdminPlayers } from "@/lib/queries/admin";
 export default async function AdminPlayersPage({
   searchParams
 }: {
-  searchParams: { org?: string; error?: string; success?: string };
+  searchParams: { org?: string; error?: string; success?: string; refresh?: string };
 }) {
   const { organizations, selectedOrganization } = await requireAdminOrganization(searchParams.org);
   const players = await getAdminPlayers(selectedOrganization.id);
   const error = searchParams.error;
   const success = searchParams.success;
   const photoSuccess = success?.toLowerCase().includes("foto") ? success : null;
+  const formRenderKey = `${selectedOrganization.id}:${searchParams.refresh ?? "base"}`;
 
   return (
     <div className="space-y-4">
@@ -89,7 +90,7 @@ export default async function AdminPlayersPage({
         {error ? <p className="mt-3 text-sm font-semibold text-danger">{error}</p> : null}
         {success ? <p className="mt-3 text-sm font-semibold text-emerald-300">{success}</p> : null}
 
-        <form action={bulkUpdatePlayersAction} className="mt-4 space-y-3">
+        <form action={bulkUpdatePlayersAction} className="mt-4 space-y-3" key={formRenderKey}>
           <input name="organizationId" type="hidden" value={selectedOrganization.id} />
           <input name="deletePlayerId" type="hidden" value="" />
 
