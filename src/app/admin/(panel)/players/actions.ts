@@ -49,14 +49,14 @@ function withMessage(organizationId: string, error: string | null) {
   const basePath = withOrgQuery("/admin/players", organizationId);
   if (!error) return basePath;
   const separator = basePath.includes("?") ? "&" : "?";
-  return `${basePath}${separator}error=${encodeURIComponent(error)}`;
+  return `${basePath}${separator}error=${encodeURIComponent(error)}&refresh=${Date.now()}`;
 }
 
 function withSuccess(organizationId: string, success: string | null) {
   const basePath = withOrgQuery("/admin/players", organizationId);
   if (!success) return basePath;
   const separator = basePath.includes("?") ? "&" : "?";
-  return `${basePath}${separator}success=${encodeURIComponent(success)}`;
+  return `${basePath}${separator}success=${encodeURIComponent(success)}&refresh=${Date.now()}`;
 }
 
 function inferFileExtension(file: File) {

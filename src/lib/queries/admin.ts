@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { unstable_noStore as noStore } from "next/cache";
 
 function notNull<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined;
@@ -100,6 +101,7 @@ export async function getOrganizationAdminData(organizationId: string) {
 }
 
 export async function getAdminPlayers(organizationId: string) {
+  noStore();
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("players")
