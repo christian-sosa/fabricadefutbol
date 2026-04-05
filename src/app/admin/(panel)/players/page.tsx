@@ -24,6 +24,7 @@ export default async function AdminPlayersPage({
   const players = await getAdminPlayers(selectedOrganization.id);
   const error = searchParams.error;
   const success = searchParams.success;
+  const photoSuccess = success?.toLowerCase().includes("foto") ? success : null;
 
   return (
     <div className="space-y-4">
@@ -76,12 +77,13 @@ export default async function AdminPlayersPage({
             Subir foto
           </Button>
         </form>
+        {photoSuccess ? <p className="mt-3 text-sm font-semibold text-emerald-300">{photoSuccess}</p> : null}
       </Card>
 
       <Card>
         <CardTitle>Editar planilla de jugadores</CardTitle>
         <CardDescription>
-          Modifica toda la planilla y guarda una sola vez. Los ranks deben quedar secuenciales y unicos (1, 2, 3...).
+          Modifica la planilla y guarda una sola vez. Si cambias el rank de alguien, el resto se reordena automaticamente.
         </CardDescription>
 
         {error ? <p className="mt-3 text-sm font-semibold text-danger">{error}</p> : null}
