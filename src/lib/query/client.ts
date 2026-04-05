@@ -34,8 +34,9 @@ export async function fetchOrganizationStandings(organizationId: string) {
   return data.standings;
 }
 
-export async function fetchOrganizationMatches(organizationId: string) {
-  const response = await fetch(`/api/organizations/${organizationId}/matches`, {
+export async function fetchOrganizationMatches(params: { organizationId: string; page: number; pageSize: number }) {
+  const { organizationId, page, pageSize } = params;
+  const response = await fetch(`/api/organizations/${organizationId}/matches?page=${page}&pageSize=${pageSize}`, {
     method: "GET",
     headers: {
       "content-type": "application/json"
@@ -46,8 +47,7 @@ export async function fetchOrganizationMatches(organizationId: string) {
     throw new Error(await parseApiError(response));
   }
 
-  const data = (await response.json()) as OrganizationMatchesResponse;
-  return data.matches;
+  return (await response.json()) as OrganizationMatchesResponse;
 }
 
 export async function updateMatchResult(params: {

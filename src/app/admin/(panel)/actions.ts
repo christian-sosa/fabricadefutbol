@@ -30,6 +30,11 @@ const revokeInviteSchema = z.object({
   inviteId: z.string().uuid()
 });
 
+const removeAdminSchema = z.object({
+  organizationId: z.string().uuid(),
+  adminId: z.string().uuid()
+});
+
 const deleteOrganizationSchema = z.object({
   organizationId: z.string().uuid()
 });
@@ -217,6 +222,57 @@ export async function revokeOrganizationInviteAction(formData: FormData) {
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo cancelar la invitacion.";
+    redirect(buildAdminPath(undefined, message));
+  }
+}
+
+export async function removeOrganizationAdminAction(formData: FormData) {
+  try {
+    const parsed = removeAdminSchema.safeParse({
+      organizationId: formData.get("organizationId"),
+      adminId: formData.get("adminId")
+    });
+
+    if (!parsed.success) {
+      redirect(buildAdminPath(undefined, parsed.error.issues[0]?.message ?? "Datos invalidos."));
+    }
+
+    const actingAdmin = await assertOrganizationAdminAction(parsed.data.organizationId);
+    const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
+    const supabase = await createSupabaseServerClient();
+
+    if (actingAdmin.userId === parsed.data.adminId) {
+      redirect(buildAdminPath(organizationQueryKey, "No puedes quitarte a ti mismo como admin de esta organizacion."));
+    }
+
+    const { count: adminsCount, error: adminsCountError } = await supabase
+      .from("organization_admins")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", parsed.data.organizationId);
+
+    if (adminsCountError) {
+      redirect(buildAdminPath(organizationQueryKey, adminsCountError.message));
+    }
+
+    if ((adminsCount ?? 0) <= 1) {
+      redirect(buildAdminPath(organizationQueryKey, "La organizacion debe mantener al menos 1 admin activo."));
+    }
+
+    const { error: deleteError } = await supabase
+      .from("organization_admins")
+      .delete()
+      .eq("organization_id", parsed.data.organizationId)
+      .eq("admin_id", parsed.data.adminId);
+
+    if (deleteError) {
+      redirect(buildAdminPath(organizationQueryKey, deleteError.message));
+    }
+
+    revalidatePath("/admin");
+    redirect(withOrgQuery("/admin", organizationQueryKey));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    const message = error instanceof Error ? error.message : "No se pudo quitar al administrador.";
     redirect(buildAdminPath(undefined, message));
   }
 }

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { getMatchHistoryCards } from "@/lib/queries/public";
+import { getMatchHistoryCardsPage } from "@/lib/queries/public";
 
 export async function GET(
-  _: Request,
+  request: Request,
   context: {
     params: { organizationId: string };
   }
@@ -14,11 +14,17 @@ export async function GET(
   }
 
   try {
-    const matches = await getMatchHistoryCards(organizationId);
-    return NextResponse.json({
-      organizationId,
-      matches
+    const { searchParams } = new URL(request.url);
+    const requestedPage = Number(searchParams.get("page") ?? "1");
+    const requestedPageSize = Number(searchParams.get("pageSize") ?? "10");
+    const page = Number.isFinite(requestedPage) ? requestedPage : 1;
+    const pageSize = Number.isFinite(requestedPageSize) ? requestedPageSize : 10;
+
+    const result = await getMatchHistoryCardsPage(organizationId, {
+      page,
+      pageSize
     });
+    return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo obtener el historial.";
     return NextResponse.json({ error: message }, { status: 500 });

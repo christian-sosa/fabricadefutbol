@@ -15,6 +15,7 @@ const CONTENT_TYPE_BY_EXTENSION: Record<(typeof PHOTO_EXTENSIONS)[number], strin
   png: "image/png",
   webp: "image/webp"
 };
+const PHOTO_CACHE_CONTROL = "no-store";
 
 function getLegacyPhotoPath(playerId: string, extension: (typeof PHOTO_EXTENSIONS)[number]) {
   return path.join(process.cwd(), "public", "players", `${playerId}.${extension}`);
@@ -42,7 +43,7 @@ async function readImageResponse(filePath: string, contentType: string) {
   return new NextResponse(file, {
     headers: {
       "content-type": contentType,
-      "cache-control": "public, max-age=300"
+      "cache-control": PHOTO_CACHE_CONTROL
     }
   });
 }
@@ -95,7 +96,7 @@ export async function GET(
         return new NextResponse(fileBuffer, {
           headers: {
             "content-type": "image/webp",
-            "cache-control": "public, max-age=300"
+            "cache-control": PHOTO_CACHE_CONTROL
           }
         });
       }

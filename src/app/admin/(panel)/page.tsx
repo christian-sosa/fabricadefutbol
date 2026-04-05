@@ -4,12 +4,14 @@ import {
   createOrganizationAction,
   deleteOrganizationAction,
   inviteOrganizationAdminAction,
+  removeOrganizationAdminAction,
   revokeOrganizationInviteAction
 } from "@/app/admin/(panel)/actions";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { MatchStatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
 import { getAdminOrganizationContext } from "@/lib/auth/admin";
 import { withOrgQuery } from "@/lib/org";
@@ -157,9 +159,30 @@ export default async function AdminDashboardPage({
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Admins activos</p>
                 <div className="space-y-2">
                   {organizationAdmins.admins.map((member) => (
-                    <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm" key={member.id}>
-                      <p className="font-semibold text-slate-100">{member.displayName}</p>
-                      <p className="text-xs text-slate-400">Desde {new Date(member.createdAt).toLocaleDateString("es-AR")}</p>
+                    <div
+                      className="flex items-start justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm"
+                      key={member.id}
+                    >
+                      <div>
+                        <p className="font-semibold text-slate-100">{member.displayName}</p>
+                        <p className="text-xs text-slate-400">Desde {new Date(member.createdAt).toLocaleDateString("es-AR")}</p>
+                      </div>
+                      {member.id === admin.userId ? (
+                        <span className="rounded-md border border-slate-700 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+                          Tu cuenta
+                        </span>
+                      ) : (
+                        <form action={removeOrganizationAdminAction}>
+                          <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+                          <input name="adminId" type="hidden" value={member.id} />
+                          <ConfirmSubmitButton
+                            className="h-7 min-w-7 px-2 text-xs"
+                            confirmMessage={`Estas seguro de quitar a ${member.displayName} como admin de ${selectedOrganization.name}?`}
+                            label="X"
+                            variant="ghost"
+                          />
+                        </form>
+                      )}
                     </div>
                   ))}
                 </div>

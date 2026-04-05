@@ -51,8 +51,10 @@ export function PlayerAvatar({ playerId, name, size = "md", className }: PlayerA
         alt={`Avatar de ${name}`}
         className="h-full w-full object-cover"
         height={pixelSize}
+        loading="lazy"
         sizes={`${pixelSize}px`}
         src={src}
+        unoptimized
         width={pixelSize}
       />
       {!playerId ? (

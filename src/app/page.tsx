@@ -14,7 +14,7 @@ export default async function HomePage({
   searchParams: { org?: string };
 }) {
   const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
-    resolvePublicOrganization(searchParams.org),
+    resolvePublicOrganization(searchParams.org, { defaultContext: "home" }),
     getViewerAdminOrganizations()
   ]);
   const summary = await getHomeSummary(selectedOrganization?.id ?? null);
