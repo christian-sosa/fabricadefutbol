@@ -85,13 +85,52 @@ async function optimizePlayerAvatarImage(file: File) {
   return optimized;
 }
 
-async function ensureSequentialRanks(rows: Array<z.infer<typeof rowSchema>>) {
-  const sortedRanks = [...rows.map((row) => row.initialRank)].sort((a, b) => a - b);
-  const hasSequentialRanks = sortedRanks.every((rank, index) => rank === index + 1);
+function buildRankAssignments(params: {
+  rows: Array<z.infer<typeof rowSchema>>;
+  originalRankById: Map<string, number>;
+}) {
+  const { rows, originalRankById } = params;
+  const rowById = new Map(rows.map((row) => [row.id, row]));
 
-  if (!hasSequentialRanks) {
-    throw new Error("Los ranks deben ser secuenciales y unicos (1, 2, 3, ...). Ajusta la planilla antes de guardar.");
+  const orderedIds = [...rows]
+    .sort((a, b) => {
+      const aRank = originalRankById.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const bRank = originalRankById.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+      return aRank - bRank;
+    })
+    .map((row) => row.id);
+
+  const rankMoves = rows
+    .map((row) => ({
+      id: row.id,
+      originalRank: originalRankById.get(row.id),
+      targetRank: row.initialRank
+    }))
+    .filter((move) => typeof move.originalRank === "number" && move.originalRank !== move.targetRank)
+    .sort((a, b) => (a.originalRank ?? 0) - (b.originalRank ?? 0));
+
+  for (const move of rankMoves) {
+    const currentIndex = orderedIds.indexOf(move.id);
+    if (currentIndex < 0) continue;
+
+    const targetIndex = Math.min(Math.max(move.targetRank, 1), orderedIds.length) - 1;
+    if (targetIndex === currentIndex) continue;
+
+    orderedIds.splice(currentIndex, 1);
+    orderedIds.splice(targetIndex, 0, move.id);
   }
+
+  return orderedIds.map((id, index) => {
+    const row = rowById.get(id);
+    if (!row) {
+      throw new Error("No se pudo reordenar el ranking por datos incompletos.");
+    }
+
+    return {
+      row,
+      finalRank: index + 1
+    };
+  });
 }
 
 export async function createPlayerAction(formData: FormData) {
@@ -199,17 +238,38 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
       })
     );
 
-    await ensureSequentialRanks(rows);
-
     const idsSet = new Set(rows.map((row) => row.id));
     if (idsSet.size !== rows.length) {
       redirect(withMessage(organizationQueryKey, "Hay IDs de jugadores duplicados en la planilla."));
     }
 
     const supabase = await createSupabaseServerClient();
+    const { data: currentPlayers, error: currentPlayersError } = await supabase
+      .from("players")
+      .select("id, initial_rank")
+      .eq("organization_id", organizationId);
 
-    for (let index = 0; index < rows.length; index += 1) {
-      const row = rows[index];
+    if (currentPlayersError) {
+      redirect(withMessage(organizationQueryKey, currentPlayersError.message));
+    }
+
+    const originalRankById = new Map((currentPlayers ?? []).map((player) => [player.id, player.initial_rank]));
+    if (originalRankById.size !== rows.length) {
+      redirect(
+        withMessage(
+          organizationQueryKey,
+          "La planilla cambio mientras editabas. Recarga la pagina y vuelve a intentar."
+        )
+      );
+    }
+
+    const assignments = buildRankAssignments({ rows, originalRankById });
+    const hasRankChanges = assignments.some(
+      ({ row, finalRank }) => (originalRankById.get(row.id) ?? finalRank) !== finalRank
+    );
+
+    for (let index = 0; index < assignments.length; index += 1) {
+      const row = assignments[index].row;
       const { error: tempError } = await supabase
         .from("players")
         .update({ initial_rank: 10000 + index })
@@ -221,12 +281,13 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
       }
     }
 
-    for (const row of rows) {
+    for (const assignment of assignments) {
+      const row = assignment.row;
       const { error: saveError } = await supabase
         .from("players")
         .update({
           full_name: row.fullName,
-          initial_rank: row.initialRank,
+          initial_rank: assignment.finalRank,
           current_rating: Number(row.currentRating.toFixed(2)),
           active: row.active
         })
@@ -242,7 +303,14 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
     revalidatePath("/players");
     revalidatePath("/ranking");
     revalidatePath("/");
-    redirect(withSuccess(organizationQueryKey, "Se guardaron todos los cambios de la planilla."));
+    redirect(
+      withSuccess(
+        organizationQueryKey,
+        hasRankChanges
+          ? "Se guardaron los cambios y el ranking se reordeno automaticamente."
+          : "Se guardaron todos los cambios de la planilla."
+      )
+    );
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo guardar la planilla.";
@@ -404,7 +472,7 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
     revalidatePath("/ranking");
     revalidatePath(`/players/${parsed.data.playerId}`);
     revalidatePath(`/api/player-photo/${parsed.data.playerId}`);
-    redirect(withSuccess(organizationQueryKey, "Foto actualizada correctamente en Supabase Storage."));
+    redirect(withSuccess(organizationQueryKey, "Foto subida correctamente."));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo subir la foto.";
