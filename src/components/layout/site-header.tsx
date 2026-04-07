@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -61,8 +62,17 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <Link className="text-sm font-extrabold uppercase tracking-[0.22em] text-slate-100" href="/">
-          Fabrica de Futbol
+        <Link className="flex items-center gap-3" href="/">
+          <Image
+            alt="Logo placeholder de Fabrica de Futbol"
+            className="h-9 w-9 rounded-lg border border-slate-700 bg-slate-900 object-cover"
+            height={36}
+            src="/logo-placeholder.svg"
+            width={36}
+          />
+          <div>
+            <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-slate-100">Fabrica de Futbol</p>
+          </div>
         </Link>
         <nav className="flex flex-wrap items-center justify-end gap-2">
           {PUBLIC_NAV_ITEMS.map((item) => {

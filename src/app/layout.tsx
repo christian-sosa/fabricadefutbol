@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import "@/app/globals.css";
+import { BetaNotice } from "@/components/layout/beta-notice";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ReactQueryProvider } from "@/components/providers/react-query-provider";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -30,6 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Suspense fallback={<div className="sticky top-0 z-30 h-[57px] border-b border-slate-800 bg-slate-950/85" />}>
             <SiteHeader initialIsAuthenticated={initialIsAuthenticated} />
           </Suspense>
+          <BetaNotice />
           <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8">{children}</main>
         </ReactQueryProvider>
       </body>

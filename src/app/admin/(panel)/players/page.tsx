@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import {
   bulkUpdatePlayersAction,
   createPlayerAction,
@@ -12,15 +14,22 @@ import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
-import { requireAdminOrganization } from "@/lib/auth/admin";
+import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { getAdminPlayers } from "@/lib/queries/admin";
+import { withOrgQuery } from "@/lib/org";
 
 export default async function AdminPlayersPage({
   searchParams
 }: {
   searchParams: { org?: string; error?: string; success?: string; refresh?: string };
 }) {
-  const { organizations, selectedOrganization } = await requireAdminOrganization(searchParams.org);
+  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(searchParams.org);
+  const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
+  if (!writeAccess.canWrite) {
+    const target = withOrgQuery("/admin", selectedOrganization.slug);
+    const separator = target.includes("?") ? "&" : "?";
+    redirect(`${target}${separator}error=${encodeURIComponent(writeAccess.reason ?? "No tienes permisos para editar esta organizacion.")}`);
+  }
   const players = await getAdminPlayers(selectedOrganization.id);
   const error = searchParams.error;
   const success = searchParams.success;

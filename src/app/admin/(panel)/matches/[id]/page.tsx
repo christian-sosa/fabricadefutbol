@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import {
   confirmOptionAction,
   deleteMatchAction,
   regenerateOptionsAction,
+  saveLineupBeforeResultAction,
   updateMatchAction
 } from "@/app/admin/(panel)/matches/[id]/actions";
+import { MatchLineupEditor } from "@/components/admin/match-lineup-editor";
 import { MatchResultEditorQuery } from "@/components/admin/match-result-editor-query";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { TeamOptionCard } from "@/components/matches/team-option-card";
@@ -16,9 +18,9 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
-import { requireAdminOrganization } from "@/lib/auth/admin";
+import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { withOrgQuery } from "@/lib/org";
-import { getAdminMatchDetails } from "@/lib/queries/admin";
+import { getAdminMatchDetails, getSelectablePlayers } from "@/lib/queries/admin";
 import { formatDateTime } from "@/lib/utils";
 
 function toInputDateTime(isoDate: string) {
@@ -41,7 +43,13 @@ export default async function AdminMatchDetailPage({
   params: { id: string };
   searchParams: { org?: string; error?: string };
 }) {
-  const { organizations, selectedOrganization } = await requireAdminOrganization(searchParams.org);
+  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(searchParams.org);
+  const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
+  if (!writeAccess.canWrite) {
+    const target = withOrgQuery("/admin", selectedOrganization.slug);
+    const separator = target.includes("?") ? "&" : "?";
+    redirect(`${target}${separator}error=${encodeURIComponent(writeAccess.reason ?? "No tienes permisos para editar esta organizacion.")}`);
+  }
   const details = await getAdminMatchDetails(params.id, selectedOrganization.id);
   if (!details) notFound();
 
@@ -49,6 +57,7 @@ export default async function AdminMatchDetailPage({
   const regenerateAction = regenerateOptionsAction.bind(null, params.id, selectedOrganization.id);
   const matchUpdateAction = updateMatchAction.bind(null, params.id, selectedOrganization.id);
   const deleteAction = deleteMatchAction.bind(null, params.id, selectedOrganization.id);
+  const saveLineupAction = saveLineupBeforeResultAction.bind(null, params.id, selectedOrganization.id);
   const canDeleteMatch =
     details.match.status === "draft" ||
     (details.match.status === "confirmed" && !details.result);
@@ -72,6 +81,14 @@ export default async function AdminMatchDetailPage({
         }))
       ]
     : [];
+  const canAdjustLineupBeforeResult =
+    details.match.status === "confirmed" && !details.result && editableParticipants.length > 0;
+  const selectablePlayers = await getSelectablePlayers(selectedOrganization.id);
+  const availableReplacementPlayers = selectablePlayers.map((player) => ({
+    id: player.id,
+    fullName: player.full_name,
+    rating: Number(player.current_rating)
+  }));
 
   return (
     <div className="space-y-4">
@@ -195,6 +212,22 @@ export default async function AdminMatchDetailPage({
           {!details.options.length ? <p className="text-sm text-slate-400">No hay opciones generadas para este partido.</p> : null}
         </div>
       </Card>
+
+      {canAdjustLineupBeforeResult ? (
+        <Card>
+          <CardTitle>Ajustar formacion antes del resultado</CardTitle>
+          <CardDescription>
+            Si hubo ausencias, puedes bajar jugadores, subir reemplazos de plantilla o agregar invitados
+            antes de cargar el resultado.
+          </CardDescription>
+          <MatchLineupEditor
+            action={saveLineupAction}
+            availablePlayers={availableReplacementPlayers}
+            existingParticipants={editableParticipants}
+            submitLabel="Guardar formacion final (sin resultado)"
+          />
+        </Card>
+      ) : null}
 
       {canManageResult ? (
         <Card>

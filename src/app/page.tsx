@@ -4,9 +4,19 @@ import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import { ORGANIZATION_BILLING_CURRENCY, ORGANIZATION_MONTHLY_PRICE_ARS } from "@/lib/constants";
 import { withOrgQuery } from "@/lib/org";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
 import { formatDateTime } from "@/lib/utils";
+
+function formatCurrencyArs(amount: number) {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: ORGANIZATION_BILLING_CURRENCY,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+}
 
 export default async function HomePage({
   searchParams
@@ -26,6 +36,9 @@ export default async function HomePage({
         <h1 className="mt-2 text-3xl font-black text-slate-100 md:text-5xl">Organizacion simple, estadisticas reales</h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
           Cada organizacion gestiona sus jugadores y partidos, pero toda la data publica se puede consultar desde este portal.
+        </p>
+        <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-300">
+          Proba 1 mes gratis. Despues, {formatCurrencyArs(ORGANIZATION_MONTHLY_PRICE_ARS)} por mes por organizacion.
         </p>
 
         <div className="mt-6">
@@ -50,6 +63,12 @@ export default async function HomePage({
             href={withOrgQuery("/ranking", selectedOrganization?.slug)}
           >
             Ver ranking
+          </Link>
+          <Link
+            className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
+            href={withOrgQuery("/pricing", selectedOrganization?.slug)}
+          >
+            Ver precios
           </Link>
           <Link
             className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20"

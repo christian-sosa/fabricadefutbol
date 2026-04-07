@@ -3,7 +3,6 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const loginSchema = z.object({
@@ -82,50 +81,14 @@ export async function registerAdminAction(_: RegisterState, formData: FormData):
   }
 
   const supabase = await createSupabaseServerClient();
-  const adminClient = createSupabaseAdminClient();
-
-  if (adminClient) {
-    const { error: createUserError } = await adminClient.auth.admin.createUser({
-      email: parsed.data.email,
-      password: parsed.data.password,
-      email_confirm: true,
-      user_metadata: {
-        display_name: parsed.data.displayName
-      }
-    });
-
-    const isInvalidAdminKey = String(createUserError?.message ?? "")
-      .toLowerCase()
-      .includes("invalid api key");
-
-    if (createUserError && !isInvalidAdminKey) {
-      return {
-        error: createUserError.message,
-        success: null
-      };
-    }
-
-    if (!isInvalidAdminKey) {
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: parsed.data.email,
-        password: parsed.data.password
-      });
-
-      if (signInError || !signInData.user) {
-        return {
-          error: signInError?.message ?? "No se pudo iniciar sesion luego del registro.",
-          success: null
-        };
-      }
-
-      redirect("/admin");
-    }
-  }
+  const appUrl = process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
+  const emailRedirectTo = appUrl ? `${appUrl.replace(/\/+$/, "")}/admin/login` : undefined;
 
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
+      ...(emailRedirectTo ? { emailRedirectTo } : {}),
       data: {
         display_name: parsed.data.displayName
       }
