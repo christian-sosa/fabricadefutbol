@@ -1,7 +1,15 @@
 import { redirect } from "next/navigation";
 
-import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
+import { FREE_TRIAL_DAYS, SUPER_ADMIN_EMAIL } from "@/lib/constants";
+import {
+  addDaysToIsoDate,
+  getOrganizationTrialEndsAt,
+  hasActiveOrganizationSubscription,
+  isIsoDateExpired,
+  toShortDate
+} from "@/lib/domain/billing";
 import { normalizeEmail } from "@/lib/org";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type AdminSession = {
@@ -18,6 +26,27 @@ export type AdminOrganization = {
   is_public: boolean;
   created_at: string;
 };
+
+type FreeTrialStatus = {
+  hasCreatedOrganization: boolean;
+  firstOrganizationCreatedAt: string | null;
+  trialEndsAt: string | null;
+  trialExpired: boolean;
+};
+
+export type OrganizationWriteAccess = {
+  canWrite: boolean;
+  reason: string | null;
+  organizationTrialEndsAt: string | null;
+  organizationTrialExpired: boolean;
+  adminTrialEndsAt: string | null;
+  adminTrialExpired: boolean;
+  subscriptionStatus: string | null;
+  subscriptionCurrentPeriodEnd: string | null;
+  subscriptionActive: boolean;
+};
+
+let cachedSuperAdminUserId: string | null | undefined;
 
 function findOrganizationByKey(organizations: AdminOrganization[], organizationKey?: string | null) {
   if (!organizationKey) return null;
@@ -137,6 +166,208 @@ function isSuperAdminEmail(email: string) {
   return normalizeEmail(email) === SUPER_ADMIN_EMAIL;
 }
 
+async function resolveSuperAdminUserId() {
+  if (typeof cachedSuperAdminUserId !== "undefined") {
+    return cachedSuperAdminUserId;
+  }
+
+  const adminClient = createSupabaseAdminClient();
+  if (!adminClient) {
+    cachedSuperAdminUserId = null;
+    return null;
+  }
+
+  const { data, error } = await adminClient.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000
+  });
+
+  if (error) {
+    cachedSuperAdminUserId = null;
+    return null;
+  }
+
+  const user = (data?.users ?? []).find(
+    (candidate) => normalizeEmail(candidate.email ?? "") === SUPER_ADMIN_EMAIL
+  );
+  cachedSuperAdminUserId = user?.id ?? null;
+  return cachedSuperAdminUserId;
+}
+
+function isBillingSchemaMissing(message: string) {
+  return /organization_billing_subscriptions|organization_billing_payments|requested_organization_name|requested_organization_slug|created_organization_id|purpose/i.test(
+    message
+  );
+}
+
+async function getAdminFreeTrialStatus(userId: string): Promise<FreeTrialStatus> {
+  const supabase = await createSupabaseServerClient();
+  const { data: firstCreatedOrganization, error } = await supabase
+    .from("organizations")
+    .select("id, created_at")
+    .eq("created_by", userId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!firstCreatedOrganization?.created_at) {
+    return {
+      hasCreatedOrganization: false,
+      firstOrganizationCreatedAt: null,
+      trialEndsAt: null,
+      trialExpired: false
+    };
+  }
+
+  const trialEndsAt = addDaysToIsoDate(firstCreatedOrganization.created_at, FREE_TRIAL_DAYS);
+  return {
+    hasCreatedOrganization: true,
+    firstOrganizationCreatedAt: firstCreatedOrganization.created_at,
+    trialEndsAt,
+    trialExpired: isIsoDateExpired(trialEndsAt)
+  };
+}
+
+export async function getAdminOrganizationCreationAccess(admin: AdminSession) {
+  if (admin.isSuperAdmin) {
+    return {
+      canCreateOrganization: true,
+      reason: null as string | null
+    };
+  }
+
+  const freeTrialStatus = await getAdminFreeTrialStatus(admin.userId);
+  if (!freeTrialStatus.hasCreatedOrganization) {
+    return {
+      canCreateOrganization: true,
+      reason: null as string | null
+    };
+  }
+
+  return {
+    canCreateOrganization: false,
+    reason:
+      "Ya consumiste tu organizacion free. Para crear una nueva vas a necesitar activar el plan pago."
+  };
+}
+
+export async function assertCanCreateOrganization(admin: AdminSession) {
+  if (admin.isSuperAdmin) return;
+
+  const creationAccess = await getAdminOrganizationCreationAccess(admin);
+  if (creationAccess.canCreateOrganization) return;
+  throw new Error(
+    creationAccess.reason ??
+      "Cada cuenta tiene 1 organizacion free. Para crear una nueva organizacion tendras que activar el plan pago."
+  );
+}
+
+export async function getOrganizationWriteAccess(
+  admin: AdminSession,
+  organizationId: string
+): Promise<OrganizationWriteAccess> {
+  if (admin.isSuperAdmin) {
+    return {
+      canWrite: true,
+      reason: null,
+      organizationTrialEndsAt: null,
+      organizationTrialExpired: false,
+      adminTrialEndsAt: null,
+      adminTrialExpired: false,
+      subscriptionStatus: null,
+      subscriptionCurrentPeriodEnd: null,
+      subscriptionActive: false
+    };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: organization, error: organizationError } = await supabase
+    .from("organizations")
+    .select("id, created_at, created_by")
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  if (organizationError) {
+    throw new Error(organizationError.message);
+  }
+
+  if (!organization?.created_at) {
+    throw new Error("La organizacion no existe.");
+  }
+
+  const superAdminUserId = await resolveSuperAdminUserId();
+  const isSuperAdminOwnedOrganization = Boolean(
+    superAdminUserId && organization.created_by === superAdminUserId
+  );
+  if (isSuperAdminOwnedOrganization) {
+    return {
+      canWrite: true,
+      reason: null,
+      organizationTrialEndsAt: null,
+      organizationTrialExpired: false,
+      adminTrialEndsAt: null,
+      adminTrialExpired: false,
+      subscriptionStatus: null,
+      subscriptionCurrentPeriodEnd: null,
+      subscriptionActive: false
+    };
+  }
+
+  const organizationTrialEndsAt = getOrganizationTrialEndsAt(organization.created_at);
+  const organizationTrialExpired = isIsoDateExpired(organizationTrialEndsAt);
+
+  const { data: subscription, error: subscriptionError } = await supabase
+    .from("organization_billing_subscriptions")
+    .select("status, current_period_end")
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (subscriptionError && !isBillingSchemaMissing(subscriptionError.message)) {
+    throw new Error(subscriptionError.message);
+  }
+
+  const safeSubscription = subscriptionError && isBillingSchemaMissing(subscriptionError.message) ? null : subscription;
+  const subscriptionStatus = safeSubscription?.status ?? null;
+  const subscriptionCurrentPeriodEnd = safeSubscription?.current_period_end ?? null;
+  const subscriptionActive = hasActiveOrganizationSubscription(safeSubscription);
+
+  const userTrial = await getAdminFreeTrialStatus(admin.userId);
+  const adminTrialEndsAt = userTrial.trialEndsAt;
+  const adminTrialExpired = userTrial.trialExpired;
+
+  if (organizationTrialExpired && !subscriptionActive) {
+    return {
+      canWrite: false,
+      reason: `La organizacion supero su mes free (vencio el ${toShortDate(
+        organizationTrialEndsAt
+      )}). Necesita activar el plan mensual para volver a gestionar.`,
+      organizationTrialEndsAt,
+      organizationTrialExpired: true,
+      adminTrialEndsAt,
+      adminTrialExpired,
+      subscriptionStatus,
+      subscriptionCurrentPeriodEnd,
+      subscriptionActive
+    };
+  }
+
+  return {
+    canWrite: true,
+    reason: null,
+    organizationTrialEndsAt,
+    organizationTrialExpired,
+    adminTrialEndsAt,
+    adminTrialExpired,
+    subscriptionStatus,
+    subscriptionCurrentPeriodEnd,
+    subscriptionActive
+  };
+}
+
 export async function getAdminSession(): Promise<AdminSession | null> {
   const supabase = await createSupabaseServerClient();
   const {
@@ -155,6 +386,9 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   });
 
   await autoAcceptOrganizationInvites(user.id, email);
+  if (isSuperAdminEmail(email)) {
+    cachedSuperAdminUserId = user.id;
+  }
 
   return {
     userId: user.id,
@@ -261,7 +495,7 @@ export async function requireAdminOrganization(preferredOrganizationId?: string 
   };
 }
 
-export async function assertOrganizationAdminAction(organizationId: string) {
+async function assertOrganizationMembership(organizationId: string) {
   const admin = await assertAdminAction();
 
   if (admin.isSuperAdmin) {
@@ -292,6 +526,21 @@ export async function assertOrganizationAdminAction(organizationId: string) {
 
   if (!hasAccess) {
     throw new Error("No autorizado para administrar esta organizacion.");
+  }
+
+  return admin;
+}
+
+export async function assertOrganizationMembershipAction(organizationId: string) {
+  return assertOrganizationMembership(organizationId);
+}
+
+export async function assertOrganizationAdminAction(organizationId: string) {
+  const admin = await assertOrganizationMembership(organizationId);
+
+  const writeAccess = await getOrganizationWriteAccess(admin, organizationId);
+  if (!writeAccess.canWrite) {
+    throw new Error(writeAccess.reason ?? "No tienes acceso de escritura para esta organizacion.");
   }
 
   return admin;

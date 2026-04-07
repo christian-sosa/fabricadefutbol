@@ -1,20 +1,32 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
-import { redirect } from "next/navigation";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function SignOutButton() {
+  const router = useRouter();
+  const [submitting, setSubmitting] = useState(false);
+
   async function signOut() {
-    "use server";
-    const supabase = await createSupabaseServerClient();
-    await supabase.auth.signOut();
-    redirect("/admin/login");
+    if (submitting) return;
+    setSubmitting(true);
+
+    try {
+      const supabase = createSupabaseBrowserClient();
+      await supabase.auth.signOut();
+      router.push("/admin/login");
+      router.refresh();
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
-    <form action={signOut}>
-      <Button className="w-full sm:w-auto" variant="ghost">
-        Cerrar sesión
-      </Button>
-    </form>
+    <Button className="w-full sm:w-auto" disabled={submitting} onClick={signOut} type="button" variant="ghost">
+      {submitting ? "Cerrando..." : "Cerrar sesion"}
+    </Button>
   );
 }

@@ -7,6 +7,7 @@ import type { MatchModality, MatchResultInput, ResultAssignmentTeam, TeamSide } 
 type DbClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
 type DraftGuestInput = {
+  key: string;
   name: string;
   rating: number;
 };
@@ -25,6 +26,11 @@ type ConfirmedParticipant = {
   current_rating: number;
 };
 
+type ManualTeamAssignmentInput = {
+  participantId: string;
+  team: TeamSide;
+};
+
 type LineupAssignmentInput = {
   participantId: string;
   team: ResultAssignmentTeam;
@@ -34,6 +40,17 @@ type NewGuestLineupInput = {
   name: string;
   rating: number;
   team: TeamSide;
+};
+
+type NewPlayerLineupInput = {
+  playerId: string;
+  team: TeamSide;
+};
+
+type MatchLineupAdjustmentInput = {
+  assignments: LineupAssignmentInput[];
+  newPlayers?: NewPlayerLineupInput[];
+  newGuests?: NewGuestLineupInput[];
 };
 
 type ResolvedMatchLineup = {
@@ -52,6 +69,9 @@ type CreateDraftInput = {
   location?: string;
   selectedPlayerIds: string[];
   invitedGuests: DraftGuestInput[];
+  teamCreationMode?: "auto" | "manual";
+  manualTeamAssignments?: ManualTeamAssignmentInput[];
+  goalkeeperPlayerIds?: string[];
 };
 
 const PLAYER_PREFIX = "player:";
@@ -84,6 +104,24 @@ function validatePlayerCount(modality: MatchModality, registeredPlayersCount: nu
   }
 }
 
+function validateGoalkeeperSelection(selectedPlayerIds: string[], goalkeeperPlayerIds: string[]) {
+  if (goalkeeperPlayerIds.length !== 0 && goalkeeperPlayerIds.length !== 2) {
+    throw new Error("Si seleccionas arqueros, debes elegir exactamente 2.");
+  }
+
+  const uniqueGoalkeepers = new Set(goalkeeperPlayerIds);
+  if (uniqueGoalkeepers.size !== goalkeeperPlayerIds.length) {
+    throw new Error("Hay arqueros duplicados en la convocatoria.");
+  }
+
+  const selectedPlayersSet = new Set(selectedPlayerIds);
+  for (const goalkeeperId of goalkeeperPlayerIds) {
+    if (!selectedPlayersSet.has(goalkeeperId)) {
+      throw new Error("Los arqueros seleccionados deben estar dentro de los jugadores convocados.");
+    }
+  }
+}
+
 function toPlayerParticipantId(playerId: string) {
   return `${PLAYER_PREFIX}${playerId}`;
 }
@@ -106,6 +144,24 @@ function parseParticipantId(participantId: string): { source: "player" | "guest"
     };
   }
   throw new Error("Participante invalido dentro de la opcion de equipos.");
+}
+
+function resolveManualParticipantId(
+  participantId: string,
+  guestParticipantIdByKey: Map<string, string>
+) {
+  if (participantId.startsWith(PLAYER_PREFIX)) return participantId;
+
+  if (participantId.startsWith(GUEST_PREFIX)) {
+    const guestKey = participantId.slice(GUEST_PREFIX.length);
+    const resolvedGuestParticipantId = guestParticipantIdByKey.get(guestKey);
+    if (!resolvedGuestParticipantId) {
+      throw new Error("El armado manual incluye invitados que no existen en la convocatoria.");
+    }
+    return resolvedGuestParticipantId;
+  }
+
+  throw new Error("El armado manual incluye participantes invalidos.");
 }
 
 async function assertMatchBelongsToOrganization(params: {
@@ -177,12 +233,77 @@ function toBalancePlayers(
   return [...basePlayers, ...guestPlayers];
 }
 
+function buildManualTeamOption(params: {
+  participants: BalanceParticipant[];
+  assignments: ManualTeamAssignmentInput[];
+  teamSize: number;
+  guestParticipantIdByKey: Map<string, string>;
+  goalkeeperPlayerIds: string[];
+}) {
+  const { participants, assignments, teamSize, guestParticipantIdByKey, goalkeeperPlayerIds } = params;
+  const expectedParticipantIds = new Set(participants.map((participant) => participant.id));
+  const assignmentByParticipantId = new Map<string, TeamSide>();
+
+  for (const assignment of assignments) {
+    const resolvedParticipantId = resolveManualParticipantId(
+      assignment.participantId,
+      guestParticipantIdByKey
+    );
+    if (!expectedParticipantIds.has(resolvedParticipantId)) {
+      throw new Error("El armado manual incluye participantes que no forman parte de la convocatoria.");
+    }
+    if (assignmentByParticipantId.has(resolvedParticipantId)) {
+      throw new Error("El armado manual incluye participantes duplicados.");
+    }
+    assignmentByParticipantId.set(resolvedParticipantId, assignment.team);
+  }
+
+  if (assignmentByParticipantId.size !== expectedParticipantIds.size) {
+    throw new Error("El armado manual debe asignar a todos los convocados.");
+  }
+
+  const teamA: BalanceParticipant[] = [];
+  const teamB: BalanceParticipant[] = [];
+  for (const participant of participants) {
+    const assignedTeam = assignmentByParticipantId.get(participant.id);
+    if (assignedTeam === "A") teamA.push(participant);
+    if (assignedTeam === "B") teamB.push(participant);
+  }
+
+  if (teamA.length !== teamSize || teamB.length !== teamSize) {
+    throw new Error(`Los equipos manuales deben quedar en ${teamSize} vs ${teamSize}.`);
+  }
+
+  if (goalkeeperPlayerIds.length === 2) {
+    const [firstGoalkeeperId, secondGoalkeeperId] = goalkeeperPlayerIds.map((playerId) =>
+      toPlayerParticipantId(playerId)
+    );
+    const firstGoalkeeperTeam = assignmentByParticipantId.get(firstGoalkeeperId);
+    const secondGoalkeeperTeam = assignmentByParticipantId.get(secondGoalkeeperId);
+    if (!firstGoalkeeperTeam || !secondGoalkeeperTeam || firstGoalkeeperTeam === secondGoalkeeperTeam) {
+      throw new Error("Los dos arqueros deben quedar en equipos separados.");
+    }
+  }
+
+  const ratingSumA = Number(teamA.reduce((acc, participant) => acc + participant.rating, 0).toFixed(2));
+  const ratingSumB = Number(teamB.reduce((acc, participant) => acc + participant.rating, 0).toFixed(2));
+  const ratingDiff = Number(Math.abs(ratingSumA - ratingSumB).toFixed(2));
+
+  return {
+    teamA,
+    teamB,
+    ratingSumA,
+    ratingSumB,
+    ratingDiff
+  };
+}
+
 async function insertTeamOptions(
   supabase: DbClient,
   adminId: string,
   matchId: string,
   options: ReturnType<typeof generateBalancedTeamOptions>
-) {
+): Promise<Array<{ id: string; option_number: number }>> {
   const optionRows = options.map((option, index) => ({
     match_id: matchId,
     option_number: index + 1,
@@ -274,11 +395,64 @@ async function insertTeamOptions(
       throw new Error(`No se pudieron guardar invitados en opciones: ${insertGuestsError.message}`);
     }
   }
+
+  return insertedOptions ?? [];
+}
+
+async function insertDraftGuests(params: {
+  supabase: DbClient;
+  matchId: string;
+  invitedGuests: DraftGuestInput[];
+}) {
+  const { supabase, matchId, invitedGuests } = params;
+  if (!invitedGuests.length) return [] as Array<{ key: string; id: string; guest_name: string; guest_rating: number }>;
+
+  const insertedGuests: Array<{ key: string; id: string; guest_name: string; guest_rating: number }> = [];
+  for (const guest of invitedGuests) {
+    const { data, error } = await supabase
+      .from("match_guests")
+      .insert({
+        match_id: matchId,
+        guest_name: guest.name,
+        guest_rating: guest.rating
+      })
+      .select("id, guest_name, guest_rating")
+      .single();
+
+    if (error || !data) {
+      if (error && isGuestSchemaMissing(error.message)) {
+        throw new Error(buildGuestSchemaErrorMessage("No se pudieron guardar invitados del partido."));
+      }
+      throw new Error(`No se pudieron guardar invitados del partido: ${error?.message ?? "sin detalle"}`);
+    }
+
+    insertedGuests.push({
+      key: guest.key,
+      id: data.id,
+      guest_name: data.guest_name,
+      guest_rating: Number(data.guest_rating)
+    });
+  }
+
+  return insertedGuests;
 }
 
 export async function createDraftMatchWithOptions(input: CreateDraftInput) {
-  const { supabase, adminId, organizationId, scheduledAt, modality, location, selectedPlayerIds, invitedGuests } = input;
+  const {
+    supabase,
+    adminId,
+    organizationId,
+    scheduledAt,
+    modality,
+    location,
+    selectedPlayerIds,
+    invitedGuests,
+    teamCreationMode = "auto",
+    manualTeamAssignments,
+    goalkeeperPlayerIds = []
+  } = input;
   validatePlayerCount(modality, selectedPlayerIds.length, invitedGuests.length);
+  validateGoalkeeperSelection(selectedPlayerIds, goalkeeperPlayerIds);
 
   const players = await fetchSelectedPlayers(supabase, organizationId, selectedPlayerIds);
 
@@ -307,31 +481,53 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
     }
   }
 
-  const { data: insertedGuests, error: guestsError } = invitedGuests.length
-    ? await supabase
-        .from("match_guests")
-        .insert(
-          invitedGuests.map((guest) => ({
-            match_id: match.id,
-            guest_name: guest.name,
-            guest_rating: guest.rating
-          }))
-        )
-        .select("id, guest_name, guest_rating")
-    : { data: [], error: null };
+  const insertedGuests = await insertDraftGuests({
+    supabase,
+    matchId: match.id,
+    invitedGuests
+  });
+  const participants = toBalancePlayers(players, insertedGuests);
 
-  if (guestsError) {
-    if (isGuestSchemaMissing(guestsError.message)) {
-      throw new Error(buildGuestSchemaErrorMessage("No se pudieron guardar invitados del partido."));
+  if (teamCreationMode === "manual") {
+    if (!manualTeamAssignments?.length) {
+      throw new Error("Falta el armado manual de equipos.");
     }
-    throw new Error(`No se pudieron guardar invitados del partido: ${guestsError.message}`);
+
+    const guestParticipantIdByKey = new Map(
+      insertedGuests.map((guest) => [guest.key, toGuestParticipantId(guest.id)])
+    );
+    const manualOption = buildManualTeamOption({
+      participants,
+      assignments: manualTeamAssignments,
+      teamSize: TEAM_SIZE_BY_MODALITY[modality],
+      guestParticipantIdByKey,
+      goalkeeperPlayerIds
+    });
+
+    const insertedOptions = await insertTeamOptions(supabase, adminId, match.id, [manualOption]);
+    const optionIdToConfirm = insertedOptions.find((option) => option.option_number === 1)?.id;
+    if (!optionIdToConfirm) {
+      throw new Error("No se pudo confirmar la opcion manual de equipos.");
+    }
+
+    await confirmTeamOption({
+      supabase,
+      matchId: match.id,
+      optionId: optionIdToConfirm
+    });
+    return match.id;
   }
 
-  const participants = toBalancePlayers(players, insertedGuests ?? []);
+  const requiredSeparatedPairs =
+    goalkeeperPlayerIds.length === 2
+      ? [[toPlayerParticipantId(goalkeeperPlayerIds[0]), toPlayerParticipantId(goalkeeperPlayerIds[1])] as [string, string]]
+      : undefined;
+
   const options = generateBalancedTeamOptions({
     players: participants,
     modality,
-    requestedOptions: 3
+    requestedOptions: 3,
+    requiredSeparatedPairs
   });
 
   await insertTeamOptions(supabase, adminId, match.id, options);
@@ -596,6 +792,26 @@ function normalizeLineupGuests(rawGuests: NewGuestLineupInput[] | undefined) {
   });
 }
 
+function normalizeLineupPlayers(rawPlayers: NewPlayerLineupInput[] | undefined) {
+  const usedPlayerIds = new Set<string>();
+
+  return (rawPlayers ?? []).map((row) => {
+    const normalizedPlayerId = row.playerId.trim();
+    if (!normalizedPlayerId) {
+      throw new Error("Los jugadores de reemplazo deben tener un ID valido.");
+    }
+    if (usedPlayerIds.has(normalizedPlayerId)) {
+      throw new Error("Hay jugadores de reemplazo duplicados en la formacion final.");
+    }
+    usedPlayerIds.add(normalizedPlayerId);
+
+    return {
+      playerId: normalizedPlayerId,
+      team: row.team
+    };
+  });
+}
+
 async function insertNewLineupGuests(params: {
   supabase: DbClient;
   matchId: string;
@@ -633,6 +849,55 @@ async function insertNewLineupGuests(params: {
   }
 
   return insertedGuests;
+}
+
+async function resolveNewLineupPlayers(params: {
+  supabase: DbClient;
+  organizationId: string;
+  players: Array<{ playerId: string; team: TeamSide }>;
+  participantsById: Map<string, ConfirmedParticipant>;
+}) {
+  const { supabase, organizationId, players, participantsById } = params;
+  if (!players.length) return [];
+
+  const playerIds = players.map((player) => player.playerId);
+  const { data: playerRows, error: playersError } = await supabase
+    .from("players")
+    .select("id, full_name, current_rating, organization_id")
+    .in("id", playerIds)
+    .eq("organization_id", organizationId);
+
+  if (playersError) {
+    throw new Error(`No se pudieron leer jugadores de reemplazo: ${playersError.message}`);
+  }
+
+  const playersById = new Map((playerRows ?? []).map((row) => [row.id, row]));
+  if (playersById.size !== playerIds.length) {
+    throw new Error("Al menos un jugador de reemplazo no existe o no pertenece a esta organizacion.");
+  }
+
+  return players.map((player) => {
+    const participantId = toPlayerParticipantId(player.playerId);
+    if (participantsById.has(participantId)) {
+      throw new Error("No puedes agregar como reemplazo a un jugador que ya estaba en la formacion confirmada.");
+    }
+
+    const playerRow = playersById.get(player.playerId);
+    if (!playerRow) {
+      throw new Error("No se encontro un jugador de reemplazo seleccionado.");
+    }
+
+    return {
+      participant: {
+        id: participantId,
+        source: "player" as const,
+        entityId: playerRow.id,
+        full_name: playerRow.full_name,
+        current_rating: Number(playerRow.current_rating)
+      },
+      team: player.team
+    };
+  });
 }
 
 async function persistConfirmedLineup(params: {
@@ -865,4 +1130,90 @@ export async function saveMatchResult(params: {
   if (updateMatchError) {
     throw new Error(`No se pudo actualizar estado final del partido: ${updateMatchError.message}`);
   }
+}
+
+export async function saveConfirmedMatchLineup(params: {
+  supabase: DbClient;
+  matchId: string;
+  organizationId: string;
+  lineupInput: MatchLineupAdjustmentInput;
+}) {
+  const { supabase, matchId, organizationId, lineupInput } = params;
+  await assertMatchBelongsToOrganization({ supabase, matchId, organizationId });
+
+  const { data: match, error: matchError } = await supabase
+    .from("matches")
+    .select("id, status")
+    .eq("id", matchId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (matchError || !match) {
+    throw new Error("No se encontro el partido para la organizacion seleccionada.");
+  }
+
+  if (match.status !== "confirmed") {
+    throw new Error("Solo puedes ajustar la formacion en partidos confirmados.");
+  }
+
+  const { data: existingResult, error: resultError } = await supabase
+    .from("match_result")
+    .select("id")
+    .eq("match_id", matchId)
+    .maybeSingle();
+  if (resultError) {
+    throw new Error(`No se pudo verificar el resultado del partido: ${resultError.message}`);
+  }
+  if (existingResult) {
+    throw new Error("Este partido ya tiene resultado. Solo puedes ajustar formacion antes de cargarlo.");
+  }
+
+  const confirmed = await loadConfirmedTeams(supabase, matchId);
+  const participants = [...confirmed.teamA, ...confirmed.teamB];
+  const participantsById = new Map(participants.map((participant) => [participant.id, participant]));
+
+  const assignmentMap = normalizeLineupAssignments(lineupInput.assignments, participantsById);
+  const teamA: ConfirmedParticipant[] = [];
+  const teamB: ConfirmedParticipant[] = [];
+
+  for (const participant of participants) {
+    const team = assignmentMap.get(participant.id) ?? "OUT";
+    if (team === "A") teamA.push(participant);
+    if (team === "B") teamB.push(participant);
+  }
+
+  const normalizedNewPlayers = normalizeLineupPlayers(lineupInput.newPlayers);
+  const additionalPlayers = await resolveNewLineupPlayers({
+    supabase,
+    organizationId,
+    players: normalizedNewPlayers,
+    participantsById
+  });
+  for (const row of additionalPlayers) {
+    if (row.team === "A") teamA.push(row.participant);
+    if (row.team === "B") teamB.push(row.participant);
+  }
+
+  const normalizedGuests = normalizeLineupGuests(lineupInput.newGuests);
+  const insertedGuests = await insertNewLineupGuests({
+    supabase,
+    matchId,
+    guests: normalizedGuests
+  });
+
+  insertedGuests.forEach((guest, index) => {
+    const targetTeam = normalizedGuests[index]?.team;
+    if (targetTeam === "A") teamA.push(guest);
+    if (targetTeam === "B") teamB.push(guest);
+  });
+
+  if (!teamA.length || !teamB.length) {
+    throw new Error("Cada equipo debe tener al menos un participante en la formacion final.");
+  }
+
+  await persistConfirmedLineup({
+    supabase,
+    optionId: confirmed.optionId,
+    teamA,
+    teamB
+  });
 }

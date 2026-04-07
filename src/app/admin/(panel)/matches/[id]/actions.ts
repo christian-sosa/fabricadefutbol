@@ -5,7 +5,12 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/lib/auth/admin";
-import { confirmTeamOption, regenerateDraftTeamOptions, saveMatchResult } from "@/lib/domain/match-workflow";
+import {
+  confirmTeamOption,
+  regenerateDraftTeamOptions,
+  saveConfirmedMatchLineup,
+  saveMatchResult
+} from "@/lib/domain/match-workflow";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -19,6 +24,10 @@ const resultSchema = z.object({
   scoreB: z.coerce.number().int().nonnegative(),
   notes: z.string().optional(),
   lineupPayload: z.string().optional()
+});
+
+const lineupAdjustmentPayloadSchema = z.object({
+  lineupPayload: z.string().min(1, "La formacion final enviada es invalida.")
 });
 
 const lineupSchema = z.object({
@@ -40,6 +49,34 @@ const lineupSchema = z.object({
     )
     .optional(),
   handicapTeam: z.union([z.enum(["A", "B"]), z.null()]).optional()
+});
+
+const lineupAdjustmentSchema = z.object({
+  assignments: z
+    .array(
+      z.object({
+        participantId: z.string().min(1),
+        team: z.enum(["A", "B", "OUT"])
+      })
+    )
+    .min(1),
+  newPlayers: z
+    .array(
+      z.object({
+        playerId: z.string().uuid(),
+        team: z.enum(["A", "B"])
+      })
+    )
+    .optional(),
+  newGuests: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1),
+        rating: z.coerce.number().positive(),
+        team: z.enum(["A", "B"])
+      })
+    )
+    .optional()
 });
 
 const updateMatchSchema = z.object({
@@ -168,6 +205,62 @@ export async function saveResultAction(matchId: string, organizationId: string, 
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo guardar resultado.";
+    redirect(buildPath(matchId, organizationQueryKey, message));
+  }
+}
+
+export async function saveLineupBeforeResultAction(
+  matchId: string,
+  organizationId: string,
+  formData: FormData
+) {
+  const organizationQueryKey = await getOrganizationQueryKeyById(organizationId);
+  try {
+    await assertOrganizationAdminAction(organizationId);
+    const parsedPayload = lineupAdjustmentPayloadSchema.safeParse({
+      lineupPayload: formData.get("lineupPayload")
+    });
+    if (!parsedPayload.success) {
+      redirect(
+        buildPath(
+          matchId,
+          organizationQueryKey,
+          parsedPayload.error.issues[0]?.message ?? "La formacion final enviada es invalida."
+        )
+      );
+    }
+
+    let rawPayload: unknown;
+    try {
+      rawPayload = JSON.parse(parsedPayload.data.lineupPayload);
+    } catch {
+      redirect(buildPath(matchId, organizationQueryKey, "La formacion final enviada es invalida."));
+    }
+
+    const parsedLineup = lineupAdjustmentSchema.safeParse(rawPayload);
+    if (!parsedLineup.success) {
+      redirect(
+        buildPath(
+          matchId,
+          organizationQueryKey,
+          parsedLineup.error.issues[0]?.message ?? "La formacion final enviada es invalida."
+        )
+      );
+    }
+
+    const supabase = await createSupabaseServerClient();
+    await saveConfirmedMatchLineup({
+      supabase,
+      matchId,
+      organizationId,
+      lineupInput: parsedLineup.data
+    });
+
+    revalidateMatchPaths(matchId);
+    redirect(buildPath(matchId, organizationQueryKey));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    const message = error instanceof Error ? error.message : "No se pudo guardar la formacion final.";
     redirect(buildPath(matchId, organizationQueryKey, message));
   }
 }

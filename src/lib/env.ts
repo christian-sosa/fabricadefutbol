@@ -58,6 +58,22 @@ function getServerEnv(name: string) {
   return value;
 }
 
+function firstServerDefined(names: string[]) {
+  for (const name of names) {
+    const value = getServerEnv(name);
+    if (value) return value;
+  }
+  return null;
+}
+
+function parseBooleanEnv(value: string | null, fallback = false) {
+  if (value === null) return fallback;
+  const normalized = value.toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
+}
+
 function getSupabaseTargetEnv(): SupabaseTargetEnv {
   const configured = (getServerEnv("SUPABASE_TARGET_ENV") ?? "").toLowerCase();
   if (configured === "dev" || configured === "development") return "development";
@@ -70,6 +86,7 @@ function isPlaceholderServiceRoleKey(value: string) {
   return (
     normalized === "your-service-role-key-optional" ||
     normalized === "your-service-role-key" ||
+    normalized.startsWith("sb_service_role_") ||
     normalized.includes("your-service-role-key") ||
     normalized.includes("replace-with-service-role-key")
   );
@@ -217,4 +234,127 @@ export function getPlayerPhotosBucket() {
   const value = selected ?? fallback;
 
   return value ?? "player-photos";
+}
+
+export function getMercadoPagoAccessToken() {
+  const targetEnv = getSupabaseTargetEnv();
+  const selected =
+    targetEnv === "development"
+      ? firstServerDefined(["MERCADOPAGO_ACCESS_TOKEN_DEV", "MERCADOPAGO_ACCESS_TOKEN"])
+      : firstServerDefined(["MERCADOPAGO_ACCESS_TOKEN", "MERCADOPAGO_ACCESS_TOKEN_PROD"]);
+  const fallback = firstServerDefined([
+    "MERCADOPAGO_ACCESS_TOKEN",
+    "MERCADOPAGO_ACCESS_TOKEN_DEV",
+    "MERCADOPAGO_ACCESS_TOKEN_PROD"
+  ]);
+  const token = selected ?? fallback;
+
+  if (!token) {
+    throw new Error(
+      "Falta token de Mercado Pago. Configura MERCADOPAGO_ACCESS_TOKEN_DEV (local) y/o MERCADOPAGO_ACCESS_TOKEN (prod)."
+    );
+  }
+  return token;
+}
+
+export function getMercadoPagoWebhookSecret() {
+  const targetEnv = getSupabaseTargetEnv();
+  const selected =
+    targetEnv === "development"
+      ? firstServerDefined(["MERCADOPAGO_WEBHOOK_SECRET_DEV", "MERCADOPAGO_WEBHOOK_SECRET"])
+      : firstServerDefined(["MERCADOPAGO_WEBHOOK_SECRET", "MERCADOPAGO_WEBHOOK_SECRET_PROD"]);
+  const fallback = firstServerDefined([
+    "MERCADOPAGO_WEBHOOK_SECRET",
+    "MERCADOPAGO_WEBHOOK_SECRET_DEV",
+    "MERCADOPAGO_WEBHOOK_SECRET_PROD"
+  ]);
+  return selected ?? fallback;
+}
+
+export function getMercadoPagoWebhookBaseUrl() {
+  const targetEnv = getSupabaseTargetEnv();
+  const selected =
+    targetEnv === "development"
+      ? firstServerDefined([
+          "MERCADOPAGO_WEBHOOK_BASE_URL_DEV",
+          "MERCADOPAGO_WEBHOOK_BASE_URL",
+          "APP_URL_DEV",
+          "APP_URL",
+          "NEXT_PUBLIC_APP_URL_DEV",
+          "NEXT_PUBLIC_APP_URL"
+        ])
+      : firstServerDefined([
+          "MERCADOPAGO_WEBHOOK_BASE_URL",
+          "MERCADOPAGO_WEBHOOK_BASE_URL_PROD",
+          "APP_URL",
+          "APP_URL_PROD",
+          "NEXT_PUBLIC_APP_URL",
+          "NEXT_PUBLIC_APP_URL_PROD"
+        ]);
+  const fallback = firstServerDefined([
+    "MERCADOPAGO_WEBHOOK_BASE_URL",
+    "MERCADOPAGO_WEBHOOK_BASE_URL_DEV",
+    "MERCADOPAGO_WEBHOOK_BASE_URL_PROD",
+    "APP_URL",
+    "APP_URL_DEV",
+    "APP_URL_PROD",
+    "NEXT_PUBLIC_APP_URL",
+    "NEXT_PUBLIC_APP_URL_DEV",
+    "NEXT_PUBLIC_APP_URL_PROD"
+  ]);
+
+  return selected ?? fallback;
+}
+
+export function getResendApiKey() {
+  const targetEnv = getSupabaseTargetEnv();
+  const selected =
+    targetEnv === "development"
+      ? firstServerDefined(["RESEND_API_KEY_DEV", "RESEND_API_KEY"])
+      : firstServerDefined(["RESEND_API_KEY", "RESEND_API_KEY_PROD"]);
+  const fallback = firstServerDefined(["RESEND_API_KEY", "RESEND_API_KEY_DEV", "RESEND_API_KEY_PROD"]);
+  return selected ?? fallback;
+}
+
+export function getFeedbackInboxEmail() {
+  const targetEnv = getSupabaseTargetEnv();
+  const selected =
+    targetEnv === "development"
+      ? firstServerDefined(["FEEDBACK_TO_EMAIL_DEV", "FEEDBACK_TO_EMAIL"])
+      : firstServerDefined(["FEEDBACK_TO_EMAIL", "FEEDBACK_TO_EMAIL_PROD"]);
+  const fallback = firstServerDefined([
+    "FEEDBACK_TO_EMAIL",
+    "FEEDBACK_TO_EMAIL_DEV",
+    "FEEDBACK_TO_EMAIL_PROD"
+  ]);
+  return selected ?? fallback ?? "info@fabricadefutbol.com";
+}
+
+export function getFeedbackFromEmail() {
+  const targetEnv = getSupabaseTargetEnv();
+  const selected =
+    targetEnv === "development"
+      ? firstServerDefined(["FEEDBACK_FROM_EMAIL_DEV", "FEEDBACK_FROM_EMAIL"])
+      : firstServerDefined(["FEEDBACK_FROM_EMAIL", "FEEDBACK_FROM_EMAIL_PROD"]);
+  const fallback = firstServerDefined([
+    "FEEDBACK_FROM_EMAIL",
+    "FEEDBACK_FROM_EMAIL_DEV",
+    "FEEDBACK_FROM_EMAIL_PROD"
+  ]);
+  return selected ?? fallback ?? "info@fabricadefutbol.com";
+}
+
+export function shouldUseMercadoPagoSandboxCheckout() {
+  const targetEnv = getSupabaseTargetEnv();
+  const selected =
+    targetEnv === "development"
+      ? firstServerDefined(["MERCADOPAGO_USE_SANDBOX_DEV", "MERCADOPAGO_USE_SANDBOX"])
+      : firstServerDefined(["MERCADOPAGO_USE_SANDBOX", "MERCADOPAGO_USE_SANDBOX_PROD"]);
+  const fallback = firstServerDefined([
+    "MERCADOPAGO_USE_SANDBOX",
+    "MERCADOPAGO_USE_SANDBOX_DEV",
+    "MERCADOPAGO_USE_SANDBOX_PROD"
+  ]);
+
+  return parseBooleanEnv(selected ?? fallback, targetEnv === "development");
 }

@@ -22,10 +22,18 @@ export function AdminNav({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     setMounted(true);
   }, []);
 
+  function isItemActive(itemHref: string) {
+    if (!mounted) return false;
+    if (itemHref === "/admin") {
+      return safePathname === "/admin";
+    }
+    return safePathname === itemHref || safePathname.startsWith(`${itemHref}/`);
+  }
+
   return (
     <nav className="flex flex-wrap items-center gap-2">
       {navItems.map((item) => {
-        const active = mounted && (safePathname === item.href || safePathname.startsWith(`${item.href}/`));
+        const active = isItemActive(item.href);
         const href = withOrgQuery(item.href, organizationId);
         return (
           <Link

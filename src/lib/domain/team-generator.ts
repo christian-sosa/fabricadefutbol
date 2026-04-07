@@ -6,6 +6,7 @@ type GenerateTeamOptionsInput = {
   modality: MatchModality;
   requestedOptions?: number;
   seed?: number;
+  requiredSeparatedPairs?: Array<[string, string]>;
 };
 
 type ScoredCombination = TeamOptionCandidate & {
@@ -51,6 +52,14 @@ function sameTeam(topPlayerAId: string, topPlayerBId: string, teamA: PlayerRatin
   const topInTeamA = ids.has(topPlayerAId) && ids.has(topPlayerBId);
   const topInTeamB = !ids.has(topPlayerAId) && !ids.has(topPlayerBId);
   return topInTeamA || topInTeamB;
+}
+
+function areParticipantsSeparated(
+  firstParticipantId: string,
+  secondParticipantId: string,
+  teamAIds: Set<string>
+) {
+  return teamAIds.has(firstParticipantId) !== teamAIds.has(secondParticipantId);
 }
 
 function chooseCombinations(
@@ -102,6 +111,16 @@ export function generateBalancedTeamOptions(input: GenerateTeamOptionsInput): Te
     throw new Error("Hay jugadores duplicados en la convocatoria.");
   }
 
+  const requiredSeparatedPairs = input.requiredSeparatedPairs ?? [];
+  for (const [firstParticipantId, secondParticipantId] of requiredSeparatedPairs) {
+    if (!uniquePlayerIds.has(firstParticipantId) || !uniquePlayerIds.has(secondParticipantId)) {
+      throw new Error("Las reglas de separacion incluyen participantes que no existen en la convocatoria.");
+    }
+    if (firstParticipantId === secondParticipantId) {
+      throw new Error("Las reglas de separacion incluyen participantes duplicados.");
+    }
+  }
+
   const requested = Math.min(Math.max(input.requestedOptions ?? DEFAULT_OPTION_COUNT, 1), MAX_OPTION_COUNT);
   const seed = input.seed ?? Math.floor(Date.now() + Math.random() * 100000);
   const random = createSeededRandom(seed);
@@ -111,8 +130,13 @@ export function generateBalancedTeamOptions(input: GenerateTeamOptionsInput): Te
   const topB = sortedByRating[1]?.id;
   const combinations = chooseCombinations(players, teamSize, random);
 
-  const scored: ScoredCombination[] = combinations.map((teamA) => {
+  const scored: ScoredCombination[] = combinations.flatMap((teamA) => {
     const teamAIds = new Set(teamA.map((player) => player.id));
+    const respectsSeparatedPairs = requiredSeparatedPairs.every(([firstParticipantId, secondParticipantId]) =>
+      areParticipantsSeparated(firstParticipantId, secondParticipantId, teamAIds)
+    );
+    if (!respectsSeparatedPairs) return [];
+
     const teamB = players.filter((player) => !teamAIds.has(player.id));
     const ratingSumA = sumRatings(teamA);
     const ratingSumB = sumRatings(teamB);
@@ -133,6 +157,10 @@ export function generateBalancedTeamOptions(input: GenerateTeamOptionsInput): Te
       key: canonicalKey(teamA)
     };
   });
+
+  if (!scored.length) {
+    throw new Error("No se pudieron generar equipos que respeten las reglas definidas.");
+  }
 
   scored.sort((a, b) => a.score - b.score);
 

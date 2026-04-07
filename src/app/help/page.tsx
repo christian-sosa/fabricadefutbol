@@ -2,6 +2,16 @@ import Link from "next/link";
 
 import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { ORGANIZATION_BILLING_CURRENCY, ORGANIZATION_MONTHLY_PRICE_ARS } from "@/lib/constants";
+
+function formatCurrencyArs(amount: number) {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: ORGANIZATION_BILLING_CURRENCY,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+}
 
 const faqItems = [
   {
@@ -23,6 +33,31 @@ const faqItems = [
     question: "Cuantos admins puede tener una organizacion?",
     answer:
       "Cada organizacion admite hasta 4 administradores activos o pendientes de invitacion (por ejemplo 1 creador + 3 invitados)."
+  },
+  {
+    question: "La app tiene costo?",
+    answer:
+      `Cada organizacion tiene 1 mes de uso gratis desde su creacion. Al terminar ese periodo, el costo es ${formatCurrencyArs(ORGANIZATION_MONTHLY_PRICE_ARS)} por mes por organizacion para mantener escritura habilitada.`
+  },
+  {
+    question: "Que pasa cuando termina el mes free?",
+    answer:
+      "La organizacion queda en modo solo lectura: se conserva toda la informacion publica, pero no se pueden crear partidos ni editar, agregar o borrar jugadores."
+  },
+  {
+    question: "Puedo crear varias organizaciones gratis con el mismo email?",
+    answer:
+      `No. Cada cuenta tiene una sola organizacion gratis inicial. Si ya consumiste esa prueba, para crear nuevas organizaciones debes pagar ${formatCurrencyArs(ORGANIZATION_MONTHLY_PRICE_ARS)} por cada nueva alta.`
+  },
+  {
+    question: "Donde veo el detalle de precios y condiciones?",
+    answer:
+      "En la seccion Precios (/pricing) tienes el resumen del plan, periodo gratis, costo mensual y que sucede cuando una organizacion pasa a modo solo lectura."
+  },
+  {
+    question: "Donde envio sugerencias o reclamos?",
+    answer:
+      "En la seccion Contacto (/feedback) puedes enviar sugerencias, quejas o reportes de error y llega al equipo por email."
   }
 ];
 
@@ -41,6 +76,12 @@ export default function HelpPage() {
             href="/"
           >
             Volver al inicio
+          </Link>
+          <Link
+            className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
+            href="/pricing"
+          >
+            Ver precios
           </Link>
           <Link
             className="rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"

@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { unstable_noStore as noStore } from "next/cache";
 
 function notNull<T>(value: T | null | undefined): value is T {
@@ -8,6 +9,13 @@ function notNull<T>(value: T | null | undefined): value is T {
 function isGuestSchemaMissing(error: { message: string } | null) {
   if (!error) return false;
   return /match_guests|team_option_guests/i.test(error.message);
+}
+
+function isBillingSchemaMissing(error: { message: string } | null) {
+  if (!error) return false;
+  return /organization_billing_subscriptions|organization_billing_payments|requested_organization_name|requested_organization_slug|created_organization_id|purpose/i.test(
+    error.message
+  );
 }
 
 export async function getAdminDashboardData(organizationId: string) {
@@ -75,6 +83,18 @@ export async function getOrganizationAdminData(organizationId: string) {
   if (adminsError) throw new Error(adminsError.message);
   if (invitesError) throw new Error(invitesError.message);
 
+  const adminClient = createSupabaseAdminClient();
+  const adminEmailsById = new Map<string, string>();
+  if (adminClient) {
+    for (const row of adminsData ?? []) {
+      if (!row.admin_id || adminEmailsById.has(row.admin_id)) continue;
+      const { data: authData } = await adminClient.auth.admin.getUserById(row.admin_id);
+      if (authData?.user?.email) {
+        adminEmailsById.set(row.admin_id, authData.user.email.toLowerCase());
+      }
+    }
+  }
+
   const admins = (adminsData ?? []).map((row) => {
     const relation = row.admins;
     const adminRow = Array.isArray(relation) ? relation[0] : relation;
@@ -82,6 +102,7 @@ export async function getOrganizationAdminData(organizationId: string) {
     return {
       id: row.admin_id,
       displayName: adminRow?.display_name ?? "Admin",
+      email: adminEmailsById.get(row.admin_id) ?? null,
       createdAt: row.created_at
     };
   });
@@ -251,6 +272,42 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
     roster,
     options: optionsWithPlayers,
     result
+  };
+}
+
+export async function getOrganizationBillingData(organizationId: string) {
+  const supabase = await createSupabaseServerClient();
+
+  const [{ data: subscription, error: subscriptionError }, { data: payments, error: paymentsError }] =
+    await Promise.all([
+      supabase
+        .from("organization_billing_subscriptions")
+        .select(
+          "id, organization_id, status, current_period_start, current_period_end, last_payment_at, created_at, updated_at"
+        )
+        .eq("organization_id", organizationId)
+        .maybeSingle(),
+      supabase
+        .from("organization_billing_payments")
+        .select(
+          "id, purpose, status, amount, currency_id, mp_payment_id, mp_preference_id, mp_external_reference, approved_at, period_start, period_end, created_at, created_organization_id"
+        )
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: false })
+        .limit(20)
+    ]);
+
+  if (subscriptionError && !isBillingSchemaMissing(subscriptionError)) {
+    throw new Error(subscriptionError.message);
+  }
+  if (paymentsError && !isBillingSchemaMissing(paymentsError)) {
+    throw new Error(paymentsError.message);
+  }
+
+  return {
+    subscription:
+      subscriptionError && isBillingSchemaMissing(subscriptionError) ? null : subscription ?? null,
+    payments: paymentsError && isBillingSchemaMissing(paymentsError) ? [] : payments ?? []
   };
 }
 
