@@ -35,6 +35,27 @@ function buildFeedbackPath(params: { organizationKey: string | null; sent?: bool
   return basePath;
 }
 
+function buildFriendlyFeedbackErrorMessage(error: unknown) {
+  const fallback = "No se pudo enviar ahora mismo. Si sigue fallando, escribe directo a info@fabricadefutbol.com.";
+  if (!(error instanceof Error)) return fallback;
+
+  const message = error.message.toLowerCase();
+  if (message.includes("falta resend_api_key")) {
+    return "El formulario de contacto todavia no esta configurado para enviar emails. Escribe directo a info@fabricadefutbol.com.";
+  }
+
+  if (
+    (message.includes("verify") && message.includes("domain")) ||
+    message.includes("testing emails") ||
+    message.includes("sender") ||
+    message.includes("from address")
+  ) {
+    return "El remitente del formulario todavia no esta listo en Resend. Mientras tanto, escribe directo a info@fabricadefutbol.com.";
+  }
+
+  return fallback;
+}
+
 export async function submitFeedbackAction(organizationKey: string | null, formData: FormData) {
   const parsed = feedbackSchema.safeParse({
     fullName: formData.get("fullName"),
@@ -72,12 +93,11 @@ export async function submitFeedbackAction(organizationKey: string | null, formD
     });
 
     redirect(buildFeedbackPath({ organizationKey, sent: true }));
-  } catch {
+  } catch (error) {
     redirect(
       buildFeedbackPath({
         organizationKey,
-        error:
-          "No se pudo enviar ahora mismo. Si sigue fallando, escribe directo a info@fabricadefutbol.com."
+        error: buildFriendlyFeedbackErrorMessage(error)
       })
     );
   }

@@ -2,10 +2,9 @@
 
 import { useMemo, useState } from "react";
 
-import { cn } from "@/lib/utils";
-import { formatPercent } from "@/lib/utils";
 import { PlayerPhotoModalTrigger } from "@/components/ui/player-photo-modal-trigger";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
+import { cn, formatPercent } from "@/lib/utils";
 
 type PlayerStatsRow = {
   playerId: string;
@@ -76,47 +75,121 @@ export function PlayersStatsTable({ players }: { players: PlayerStatsRow[] }) {
   };
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <THead>
-          <tr>
-            <TH>Jugador</TH>
-            {columnConfig.map((column) => {
-              const isActive = sortKey === column.key;
-              return (
-                <TH key={column.key}>
-                  <button
-                    className={cn(
-                      "inline-flex items-center gap-1 text-left transition hover:text-emerald-300",
-                      isActive ? "text-emerald-300" : "text-slate-200"
-                    )}
-                    onClick={() => onSort(column.key)}
-                    type="button"
-                  >
-                    {column.label}
-                    <span className="text-[10px] uppercase">{isActive ? (sortDirection === "desc" ? "desc" : "asc") : ""}</span>
-                  </button>
-                </TH>
-              );
-            })}
-          </tr>
-        </THead>
-        <TBody>
-          {sortedPlayers.map((player) => (
-            <tr className="transition-colors hover:bg-slate-800/70" key={player.playerId}>
-              <TD>
-                <PlayerPhotoModalTrigger playerId={player.playerId} playerName={player.playerName} />
-              </TD>
-              <TD className="font-semibold text-slate-100">{player.currentRating.toFixed(2)}</TD>
-              <TD>{player.matchesPlayed}</TD>
-              <TD>{player.wins}</TD>
-              <TD>{player.draws}</TD>
-              <TD>{player.losses}</TD>
-              <TD className="font-semibold text-emerald-300">{formatPercent(player.winRate)}</TD>
+    <div className="space-y-3">
+      <div className="scrollbar-none flex gap-2 overflow-x-auto pb-1 md:hidden">
+        {columnConfig.map((column) => {
+          const isActive = sortKey === column.key;
+          return (
+            <button
+              className={cn(
+                "whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                isActive
+                  ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
+                  : "border-slate-700 bg-slate-950 text-slate-300"
+              )}
+              key={column.key}
+              onClick={() => onSort(column.key)}
+              type="button"
+            >
+              {column.label}
+              {isActive ? ` ${sortDirection === "desc" ? "desc" : "asc"}` : ""}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-3 md:hidden">
+        {sortedPlayers.map((player) => (
+          <article className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4" key={player.playerId}>
+            <div className="flex items-start justify-between gap-3">
+              <PlayerPhotoModalTrigger playerId={player.playerId} playerName={player.playerName} />
+              <div className="text-right">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Rating</p>
+                <p className="text-xl font-black text-emerald-300">{player.currentRating.toFixed(2)}</p>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">PJ</p>
+                <p className="mt-1 font-semibold text-slate-100">{player.matchesPlayed}</p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Win Rate</p>
+                <p className="mt-1 font-semibold text-emerald-300">{formatPercent(player.winRate)}</p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">PG</p>
+                <p className="mt-1 font-semibold text-slate-100">{player.wins}</p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">PE / PP</p>
+                <p className="mt-1 font-semibold text-slate-100">
+                  {player.draws} / {player.losses}
+                </p>
+              </div>
+            </div>
+          </article>
+        ))}
+
+        {!sortedPlayers.length ? (
+          <p className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-6 text-sm text-slate-400">
+            No hay jugadores para esta organizacion.
+          </p>
+        ) : null}
+      </div>
+
+      <div className="hidden overflow-x-auto md:block">
+        <Table>
+          <THead>
+            <tr>
+              <TH>Jugador</TH>
+              {columnConfig.map((column) => {
+                const isActive = sortKey === column.key;
+                return (
+                  <TH key={column.key}>
+                    <button
+                      className={cn(
+                        "inline-flex items-center gap-1 text-left transition hover:text-emerald-300",
+                        isActive ? "text-emerald-300" : "text-slate-200"
+                      )}
+                      onClick={() => onSort(column.key)}
+                      type="button"
+                    >
+                      {column.label}
+                      <span className="text-[10px] uppercase">
+                        {isActive ? (sortDirection === "desc" ? "desc" : "asc") : ""}
+                      </span>
+                    </button>
+                  </TH>
+                );
+              })}
             </tr>
-          ))}
-        </TBody>
-      </Table>
+          </THead>
+          <TBody>
+            {sortedPlayers.map((player) => (
+              <tr className="transition-colors hover:bg-slate-800/70" key={player.playerId}>
+                <TD>
+                  <PlayerPhotoModalTrigger playerId={player.playerId} playerName={player.playerName} />
+                </TD>
+                <TD className="font-semibold text-slate-100">{player.currentRating.toFixed(2)}</TD>
+                <TD>{player.matchesPlayed}</TD>
+                <TD>{player.wins}</TD>
+                <TD>{player.draws}</TD>
+                <TD>{player.losses}</TD>
+                <TD className="font-semibold text-emerald-300">{formatPercent(player.winRate)}</TD>
+              </tr>
+            ))}
+            {!sortedPlayers.length ? (
+              <tr>
+                <TD className="py-6 text-sm text-slate-400" colSpan={7}>
+                  No hay jugadores para esta organizacion.
+                </TD>
+              </tr>
+            ) : null}
+          </TBody>
+        </Table>
+      </div>
     </div>
   );
 }

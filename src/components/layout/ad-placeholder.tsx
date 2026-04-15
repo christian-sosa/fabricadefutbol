@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { shouldRenderAds } from "@/lib/env";
 
 export function AdPlaceholder({
   slot,
@@ -7,6 +8,10 @@ export function AdPlaceholder({
   slot: string;
   className?: string;
 }) {
+  if (!shouldRenderAds()) {
+    return null;
+  }
+
   return (
     <aside
       className={cn(

@@ -100,7 +100,7 @@ export default function FeedbackPage({ searchParams }: FeedbackPageProps) {
             <Textarea
               id="message"
               name="message"
-              placeholder="Cuéntanos qué pasó o qué te gustaría mejorar."
+              placeholder="Cuentanos que paso o que te gustaria mejorar."
               required
               rows={7}
             />
@@ -110,7 +110,7 @@ export default function FeedbackPage({ searchParams }: FeedbackPageProps) {
         </form>
       </Card>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <Link
           className="rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
           href={homePath}

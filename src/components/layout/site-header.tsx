@@ -59,66 +59,82 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
     router.refresh();
   };
 
+  const renderAuthControls = (compact = false) =>
+    isAuthenticated ? (
+      <div className={cn("flex items-center gap-2", compact ? "shrink-0" : "")}>
+        <Link
+          className="rounded-md border border-emerald-400/40 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/10 md:text-sm"
+          href={withOrgQuery("/admin", organizationId)}
+        >
+          Panel
+        </Link>
+        <button
+          className="rounded-md border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-slate-500 hover:bg-slate-900 md:text-sm"
+          onClick={handleSignOut}
+          type="button"
+        >
+          Salir
+        </button>
+      </div>
+    ) : (
+      <Link
+        className={cn(
+          "rounded-md border border-emerald-400/40 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/10 md:text-sm",
+          compact ? "shrink-0" : ""
+        )}
+        href="/admin/login"
+      >
+        Ingresar / Registro
+      </Link>
+    );
+
   return (
     <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/85 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <Link className="flex items-center gap-3" href="/">
-          <Image
-            alt="Logo placeholder de Fabrica de Futbol"
-            className="h-9 w-9 rounded-lg border border-slate-700 bg-slate-900 object-cover"
-            height={36}
-            src="/logo-placeholder.svg"
-            width={36}
-          />
-          <div>
-            <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-slate-100">Fabrica de Futbol</p>
-          </div>
-        </Link>
-        <nav className="flex flex-wrap items-center justify-end gap-2">
-          {PUBLIC_NAV_ITEMS.map((item) => {
-            const active = mounted && (safePathname === item.href || safePathname.startsWith(`${item.href}/`));
-            const href = withOrgQuery(item.href, organizationId);
-            return (
-              <Link
-                className={cn(
-                  "rounded-md border px-3 py-2 text-xs font-semibold transition md:text-sm",
-                  active
-                    ? "border-emerald-400/50 bg-accent text-white shadow-[0_10px_20px_-14px_rgba(16,185,129,1)]"
-                    : "border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-900"
-                )}
-                href={href}
-                key={item.href}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-
-          {isAuthenticated ? (
-            <>
-              <Link
-                className="rounded-md border border-emerald-400/40 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/10 md:text-sm"
-                href={withOrgQuery("/admin", organizationId)}
-              >
-                Panel
-              </Link>
-              <button
-                className="rounded-md border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-slate-500 hover:bg-slate-900 md:text-sm"
-                onClick={handleSignOut}
-                type="button"
-              >
-                Salir
-              </button>
-            </>
-          ) : (
-            <Link
-              className="rounded-md border border-emerald-400/40 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/10 md:text-sm"
-              href="/admin/login"
-            >
-              Ingresar / Registro
+      <div className="mx-auto max-w-6xl px-4 py-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center justify-between gap-3">
+            <Link className="flex min-w-0 items-center gap-3" href="/">
+              <Image
+                alt="Logo placeholder de Fabrica de Futbol"
+                className="h-9 w-9 rounded-lg border border-slate-700 bg-slate-900 object-cover"
+                height={36}
+                src="/logo-placeholder.svg"
+                width={36}
+              />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-extrabold uppercase tracking-[0.18em] text-slate-100">
+                  Fabrica de Futbol
+                </p>
+              </div>
             </Link>
-          )}
-        </nav>
+            <div className="md:hidden">{renderAuthControls(true)}</div>
+          </div>
+
+          <div className="flex flex-col gap-3 md:flex-1 md:flex-row md:items-center md:justify-end">
+            <nav className="scrollbar-none flex w-full items-center gap-2 overflow-x-auto pb-1 md:w-auto md:flex-wrap md:justify-end md:overflow-visible md:pb-0">
+              {PUBLIC_NAV_ITEMS.map((item) => {
+                const active = mounted && (safePathname === item.href || safePathname.startsWith(`${item.href}/`));
+                const href = withOrgQuery(item.href, organizationId);
+                return (
+                  <Link
+                    className={cn(
+                      "whitespace-nowrap rounded-md border px-3 py-2 text-xs font-semibold transition md:text-sm",
+                      active
+                        ? "border-emerald-400/50 bg-accent text-white shadow-[0_10px_20px_-14px_rgba(16,185,129,1)]"
+                        : "border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-900"
+                    )}
+                    href={href}
+                    key={item.href}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            <div className="hidden md:flex md:items-center">{renderAuthControls()}</div>
+          </div>
+        </div>
       </div>
     </header>
   );
