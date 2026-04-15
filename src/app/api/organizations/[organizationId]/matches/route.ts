@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { getMatchHistoryCardsPage } from "@/lib/queries/public";
 
+const PUBLIC_CACHE_HEADER = "public, s-maxage=60, stale-while-revalidate=300";
+
 export async function GET(
   request: Request,
   context: {
@@ -24,7 +26,11 @@ export async function GET(
       page,
       pageSize
     });
-    return NextResponse.json(result);
+    return NextResponse.json(result, {
+      headers: {
+        "Cache-Control": PUBLIC_CACHE_HEADER
+      }
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo obtener el historial.";
     return NextResponse.json({ error: message }, { status: 500 });

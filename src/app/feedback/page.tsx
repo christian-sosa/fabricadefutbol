@@ -99,11 +99,14 @@ export default function FeedbackPage({ searchParams }: FeedbackPageProps) {
             </label>
             <Textarea
               id="message"
+              maxLength={2500}
+              minLength={10}
               name="message"
               placeholder="Cuentanos que paso o que te gustaria mejorar."
               required
               rows={7}
             />
+            <p className="mt-1 text-xs text-slate-500">Minimo 10 caracteres.</p>
           </div>
 
           <Button type="submit">Enviar mensaje</Button>

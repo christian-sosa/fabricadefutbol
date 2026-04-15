@@ -16,7 +16,6 @@ import { MatchStatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { withOrgQuery } from "@/lib/org";
@@ -145,26 +144,6 @@ export default async function AdminMatchDetailPage({
             </Button>
           </div>
         </form>
-      </Card>
-
-      <Card>
-        <CardTitle>Convocados ({details.roster.length})</CardTitle>
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
-          {details.roster.map((player) => (
-            <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm" key={player.id}>
-              <span className="flex items-center gap-2">
-                <PlayerAvatar name={player.full_name} playerId={player.is_guest ? undefined : player.id} size="sm" />
-                {player.full_name}
-                {player.is_guest ? (
-                  <span className="rounded-full border border-cyan-400/50 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
-                    Invitado
-                  </span>
-                ) : null}
-              </span>
-              {!player.is_guest ? <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span> : null}
-            </div>
-          ))}
-        </div>
       </Card>
 
       {canDeleteMatch ? (
