@@ -21,6 +21,8 @@ export function useOrganizationStandingsQuery(params: {
     enabled: Boolean(organizationId),
     initialData: params.initialData,
     staleTime: ORGANIZATION_QUERY_STALE_TIME,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData
   });
 }
@@ -48,6 +50,8 @@ export function useOrganizationMatchesQuery(params: {
     enabled: Boolean(organizationId),
     initialData: params.initialData,
     staleTime: ORGANIZATION_QUERY_STALE_TIME,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData
   });
 }

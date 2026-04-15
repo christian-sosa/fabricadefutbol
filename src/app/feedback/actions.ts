@@ -16,7 +16,11 @@ const feedbackSchema = z.object({
     .trim()
     .max(80, "El nombre de la organizacion es demasiado largo.")
     .optional(),
-  message: z.string().trim().min(10, "Describe un poco mas el detalle.").max(2500, "Mensaje demasiado largo."),
+  message: z
+    .string()
+    .trim()
+    .min(10, "El mensaje debe tener al menos 10 caracteres.")
+    .max(2500, "Mensaje demasiado largo."),
   website: z.string().optional()
 });
 
@@ -94,6 +98,7 @@ export async function submitFeedbackAction(organizationKey: string | null, formD
 
     redirect(buildFeedbackPath({ organizationKey, sent: true }));
   } catch (error) {
+    console.error("[feedback] No se pudo enviar el email de contacto", error);
     redirect(
       buildFeedbackPath({
         organizationKey,

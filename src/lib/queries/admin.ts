@@ -157,27 +157,6 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
   if (matchError) throw new Error(matchError.message);
   if (!match) return null;
 
-  const [{ data: matchPlayers, error: matchPlayersError }, { data: matchGuests, error: matchGuestsError }] =
-    await Promise.all([
-      supabase.from("match_players").select("player_id").eq("match_id", matchId),
-      supabase.from("match_guests").select("id, guest_name, guest_rating").eq("match_id", matchId)
-    ]);
-  if (matchPlayersError) throw new Error(matchPlayersError.message);
-  if (matchGuestsError && !isGuestSchemaMissing(matchGuestsError)) throw new Error(matchGuestsError.message);
-  const safeMatchGuests = matchGuestsError && isGuestSchemaMissing(matchGuestsError) ? [] : matchGuests ?? [];
-
-  const playerIds = (matchPlayers ?? []).map((row) => row.player_id);
-  const { data: players, error: playersError } = playerIds.length
-    ? await supabase
-        .from("players")
-        .select("id, full_name, current_rating")
-        .eq("organization_id", organizationId)
-        .in("id", playerIds)
-    : { data: [], error: null };
-  if (playersError) throw new Error(playersError.message);
-  const playersById = new Map((players ?? []).map((player) => [player.id, player]));
-  const guestsById = new Map(safeMatchGuests.map((guest) => [guest.id, guest]));
-
   const { data: options, error: optionsError } = await supabase
     .from("team_options")
     .select("*")
@@ -202,6 +181,29 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
   if (optionPlayersError) throw new Error(optionPlayersError.message);
   if (optionGuestsError && !isGuestSchemaMissing(optionGuestsError)) throw new Error(optionGuestsError.message);
   const safeOptionGuests = optionGuestsError && isGuestSchemaMissing(optionGuestsError) ? [] : optionGuests ?? [];
+  const playerIds = Array.from(new Set((optionPlayers ?? []).map((row) => row.player_id)));
+  const guestIds = Array.from(new Set(safeOptionGuests.map((row) => row.guest_id)));
+
+  const { data: players, error: playersError } = playerIds.length
+    ? await supabase
+        .from("players")
+        .select("id, full_name, current_rating")
+        .eq("organization_id", organizationId)
+        .in("id", playerIds)
+    : { data: [], error: null };
+  if (playersError) throw new Error(playersError.message);
+
+  const { data: guests, error: guestsError } = guestIds.length
+    ? await supabase
+        .from("match_guests")
+        .select("id, guest_name, guest_rating")
+        .in("id", guestIds)
+    : { data: [], error: null };
+  if (guestsError && !isGuestSchemaMissing(guestsError)) throw new Error(guestsError.message);
+  const safeGuests = guestsError && isGuestSchemaMissing(guestsError) ? [] : guests ?? [];
+
+  const playersById = new Map((players ?? []).map((player) => [player.id, player]));
+  const guestsById = new Map(safeGuests.map((guest) => [guest.id, guest]));
 
   const optionsWithPlayers =
     options?.map((option) => {
@@ -255,21 +257,8 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
     .maybeSingle();
   if (resultError) throw new Error(resultError.message);
 
-  const rosterPlayers = (matchPlayers ?? [])
-    .map((row) => playersById.get(row.player_id))
-    .filter((player): player is NonNullable<typeof player> => Boolean(player))
-    .map((player) => ({ ...player, is_guest: false }));
-  const rosterGuests = safeMatchGuests.map((guest) => ({
-    id: guest.id,
-    full_name: guest.guest_name,
-    current_rating: Number(guest.guest_rating),
-    is_guest: true
-  }));
-  const roster = [...rosterPlayers, ...rosterGuests];
-
   return {
     match,
-    roster,
     options: optionsWithPlayers,
     result
   };
