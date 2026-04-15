@@ -63,6 +63,7 @@ export default async function AdminMatchDetailPage({
     (details.match.status === "confirmed" && !details.result);
   const canManageResult = details.match.status === "confirmed" || details.match.status === "finished";
   const confirmedOption = details.options.find((option) => option.is_confirmed) ?? null;
+  const visibleOptions = confirmedOption ? [confirmedOption] : details.options;
   const editableParticipants = confirmedOption
     ? [
         ...confirmedOption.teamA.map((member: OptionMember) => ({
@@ -183,8 +184,12 @@ export default async function AdminMatchDetailPage({
       <Card>
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <CardTitle>Opciones de equipos</CardTitle>
-            <CardDescription>Puedes regenerar en estado draft y confirmar una opcion final.</CardDescription>
+            <CardTitle>{confirmedOption ? "Equipo confirmado" : "Opciones de equipos"}</CardTitle>
+            <CardDescription>
+              {confirmedOption
+                ? "Ya se eligio una opcion final. En esta vista solo mostramos el equipo confirmado."
+                : "Puedes regenerar en estado draft y confirmar una opcion final."}
+            </CardDescription>
           </div>
           {details.match.status === "draft" ? (
             <form action={regenerateAction}>
@@ -195,7 +200,7 @@ export default async function AdminMatchDetailPage({
           ) : null}
         </div>
         <div className="space-y-3">
-          {details.options.map((option) => (
+          {visibleOptions.map((option) => (
             <TeamOptionCard
               confirmAction={details.match.status === "draft" ? confirmAction : undefined}
               isConfirmed={option.is_confirmed}
@@ -209,7 +214,7 @@ export default async function AdminMatchDetailPage({
               teamB={option.teamB}
             />
           ))}
-          {!details.options.length ? <p className="text-sm text-slate-400">No hay opciones generadas para este partido.</p> : null}
+          {!visibleOptions.length ? <p className="text-sm text-slate-400">No hay opciones generadas para este partido.</p> : null}
         </div>
       </Card>
 

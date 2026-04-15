@@ -43,7 +43,40 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
   return (
     <Card>
       <div className="mb-2 text-xs text-slate-400">{isFetching ? "Actualizando historial..." : "Historial estable"}</div>
-      <div className="overflow-x-auto">
+
+      <div className="grid gap-3 md:hidden">
+        {matches.map((match) => (
+          <article className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4" key={match.id}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-100">{formatDateTime(match.scheduledAt)}</p>
+                <p className="mt-1 text-sm text-slate-400">{match.modality}</p>
+              </div>
+              <MatchStatusBadge status={match.status} />
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <p className="text-sm text-slate-300">
+                Resultado: {match.scoreA !== null && match.scoreB !== null ? `${match.scoreA} - ${match.scoreB}` : "Pendiente"}
+              </p>
+              <Link
+                className="whitespace-nowrap text-sm font-semibold text-emerald-300 hover:underline"
+                href={withOrgQuery(`/matches/${match.id}`, organizationSlug)}
+              >
+                Ver detalle
+              </Link>
+            </div>
+          </article>
+        ))}
+
+        {!matches.length ? (
+          <p className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-6 text-sm text-slate-400">
+            {isFetching ? "Cargando historial..." : "No hay partidos para esta organizacion."}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="hidden overflow-x-auto md:block">
         <Table>
           <THead>
             <tr>
@@ -73,6 +106,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
                 </TD>
               </tr>
             ))}
+
             {!matches.length ? (
               <tr>
                 <TD className="py-6 text-sm text-slate-400" colSpan={5}>
@@ -83,10 +117,11 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
           </TBody>
         </Table>
       </div>
+
       {pagination ? (
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-800 pt-3">
+        <div className="mt-4 flex flex-col gap-3 border-t border-slate-800 pt-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-slate-400">
-            Pagina {pagination.page} de {Math.max(1, pagination.totalPages)} · {pagination.totalCount} partidos
+            Pagina {pagination.page} de {Math.max(1, pagination.totalPages)} - {pagination.totalCount} partidos
           </p>
           <div className="flex items-center gap-2">
             <Button

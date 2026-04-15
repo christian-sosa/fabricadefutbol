@@ -74,6 +74,10 @@ function parseBooleanEnv(value: string | null, fallback = false) {
   return fallback;
 }
 
+export function shouldRenderAds() {
+  return parseBooleanEnv(getEnv("NEXT_PUBLIC_ENABLE_ADS"), false);
+}
+
 function getSupabaseTargetEnv(): SupabaseTargetEnv {
   const configured = (getServerEnv("SUPABASE_TARGET_ENV") ?? "").toLowerCase();
   if (configured === "dev" || configured === "development") return "development";
@@ -341,7 +345,7 @@ export function getFeedbackFromEmail() {
     "FEEDBACK_FROM_EMAIL_DEV",
     "FEEDBACK_FROM_EMAIL_PROD"
   ]);
-  return selected ?? fallback ?? "info@fabricadefutbol.com";
+  return selected ?? fallback ?? "Fabrica de Futbol <onboarding@resend.dev>";
 }
 
 export function shouldUseMercadoPagoSandboxCheckout() {
