@@ -31,7 +31,7 @@ export default function FeedbackPage({ searchParams }: FeedbackPageProps) {
           contacto valido.
         </CardDescription>
         <p className="mt-2 text-xs text-slate-400">
-          Tambien puedes escribir directo a <span className="font-semibold text-slate-200">info@fabricadefutbol.com</span>.
+          Tambien puedes escribir directo a <span className="font-semibold text-slate-200">info@fabricadefutbol.com.ar</span>.
         </p>
       </Card>
 
