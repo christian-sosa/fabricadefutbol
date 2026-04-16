@@ -82,7 +82,9 @@ export async function registerAdminAction(_: RegisterState, formData: FormData):
 
   const supabase = await createSupabaseServerClient();
   const appUrl = process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
-  const emailRedirectTo = appUrl ? `${appUrl.replace(/\/+$/, "")}/admin/login` : undefined;
+  const emailRedirectTo = appUrl
+    ? new URL("/auth/confirm?next=/admin/login", appUrl.replace(/\/+$/, "")).toString()
+    : undefined;
 
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
@@ -96,6 +98,13 @@ export async function registerAdminAction(_: RegisterState, formData: FormData):
   });
 
   if (error) {
+    console.error("[auth] No se pudo registrar o enviar el email de confirmacion", {
+      code: "code" in error ? error.code : undefined,
+      message: error.message,
+      name: error.name,
+      status: "status" in error ? error.status : undefined
+    });
+
     return {
       error: error.message,
       success: null
