@@ -95,8 +95,6 @@ export async function submitFeedbackAction(organizationKey: string | null, formD
       userAgent: headerStore.get("user-agent"),
       referer: headerStore.get("referer")
     });
-
-    redirect(buildFeedbackPath({ organizationKey, sent: true }));
   } catch (error) {
     console.error("[feedback] No se pudo enviar el email de contacto", error);
     redirect(
@@ -106,4 +104,6 @@ export async function submitFeedbackAction(organizationKey: string | null, formD
       })
     );
   }
+
+  redirect(buildFeedbackPath({ organizationKey, sent: true }));
 }
