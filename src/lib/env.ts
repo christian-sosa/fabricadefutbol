@@ -331,7 +331,7 @@ export function getFeedbackInboxEmail() {
     "FEEDBACK_TO_EMAIL_DEV",
     "FEEDBACK_TO_EMAIL_PROD"
   ]);
-  return selected ?? fallback ?? "info@fabricadefutbol.com";
+  return selected ?? fallback ?? "info@fabricadefutbol.com.ar";
 }
 
 export function getFeedbackFromEmail() {
@@ -345,7 +345,7 @@ export function getFeedbackFromEmail() {
     "FEEDBACK_FROM_EMAIL_DEV",
     "FEEDBACK_FROM_EMAIL_PROD"
   ]);
-  return selected ?? fallback ?? "Fabrica de Futbol <onboarding@resend.dev>";
+  return selected ?? fallback ?? "Fabrica de Futbol <no-reply@fabricadefutbol.com.ar>";
 }
 
 export function shouldUseMercadoPagoSandboxCheckout() {
