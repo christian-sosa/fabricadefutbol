@@ -82,7 +82,8 @@ async function ensureAdminProfile(params: {
   metadata?: Record<string, unknown>;
 }) {
   const { userId, email, metadata } = params;
-  const supabase = await createSupabaseServerClient();
+  const adminClient = createSupabaseAdminClient();
+  const supabase = adminClient ?? (await createSupabaseServerClient());
 
   const { data: existing, error: existingError } = await supabase
     .from("admins")
@@ -115,6 +116,12 @@ async function ensureAdminProfile(params: {
     .maybeSingle();
 
   if (insertedError || !inserted) {
+    console.error("[auth] No se pudo leer el perfil de administrador luego del alta", {
+      userId,
+      email,
+      insertedError: insertedError?.message ?? null,
+      usingServiceRole: Boolean(adminClient)
+    });
     throw new Error(insertedError?.message ?? "No se pudo crear perfil de administrador.");
   }
 
@@ -123,7 +130,8 @@ async function ensureAdminProfile(params: {
 
 async function autoAcceptOrganizationInvites(adminId: string, email: string) {
   const normalizedEmail = normalizeEmail(email);
-  const supabase = await createSupabaseServerClient();
+  const adminClient = createSupabaseAdminClient();
+  const supabase = adminClient ?? (await createSupabaseServerClient());
 
   const { data: pendingInvites, error: pendingInvitesError } = await supabase
     .from("organization_invites")

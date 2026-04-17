@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getOrganizationQueryKeyById } from "@/lib/auth/admin";
 import { normalizeEmail, withOrgQuery } from "@/lib/org";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function deriveDisplayName(email: string, metadata?: Record<string, unknown>) {
@@ -77,7 +78,9 @@ export default async function InviteByLinkPage({
     );
   }
 
-  const { error: ensureAdminError } = await supabase.from("admins").upsert(
+  const privilegedSupabase = createSupabaseAdminClient() ?? supabase;
+
+  const { error: ensureAdminError } = await privilegedSupabase.from("admins").upsert(
     {
       id: user.id,
       display_name: deriveDisplayName(user.email, (user.user_metadata ?? undefined) as Record<string, unknown> | undefined)
@@ -89,7 +92,7 @@ export default async function InviteByLinkPage({
     throw new Error(ensureAdminError.message);
   }
 
-  const { error: insertMembershipError } = await supabase.from("organization_admins").insert({
+  const { error: insertMembershipError } = await privilegedSupabase.from("organization_admins").insert({
     organization_id: invite.organization_id,
     admin_id: user.id,
     created_by: user.id
@@ -99,7 +102,7 @@ export default async function InviteByLinkPage({
     throw new Error(insertMembershipError.message);
   }
 
-  const { error: deleteInviteError } = await supabase
+  const { error: deleteInviteError } = await privilegedSupabase
     .from("organization_invites")
     .delete()
     .eq("id", invite.id)
