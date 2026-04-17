@@ -76,7 +76,8 @@ export default async function AdminBillingPage({
       if (supabaseAdmin) {
         await syncOrganizationBillingPaymentFromMercadoPago({
           supabase: supabaseAdmin,
-          mercadopagoPaymentId: searchParams.payment_id
+          mercadopagoPaymentId: searchParams.payment_id,
+          expectedOrganizationId: selectedOrganization.id
         });
       }
     } catch {

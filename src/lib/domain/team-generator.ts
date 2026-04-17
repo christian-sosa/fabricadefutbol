@@ -17,6 +17,11 @@ type ScoredCombination = TeamOptionCandidate & {
 const DEFAULT_OPTION_COUNT = 3;
 const MAX_OPTION_COUNT = 6;
 const TOP_TWO_SAME_TEAM_PENALTY = 35;
+// Por encima de este numero de combinaciones totales evitamos enumerar todo
+// y usamos muestreo aleatorio. Cubre hasta 9v9 (C(17,8)=24310) sin cambios;
+// 11v11 (C(21,10)=352716) pasa al camino de muestreo.
+const MAX_ENUMERATED_COMBINATIONS = 50_000;
+const SAMPLE_COMBINATIONS_TARGET = 50_000;
 
 function createSeededRandom(seed: number) {
   let state = seed >>> 0;
@@ -62,6 +67,76 @@ function areParticipantsSeparated(
   return teamAIds.has(firstParticipantId) !== teamAIds.has(secondParticipantId);
 }
 
+function binomial(n: number, k: number) {
+  if (k < 0 || k > n) return 0;
+  if (k === 0 || k === n) return 1;
+  const m = Math.min(k, n - k);
+  let result = 1;
+  for (let i = 1; i <= m; i += 1) {
+    result = (result * (n - m + i)) / i;
+  }
+  return result;
+}
+
+function enumerateCombinations(
+  first: PlayerRatingInput,
+  rest: PlayerRatingInput[],
+  targetSize: number,
+  random: () => number
+): PlayerRatingInput[][] {
+  const output: PlayerRatingInput[][] = [];
+  const acc: PlayerRatingInput[] = [];
+
+  const walk = (start: number) => {
+    if (acc.length === targetSize) {
+      output.push([first, ...acc]);
+      return;
+    }
+    const remaining = targetSize - acc.length;
+    const maxStart = rest.length - remaining;
+    for (let i = start; i <= maxStart; i += 1) {
+      acc.push(rest[i]);
+      walk(i + 1);
+      acc.pop();
+    }
+  };
+
+  walk(0);
+  shuffleInPlace(output, random);
+  return output;
+}
+
+function sampleCombinations(
+  first: PlayerRatingInput,
+  rest: PlayerRatingInput[],
+  targetSize: number,
+  sampleSize: number,
+  random: () => number
+): PlayerRatingInput[][] {
+  const seenKeys = new Set<string>();
+  const output: PlayerRatingInput[][] = [];
+  const restCopy = rest.slice();
+  const maxTries = sampleSize * 3;
+
+  for (let attempts = 0; attempts < maxTries && output.length < sampleSize; attempts += 1) {
+    // Fisher-Yates parcial: mezclamos solo los primeros targetSize elementos.
+    for (let i = 0; i < targetSize; i += 1) {
+      const j = i + Math.floor(random() * (restCopy.length - i));
+      [restCopy[i], restCopy[j]] = [restCopy[j], restCopy[i]];
+    }
+    const teamATail = restCopy.slice(0, targetSize);
+    const key = teamATail
+      .map((player) => player.id)
+      .sort((a, b) => a.localeCompare(b))
+      .join("|");
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    output.push([first, ...teamATail]);
+  }
+
+  return output;
+}
+
 function chooseCombinations(
   items: PlayerRatingInput[],
   size: number,
@@ -70,22 +145,16 @@ function chooseCombinations(
   const first = items[0];
   const rest = items.slice(1);
   const targetSize = size - 1;
-  const output: PlayerRatingInput[][] = [];
 
-  const walk = (start: number, acc: PlayerRatingInput[]) => {
-    if (acc.length === targetSize) {
-      output.push([first, ...acc]);
-      return;
-    }
+  const totalCombinations = binomial(rest.length, targetSize);
+  if (totalCombinations <= MAX_ENUMERATED_COMBINATIONS) {
+    return enumerateCombinations(first, rest, targetSize, random);
+  }
 
-    for (let i = start; i < rest.length; i += 1) {
-      walk(i + 1, [...acc, rest[i]]);
-    }
-  };
-
-  walk(0, []);
-  shuffleInPlace(output, random);
-  return output;
+  // Modalidades grandes (ej. 11v11): muestreo aleatorio uniforme con dedup
+  // por clave canonica. Evita explosion combinatoria sin perder calidad porque
+  // el scoring posterior filtra al top.
+  return sampleCombinations(first, rest, targetSize, SAMPLE_COMBINATIONS_TARGET, random);
 }
 
 export function generateBalancedTeamOptions(input: GenerateTeamOptionsInput): TeamOptionCandidate[] {

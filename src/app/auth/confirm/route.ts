@@ -4,7 +4,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function resolveNextPath(next: string | null) {
-  return next?.startsWith("/") ? next : "/admin/login";
+  if (!next) return "/admin/login";
+  if (!next.startsWith("/")) return "/admin/login";
+  // Bloquea rutas protocol-relative ("//evil.com") y variantes con backslash
+  // que algunos navegadores normalizan como "/" y permitirian redireccion abierta.
+  if (next.startsWith("//") || next.startsWith("/\\")) return "/admin/login";
+  return next;
 }
 
 function buildRedirectUrl(request: NextRequest, pathname: string, searchParams?: Record<string, string>) {

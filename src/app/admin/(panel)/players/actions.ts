@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/lib/auth/admin";
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
+import { toUserMessage } from "@/lib/errors";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -226,7 +227,7 @@ export async function createPlayerAction(formData: FormData) {
       initial_rank: rankToUse
     });
     if (error) {
-      redirect(withMessage(organizationQueryKey, error.message));
+      redirect(withMessage(organizationQueryKey, toUserMessage(error, "No se pudo crear al jugador.")));
     }
 
     revalidatePath("/admin/players");
@@ -236,8 +237,7 @@ export async function createPlayerAction(formData: FormData) {
     redirect(withSuccess(organizationQueryKey, "Jugador creado correctamente."));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    const message = error instanceof Error ? error.message : "Error inesperado al crear jugador.";
-    redirect(withMessage(String(formData.get("organizationId") ?? ""), message));
+    redirect(withMessage(String(formData.get("organizationId") ?? ""), toUserMessage(error, "Error inesperado al crear jugador.")));
   }
 }
 
@@ -353,8 +353,7 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
     );
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    const message = error instanceof Error ? error.message : "No se pudo guardar la planilla.";
-    redirect(withMessage(organizationId, message));
+    redirect(withMessage(organizationId, toUserMessage(error, "No se pudo guardar la planilla.")));
   }
 }
 
@@ -402,7 +401,7 @@ export async function deletePlayerAction(formData: FormData) {
           organizationQueryKey,
           cannotDeleteDueToHistory
             ? "No se puede eliminar este jugador porque esta vinculado a partidos ya registrados."
-            : deleteError.message
+            : toUserMessage(deleteError, "No se pudo eliminar el jugador.")
         )
       );
     }
@@ -415,7 +414,7 @@ export async function deletePlayerAction(formData: FormData) {
       .order("initial_rank", { ascending: true });
 
     if (shiftCandidatesError) {
-      redirect(withMessage(organizationQueryKey, shiftCandidatesError.message));
+      redirect(withMessage(organizationQueryKey, toUserMessage(shiftCandidatesError, "No se pudo recalcular el ranking.")));
     }
 
     for (const player of playersToShift ?? []) {
@@ -426,7 +425,7 @@ export async function deletePlayerAction(formData: FormData) {
         .eq("organization_id", parsed.data.organizationId);
 
       if (shiftError) {
-        redirect(withMessage(organizationQueryKey, shiftError.message));
+        redirect(withMessage(organizationQueryKey, toUserMessage(shiftError, "No se pudo reordenar el ranking.")));
       }
     }
 
@@ -437,8 +436,7 @@ export async function deletePlayerAction(formData: FormData) {
     redirect(withSuccess(organizationQueryKey, `Jugador ${playerToDelete.full_name} eliminado y ranking reordenado.`));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    const message = error instanceof Error ? error.message : "No se pudo eliminar el jugador.";
-    redirect(withMessage(String(formData.get("organizationId") ?? ""), message));
+    redirect(withMessage(String(formData.get("organizationId") ?? ""), toUserMessage(error, "No se pudo eliminar el jugador.")));
   }
 }
 
@@ -504,7 +502,12 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
       });
 
     if (uploadError) {
-      redirect(withMessage(organizationQueryKey, `No se pudo guardar la foto en Storage: ${uploadError.message}`));
+      console.error("[players] storage upload failed", {
+        organizationId: parsed.data.organizationId,
+        playerId: parsed.data.playerId,
+        message: uploadError.message
+      });
+      redirect(withMessage(organizationQueryKey, "No se pudo guardar la foto en Storage. Intenta nuevamente."));
     }
 
     revalidatePath("/admin/players");
@@ -515,7 +518,6 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
     redirect(withSuccess(organizationQueryKey, "Foto subida correctamente."));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    const message = error instanceof Error ? error.message : "No se pudo subir la foto.";
-    redirect(withMessage(String(formData.get("organizationId") ?? ""), message));
+    redirect(withMessage(String(formData.get("organizationId") ?? ""), toUserMessage(error, "No se pudo subir la foto.")));
   }
 }

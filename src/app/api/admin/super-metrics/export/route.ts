@@ -1,7 +1,10 @@
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getAdminSession } from "@/lib/auth/admin";
+import { maskEmail, maskUserId } from "@/lib/log-pii";
 import { getSuperAdminDashboardMetrics } from "@/lib/queries/admin";
+import { getClientIpFromHeaders } from "@/lib/rate-limit";
 
 function csvCell(value: string | number) {
   const safeValue = String(value ?? "");
@@ -21,6 +24,20 @@ export async function GET() {
   if (!admin.isSuperAdmin) {
     return new NextResponse("Solo el super admin puede exportar estas metricas.", { status: 403 });
   }
+
+  // Auditoria: registramos quien exporto y desde donde, para rastreo de uso
+  // de datos sensibles agregados. Log estructurado para filtrar facil en
+  // herramientas de observabilidad.
+  const headerStore = headers();
+  const clientIp = getClientIpFromHeaders(headerStore);
+  const userAgent = headerStore.get("user-agent");
+  console.info("[audit] super-admin csv export", {
+    adminUserId: maskUserId(admin.userId),
+    adminEmail: maskEmail(admin.email),
+    ip: clientIp,
+    userAgent,
+    at: new Date().toISOString()
+  });
 
   const metrics = await getSuperAdminDashboardMetrics();
   const dateStamp = new Date().toISOString().slice(0, 10);

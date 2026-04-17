@@ -25,6 +25,7 @@ import {
 } from "@/lib/env";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { normalizeEmail, slugifyOrganizationName, withOrgQuery } from "@/lib/org";
+import { toUserMessage } from "@/lib/errors";
 import { createCheckoutProPreference } from "@/lib/payments/mercadopago";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -147,7 +148,7 @@ export async function createOrganizationAction(formData: FormData) {
       .ilike("slug", `${baseSlug}%`);
 
     if (existingSlugsError) {
-      redirect(buildAdminPath(undefined, existingSlugsError.message));
+      redirect(buildAdminPath(undefined, toUserMessage(existingSlugsError, "No se pudo crear la organizacion.")));
     }
 
     const existingSlugs = (existingSlugsRows ?? []).map((row) => row.slug.toLowerCase());
@@ -165,7 +166,7 @@ export async function createOrganizationAction(formData: FormData) {
       .single();
 
     if (organizationError || !organization) {
-      redirect(buildAdminPath(undefined, organizationError?.message ?? "No se pudo crear la organizacion."));
+      redirect(buildAdminPath(undefined, toUserMessage(organizationError, "No se pudo crear la organizacion.")));
     }
 
     const { error: membershipError } = await supabase.from("organization_admins").insert({
@@ -175,7 +176,7 @@ export async function createOrganizationAction(formData: FormData) {
     });
 
     if (membershipError && membershipError.code !== "23505") {
-      redirect(buildAdminPath(undefined, membershipError.message));
+      redirect(buildAdminPath(undefined, toUserMessage(membershipError, "No se pudo asociar el admin a la organizacion.")));
     }
 
     revalidatePath("/admin");
@@ -187,8 +188,7 @@ export async function createOrganizationAction(formData: FormData) {
     redirect(withOrgQuery("/admin", slug));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    const message = error instanceof Error ? error.message : "No se pudo crear la organizacion.";
-    redirect(buildAdminPath(undefined, message));
+    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo crear la organizacion.")));
   }
 }
 
@@ -234,7 +234,7 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
       .ilike("slug", `${baseSlug}%`);
 
     if (existingSlugsError) {
-      redirect(buildAdminPath(organizationQueryKey, existingSlugsError.message));
+      redirect(buildAdminPath(organizationQueryKey, toUserMessage(existingSlugsError, "No se pudo iniciar el pago.")));
     }
 
     const existingSlugs = (existingSlugsRows ?? []).map((row) => row.slug.toLowerCase());
@@ -279,7 +279,7 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
       redirect(
         buildAdminPath(
           organizationQueryKey,
-          insertPaymentError?.message ?? "No se pudo registrar el pago para crear la organizacion."
+          toUserMessage(insertPaymentError, "No se pudo registrar el pago para crear la organizacion.")
         )
       );
     }
@@ -312,7 +312,7 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
       .eq("id", insertedPayment.id);
 
     if (updatePaymentError) {
-      redirect(buildAdminPath(organizationQueryKey, updatePaymentError.message));
+      redirect(buildAdminPath(organizationQueryKey, toUserMessage(updatePaymentError, "No se pudo guardar la preferencia de pago.")));
     }
 
     const redirectUrl = shouldUseMercadoPagoSandboxCheckout()
@@ -331,11 +331,7 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
     redirect(redirectUrl);
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    const message =
-      error instanceof Error
-        ? error.message
-        : "No se pudo iniciar el pago para crear la nueva organizacion.";
-    redirect(buildAdminPath(undefined, message));
+    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo iniciar el pago para crear la nueva organizacion.")));
   }
 }
 
@@ -371,7 +367,7 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
       redirect(
         buildBillingPath(
           organizationQueryKey,
-          organizationError?.message ?? "No se pudo leer la organizacion para facturar."
+          toUserMessage(organizationError, "No se pudo leer la organizacion para facturar.")
         )
       );
     }
@@ -403,7 +399,7 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
       redirect(
         buildBillingPath(
           organizationQueryKey,
-          insertPaymentError?.message ?? "No se pudo registrar el intento de pago."
+          toUserMessage(insertPaymentError, "No se pudo registrar el intento de pago.")
         )
       );
     }
@@ -435,7 +431,7 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
       .eq("id", insertedPayment.id);
 
     if (updatePaymentError) {
-      redirect(buildBillingPath(organizationQueryKey, updatePaymentError.message));
+      redirect(buildBillingPath(organizationQueryKey, toUserMessage(updatePaymentError, "No se pudo guardar la preferencia de pago.")));
     }
 
     const redirectUrl = shouldUseMercadoPagoSandboxCheckout()
@@ -454,9 +450,7 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
     redirect(redirectUrl);
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    const message =
-      error instanceof Error ? error.message : "No se pudo iniciar el pago en Mercado Pago.";
-    redirect(buildBillingPath(undefined, message));
+    redirect(buildBillingPath(undefined, toUserMessage(error, "No se pudo iniciar el pago en Mercado Pago.")));
   }
 }
 
@@ -485,7 +479,8 @@ export async function syncOrganizationCheckoutPaymentAction(formData: FormData) 
 
     await syncOrganizationBillingPaymentFromMercadoPago({
       supabase: supabaseAdmin,
-      mercadopagoPaymentId: parsed.data.paymentId
+      mercadopagoPaymentId: parsed.data.paymentId,
+      expectedOrganizationId: parsed.data.organizationId
     });
 
     revalidatePath("/admin");
@@ -493,8 +488,7 @@ export async function syncOrganizationCheckoutPaymentAction(formData: FormData) 
     redirect(withOrgQuery("/admin/billing?checkout=sync", organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    const message = error instanceof Error ? error.message : "No se pudo sincronizar el pago.";
-    redirect(buildBillingPath(undefined, message));
+    redirect(buildBillingPath(undefined, toUserMessage(error, "No se pudo sincronizar el pago.")));
   }
 }
 
@@ -532,10 +526,10 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
       ]);
 
     if (adminCountError) {
-      redirect(buildAdminPath(organizationQueryKey, adminCountError.message));
+      redirect(buildAdminPath(organizationQueryKey, toUserMessage(adminCountError, "No se pudo verificar los admins actuales.")));
     }
     if (inviteCountError) {
-      redirect(buildAdminPath(organizationQueryKey, inviteCountError.message));
+      redirect(buildAdminPath(organizationQueryKey, toUserMessage(inviteCountError, "No se pudo verificar invitaciones pendientes.")));
     }
 
     const slotsUsed = (currentAdmins ?? 0) + (pendingInvites ?? 0);
@@ -555,7 +549,9 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
       redirect(
         buildAdminPath(
           organizationQueryKey,
-          alreadyInvited ? "Ese email ya tiene una invitacion pendiente." : inviteError.message
+          alreadyInvited
+            ? "Ese email ya tiene una invitacion pendiente."
+            : toUserMessage(inviteError, "No se pudo generar la invitacion.")
         )
       );
     }
@@ -564,8 +560,7 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
     redirect(withOrgQuery("/admin", organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    const message = error instanceof Error ? error.message : "No se pudo generar la invitacion.";
-    redirect(buildAdminPath(undefined, message));
+    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo generar la invitacion.")));
   }
 }
 
@@ -591,15 +586,14 @@ export async function revokeOrganizationInviteAction(formData: FormData) {
       .eq("organization_id", parsed.data.organizationId);
 
     if (error) {
-      redirect(buildAdminPath(organizationQueryKey, error.message));
+      redirect(buildAdminPath(organizationQueryKey, toUserMessage(error, "No se pudo cancelar la invitacion.")));
     }
 
     revalidatePath("/admin");
     redirect(withOrgQuery("/admin", organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    const message = error instanceof Error ? error.message : "No se pudo cancelar la invitacion.";
-    redirect(buildAdminPath(undefined, message));
+    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo cancelar la invitacion.")));
   }
 }
 
@@ -628,7 +622,7 @@ export async function removeOrganizationAdminAction(formData: FormData) {
       .eq("organization_id", parsed.data.organizationId);
 
     if (adminsCountError) {
-      redirect(buildAdminPath(organizationQueryKey, adminsCountError.message));
+      redirect(buildAdminPath(organizationQueryKey, toUserMessage(adminsCountError, "No se pudo contar los admins actuales.")));
     }
 
     if ((adminsCount ?? 0) <= 1) {
@@ -642,15 +636,14 @@ export async function removeOrganizationAdminAction(formData: FormData) {
       .eq("admin_id", parsed.data.adminId);
 
     if (deleteError) {
-      redirect(buildAdminPath(organizationQueryKey, deleteError.message));
+      redirect(buildAdminPath(organizationQueryKey, toUserMessage(deleteError, "No se pudo quitar al administrador.")));
     }
 
     revalidatePath("/admin");
     redirect(withOrgQuery("/admin", organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    const message = error instanceof Error ? error.message : "No se pudo quitar al administrador.";
-    redirect(buildAdminPath(undefined, message));
+    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo quitar al administrador.")));
   }
 }
 
@@ -677,7 +670,7 @@ export async function deleteOrganizationAction(formData: FormData) {
       .maybeSingle();
 
     if (organizationError) {
-      redirect(buildAdminPath(undefined, organizationError.message));
+      redirect(buildAdminPath(undefined, toUserMessage(organizationError, "No se pudo leer la organizacion.")));
     }
 
     if (!organization) {
@@ -690,7 +683,7 @@ export async function deleteOrganizationAction(formData: FormData) {
       .eq("id", parsed.data.organizationId);
 
     if (deleteError) {
-      redirect(buildAdminPath(undefined, deleteError.message));
+      redirect(buildAdminPath(undefined, toUserMessage(deleteError, "No se pudo borrar la organizacion.")));
     }
 
     revalidatePath("/admin");
@@ -702,7 +695,6 @@ export async function deleteOrganizationAction(formData: FormData) {
     redirect("/admin");
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    const message = error instanceof Error ? error.message : "No se pudo borrar la organizacion.";
-    redirect(buildAdminPath(undefined, message));
+    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo borrar la organizacion.")));
   }
 }

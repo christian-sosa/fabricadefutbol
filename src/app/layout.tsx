@@ -8,9 +8,52 @@ import { ReactQueryProvider } from "@/components/providers/react-query-provider"
 import { shouldRenderAds } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+  process.env.APP_URL?.trim() ||
+  "https://fabricadefutbol.com";
+
 export const metadata: Metadata = {
-  title: "Fabrica de Futbol",
-  description: "Gestion de partidos de futbol entre amigos"
+  metadataBase: new URL(APP_URL),
+  title: {
+    default: "Fabrica de Futbol",
+    template: "%s — Fabrica de Futbol"
+  },
+  description:
+    "Organiza partidos de futbol entre amigos: convocatoria, equipos balanceados, ranking y estadisticas.",
+  applicationName: "Fabrica de Futbol",
+  keywords: [
+    "futbol",
+    "amigos",
+    "partidos",
+    "equipos",
+    "ranking",
+    "estadisticas",
+    "convocatoria"
+  ],
+  authors: [{ name: "Fabrica de Futbol" }],
+  robots: {
+    index: true,
+    follow: true
+  },
+  openGraph: {
+    type: "website",
+    locale: "es_AR",
+    url: APP_URL,
+    siteName: "Fabrica de Futbol",
+    title: "Fabrica de Futbol",
+    description:
+      "Organiza partidos de futbol entre amigos: convocatoria, equipos balanceados, ranking y estadisticas."
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Fabrica de Futbol",
+    description:
+      "Organiza partidos de futbol entre amigos: convocatoria, equipos balanceados, ranking y estadisticas."
+  },
+  icons: {
+    icon: "/favicon.ico"
+  }
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -32,11 +75,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               crossOrigin="anonymous"
             ></script>
           ) : null}
+          <a className="skip-link" href="#contenido-principal">
+            Saltar al contenido
+          </a>
           <Suspense fallback={<div className="sticky top-0 z-30 h-[57px] border-b border-slate-800 bg-slate-950/85" />}>
             <SiteHeader initialIsAuthenticated={initialIsAuthenticated} />
           </Suspense>
           <BetaNotice />
-          <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8">{children}</main>
+          <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8" id="contenido-principal">
+            {children}
+          </main>
         </ReactQueryProvider>
       </body>
     </html>

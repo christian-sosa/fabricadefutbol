@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { sendFeedbackEmail } from "@/lib/feedback-email";
 import { normalizeEmail, withOrgQuery } from "@/lib/org";
+import { checkRateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
 
 const feedbackSchema = z.object({
   fullName: z.string().trim().min(2, "Escribe tu nombre.").max(80, "El nombre es demasiado largo."),
@@ -83,8 +84,25 @@ export async function submitFeedbackAction(organizationKey: string | null, formD
     redirect(buildFeedbackPath({ organizationKey, sent: true }));
   }
 
+  const headerStore = headers();
+  const clientIp = getClientIpFromHeaders(headerStore);
+  // Max 3 envios por IP cada 5 minutos. Mitiga spam/abuso del formulario.
+  const rateLimit = checkRateLimit({
+    key: `feedback:${clientIp}`,
+    limit: 3,
+    windowMs: 5 * 60 * 1000
+  });
+  if (!rateLimit.allowed) {
+    const retryMinutes = Math.max(1, Math.ceil(rateLimit.retryAfterMs / 60_000));
+    redirect(
+      buildFeedbackPath({
+        organizationKey,
+        error: `Enviaste demasiados mensajes seguidos. Probá de nuevo en ${retryMinutes} minuto(s).`
+      })
+    );
+  }
+
   try {
-    const headerStore = headers();
     await sendFeedbackEmail({
       fullName: parsed.data.fullName,
       email: normalizeEmail(parsed.data.email),

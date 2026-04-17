@@ -94,15 +94,24 @@ async function applyApprovedPaymentPeriod(params: {
     );
   if (upsertSubscriptionError) throw new Error(upsertSubscriptionError.message);
 
-  const { error: markAppliedError } = await supabase
+  // Guard atomico: solo una ejecucion concurrente puede pasar el WHERE.
+  // El WHERE adicional `subscription_applied_at IS NULL` evita doble aplicacion
+  // si el webhook llega dos veces casi simultaneamente.
+  const { data: markedRows, error: markAppliedError } = await supabase
     .from("organization_billing_payments")
     .update({
       period_start: periodStart,
       period_end: periodEnd,
       subscription_applied_at: new Date().toISOString()
     })
-    .eq("id", paymentRow.id);
+    .eq("id", paymentRow.id)
+    .is("subscription_applied_at", null)
+    .select("id");
   if (markAppliedError) throw new Error(markAppliedError.message);
+  if (!markedRows || markedRows.length === 0) {
+    // Otro proceso ya aplico este pago; no hay nada mas que hacer.
+    return;
+  }
 }
 
 async function resolveNextSlug(params: {
@@ -190,8 +199,14 @@ async function createOrganizationFromApprovedPayment(params: {
 export async function syncOrganizationBillingPaymentFromMercadoPago(params: {
   supabase: DbClient;
   mercadopagoPaymentId: string | number;
+  /**
+   * Si se provee, exige que el pago local localizado pertenezca a esta organizacion.
+   * Evita que un admin pueda sincronizar pagos de otra organizacion pasando
+   * un paymentId ajeno.
+   */
+  expectedOrganizationId?: string;
 }) {
-  const { supabase, mercadopagoPaymentId } = params;
+  const { supabase, mercadopagoPaymentId, expectedOrganizationId } = params;
   let payment;
   try {
     payment = await getMercadoPagoPaymentById(mercadopagoPaymentId);
@@ -219,6 +234,13 @@ export async function syncOrganizationBillingPaymentFromMercadoPago(params: {
     return {
       updated: false,
       reason: "No hay orden local asociada para este pago."
+    };
+  }
+
+  if (expectedOrganizationId && paymentRow.organization_id !== expectedOrganizationId) {
+    return {
+      updated: false,
+      reason: "El pago no pertenece a esta organizacion."
     };
   }
 

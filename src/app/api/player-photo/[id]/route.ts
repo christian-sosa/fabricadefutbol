@@ -15,7 +15,13 @@ const CONTENT_TYPE_BY_EXTENSION: Record<(typeof PHOTO_EXTENSIONS)[number], strin
   png: "image/png",
   webp: "image/webp"
 };
-const PHOTO_CACHE_CONTROL = "no-store";
+// Las fotos de jugador cambian raramente. Permitimos cache del navegador y
+// CDN por 1h, y servimos "stale" hasta 1 dia mientras revalidamos en segundo
+// plano. Si se sube una foto nueva, el path termina siendo el mismo pero el
+// usuario puede hacer hard-refresh; para invalidar agresivamente se puede
+// agregar un query ?v= en el <img src> a futuro.
+const PHOTO_CACHE_CONTROL = "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400";
+const PLACEHOLDER_CACHE_CONTROL = "public, max-age=86400, immutable";
 
 function getLegacyPhotoPath(playerId: string, extension: (typeof PHOTO_EXTENSIONS)[number]) {
   return path.join(process.cwd(), "public", "players", `${playerId}.${extension}`);
@@ -60,7 +66,13 @@ async function readLegacyPhotoResponse(playerId: string) {
 }
 
 async function readPlaceholderResponse() {
-  return readImageResponse(getPlaceholderPath(), "image/svg+xml");
+  const file = await readFile(getPlaceholderPath());
+  return new NextResponse(file, {
+    headers: {
+      "content-type": "image/svg+xml",
+      "cache-control": PLACEHOLDER_CACHE_CONTROL
+    }
+  });
 }
 
 export async function GET(
