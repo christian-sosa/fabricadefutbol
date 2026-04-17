@@ -101,20 +101,19 @@ async function ensureAdminProfile(params: {
   }
 
   const fallbackName = deriveDisplayName(email, metadata);
-  const { error: insertError } = await supabase.from("admins").insert({
-    id: userId,
-    display_name: fallbackName
-  });
-
-  if (insertError && insertError.code !== "23505") {
-    throw new Error(insertError.message);
-  }
-
   const { data: inserted, error: insertedError } = await supabase
     .from("admins")
+    .upsert(
+      {
+        id: userId,
+        display_name: fallbackName
+      },
+      {
+        onConflict: "id"
+      }
+    )
     .select("id, display_name")
-    .eq("id", userId)
-    .maybeSingle();
+    .single();
 
   if (insertedError || !inserted) {
     console.error("[auth] No se pudo leer el perfil de administrador luego del alta", {
@@ -123,10 +122,7 @@ async function ensureAdminProfile(params: {
       insertedError: insertedError?.message ?? null,
       usingServiceRole: Boolean(adminClient)
     });
-    return {
-      id: userId,
-      display_name: fallbackName
-    };
+    throw new Error(insertedError?.message ?? "No se pudo crear el perfil de administrador.");
   }
 
   return inserted;

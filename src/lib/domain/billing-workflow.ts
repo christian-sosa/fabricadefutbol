@@ -1,5 +1,4 @@
 import { resolveNextOrganizationBillingPeriod } from "@/lib/domain/billing";
-import { slugifyOrganizationName } from "@/lib/org";
 import { getMercadoPagoPaymentById } from "@/lib/payments/mercadopago";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -114,86 +113,20 @@ async function applyApprovedPaymentPeriod(params: {
   }
 }
 
-async function resolveNextSlug(params: {
-  supabase: DbClient;
-  requestedSlug: string | null;
-  requestedName: string;
-}) {
-  const { supabase, requestedSlug, requestedName } = params;
-  const baseSlug = (requestedSlug?.trim() || slugifyOrganizationName(requestedName)).slice(0, 50);
-  const safeBaseSlug = baseSlug || `organizacion-${Date.now()}`;
-
-  const { data: existingSlugsRows, error: existingSlugsError } = await supabase
-    .from("organizations")
-    .select("slug")
-    .ilike("slug", `${safeBaseSlug}%`);
-  if (existingSlugsError) throw new Error(existingSlugsError.message);
-
-  const existingSlugs = new Set((existingSlugsRows ?? []).map((row) => row.slug.toLowerCase()));
-  if (!existingSlugs.has(safeBaseSlug.toLowerCase())) return safeBaseSlug;
-
-  let suffix = 2;
-  while (existingSlugs.has(`${safeBaseSlug}-${suffix}`.toLowerCase())) {
-    suffix += 1;
-  }
-  return `${safeBaseSlug}-${suffix}`;
-}
-
 async function createOrganizationFromApprovedPayment(params: {
   supabase: DbClient;
   paymentRow: BillingPaymentRow;
 }) {
   const { supabase, paymentRow } = params;
-  if (paymentRow.created_organization_id) {
-    return paymentRow.created_organization_id;
-  }
-
-  const requestedName = paymentRow.requested_organization_name?.trim();
-  const requestedByAdminId = paymentRow.requested_by_admin_id;
-  if (!requestedName || !requestedByAdminId) {
-    return null;
-  }
-
-  const nextSlug = await resolveNextSlug({
-    supabase,
-    requestedSlug: paymentRow.requested_organization_slug,
-    requestedName
+  const { data, error } = await supabase.rpc("finalize_organization_creation_payment", {
+    payment_row_id: paymentRow.id
   });
 
-  const { data: organization, error: organizationError } = await supabase
-    .from("organizations")
-    .insert({
-      name: requestedName,
-      slug: nextSlug,
-      created_by: requestedByAdminId,
-      is_public: true
-    })
-    .select("id")
-    .single();
-  if (organizationError || !organization) {
-    throw new Error(organizationError?.message ?? "No se pudo crear la nueva organizacion.");
+  if (error) {
+    throw new Error(error.message);
   }
 
-  const { error: membershipError } = await supabase.from("organization_admins").insert({
-    organization_id: organization.id,
-    admin_id: requestedByAdminId,
-    created_by: requestedByAdminId
-  });
-  if (membershipError && membershipError.code !== "23505") {
-    throw new Error(membershipError.message);
-  }
-
-  const { error: updatePaymentError } = await supabase
-    .from("organization_billing_payments")
-    .update({
-      created_organization_id: organization.id
-    })
-    .eq("id", paymentRow.id);
-  if (updatePaymentError) {
-    throw new Error(updatePaymentError.message);
-  }
-
-  return organization.id;
+  return typeof data === "string" ? data : null;
 }
 
 export async function syncOrganizationBillingPaymentFromMercadoPago(params: {
