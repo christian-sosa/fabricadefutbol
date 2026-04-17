@@ -122,7 +122,10 @@ async function ensureAdminProfile(params: {
       insertedError: insertedError?.message ?? null,
       usingServiceRole: Boolean(adminClient)
     });
-    throw new Error(insertedError?.message ?? "No se pudo crear perfil de administrador.");
+    return {
+      id: userId,
+      display_name: fallbackName
+    };
   }
 
   return inserted;
@@ -393,7 +396,15 @@ export async function getAdminSession(): Promise<AdminSession | null> {
     metadata: (user.user_metadata ?? undefined) as Record<string, unknown> | undefined
   });
 
-  await autoAcceptOrganizationInvites(user.id, email);
+  try {
+    await autoAcceptOrganizationInvites(user.id, email);
+  } catch (error) {
+    console.error("[auth] No se pudieron autoaceptar las invitaciones pendientes", {
+      userId: user.id,
+      email,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
   if (isSuperAdminEmail(email)) {
     cachedSuperAdminUserId = user.id;
   }

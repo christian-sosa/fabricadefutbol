@@ -83,7 +83,7 @@ export async function registerAdminAction(_: RegisterState, formData: FormData):
   const supabase = await createSupabaseServerClient();
   const appUrl = process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
   const emailRedirectTo = appUrl
-    ? new URL("/auth/confirm?next=/admin/login", appUrl.replace(/\/+$/, "")).toString()
+    ? new URL("/auth/confirm-email?next=/admin/login", appUrl.replace(/\/+$/, "")).toString()
     : undefined;
 
   const { data, error } = await supabase.auth.signUp({
