@@ -78,18 +78,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, skipped: true, reason: "missing_payment_id" });
     }
 
-    if (webhookSecret) {
+    const isProduction = process.env.NODE_ENV === "production";
+
+    if (!webhookSecret) {
+      // En produccion exigimos secret para verificar firma; fallar cerrado evita
+      // procesamiento de webhooks no autenticados. En dev/local se permite sin
+      // secret para facilitar pruebas (mismo comportamiento previo).
+      if (isProduction) {
+        return NextResponse.json(
+          { error: "MERCADOPAGO_WEBHOOK_SECRET no configurado en produccion." },
+          { status: 503 }
+        );
+      }
+    } else {
+      // Si hay secret configurado, exigimos headers y firma validos.
+      // Devolvemos 401 (en lugar de 200 skipped) para que Mercado Pago
+      // reintente y no marque el evento como entregado.
       if (!xRequestId || !xSignature) {
-        return NextResponse.json({ ok: true, skipped: true, reason: "missing_signature_headers" });
+        return NextResponse.json(
+          { error: "Faltan headers de firma en el webhook." },
+          { status: 401 }
+        );
       }
 
-      const isSignatureValid =
-        verifyMercadoPagoWebhookSignature({
-          secret: webhookSecret,
-          dataId: String(dataId),
-          requestId: xRequestId,
-          signatureHeader: xSignature
-        });
+      const isSignatureValid = verifyMercadoPagoWebhookSignature({
+        secret: webhookSecret,
+        dataId: String(dataId),
+        requestId: xRequestId,
+        signatureHeader: xSignature
+      });
 
       if (!isSignatureValid) {
         return NextResponse.json({ error: "Firma de webhook invalida." }, { status: 401 });

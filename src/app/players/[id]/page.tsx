@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -6,6 +7,29 @@ import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { withOrgQuery } from "@/lib/org";
 import { getPlayerDetails } from "@/lib/queries/public";
 import { formatDateTime, formatPercent } from "@/lib/utils";
+
+export async function generateMetadata({
+  params,
+  searchParams
+}: {
+  params: { id: string };
+  searchParams: { org?: string };
+}): Promise<Metadata> {
+  try {
+    const details = await getPlayerDetails(params.id, searchParams.org);
+    if (!details) return { title: "Jugador no encontrado" };
+    const title = details.player.full_name;
+    const description = `Estadisticas y partidos de ${details.player.full_name} en Fabrica de Futbol.`;
+    return {
+      title,
+      description,
+      openGraph: { title, description },
+      twitter: { title, description }
+    };
+  } catch {
+    return { title: "Jugador" };
+  }
+}
 
 export default async function PlayerDetailPage({
   params,

@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import { createMatchAction } from "@/app/admin/(panel)/matches/new/actions";
 import { Button } from "@/components/ui/button";
+import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
+import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { MatchModality, TeamSide } from "@/types/domain";
 
@@ -30,13 +32,11 @@ type ManualParticipant = {
   source: "player" | "guest";
 };
 
-const EXPECTED_PLAYERS: Record<MatchModality, number> = {
-  "5v5": 10,
-  "6v6": 12,
-  "7v7": 14,
-  "9v9": 18,
-  "11v11": 22
-};
+// Mapa derivado del unico source of truth en `@/lib/constants` para evitar
+// tener dos tablas de modalidades que se desincronicen en el futuro.
+const EXPECTED_PLAYERS: Record<MatchModality, number> = Object.fromEntries(
+  Object.entries(TEAM_SIZE_BY_MODALITY).map(([modality, teamSize]) => [modality, teamSize * 2])
+) as Record<MatchModality, number>;
 
 function parsePositiveNumber(rawValue: string) {
   const parsed = Number(rawValue);
@@ -422,6 +422,7 @@ export function NewMatchForm({
                       </span>
                     </div>
                     <Select
+                      aria-label={`Equipo de ${participant.fullName}`}
                       onChange={(event) =>
                         setManualAssignments((current) => ({
                           ...current,
@@ -458,18 +459,23 @@ export function NewMatchForm({
           ) : null}
 
           <div className="mt-3">
-            <Button disabled={!canSubmitManual} name="creationMode" type="submit" value="manual">
+            <FormSubmitButton
+              disabled={!canSubmitManual}
+              name="creationMode"
+              pendingLabel="Creando partido..."
+              value="manual"
+            >
               Crear partido con equipos manuales
-            </Button>
+            </FormSubmitButton>
           </div>
         </div>
       ) : null}
 
       {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
-        <Button name="creationMode" type="submit" value="auto">
+        <FormSubmitButton name="creationMode" pendingLabel="Generando equipos..." value="auto">
           Crear partido y generar equipos
-        </Button>
+        </FormSubmitButton>
         <Button onClick={() => setShowManualBuilder((current) => !current)} type="button" variant="secondary">
           {showManualBuilder ? "Ocultar armado manual" : "Armar equipos yo mismo"}
         </Button>

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -7,6 +8,29 @@ import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { withOrgQuery } from "@/lib/org";
 import { getMatchDetails } from "@/lib/queries/public";
 import { formatDateTime } from "@/lib/utils";
+
+export async function generateMetadata({
+  params,
+  searchParams
+}: {
+  params: { id: string };
+  searchParams: { org?: string };
+}): Promise<Metadata> {
+  try {
+    const details = await getMatchDetails(params.id, searchParams.org);
+    if (!details) return { title: "Partido no encontrado" };
+    const title = `Partido ${formatDateTime(details.match.scheduled_at)}`;
+    const description = `Detalle del partido ${details.match.modality} en Fabrica de Futbol.`;
+    return {
+      title,
+      description,
+      openGraph: { title, description },
+      twitter: { title, description }
+    };
+  } catch {
+    return { title: "Partido" };
+  }
+}
 
 export default async function MatchDetailPage({
   params,

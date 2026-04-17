@@ -1,4 +1,7 @@
+import { cookies } from "next/headers";
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
 import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import { calculatePlayerStats, type MatchWithTeams } from "@/lib/domain/stats";
 import { normalizeEmail } from "@/lib/org";
@@ -92,7 +95,7 @@ export async function getViewerAdminOrganizations(): Promise<PublicOrganization[
   if (!user?.id || !user.email) return [];
 
   const normalizedEmail = normalizeEmail(user.email);
-  if (normalizedEmail === SUPER_ADMIN_EMAIL) {
+  if (SUPER_ADMIN_EMAIL && normalizedEmail.length > 0 && normalizedEmail === SUPER_ADMIN_EMAIL) {
     const { data, error } = await supabase
       .from("organizations")
       .select("id, name, slug, is_public, created_at")
@@ -123,6 +126,16 @@ export async function getViewerAdminOrganizations(): Promise<PublicOrganization[
   return organizations.sort((a, b) => a.name.localeCompare(b.name, "es"));
 }
 
+function readActiveOrgCookieSafe(): string | null {
+  try {
+    return cookies().get(ACTIVE_ORG_COOKIE)?.value ?? null;
+  } catch {
+    // `cookies()` solo es accesible en render dinamico. En contextos estaticos
+    // Next.js tira; en ese caso simplemente no hay cookie disponible.
+    return null;
+  }
+}
+
 export async function resolvePublicOrganization(
   preferredOrganizationKey?: string | null,
   options?: {
@@ -130,8 +143,12 @@ export async function resolvePublicOrganization(
   }
 ) {
   const organizations = await getPublicOrganizations();
+  // Orden de prioridad: query param -> cookie -> default contextual.
+  const fromQuery = findOrganizationByKey(organizations, preferredOrganizationKey);
+  const fromCookie = fromQuery ? null : findOrganizationByKey(organizations, readActiveOrgCookieSafe());
   const selectedOrganization =
-    findOrganizationByKey(organizations, preferredOrganizationKey) ??
+    fromQuery ??
+    fromCookie ??
     organizations[getDefaultOrganizationIndex(organizations, options?.defaultContext)] ??
     null;
 

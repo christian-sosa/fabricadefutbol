@@ -12,7 +12,10 @@ type ConfirmEmailPageProps = {
 };
 
 function resolveNextPath(next?: string) {
-  return next?.startsWith("/") ? next : "/admin/login";
+  if (!next) return "/admin/login";
+  if (!next.startsWith("/")) return "/admin/login";
+  if (next.startsWith("//") || next.startsWith("/\\")) return "/admin/login";
+  return next;
 }
 
 export default function ConfirmEmailPage({ searchParams }: ConfirmEmailPageProps) {

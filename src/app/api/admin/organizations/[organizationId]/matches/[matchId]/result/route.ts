@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { assertOrganizationAdminAction } from "@/lib/auth/admin";
 import { saveMatchResult } from "@/lib/domain/match-workflow";
+import { toUserMessage } from "@/lib/errors";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const requestSchema = z.object({
@@ -75,8 +76,19 @@ export async function PATCH(
       matchId
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo guardar resultado.";
-    const status = isAuthErrorMessage(message) ? 403 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const rawMessage = error instanceof Error ? error.message : "No se pudo guardar resultado.";
+    if (isAuthErrorMessage(rawMessage)) {
+      return NextResponse.json({ error: rawMessage }, { status: 403 });
+    }
+    // Log detalle tecnico en servidor; al cliente un mensaje mapeado en espanol.
+    console.error("[match-result] PATCH fallo", {
+      organizationId,
+      matchId,
+      message: rawMessage
+    });
+    return NextResponse.json(
+      { error: toUserMessage(error, "No se pudo guardar el resultado del partido.") },
+      { status: 500 }
+    );
   }
 }

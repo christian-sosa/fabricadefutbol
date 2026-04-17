@@ -35,3 +35,41 @@ a {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* Focus visible accesible: anillo consistente cuando el usuario navega con teclado. */
+:focus-visible {
+  outline: 2px solid rgba(16, 185, 129, 0.85);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skip link: oculto hasta que recibe foco via teclado. */
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: -40px;
+  z-index: 100;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  background-color: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: top 120ms ease-out;
+}
+
+.skip-link:focus {
+  top: 0.5rem;
+}
+
+/* Respeta usuarios con reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+

@@ -1,5 +1,9 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  countPendingInvitesByOrganization,
+  fetchPendingInvitesForOrganization
+} from "@/lib/queries/invites";
 import { unstable_noStore as noStore } from "next/cache";
 
 function notNull<T>(value: T | null | undefined): value is T {
@@ -79,32 +83,36 @@ export async function getAdminMatches(organizationId: string) {
 export async function getOrganizationAdminData(organizationId: string) {
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: adminsData, error: adminsError }, { data: invitesData, error: invitesError }] = await Promise.all([
+  const [{ data: adminsData, error: adminsError }, invitesData] = await Promise.all([
     supabase
       .from("organization_admins")
       .select("id, admin_id, created_at, admins!organization_admins_admin_id_fkey(id, display_name)")
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: true }),
-    supabase
-      .from("organization_invites")
-      .select("id, email, invite_token, status, created_at")
-      .eq("organization_id", organizationId)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false })
+    fetchPendingInvitesForOrganization(supabase, organizationId)
   ]);
 
   if (adminsError) throw new Error(adminsError.message);
-  if (invitesError) throw new Error(invitesError.message);
 
   const adminClient = createSupabaseAdminClient();
   const adminEmailsById = new Map<string, string>();
   if (adminClient) {
-    for (const row of adminsData ?? []) {
-      if (!row.admin_id || adminEmailsById.has(row.admin_id)) continue;
-      const { data: authData } = await adminClient.auth.admin.getUserById(row.admin_id);
-      if (authData?.user?.email) {
-        adminEmailsById.set(row.admin_id, authData.user.email.toLowerCase());
-      }
+    const uniqueAdminIds = Array.from(
+      new Set((adminsData ?? []).map((row) => row.admin_id).filter(Boolean))
+    ) as string[];
+    // Paralelizamos las llamadas a Auth API para evitar el patron N+1 serial.
+    const resolved = await Promise.all(
+      uniqueAdminIds.map(async (adminId) => {
+        try {
+          const { data } = await adminClient.auth.admin.getUserById(adminId);
+          return [adminId, data?.user?.email?.toLowerCase() ?? null] as const;
+        } catch {
+          return [adminId, null] as const;
+        }
+      })
+    );
+    for (const [adminId, email] of resolved) {
+      if (email) adminEmailsById.set(adminId, email);
     }
   }
 
@@ -120,7 +128,7 @@ export async function getOrganizationAdminData(organizationId: string) {
     };
   });
 
-  const pendingInvites = (invitesData ?? []).map((row) => ({
+  const pendingInvites = invitesData.map((row) => ({
     id: row.id,
     email: row.email,
     inviteToken: row.invite_token,
@@ -405,7 +413,7 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
     { data: players, error: playersError },
     { data: matches, error: matchesError },
     { data: orgAdmins, error: orgAdminsError },
-    { data: pendingInvites, error: pendingInvitesError },
+    pendingInvites,
     { count: adminsCount, error: adminsCountError },
     { count: resultsCount, error: resultsCountError },
     { count: guestsCount, error: guestsCountError }
@@ -417,10 +425,7 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
     supabase.from("players").select("id, organization_id, active, created_at"),
     supabase.from("matches").select("id, organization_id, status, created_at, finished_at"),
     supabase.from("organization_admins").select("organization_id"),
-    supabase
-      .from("organization_invites")
-      .select("organization_id")
-      .eq("status", "pending"),
+    countPendingInvitesByOrganization(supabase),
     supabase.from("admins").select("id", { count: "exact", head: true }),
     supabase.from("match_result").select("id", { count: "exact", head: true }),
     supabase.from("match_guests").select("id", { count: "exact", head: true })
@@ -430,7 +435,6 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
   if (playersError) throw new Error(playersError.message);
   if (matchesError) throw new Error(matchesError.message);
   if (orgAdminsError) throw new Error(orgAdminsError.message);
-  if (pendingInvitesError) throw new Error(pendingInvitesError.message);
   if (adminsCountError) throw new Error(adminsCountError.message);
   if (resultsCountError) throw new Error(resultsCountError.message);
   if (guestsCountError) throw new Error(guestsCountError.message);
@@ -439,7 +443,7 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
   const safePlayers = players ?? [];
   const safeMatches = matches ?? [];
   const safeOrgAdmins = orgAdmins ?? [];
-  const safePendingInvites = pendingInvites ?? [];
+  const safePendingInvites = pendingInvites;
 
   const playersByOrg = new Map<string, OrgPlayersAggregate>();
   for (const player of safePlayers) {

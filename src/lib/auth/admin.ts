@@ -8,6 +8,7 @@ import {
   isIsoDateExpired,
   toShortDate
 } from "@/lib/domain/billing";
+import { maskEmail, maskUserId } from "@/lib/log-pii";
 import { normalizeEmail } from "@/lib/org";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -117,8 +118,8 @@ async function ensureAdminProfile(params: {
 
   if (insertedError || !inserted) {
     console.error("[auth] No se pudo leer el perfil de administrador luego del alta", {
-      userId,
-      email,
+      userId: maskUserId(userId),
+      email: maskEmail(email),
       insertedError: insertedError?.message ?? null,
       usingServiceRole: Boolean(adminClient)
     });
@@ -131,55 +132,24 @@ async function ensureAdminProfile(params: {
   return inserted;
 }
 
-async function autoAcceptOrganizationInvites(adminId: string, email: string) {
-  const normalizedEmail = normalizeEmail(email);
-  const adminClient = createSupabaseAdminClient();
-  const supabase = adminClient ?? (await createSupabaseServerClient());
-
-  const { data: pendingInvites, error: pendingInvitesError } = await supabase
-    .from("organization_invites")
-    .select("id, organization_id")
-    .eq("status", "pending")
-    .eq("email", normalizedEmail);
-
-  if (pendingInvitesError || !pendingInvites?.length) {
-    return;
-  }
-
-  for (const invite of pendingInvites) {
-    const { error: addMembershipError } = await supabase
-      .from("organization_admins")
-      .insert({
-        organization_id: invite.organization_id,
-        admin_id: adminId,
-        created_by: adminId
-      });
-
-    if (addMembershipError && addMembershipError.code !== "23505") {
-      throw new Error(addMembershipError.message);
-    }
-  }
-
-  const inviteIds = pendingInvites.map((invite) => invite.id);
-  const { error: deleteInviteError } = await supabase
-    .from("organization_invites")
-    .delete()
-    .in("id", inviteIds)
-    .eq("email", normalizedEmail)
-    .eq("status", "pending");
-
-  if (deleteInviteError) {
-    throw new Error(deleteInviteError.message);
-  }
-}
-
 function isSuperAdminEmail(email: string) {
-  return normalizeEmail(email) === SUPER_ADMIN_EMAIL;
+  // Si no hay super admin configurado via env, ninguna cuenta debe obtener
+  // privilegios elevados (aunque tanto normalizeEmail como SUPER_ADMIN_EMAIL
+  // pudieran evaluarse a string vacio).
+  if (!SUPER_ADMIN_EMAIL) return false;
+  const normalized = normalizeEmail(email);
+  if (!normalized) return false;
+  return normalized === SUPER_ADMIN_EMAIL;
 }
 
 async function resolveSuperAdminUserId() {
   if (typeof cachedSuperAdminUserId !== "undefined") {
     return cachedSuperAdminUserId;
+  }
+
+  if (!SUPER_ADMIN_EMAIL) {
+    cachedSuperAdminUserId = null;
+    return null;
   }
 
   const adminClient = createSupabaseAdminClient();
@@ -198,9 +168,10 @@ async function resolveSuperAdminUserId() {
     return null;
   }
 
-  const user = (data?.users ?? []).find(
-    (candidate) => normalizeEmail(candidate.email ?? "") === SUPER_ADMIN_EMAIL
-  );
+  const user = (data?.users ?? []).find((candidate) => {
+    const candidateEmail = normalizeEmail(candidate.email ?? "");
+    return candidateEmail.length > 0 && candidateEmail === SUPER_ADMIN_EMAIL;
+  });
   cachedSuperAdminUserId = user?.id ?? null;
   return cachedSuperAdminUserId;
 }
@@ -396,15 +367,10 @@ export async function getAdminSession(): Promise<AdminSession | null> {
     metadata: (user.user_metadata ?? undefined) as Record<string, unknown> | undefined
   });
 
-  try {
-    await autoAcceptOrganizationInvites(user.id, email);
-  } catch (error) {
-    console.error("[auth] No se pudieron autoaceptar las invitaciones pendientes", {
-      userId: user.id,
-      email,
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
+  // Antes aqui corriamos `autoAcceptOrganizationInvites` en cada sesion, pero
+  // eso aceptaba silenciosamente cualquier invite pendiente que coincidiera
+  // con el email del usuario, incluso si nunca habia visto el link.
+  // Ahora la aceptacion solo ocurre por el flujo explicito en /invite/[token].
   if (isSuperAdminEmail(email)) {
     cachedSuperAdminUserId = user.id;
   }

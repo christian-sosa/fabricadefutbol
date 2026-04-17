@@ -29,14 +29,42 @@ export default async function InviteByLinkPage({
   params: { token: string };
 }) {
   const supabase = await createSupabaseServerClient();
-  const { data: invite, error: inviteError } = await supabase
-    .from("organization_invites")
-    .select("id, organization_id, email, status")
-    .eq("invite_token", params.token)
-    .eq("status", "pending")
-    .maybeSingle();
 
-  if (inviteError || !invite) {
+  type InviteRow = {
+    id: string;
+    organization_id: string;
+    email: string;
+    status: string;
+    expires_at?: string | null;
+  };
+  // Intentamos leer tambien `expires_at` cuando la columna existe; si no,
+  // caemos al select legacy sin expiracion.
+  let invite: InviteRow | null = null;
+  {
+    const withExpires = await supabase
+      .from("organization_invites")
+      .select("id, organization_id, email, status, expires_at")
+      .eq("invite_token", params.token)
+      .eq("status", "pending")
+      .maybeSingle();
+
+    if (!withExpires.error) {
+      invite = (withExpires.data ?? null) as InviteRow | null;
+    } else {
+      const legacy = await supabase
+        .from("organization_invites")
+        .select("id, organization_id, email, status")
+        .eq("invite_token", params.token)
+        .eq("status", "pending")
+        .maybeSingle();
+      if (legacy.error) {
+        throw new Error(legacy.error.message);
+      }
+      invite = (legacy.data ?? null) as InviteRow | null;
+    }
+  }
+
+  if (!invite) {
     return (
       <div className="py-6">
         <Card>
@@ -50,6 +78,25 @@ export default async function InviteByLinkPage({
         </Card>
       </div>
     );
+  }
+
+  if (invite.expires_at) {
+    const expiresAtMs = Date.parse(invite.expires_at);
+    if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) {
+      return (
+        <div className="py-6">
+          <Card>
+            <CardTitle>Invitacion vencida</CardTitle>
+            <CardDescription>
+              Este link ya expiro. Pedi una nueva invitacion a tu admin.
+            </CardDescription>
+            <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href="/admin/login">
+              Ir a login
+            </Link>
+          </Card>
+        </div>
+      );
+    }
   }
 
   const {

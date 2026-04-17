@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { toUserMessage } from "@/lib/errors";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const loginSchema = z.object({
@@ -57,8 +58,25 @@ export async function loginAdminAction(_: LoginState, formData: FormData): Promi
           "Tu email aun no esta confirmado. Revisa tu casilla y la carpeta de spam para activar la cuenta antes de ingresar."
       };
     }
+    if (normalizedMessage.includes("invalid login credentials")) {
+      return {
+        error: "Email o contrasena incorrectos."
+      };
+    }
+    if (normalizedMessage.includes("too many requests") || normalizedMessage.includes("rate limit")) {
+      return {
+        error: "Demasiados intentos seguidos. Espera un momento y volve a probar."
+      };
+    }
+    if (authError && typeof console !== "undefined") {
+      console.error("[auth] signInWithPassword fallo", {
+        code: "code" in authError ? authError.code : undefined,
+        message: authError.message,
+        status: "status" in authError ? authError.status : undefined
+      });
+    }
     return {
-      error: authError?.message ?? "Credenciales incorrectas."
+      error: toUserMessage(authError, "Credenciales incorrectas.")
     };
   }
 
@@ -105,8 +123,22 @@ export async function registerAdminAction(_: RegisterState, formData: FormData):
       status: "status" in error ? error.status : undefined
     });
 
+    const lower = error.message.toLowerCase();
+    if (lower.includes("already registered") || lower.includes("user already")) {
+      return {
+        error: "Ya existe una cuenta con ese email. Proba iniciar sesion o recuperar tu contrasena.",
+        success: null
+      };
+    }
+    if (lower.includes("password")) {
+      return {
+        error: "La contrasena no cumple los requisitos minimos. Usa al menos 6 caracteres.",
+        success: null
+      };
+    }
+
     return {
-      error: error.message,
+      error: toUserMessage(error, "No se pudo completar el registro. Intenta nuevamente."),
       success: null
     };
   }
