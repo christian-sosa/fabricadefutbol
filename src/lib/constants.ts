@@ -30,5 +30,6 @@ export const ADMIN_NAV_ITEMS = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/players", label: "Jugadores" },
   { href: "/admin/matches/new", label: "Nuevo Partido" },
+  { href: "/admin/matches", label: "Gestionar Partidos" },
   { href: "/admin/billing", label: "Facturacion" }
 ];

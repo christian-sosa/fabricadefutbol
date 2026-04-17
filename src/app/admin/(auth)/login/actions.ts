@@ -54,7 +54,7 @@ export async function loginAdminAction(_: LoginState, formData: FormData): Promi
     if (normalizedMessage.includes("email not confirmed")) {
       return {
         error:
-          "Tu email aun no esta confirmado. Si no llego el correo, revisa spam o confirma el usuario desde Supabase Auth."
+          "Tu email aun no esta confirmado. Revisa tu casilla y la carpeta de spam para activar la cuenta antes de ingresar."
       };
     }
     return {
@@ -118,6 +118,6 @@ export async function registerAdminAction(_: RegisterState, formData: FormData):
   return {
     error: null,
     success:
-      "Revisa tu email para confirmar la cuenta. Si no llega, revisa spam o desactiva/ajusta confirmacion en Supabase Auth."
+      "Te enviamos un email para activar tu cuenta. Revisa tu casilla y, si no aparece en unos minutos, busca tambien en spam."
   };
 }
