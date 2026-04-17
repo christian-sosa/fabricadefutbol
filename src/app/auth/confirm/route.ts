@@ -32,6 +32,10 @@ export async function GET(request: NextRequest) {
   const failureRedirect = buildRedirectUrl(request, "/admin/login", {
     error: "No pudimos confirmar tu email. Intenta abrir de nuevo el enlace o vuelve a registrarte."
   });
+  const legacyLinkRedirect = buildRedirectUrl(request, "/admin/login", {
+    error:
+      "Este enlace de confirmacion usa un formato anterior. Si tu cuenta ya quedo confirmada, intenta iniciar sesion. Si no, solicita un nuevo email."
+  });
 
   const supabase = await createSupabaseServerClient();
 
@@ -69,5 +73,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(failureRedirect);
   }
 
-  return NextResponse.redirect(failureRedirect);
+  return NextResponse.redirect(legacyLinkRedirect);
 }
