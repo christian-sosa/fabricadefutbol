@@ -24,6 +24,10 @@ export function AdminNav({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
   function isItemActive(itemHref: string) {
     if (!mounted) return false;
+    const exactMatch = navItems.find((item) => item.href === safePathname);
+    if (exactMatch) {
+      return exactMatch.href === itemHref;
+    }
     if (itemHref === "/admin") {
       return safePathname === "/admin";
     }

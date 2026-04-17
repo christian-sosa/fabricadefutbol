@@ -10,7 +10,6 @@ import {
   startOrganizationCreationCheckoutAction
 } from "@/app/admin/(panel)/actions";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
-import { MatchStatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
@@ -26,7 +25,6 @@ import { syncOrganizationBillingPaymentFromMercadoPago } from "@/lib/domain/bill
 import { withOrgQuery } from "@/lib/org";
 import { getAdminDashboardData, getOrganizationAdminData } from "@/lib/queries/admin";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { formatDateTime } from "@/lib/utils";
 
 function formatCurrencyArs(amount: number) {
   return new Intl.NumberFormat("es-AR", {
@@ -164,82 +162,20 @@ export default async function AdminDashboardPage({
             </Card>
           </section>
 
-          <Card>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <CardTitle>Panel operativo: {selectedOrganization.name}</CardTitle>
-                <CardDescription>Control de jugadores, partidos y equipo administrador.</CardDescription>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {canWriteSelectedOrganization ? (
-                  <>
-                    <Link
-                      className="text-sm font-semibold text-emerald-300 hover:underline"
-                      href={withOrgQuery("/admin/players", selectedOrganization.slug)}
-                    >
-                      Jugadores
-                    </Link>
-                    <Link
-                      className="text-sm font-semibold text-emerald-300 hover:underline"
-                      href={withOrgQuery("/admin/matches/new", selectedOrganization.slug)}
-                    >
-                      Nuevo partido
-                    </Link>
-                    <Link
-                      className="text-sm font-semibold text-emerald-300 hover:underline"
-                      href={withOrgQuery("/admin/billing", selectedOrganization.slug)}
-                    >
-                      Facturacion
-                    </Link>
-                  </>
-                ) : (
-                  <Link
-                    className="text-xs font-semibold uppercase tracking-wide text-amber-200 underline underline-offset-4"
-                    href={withOrgQuery("/admin/billing", selectedOrganization.slug)}
-                  >
-                    Edicion bloqueada: activar plan pago
-                  </Link>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {(dashboardData?.latestMatches ?? []).map((match) => (
-                <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 p-3 text-sm" key={match.id}>
-                  <span>
-                    {formatDateTime(match.scheduled_at)} - {match.modality}
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <MatchStatusBadge status={match.status} />
-                    <Link
-                      className={`font-semibold ${canWriteSelectedOrganization ? "text-emerald-300 hover:underline" : "text-slate-500 pointer-events-none cursor-not-allowed"}`}
-                      href={canWriteSelectedOrganization ? withOrgQuery(`/admin/matches/${match.id}`, selectedOrganization.slug) : "#"}
-                    >
-                      Gestionar
-                    </Link>
-                  </div>
-                </div>
-              ))}
-              {!dashboardData?.latestMatches.length ? (
-                <p className="text-sm text-slate-400">No hay partidos todavia para esta organizacion.</p>
-              ) : null}
-            </div>
-
-            {admin.isSuperAdmin ? (
-              <div className="mt-4 rounded-xl border border-danger/40 bg-danger/10 p-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-danger">Zona super admin</p>
-                <p className="mt-1 text-sm text-slate-200">
-                  Esta accion elimina la organizacion y todos sus datos asociados.
-                </p>
-                <form action={deleteOrganizationAction} className="mt-3">
-                  <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-                  <Button type="submit" variant="danger">
-                    Borrar organizacion
-                  </Button>
-                </form>
-              </div>
-            ) : null}
-          </Card>
+          {admin.isSuperAdmin ? (
+            <Card className="border-danger/40 bg-danger/10">
+              <CardTitle className="text-danger">Zona super admin</CardTitle>
+              <CardDescription className="mt-1 text-slate-200">
+                Esta accion elimina la organizacion seleccionada y todos sus datos asociados.
+              </CardDescription>
+              <form action={deleteOrganizationAction} className="mt-4">
+                <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+                <Button type="submit" variant="danger">
+                  Borrar organizacion
+                </Button>
+              </form>
+            </Card>
+          ) : null}
 
           <Card>
             <CardTitle>Equipo administrador (maximo 4)</CardTitle>

@@ -63,6 +63,19 @@ export async function getAdminDashboardData(organizationId: string) {
   };
 }
 
+export async function getAdminMatches(organizationId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("matches")
+    .select("id, scheduled_at, modality, status, location")
+    .eq("organization_id", organizationId)
+    .order("scheduled_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  return data ?? [];
+}
+
 export async function getOrganizationAdminData(organizationId: string) {
   const supabase = await createSupabaseServerClient();
 
