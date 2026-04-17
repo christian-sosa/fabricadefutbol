@@ -32,7 +32,7 @@ const gettingStartedSteps = [
   {
     title: "4. Confirma equipos y carga el resultado",
     description:
-      "La app genera opciones equilibradas para que elijas una formacion final. Cuando el partido se juega, cargas el resultado y el sistema actualiza automaticamente el ranking de los jugadores."
+      "La app genera opciones equilibradas para que elijas una formacion final. Ese balance toma como referencia el orden inicial del plantel y el valor manual que asignes a invitados. Cuando el partido se juega, cargas el resultado y el sistema actualiza automaticamente el ranking competitivo."
   }
 ];
 
@@ -45,7 +45,7 @@ const matchFlowItems = [
   {
     title: "Equipos balanceados",
     description:
-      "Las opciones automaticas buscan reducir la diferencia de rating entre ambos lados y, ademas, penalizan combinaciones donde los jugadores de mayor nivel quedan juntos en el mismo equipo."
+      "Las opciones automaticas buscan reducir la diferencia entre ambos lados usando como referencia el orden inicial del plantel y el puntaje manual de los invitados. Ademas, penalizan combinaciones donde los jugadores mejor ubicados quedan juntos en el mismo equipo."
   },
   {
     title: "Flexibilidad para la cancha real",
@@ -58,7 +58,7 @@ const ratingPrinciples = [
   {
     title: "Orden inicial del plantel",
     description:
-      "El ranking inicial del plantel es una referencia manual definida por el administrador para ordenar a los jugadores dentro de la organizacion. Ese orden no se mueve automaticamente con los resultados: solo cambia si el admin decide editarlo."
+      "El ranking inicial del plantel es una referencia manual definida por el administrador para ordenar a los jugadores dentro de la organizacion. Ese orden no se mueve automaticamente con los resultados: solo cambia si el admin decide editarlo. Hoy, ademas, es la base que usa el armado automatico de equipos."
   },
   {
     title: "Punto de partida del rating",
@@ -205,8 +205,9 @@ export default function HelpPage() {
           <CardTitle>Como interpretar el ranking</CardTitle>
           <CardDescription className="mt-2">
             Hay dos referencias distintas dentro de la plataforma. Por un lado, el orden inicial del plantel, que es
-            manual y lo administra tu equipo. Por otro, el ranking competitivo, que se calcula con el rating actual de
-            cada jugador y si evoluciona con los resultados cargados.
+            manual y lo administra tu equipo, y que hoy tambien sirve como base para balancear equipos. Por otro, el
+            ranking competitivo, que se calcula con el rating actual de cada jugador y si evoluciona con los
+            resultados cargados.
           </CardDescription>
         </Card>
         <Card>
