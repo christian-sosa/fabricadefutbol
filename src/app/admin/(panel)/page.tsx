@@ -38,17 +38,18 @@ function formatCurrencyArs(amount: number) {
 export default async function AdminDashboardPage({
   searchParams
 }: {
-  searchParams: { org?: string; error?: string; checkout?: string; flow?: string; payment_id?: string };
+  searchParams: Promise<{ org?: string; error?: string; checkout?: string; flow?: string; payment_id?: string }>;
 }) {
-  const { admin, organizations, selectedOrganization } = await getAdminOrganizationContext(searchParams.org);
+  const resolvedSearchParams = await searchParams;
+  const { admin, organizations, selectedOrganization } = await getAdminOrganizationContext(resolvedSearchParams.org);
 
-  if (searchParams.flow === "create-org" && searchParams.payment_id) {
+  if (resolvedSearchParams.flow === "create-org" && resolvedSearchParams.payment_id) {
     const supabaseAdmin = createSupabaseAdminClient();
     if (supabaseAdmin) {
       try {
         const syncResult = await syncOrganizationBillingPaymentFromMercadoPago({
           supabase: supabaseAdmin,
-          mercadopagoPaymentId: searchParams.payment_id
+          mercadopagoPaymentId: resolvedSearchParams.payment_id
         });
 
         if (syncResult.updated && syncResult.createdOrganizationId) {
@@ -107,12 +108,12 @@ export default async function AdminDashboardPage({
             El alta se realiza automaticamente cuando Mercado Pago confirma el pago.
           </p>
         ) : null}
-        {searchParams.checkout === "created-org" ? (
+        {resolvedSearchParams.checkout === "created-org" ? (
           <p className="mt-2 text-xs font-semibold text-emerald-300">
             Pago confirmado. La nueva organizacion ya fue creada y seleccionada.
           </p>
         ) : null}
-        {searchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{searchParams.error}</p> : null}
+        {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
       </Card>
 
       <Card>

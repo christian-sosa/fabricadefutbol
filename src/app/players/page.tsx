@@ -7,10 +7,11 @@ import { getPlayersWithStats, getViewerAdminOrganizations, resolvePublicOrganiza
 export default async function PlayersPage({
   searchParams
 }: {
-  searchParams: { org?: string };
+  searchParams: Promise<{ org?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
-    resolvePublicOrganization(searchParams.org),
+    resolvePublicOrganization(resolvedSearchParams.org),
     getViewerAdminOrganizations()
   ]);
   const players = await getPlayersWithStats(selectedOrganization?.id ?? null);

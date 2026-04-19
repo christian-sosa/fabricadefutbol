@@ -7,10 +7,10 @@ const PUBLIC_CACHE_HEADER = "public, s-maxage=60, stale-while-revalidate=300";
 export async function GET(
   _: Request,
   context: {
-    params: { organizationId: string };
+    params: Promise<{ organizationId: string }>;
   }
 ) {
-  const organizationId = context.params.organizationId;
+  const { organizationId } = await context.params;
   if (!organizationId) {
     return NextResponse.json({ error: "organizationId es requerido." }, { status: 400 });
   }

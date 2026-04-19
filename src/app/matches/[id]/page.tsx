@@ -13,11 +13,12 @@ export async function generateMetadata({
   params,
   searchParams
 }: {
-  params: { id: string };
-  searchParams: { org?: string };
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ org?: string }>;
 }): Promise<Metadata> {
   try {
-    const details = await getMatchDetails(params.id, searchParams.org);
+    const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
+    const details = await getMatchDetails(id, resolvedSearchParams.org);
     if (!details) return { title: "Partido no encontrado" };
     const title = `Partido ${formatDateTime(details.match.scheduled_at)}`;
     const description = `Detalle del partido ${details.match.modality} en Fabrica de Futbol.`;
@@ -36,15 +37,16 @@ export default async function MatchDetailPage({
   params,
   searchParams
 }: {
-  params: { id: string };
-  searchParams: { org?: string };
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ org?: string }>;
 }) {
-  const details = await getMatchDetails(params.id, searchParams.org);
+  const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
+  const details = await getMatchDetails(id, resolvedSearchParams.org);
   if (!details) notFound();
 
   return (
     <div className="space-y-4">
-      <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery("/matches", searchParams.org)}>
+      <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery("/matches", resolvedSearchParams.org)}>
         Volver al historial
       </Link>
       <Card>

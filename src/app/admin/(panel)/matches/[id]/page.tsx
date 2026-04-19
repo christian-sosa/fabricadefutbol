@@ -39,24 +39,25 @@ export default async function AdminMatchDetailPage({
   params,
   searchParams
 }: {
-  params: { id: string };
-  searchParams: { org?: string; error?: string };
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ org?: string; error?: string }>;
 }) {
-  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(searchParams.org);
+  const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
+  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
   const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   if (!writeAccess.canWrite) {
     const target = withOrgQuery("/admin", selectedOrganization.slug);
     const separator = target.includes("?") ? "&" : "?";
     redirect(`${target}${separator}error=${encodeURIComponent(writeAccess.reason ?? "No tienes permisos para editar esta organizacion.")}`);
   }
-  const details = await getAdminMatchDetails(params.id, selectedOrganization.id);
+  const details = await getAdminMatchDetails(id, selectedOrganization.id);
   if (!details) notFound();
 
-  const confirmAction = confirmOptionAction.bind(null, params.id, selectedOrganization.id);
-  const regenerateAction = regenerateOptionsAction.bind(null, params.id, selectedOrganization.id);
-  const matchUpdateAction = updateMatchAction.bind(null, params.id, selectedOrganization.id);
-  const deleteAction = deleteMatchAction.bind(null, params.id, selectedOrganization.id);
-  const saveLineupAction = saveLineupBeforeResultAction.bind(null, params.id, selectedOrganization.id);
+  const confirmAction = confirmOptionAction.bind(null, id, selectedOrganization.id);
+  const regenerateAction = regenerateOptionsAction.bind(null, id, selectedOrganization.id);
+  const matchUpdateAction = updateMatchAction.bind(null, id, selectedOrganization.id);
+  const deleteAction = deleteMatchAction.bind(null, id, selectedOrganization.id);
+  const saveLineupAction = saveLineupBeforeResultAction.bind(null, id, selectedOrganization.id);
   const canDeleteMatch =
     details.match.status === "draft" ||
     (details.match.status === "confirmed" && !details.result);
@@ -96,7 +97,7 @@ export default async function AdminMatchDetailPage({
         <CardTitle>Organizacion activa: {selectedOrganization.name}</CardTitle>
         <div className="mt-3">
           <OrganizationSwitcher
-            basePath={`/admin/matches/${params.id}`}
+            basePath={`/admin/matches/${id}`}
             currentOrganizationSlug={selectedOrganization.slug}
             label="Cambiar organizacion"
             organizations={organizations}
@@ -109,7 +110,7 @@ export default async function AdminMatchDetailPage({
         <CardDescription className="mt-1">
           {details.match.modality} | <MatchStatusBadge status={details.match.status} />
         </CardDescription>
-        {searchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{searchParams.error}</p> : null}
+        {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
       </Card>
 
       <Card>
@@ -225,7 +226,7 @@ export default async function AdminMatchDetailPage({
               defaultScoreA={details.result?.score_a ?? 0}
               defaultScoreB={details.result?.score_b ?? 0}
               existingParticipants={editableParticipants}
-              matchId={params.id}
+              matchId={id}
               organizationId={selectedOrganization.id}
               submitLabel={details.result ? "Guardar correccion" : "Guardar resultado y finalizar"}
             />

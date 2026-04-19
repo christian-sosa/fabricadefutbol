@@ -13,12 +13,13 @@ function formatCurrencyArs(amount: number) {
   }).format(amount);
 }
 
-export default function PricingPage({
+export default async function PricingPage({
   searchParams
 }: {
-  searchParams: { org?: string };
+  searchParams: Promise<{ org?: string }>;
 }) {
-  const organizationKey = searchParams.org ?? null;
+  const resolvedSearchParams = await searchParams;
+  const organizationKey = resolvedSearchParams.org ?? null;
 
   return (
     <div className="space-y-6">

@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 
 type ConfirmEmailPageProps = {
-  searchParams: {
+  searchParams: Promise<{
     token_hash?: string;
     type?: string;
     next?: string;
-  };
+  }>;
 };
 
 function resolveNextPath(next?: string) {
@@ -18,10 +18,11 @@ function resolveNextPath(next?: string) {
   return next;
 }
 
-export default function ConfirmEmailPage({ searchParams }: ConfirmEmailPageProps) {
-  const tokenHash = searchParams.token_hash?.trim() ?? "";
-  const type = searchParams.type?.trim() ?? "email";
-  const nextPath = resolveNextPath(searchParams.next);
+export default async function ConfirmEmailPage({ searchParams }: ConfirmEmailPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const tokenHash = resolvedSearchParams.token_hash?.trim() ?? "";
+  const type = resolvedSearchParams.type?.trim() ?? "email";
+  const nextPath = resolveNextPath(resolvedSearchParams.next);
 
   if (!tokenHash) {
     return (

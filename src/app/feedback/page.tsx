@@ -9,15 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { withOrgQuery } from "@/lib/org";
 
 type FeedbackPageProps = {
-  searchParams: {
+  searchParams: Promise<{
     org?: string;
     sent?: string;
     error?: string;
-  };
+  }>;
 };
 
-export default function FeedbackPage({ searchParams }: FeedbackPageProps) {
-  const organizationKey = searchParams.org ?? null;
+export default async function FeedbackPage({ searchParams }: FeedbackPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const organizationKey = resolvedSearchParams.org ?? null;
   const submitAction = submitFeedbackAction.bind(null, organizationKey);
   const homePath = withOrgQuery("/", organizationKey);
   const helpPath = withOrgQuery("/help", organizationKey);
@@ -35,7 +36,7 @@ export default function FeedbackPage({ searchParams }: FeedbackPageProps) {
         </p>
       </Card>
 
-      {searchParams.sent ? (
+      {resolvedSearchParams.sent ? (
         <Card className="border-emerald-500/40 bg-emerald-500/10">
           <CardTitle>Mensaje enviado</CardTitle>
           <CardDescription className="mt-1">
@@ -44,10 +45,10 @@ export default function FeedbackPage({ searchParams }: FeedbackPageProps) {
         </Card>
       ) : null}
 
-      {searchParams.error ? (
+      {resolvedSearchParams.error ? (
         <Card className="border-danger/40 bg-danger/10">
           <CardTitle>No se pudo enviar</CardTitle>
-          <CardDescription className="mt-1">{searchParams.error}</CardDescription>
+          <CardDescription className="mt-1">{resolvedSearchParams.error}</CardDescription>
         </Card>
       ) : null}
 

@@ -21,9 +21,10 @@ import { withOrgQuery } from "@/lib/org";
 export default async function AdminPlayersPage({
   searchParams
 }: {
-  searchParams: { org?: string; error?: string; success?: string; refresh?: string };
+  searchParams: Promise<{ org?: string; error?: string; success?: string; refresh?: string }>;
 }) {
-  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(searchParams.org);
+  const resolvedSearchParams = await searchParams;
+  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
   const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   if (!writeAccess.canWrite) {
     const target = withOrgQuery("/admin", selectedOrganization.slug);
@@ -31,10 +32,10 @@ export default async function AdminPlayersPage({
     redirect(`${target}${separator}error=${encodeURIComponent(writeAccess.reason ?? "No tienes permisos para editar esta organizacion.")}`);
   }
   const players = await getAdminPlayers(selectedOrganization.id);
-  const error = searchParams.error;
-  const success = searchParams.success;
+  const error = resolvedSearchParams.error;
+  const success = resolvedSearchParams.success;
   const photoSuccess = success?.toLowerCase().includes("foto") ? success : null;
-  const formRenderKey = `${selectedOrganization.id}:${searchParams.refresh ?? "base"}`;
+  const formRenderKey = `${selectedOrganization.id}:${resolvedSearchParams.refresh ?? "base"}`;
 
   return (
     <div className="space-y-4">

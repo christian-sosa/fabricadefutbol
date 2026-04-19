@@ -78,10 +78,10 @@ async function readPlaceholderResponse() {
 export async function GET(
   _: Request,
   context: {
-    params: { id: string };
+    params: Promise<{ id: string }>;
   }
 ) {
-  const playerId = context.params.id;
+  const { id: playerId } = await context.params;
   const supabase = await createSupabaseServerClient();
   const bucketName = getPlayerPhotosBucket();
   const schemaName = getSupabaseDbSchema();

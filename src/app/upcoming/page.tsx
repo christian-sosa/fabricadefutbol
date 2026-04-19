@@ -11,10 +11,11 @@ import { formatDateTime } from "@/lib/utils";
 export default async function UpcomingPage({
   searchParams
 }: {
-  searchParams: { org?: string };
+  searchParams: Promise<{ org?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
-    resolvePublicOrganization(searchParams.org),
+    resolvePublicOrganization(resolvedSearchParams.org),
     getViewerAdminOrganizations()
   ]);
   const upcoming = await getUpcomingConfirmedMatches(selectedOrganization?.id ?? null);
