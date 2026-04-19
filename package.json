@@ -2,12 +2,22 @@
   "name": "fabrica-de-futbol",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.19.0 <21 || >=22.13.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test": "vitest run --project unit --project integration --project ui",
+    "test:watch": "vitest --project unit --project integration --project ui",
+    "test:coverage": "vitest run --coverage --project unit --project integration --project ui",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
+    "verify": "npm run lint && npm run typecheck && npm run test:coverage && npm run build",
+    "verify:smoke": "npm run verify && npm run test:e2e",
+    "prepare": "husky",
     "clean": "rimraf .next",
     "sql:build-schema": "node scripts/build-schema-sql.mjs",
     "storage:copy": "node scripts/copy-storage-bucket.mjs"
@@ -27,14 +37,23 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.13.5",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^4.1.4",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.4",
+    "husky": "^9.1.7",
+    "jsdom": "^22.1.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.4"
   }
 }
