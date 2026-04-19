@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { Analytics } from "@vercel/analytics/next";
 
 import "@/app/globals.css";
 import { BetaNotice } from "@/components/layout/beta-notice";
@@ -86,6 +87,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {children}
           </main>
         </ReactQueryProvider>
+        <Analytics />
       </body>
     </html>
   );

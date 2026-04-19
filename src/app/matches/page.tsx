@@ -6,10 +6,11 @@ import { getMatchHistoryCardsPage, getViewerAdminOrganizations, resolvePublicOrg
 export default async function MatchesPage({
   searchParams
 }: {
-  searchParams: { org?: string };
+  searchParams: Promise<{ org?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
-    resolvePublicOrganization(searchParams.org),
+    resolvePublicOrganization(resolvedSearchParams.org),
     getViewerAdminOrganizations()
   ]);
   const initialMatchesData = await getMatchHistoryCardsPage(selectedOrganization?.id ?? null, {

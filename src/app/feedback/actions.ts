@@ -84,7 +84,7 @@ export async function submitFeedbackAction(organizationKey: string | null, formD
     redirect(buildFeedbackPath({ organizationKey, sent: true }));
   }
 
-  const headerStore = headers();
+  const headerStore = await headers();
   const clientIp = getClientIpFromHeaders(headerStore);
   // Max 3 envios por IP cada 5 minutos. Mitiga spam/abuso del formulario.
   const rateLimit = checkRateLimit({

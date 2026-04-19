@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 
 import {
   loginAdminAction,
@@ -34,8 +35,8 @@ function RegisterSubmitButton() {
 }
 
 export function LoginForm() {
-  const [loginState, loginAction] = useFormState(loginAdminAction, initialLoginState);
-  const [registerState, registerAction] = useFormState(registerAdminAction, initialRegisterState);
+  const [loginState, loginAction] = useActionState(loginAdminAction, initialLoginState);
+  const [registerState, registerAction] = useActionState(registerAdminAction, initialRegisterState);
 
   return (
     <div className="grid gap-4 md:grid-cols-2">

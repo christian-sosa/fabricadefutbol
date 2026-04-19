@@ -41,11 +41,10 @@ function isAuthErrorMessage(message: string) {
 export async function PATCH(
   request: Request,
   context: {
-    params: { organizationId: string; matchId: string };
+    params: Promise<{ organizationId: string; matchId: string }>;
   }
 ) {
-  const organizationId = context.params.organizationId;
-  const matchId = context.params.matchId;
+  const { organizationId, matchId } = await context.params;
   if (!organizationId || !matchId) {
     return NextResponse.json({ error: "organizationId y matchId son requeridos." }, { status: 400 });
   }

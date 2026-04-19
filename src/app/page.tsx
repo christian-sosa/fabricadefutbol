@@ -21,10 +21,11 @@ function formatCurrencyArs(amount: number) {
 export default async function HomePage({
   searchParams
 }: {
-  searchParams: { org?: string };
+  searchParams: Promise<{ org?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
-    resolvePublicOrganization(searchParams.org, { defaultContext: "home" }),
+    resolvePublicOrganization(resolvedSearchParams.org, { defaultContext: "home" }),
     getViewerAdminOrganizations()
   ]);
   const summary = await getHomeSummary(selectedOrganization?.id ?? null);

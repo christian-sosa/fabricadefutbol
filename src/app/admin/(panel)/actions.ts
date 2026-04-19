@@ -97,13 +97,13 @@ function buildMercadoPagoReturnUrl(baseUrl: string, targetPath: string) {
   return url.toString();
 }
 
-function resolveServerBaseUrl() {
+async function resolveServerBaseUrl() {
   const configuredPublicBaseUrl = getMercadoPagoWebhookBaseUrl();
   if (configuredPublicBaseUrl) {
     return stripTrailingSlashes(configuredPublicBaseUrl);
   }
 
-  const headerStore = headers();
+  const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
   const protocol =
     headerStore.get("x-forwarded-proto") ?? (host?.includes("localhost") ? "http" : "https");
@@ -243,7 +243,7 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
     const externalReference = `${parsed.data.organizationId}:${Date.now()}:${crypto
       .randomUUID()
       .slice(0, 8)}`;
-    const publicBaseUrl = resolveServerBaseUrl();
+    const publicBaseUrl = await resolveServerBaseUrl();
     const successPath = withOrgQuery(
       "/admin?checkout=success&flow=create-org",
       organizationQueryKey
@@ -375,7 +375,7 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
     const externalReference = `${organization.id}:${Date.now()}:${crypto
       .randomUUID()
       .slice(0, 8)}`;
-    const publicBaseUrl = resolveServerBaseUrl();
+    const publicBaseUrl = await resolveServerBaseUrl();
     const successPath = withOrgQuery("/admin/billing?checkout=success", organizationQueryKey);
     const failurePath = withOrgQuery("/admin/billing?checkout=failure", organizationQueryKey);
     const pendingPath = withOrgQuery("/admin/billing?checkout=pending", organizationQueryKey);

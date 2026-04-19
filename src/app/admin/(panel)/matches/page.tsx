@@ -11,9 +11,10 @@ import { formatDateTime } from "@/lib/utils";
 export default async function AdminMatchesPage({
   searchParams
 }: {
-  searchParams: { org?: string };
+  searchParams: Promise<{ org?: string }>;
 }) {
-  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(searchParams.org);
+  const resolvedSearchParams = await searchParams;
+  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
   const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   const matches = await getAdminMatches(selectedOrganization.id);
 

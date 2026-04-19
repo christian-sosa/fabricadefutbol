@@ -58,25 +58,26 @@ function normalizePaymentPurposeLabel(purpose: string | null | undefined) {
 export default async function AdminBillingPage({
   searchParams
 }: {
-  searchParams: {
+  searchParams: Promise<{
     org?: string;
     error?: string;
     checkout?: string;
     payment_id?: string;
-  };
+  }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const { admin, organizations, selectedOrganization } = await requireAdminOrganization(
-    searchParams.org
+    resolvedSearchParams.org
   );
   const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
 
-  if (searchParams.payment_id) {
+  if (resolvedSearchParams.payment_id) {
     try {
       const supabaseAdmin = createSupabaseAdminClient();
       if (supabaseAdmin) {
         await syncOrganizationBillingPaymentFromMercadoPago({
           supabase: supabaseAdmin,
-          mercadopagoPaymentId: searchParams.payment_id,
+          mercadopagoPaymentId: resolvedSearchParams.payment_id,
           expectedOrganizationId: selectedOrganization.id
         });
       }
@@ -114,48 +115,48 @@ export default async function AdminBillingPage({
         </div>
       </Card>
 
-      {searchParams.checkout ? (
+      {resolvedSearchParams.checkout ? (
         <Card
           className={
-            searchParams.checkout === "failure"
+            resolvedSearchParams.checkout === "failure"
               ? "border-danger/40 bg-danger/10"
               : "border-emerald-500/30 bg-emerald-500/10"
           }
         >
           <CardTitle>
-            {searchParams.checkout === "success"
+            {resolvedSearchParams.checkout === "success"
               ? "Pago iniciado"
-              : searchParams.checkout === "pending"
+              : resolvedSearchParams.checkout === "pending"
                 ? "Pago pendiente"
-                : searchParams.checkout === "sync"
+                : resolvedSearchParams.checkout === "sync"
                   ? "Pago sincronizado"
                   : "Pago cancelado"}
           </CardTitle>
           <CardDescription className="mt-1">
-            {searchParams.checkout === "success"
+            {resolvedSearchParams.checkout === "success"
               ? "Estamos validando el pago. Si se aprobo, el acceso se activa automaticamente."
-              : searchParams.checkout === "pending"
+              : resolvedSearchParams.checkout === "pending"
                 ? "El pago quedo pendiente. Puedes sincronizarlo con el boton de abajo."
-                : searchParams.checkout === "sync"
+                : resolvedSearchParams.checkout === "sync"
                   ? "Se refresco el estado del pago desde Mercado Pago."
                   : "No se pudo completar el checkout. Puedes intentarlo de nuevo."}
           </CardDescription>
-          {searchParams.payment_id ? (
+          {resolvedSearchParams.payment_id ? (
             <form action={syncOrganizationCheckoutPaymentAction} className="mt-3">
               <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-              <input name="paymentId" type="hidden" value={searchParams.payment_id} />
+              <input name="paymentId" type="hidden" value={resolvedSearchParams.payment_id} />
               <Button type="submit" variant="secondary">
-                Revalidar pago #{searchParams.payment_id}
+                Revalidar pago #{resolvedSearchParams.payment_id}
               </Button>
             </form>
           ) : null}
         </Card>
       ) : null}
 
-      {searchParams.error ? (
+      {resolvedSearchParams.error ? (
         <Card className="border-danger/40 bg-danger/10">
           <CardTitle>Error de facturacion</CardTitle>
-          <CardDescription className="mt-1">{searchParams.error}</CardDescription>
+          <CardDescription className="mt-1">{resolvedSearchParams.error}</CardDescription>
         </Card>
       ) : null}
 

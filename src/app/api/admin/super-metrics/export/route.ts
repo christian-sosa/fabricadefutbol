@@ -28,7 +28,7 @@ export async function GET() {
   // Auditoria: registramos quien exporto y desde donde, para rastreo de uso
   // de datos sensibles agregados. Log estructurado para filtrar facil en
   // herramientas de observabilidad.
-  const headerStore = headers();
+  const headerStore = await headers();
   const clientIp = getClientIpFromHeaders(headerStore);
   const userAgent = headerStore.get("user-agent");
   console.info("[audit] super-admin csv export", {

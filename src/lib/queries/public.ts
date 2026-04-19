@@ -126,9 +126,10 @@ export async function getViewerAdminOrganizations(): Promise<PublicOrganization[
   return organizations.sort((a, b) => a.name.localeCompare(b.name, "es"));
 }
 
-function readActiveOrgCookieSafe(): string | null {
+async function readActiveOrgCookieSafe(): Promise<string | null> {
   try {
-    return cookies().get(ACTIVE_ORG_COOKIE)?.value ?? null;
+    const cookieStore = await cookies();
+    return cookieStore.get(ACTIVE_ORG_COOKIE)?.value ?? null;
   } catch {
     // `cookies()` solo es accesible en render dinamico. En contextos estaticos
     // Next.js tira; en ese caso simplemente no hay cookie disponible.
@@ -145,7 +146,7 @@ export async function resolvePublicOrganization(
   const organizations = await getPublicOrganizations();
   // Orden de prioridad: query param -> cookie -> default contextual.
   const fromQuery = findOrganizationByKey(organizations, preferredOrganizationKey);
-  const fromCookie = fromQuery ? null : findOrganizationByKey(organizations, readActiveOrgCookieSafe());
+  const fromCookie = fromQuery ? null : findOrganizationByKey(organizations, await readActiveOrgCookieSafe());
   const selectedOrganization =
     fromQuery ??
     fromCookie ??

@@ -6,10 +6,11 @@ import { getPlayersWithStats, getViewerAdminOrganizations, resolvePublicOrganiza
 export default async function RankingPage({
   searchParams
 }: {
-  searchParams: { org?: string };
+  searchParams: Promise<{ org?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
-    resolvePublicOrganization(searchParams.org, { defaultContext: "ranking" }),
+    resolvePublicOrganization(resolvedSearchParams.org, { defaultContext: "ranking" }),
     getViewerAdminOrganizations()
   ]);
   const initialPlayers = await getPlayersWithStats(selectedOrganization?.id ?? null);

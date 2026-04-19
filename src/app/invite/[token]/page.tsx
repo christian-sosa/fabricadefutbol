@@ -26,8 +26,9 @@ function deriveDisplayName(email: string, metadata?: Record<string, unknown>) {
 export default async function InviteByLinkPage({
   params
 }: {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 }) {
+  const { token } = await params;
   const supabase = await createSupabaseServerClient();
 
   type InviteRow = {
@@ -44,7 +45,7 @@ export default async function InviteByLinkPage({
     const withExpires = await supabase
       .from("organization_invites")
       .select("id, organization_id, email, status, expires_at")
-      .eq("invite_token", params.token)
+      .eq("invite_token", token)
       .eq("status", "pending")
       .maybeSingle();
 
@@ -54,7 +55,7 @@ export default async function InviteByLinkPage({
       const legacy = await supabase
         .from("organization_invites")
         .select("id, organization_id, email, status")
-        .eq("invite_token", params.token)
+        .eq("invite_token", token)
         .eq("status", "pending")
         .maybeSingle();
       if (legacy.error) {

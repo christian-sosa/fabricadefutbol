@@ -5,14 +5,14 @@ function stripTrailingSlashes(value: string) {
   return value.replace(/\/+$/, "");
 }
 
-function resolveAppBaseUrl() {
+async function resolveAppBaseUrl() {
   const configuredAppUrl =
     process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (configuredAppUrl) {
     return stripTrailingSlashes(configuredAppUrl);
   }
 
-  const headerStore = headers();
+  const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
   const protocol =
     headerStore.get("x-forwarded-proto") ?? (host?.includes("localhost") ? "http" : "https");
@@ -43,7 +43,7 @@ function normalizeTargetPath(target: string | null, appBaseUrl: string) {
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
-  const appBaseUrl = resolveAppBaseUrl();
+  const appBaseUrl = await resolveAppBaseUrl();
   const targetPath = normalizeTargetPath(requestUrl.searchParams.get("target"), appBaseUrl);
   const destination = new URL(targetPath, `${appBaseUrl}/`);
 
@@ -54,4 +54,3 @@ export async function GET(request: Request) {
 
   return NextResponse.redirect(destination.toString(), { status: 302 });
 }
-

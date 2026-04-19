@@ -10,9 +10,10 @@ import { getSelectablePlayers } from "@/lib/queries/admin";
 export default async function NewMatchPage({
   searchParams
 }: {
-  searchParams: { org?: string; error?: string };
+  searchParams: Promise<{ org?: string; error?: string }>;
 }) {
-  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(searchParams.org);
+  const resolvedSearchParams = await searchParams;
+  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
   const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   if (!writeAccess.canWrite) {
     const target = withOrgQuery("/admin", selectedOrganization.slug);
@@ -20,7 +21,7 @@ export default async function NewMatchPage({
     redirect(`${target}${separator}error=${encodeURIComponent(writeAccess.reason ?? "No tienes permisos para editar esta organizacion.")}`);
   }
   const players = await getSelectablePlayers(selectedOrganization.id);
-  const error = searchParams.error;
+  const error = resolvedSearchParams.error;
 
   return (
     <div className="space-y-4">
