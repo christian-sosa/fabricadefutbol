@@ -484,6 +484,38 @@ describe("billing workflow", () => {
     });
   });
 
+  it("si Mercado Pago falla con un valor no-Error lo repropaga", async () => {
+    const fake = createFakeSupabase();
+    getMercadoPagoPaymentByIdMock.mockRejectedValue("network-down");
+
+    await expect(
+      syncOrganizationBillingPaymentFromMercadoPago({
+        supabase: fake.client as never,
+        mercadopagoPaymentId: 707
+      })
+    ).rejects.toBe("network-down");
+  });
+
+  it("si el pago no trae external_reference y no hay mp_payment_id local hace skip", async () => {
+    const fake = createFakeSupabase();
+    getMercadoPagoPaymentByIdMock.mockResolvedValue({
+      id: 808,
+      status: "approved",
+      external_reference: null,
+      date_approved: "2026-04-19T12:00:00.000Z"
+    });
+
+    await expect(
+      syncOrganizationBillingPaymentFromMercadoPago({
+        supabase: fake.client as never,
+        mercadopagoPaymentId: 808
+      })
+    ).resolves.toEqual({
+      updated: false,
+      reason: "No hay orden local asociada para este pago."
+    });
+  });
+
   it("actualiza el pago rechazado sin activar una suscripcion", async () => {
     const fake = createFakeSupabase({
       organizations: [{ id: ORG_ID, name: "Liga A", slug: "liga-a" }],
@@ -521,6 +553,121 @@ describe("billing workflow", () => {
       expect.objectContaining({
         mp_payment_id: "909",
         status: "rejected"
+      })
+    );
+  });
+
+  it("si el pago aprobado no trae purpose usa suscripcion por defecto", async () => {
+    const fake = createFakeSupabase({
+      organizations: [
+        {
+          id: ORG_ID,
+          name: "Liga A",
+          slug: "liga-a",
+          created_at: "2026-03-01T00:00:00.000Z"
+        }
+      ],
+      organization_billing_payments: [
+        {
+          id: PAYMENT_ID,
+          organization_id: ORG_ID,
+          mp_external_reference: "ext-null-purpose",
+          mp_payment_id: null,
+          status: "pending",
+          subscription_applied_at: null,
+          purpose: null
+        }
+      ]
+    });
+
+    getMercadoPagoPaymentByIdMock.mockResolvedValue({
+      id: 910,
+      status: "approved",
+      external_reference: "ext-null-purpose",
+      date_approved: "2026-04-19T12:08:00.000Z"
+    });
+
+    await expect(
+      syncOrganizationBillingPaymentFromMercadoPago({
+        supabase: fake.client as never,
+        mercadopagoPaymentId: 910
+      })
+    ).resolves.toMatchObject({
+      updated: true,
+      status: "approved",
+      createdOrganizationId: null
+    });
+
+    expect(fake.table("organization_billing_subscriptions")).toEqual([
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        status: "active"
+      })
+    ]);
+  });
+
+  it("si el alta ya estaba asociada a la misma organizacion evita reasignar y usa la hora actual cuando falta date_approved", async () => {
+    const fake = createFakeSupabase({
+      admins: [{ id: ADMIN_ID, display_name: "Admin" }],
+      organizations: [
+        {
+          id: ORG_ID,
+          name: "Base",
+          slug: "base",
+          created_at: "2026-03-01T00:00:00.000Z"
+        }
+      ],
+      organization_billing_payments: [
+        {
+          id: PAYMENT_ID,
+          organization_id: ORG_ID,
+          mp_external_reference: "ext-create-same-org",
+          status: "pending",
+          subscription_applied_at: null,
+          purpose: "organization_creation",
+          requested_organization_name: "Base",
+          requested_organization_slug: "base",
+          requested_by_admin_id: ADMIN_ID,
+          created_organization_id: ORG_ID
+        }
+      ]
+    });
+
+    getMercadoPagoPaymentByIdMock.mockResolvedValue({
+      id: 911,
+      status: "approved",
+      external_reference: "ext-create-same-org",
+      date_approved: null
+    });
+
+    await expect(
+      syncOrganizationBillingPaymentFromMercadoPago({
+        supabase: fake.client as never,
+        mercadopagoPaymentId: 911
+      })
+    ).resolves.toEqual({
+      updated: true,
+      organizationId: ORG_ID,
+      localPaymentId: PAYMENT_ID,
+      status: "approved",
+      createdOrganizationId: ORG_ID
+    });
+
+    expect(fake.find("organization_billing_payments", (row) => row.id === PAYMENT_ID)).toEqual(
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        created_organization_id: ORG_ID,
+        subscription_applied_at: expect.any(String)
+      })
+    );
+    expect(
+      fake.find(
+        "organization_billing_subscriptions",
+        (row) => row.organization_id === ORG_ID
+      )
+    ).toEqual(
+      expect.objectContaining({
+        last_payment_at: "2026-04-19T12:00:00.000Z"
       })
     );
   });
