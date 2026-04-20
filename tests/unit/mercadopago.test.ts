@@ -105,6 +105,7 @@ describe("mercadopago helpers", () => {
       title: "Plan mensual",
       unitPrice: 5000,
       currencyId: "ARS",
+      expiresAt: "2026-04-20T12:00:00.000Z",
       externalReference: "ext-1",
       notificationUrl: "https://example.com/webhook",
       successUrl: "https://example.com/success",
@@ -127,6 +128,15 @@ describe("mercadopago helpers", () => {
         })
       })
     );
+
+    const requestInit = fetchMock.mock.calls[0]?.[1];
+    expect(requestInit).toBeTruthy();
+    const requestBody = JSON.parse(String(requestInit?.body ?? "{}"));
+    expect(requestBody).toMatchObject({
+      expires: true,
+      expiration_date_to: "2026-04-20T12:00:00.000Z"
+    });
+    expect(requestBody.expiration_date_from).toEqual(expect.any(String));
   });
 
   it("corta luego de agotar reintentos por 500", async () => {

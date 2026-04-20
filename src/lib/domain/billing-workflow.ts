@@ -13,6 +13,7 @@ type BillingPaymentRow = {
   mp_external_reference: string | null;
   mp_payment_id: string | null;
   status: string;
+  created_at?: string | null;
   subscription_applied_at: string | null;
   purpose: string | null;
   requested_organization_name: string | null;
@@ -21,8 +22,62 @@ type BillingPaymentRow = {
   created_organization_id: string | null;
 };
 
+const STALE_PENDING_PAYMENT_TTL_MS = 24 * 60 * 60 * 1000;
+
 function normalizePaymentStatus(status: string | null | undefined) {
   return (status ?? "unknown").toLowerCase();
+}
+
+function isStalePendingBillingPayment(
+  paymentRow: Pick<BillingPaymentRow, "created_at" | "mp_payment_id" | "status">,
+  now = Date.now()
+) {
+  if (normalizePaymentStatus(paymentRow.status) !== "pending") return false;
+  if (paymentRow.mp_payment_id) return false;
+  if (!paymentRow.created_at) return false;
+
+  const createdAt = new Date(paymentRow.created_at).getTime();
+  if (!Number.isFinite(createdAt)) return false;
+  return now - createdAt >= STALE_PENDING_PAYMENT_TTL_MS;
+}
+
+export async function cleanupStalePendingOrganizationBillingPayments(params: {
+  supabase: DbClient;
+  organizationId: string;
+  now?: number;
+}) {
+  const { supabase, organizationId, now } = params;
+
+  const { data: pendingRows, error: pendingRowsError } = await supabase
+    .from("organization_billing_payments")
+    .select("id, status, mp_payment_id, created_at")
+    .eq("organization_id", organizationId)
+    .eq("status", "pending")
+    .is("mp_payment_id", null);
+  if (pendingRowsError) throw new Error(pendingRowsError.message);
+
+  const staleIds = (pendingRows ?? [])
+    .filter((row) =>
+      isStalePendingBillingPayment(
+        {
+          created_at: typeof row.created_at === "string" ? row.created_at : null,
+          mp_payment_id: typeof row.mp_payment_id === "string" ? row.mp_payment_id : null,
+          status: typeof row.status === "string" ? row.status : "pending"
+        },
+        now
+      )
+    )
+    .map((row) => String(row.id));
+
+  if (!staleIds.length) return 0;
+
+  const { error: deleteError } = await supabase
+    .from("organization_billing_payments")
+    .delete()
+    .in("id", staleIds);
+  if (deleteError) throw new Error(deleteError.message);
+
+  return staleIds.length;
 }
 
 async function findBillingPaymentRow(params: {
@@ -129,6 +184,25 @@ async function createOrganizationFromApprovedPayment(params: {
   return typeof data === "string" ? data : null;
 }
 
+async function reassignCreationPaymentToCreatedOrganization(params: {
+  supabase: DbClient;
+  paymentRow: BillingPaymentRow;
+  createdOrganizationId: string;
+}) {
+  const { supabase, paymentRow, createdOrganizationId } = params;
+  if (paymentRow.organization_id === createdOrganizationId) return;
+
+  const { error: updatePaymentError } = await supabase
+    .from("organization_billing_payments")
+    .update({
+      organization_id: createdOrganizationId
+    })
+    .eq("id", paymentRow.id);
+  if (updatePaymentError) throw new Error(updatePaymentError.message);
+
+  paymentRow.organization_id = createdOrganizationId;
+}
+
 export async function syncOrganizationBillingPaymentFromMercadoPago(params: {
   supabase: DbClient;
   mercadopagoPaymentId: string | number;
@@ -199,6 +273,12 @@ export async function syncOrganizationBillingPaymentFromMercadoPago(params: {
       });
 
       if (createdOrganizationId) {
+        await reassignCreationPaymentToCreatedOrganization({
+          supabase,
+          paymentRow,
+          createdOrganizationId
+        });
+
         await applyApprovedPaymentPeriod({
           supabase,
           paymentRow,

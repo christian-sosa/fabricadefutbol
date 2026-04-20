@@ -83,6 +83,7 @@ export type CreateCheckoutProPreferenceInput = {
   unitPrice: number;
   currencyId: string;
   quantity?: number;
+  expiresAt?: string | null;
   externalReference: string;
   notificationUrl: string;
   successUrl: string;
@@ -119,6 +120,13 @@ export async function createCheckoutProPreference(
         failure: input.failureUrl,
         pending: input.pendingUrl
       },
+      ...(input.expiresAt
+        ? {
+            expires: true,
+            expiration_date_from: new Date().toISOString(),
+            expiration_date_to: input.expiresAt
+          }
+        : {}),
       auto_return: "approved",
       notification_url: input.notificationUrl,
       external_reference: input.externalReference,

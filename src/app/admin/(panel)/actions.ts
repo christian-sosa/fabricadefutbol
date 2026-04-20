@@ -17,7 +17,10 @@ import {
 import {
   ORGANIZATION_BILLING_CURRENCY
 } from "@/lib/constants";
-import { syncOrganizationBillingPaymentFromMercadoPago } from "@/lib/domain/billing-workflow";
+import {
+  cleanupStalePendingOrganizationBillingPayments,
+  syncOrganizationBillingPaymentFromMercadoPago
+} from "@/lib/domain/billing-workflow";
 import {
   getMercadoPagoWebhookBaseUrl,
   shouldUseMercadoPagoSandboxCheckout
@@ -73,6 +76,7 @@ const syncCheckoutPaymentSchema = z.object({
 });
 
 const MERCADOPAGO_TEST_CHARGE_ARS = 100;
+const MERCADOPAGO_PREFERENCE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function buildAdminPath(organizationKey?: string, error?: string) {
   const basePath = withOrgQuery("/admin", organizationKey ?? null);
@@ -96,6 +100,10 @@ function buildMercadoPagoReturnUrl(baseUrl: string, targetPath: string) {
   const url = new URL("/api/payments/mercadopago/return", `${baseUrl}/`);
   url.searchParams.set("target", targetPath);
   return url.toString();
+}
+
+function buildMercadoPagoPreferenceExpirationDate() {
+  return new Date(Date.now() + MERCADOPAGO_PREFERENCE_TTL_MS).toISOString();
 }
 
 async function resolveServerBaseUrl() {
@@ -259,6 +267,11 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
     );
     const notificationPath = "/api/payments/mercadopago/webhook";
 
+    await cleanupStalePendingOrganizationBillingPayments({
+      supabase: supabaseAdmin,
+      organizationId: parsed.data.organizationId
+    });
+
     const { data: insertedPayment, error: insertPaymentError } = await supabaseAdmin
       .from("organization_billing_payments")
       .insert({
@@ -295,6 +308,7 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
       successUrl: buildMercadoPagoReturnUrl(publicBaseUrl, successPath),
       failureUrl: buildMercadoPagoReturnUrl(publicBaseUrl, failurePath),
       pendingUrl: buildMercadoPagoReturnUrl(publicBaseUrl, pendingPath),
+      expiresAt: buildMercadoPagoPreferenceExpirationDate(),
       payerEmail: admin.email,
       metadata: {
         organization_id: parsed.data.organizationId,
@@ -382,6 +396,11 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
     const pendingPath = withOrgQuery("/admin/billing?checkout=pending", organizationQueryKey);
     const notificationPath = "/api/payments/mercadopago/webhook";
 
+    await cleanupStalePendingOrganizationBillingPayments({
+      supabase: supabaseAdmin,
+      organizationId: organization.id
+    });
+
     const { data: insertedPayment, error: insertPaymentError } = await supabaseAdmin
       .from("organization_billing_payments")
       .insert({
@@ -415,6 +434,7 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
       successUrl: buildMercadoPagoReturnUrl(publicBaseUrl, successPath),
       failureUrl: buildMercadoPagoReturnUrl(publicBaseUrl, failurePath),
       pendingUrl: buildMercadoPagoReturnUrl(publicBaseUrl, pendingPath),
+      expiresAt: buildMercadoPagoPreferenceExpirationDate(),
       payerEmail: admin.email,
       metadata: {
         organization_id: organization.id,
