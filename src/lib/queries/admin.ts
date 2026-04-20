@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { cleanupStalePendingOrganizationBillingPayments } from "@/lib/domain/billing-workflow";
 import {
   countPendingInvitesByOrganization,
   fetchPendingInvitesForOrganization
@@ -287,6 +288,21 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
 
 export async function getOrganizationBillingData(organizationId: string) {
   const supabase = await createSupabaseServerClient();
+  const supabaseAdmin = createSupabaseAdminClient();
+
+  if (supabaseAdmin) {
+    try {
+      await cleanupStalePendingOrganizationBillingPayments({
+        supabase: supabaseAdmin,
+        organizationId
+      });
+    } catch (error) {
+      console.error("[billing] no se pudieron limpiar pagos pendientes vencidos", {
+        organizationId,
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
 
   const [{ data: subscription, error: subscriptionError }, { data: payments, error: paymentsError }] =
     await Promise.all([

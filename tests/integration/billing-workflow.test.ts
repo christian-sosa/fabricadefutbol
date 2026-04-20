@@ -8,7 +8,10 @@ vi.mock("@/lib/payments/mercadopago", () => ({
   getMercadoPagoPaymentById: getMercadoPagoPaymentByIdMock
 }));
 
-import { syncOrganizationBillingPaymentFromMercadoPago } from "@/lib/domain/billing-workflow";
+import {
+  cleanupStalePendingOrganizationBillingPayments,
+  syncOrganizationBillingPaymentFromMercadoPago
+} from "@/lib/domain/billing-workflow";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 const ORG_ID = "org-1";
@@ -263,6 +266,13 @@ describe("billing workflow", () => {
         slug: "nueva-liga"
       })
     );
+    expect(fake.find("organization_billing_payments", (row) => row.id === PAYMENT_ID)).toEqual(
+      expect.objectContaining({
+        organization_id: createdOrganizationId,
+        created_organization_id: createdOrganizationId,
+        status: "approved"
+      })
+    );
     expect(
       fake.find(
         "organization_admins",
@@ -449,5 +459,49 @@ describe("billing workflow", () => {
         status: "rejected"
       })
     );
+  });
+
+  it("borra intentos pending abandonados por mas de 1 dia", async () => {
+    const fake = createFakeSupabase({
+      organizations: [{ id: ORG_ID, name: "Liga A", slug: "liga-a" }],
+      organization_billing_payments: [
+        {
+          id: "old-pending",
+          organization_id: ORG_ID,
+          mp_external_reference: "old-pending",
+          status: "pending",
+          mp_payment_id: null,
+          created_at: "2026-04-18T11:59:59.000Z"
+        },
+        {
+          id: "fresh-pending",
+          organization_id: ORG_ID,
+          mp_external_reference: "fresh-pending",
+          status: "pending",
+          mp_payment_id: null,
+          created_at: "2026-04-19T11:59:59.000Z"
+        },
+        {
+          id: "pending-with-payment",
+          organization_id: ORG_ID,
+          mp_external_reference: "pending-with-payment",
+          status: "pending",
+          mp_payment_id: "already-created",
+          created_at: "2026-04-18T11:00:00.000Z"
+        }
+      ]
+    });
+
+    const deletedCount = await cleanupStalePendingOrganizationBillingPayments({
+      supabase: fake.client as never,
+      organizationId: ORG_ID
+    });
+
+    expect(deletedCount).toBe(1);
+    expect(fake.find("organization_billing_payments", (row) => row.id === "old-pending")).toBeNull();
+    expect(fake.find("organization_billing_payments", (row) => row.id === "fresh-pending")).toBeTruthy();
+    expect(
+      fake.find("organization_billing_payments", (row) => row.id === "pending-with-payment")
+    ).toBeTruthy();
   });
 });
