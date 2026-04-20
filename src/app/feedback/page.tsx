@@ -90,7 +90,7 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
               <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="organization">
                 Organizacion (opcional)
               </label>
-              <Input id="organization" name="organization" placeholder="Ej: Karen Futbol" />
+              <Input id="organization" name="organization" placeholder="Ej: F5 Lunes" />
             </div>
           </div>
 
