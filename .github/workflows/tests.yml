@@ -44,50 +44,99 @@ jobs:
 
   e2e-smoke:
     needs: quality
-    if: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL_DEV != '' && secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV != '' && secrets.SUPABASE_SERVICE_ROLE_KEY_DEV != '' && secrets.NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV != '' && secrets.SUPABASE_PLAYER_PHOTOS_BUCKET_DEV != '' && secrets.E2E_ADMIN_EMAIL != '' && secrets.E2E_ADMIN_PASSWORD != '' && secrets.E2E_ORG_SLUG != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      NEXT_PUBLIC_SUPABASE_URL_DEV: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL_DEV }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV }}
+      SUPABASE_SERVICE_ROLE_KEY_DEV: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_DEV }}
+      NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV: ${{ secrets.NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV }}
+      SUPABASE_PLAYER_PHOTOS_BUCKET_DEV: ${{ secrets.SUPABASE_PLAYER_PHOTOS_BUCKET_DEV }}
+      E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+      E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+      E2E_ORG_SLUG: ${{ secrets.E2E_ORG_SLUG }}
+      E2E_ORG_NAME: ${{ secrets.E2E_ORG_NAME }}
+      SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
 
     steps:
+      - name: Check E2E secrets
+        id: e2e-secrets
+        shell: bash
+        run: |
+          required=(
+            NEXT_PUBLIC_SUPABASE_URL_DEV
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV
+            SUPABASE_SERVICE_ROLE_KEY_DEV
+            NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV
+            SUPABASE_PLAYER_PHOTOS_BUCKET_DEV
+            E2E_ADMIN_EMAIL
+            E2E_ADMIN_PASSWORD
+            E2E_ORG_SLUG
+          )
+
+          missing=()
+          for key in "${required[@]}"; do
+            if [ -z "${!key}" ]; then
+              missing+=("$key")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping E2E smoke. Missing secrets: ${missing[*]}"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.e2e-secrets.outputs.ready == 'true'
         uses: actions/checkout@v4
 
       - name: Setup Node
+        if: steps.e2e-secrets.outputs.ready == 'true'
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
+        if: steps.e2e-secrets.outputs.ready == 'true'
         run: npm ci
 
       - name: Install Playwright browser
+        if: steps.e2e-secrets.outputs.ready == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Write .env.test
+        if: steps.e2e-secrets.outputs.ready == 'true'
         run: |
           cat <<'EOF' > .env.test
           SUPABASE_TARGET_ENV=development
-          NEXT_PUBLIC_SUPABASE_URL_DEV=${{ secrets.NEXT_PUBLIC_SUPABASE_URL_DEV }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV=${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV }}
-          SUPABASE_SERVICE_ROLE_KEY_DEV=${{ secrets.SUPABASE_SERVICE_ROLE_KEY_DEV }}
-          NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV=${{ secrets.NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV }}
-          SUPABASE_PLAYER_PHOTOS_BUCKET_DEV=${{ secrets.SUPABASE_PLAYER_PHOTOS_BUCKET_DEV }}
+          NEXT_PUBLIC_SUPABASE_URL_DEV=${NEXT_PUBLIC_SUPABASE_URL_DEV}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV}
+          SUPABASE_SERVICE_ROLE_KEY_DEV=${SUPABASE_SERVICE_ROLE_KEY_DEV}
+          NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV=${NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV}
+          SUPABASE_PLAYER_PHOTOS_BUCKET_DEV=${SUPABASE_PLAYER_PHOTOS_BUCKET_DEV}
           E2E_BASE_URL=http://127.0.0.1:3001
           APP_URL_DEV=http://127.0.0.1:3001
           NEXT_PUBLIC_APP_URL_DEV=http://127.0.0.1:3001
-          E2E_ADMIN_EMAIL=${{ secrets.E2E_ADMIN_EMAIL }}
-          E2E_ADMIN_PASSWORD=${{ secrets.E2E_ADMIN_PASSWORD }}
-          E2E_ORG_SLUG=${{ secrets.E2E_ORG_SLUG }}
-          E2E_ORG_NAME=${{ secrets.E2E_ORG_NAME }}
-          SUPER_ADMIN_EMAIL=${{ secrets.SUPER_ADMIN_EMAIL }}
+          E2E_ADMIN_EMAIL=${E2E_ADMIN_EMAIL}
+          E2E_ADMIN_PASSWORD=${E2E_ADMIN_PASSWORD}
+          E2E_ORG_SLUG=${E2E_ORG_SLUG}
+          E2E_ORG_NAME=${E2E_ORG_NAME}
+          SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL}
           EOF
 
       - name: Run smoke E2E
+        if: steps.e2e-secrets.outputs.ready == 'true'
         run: npm run test:e2e
 
+      - name: Skip smoke E2E
+        if: steps.e2e-secrets.outputs.ready != 'true'
+        run: echo "Smoke E2E skipped because required test secrets are not configured."
+
       - name: Upload Playwright report
-        if: failure()
+        if: failure() && steps.e2e-secrets.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
