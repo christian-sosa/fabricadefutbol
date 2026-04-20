@@ -32,7 +32,14 @@ describe("billing workflow", () => {
 
   it("aplica un pago aprobado y activa el periodo siguiente", async () => {
     const fake = createFakeSupabase({
-      organizations: [{ id: ORG_ID, name: "Liga A", slug: "liga-a" }],
+      organizations: [
+        {
+          id: ORG_ID,
+          name: "Liga A",
+          slug: "liga-a",
+          created_at: "2026-03-01T00:00:00.000Z"
+        }
+      ],
       organization_billing_payments: [
         {
           id: PAYMENT_ID,
@@ -177,6 +184,63 @@ describe("billing workflow", () => {
         last_payment_at: "2026-04-19T12:10:00.000Z"
       })
     ]);
+  });
+
+  it("si la organizacion sigue en trial, suma el mes pago despues del trial gratis", async () => {
+    const fake = createFakeSupabase({
+      organizations: [
+        {
+          id: ORG_ID,
+          name: "Liga A",
+          slug: "liga-a",
+          created_at: "2026-04-01T00:00:00.000Z"
+        }
+      ],
+      organization_billing_payments: [
+        {
+          id: PAYMENT_ID,
+          organization_id: ORG_ID,
+          mp_external_reference: "ext-trial-plus-month",
+          mp_payment_id: null,
+          status: "pending",
+          subscription_applied_at: null,
+          purpose: "organization_subscription"
+        }
+      ]
+    });
+
+    getMercadoPagoPaymentByIdMock.mockResolvedValue({
+      id: 151,
+      status: "approved",
+      external_reference: "ext-trial-plus-month",
+      date_approved: "2026-04-19T12:05:00.000Z"
+    });
+
+    await expect(
+      syncOrganizationBillingPaymentFromMercadoPago({
+        supabase: fake.client as never,
+        mercadopagoPaymentId: 151
+      })
+    ).resolves.toMatchObject({
+      updated: true,
+      status: "approved"
+    });
+
+    expect(fake.table("organization_billing_subscriptions")).toEqual([
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        current_period_start: "2026-05-01T00:00:00.000Z",
+        current_period_end: "2026-06-01T00:00:00.000Z",
+        last_payment_at: "2026-04-19T12:05:00.000Z"
+      })
+    ]);
+    expect(fake.find("organization_billing_payments", (row) => row.id === PAYMENT_ID)).toEqual(
+      expect.objectContaining({
+        period_start: "2026-05-01T00:00:00.000Z",
+        period_end: "2026-06-01T00:00:00.000Z",
+        status: "approved"
+      })
+    );
   });
 
   it("rechaza sincronizar un pago que pertenece a otra organizacion", async () => {

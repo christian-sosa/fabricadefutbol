@@ -1,5 +1,10 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  getOrganizationTrialEndsAt,
+  hasActiveOrganizationSubscription,
+  isIsoDateExpired
+} from "@/lib/domain/billing";
 import { cleanupStalePendingOrganizationBillingPayments } from "@/lib/domain/billing-workflow";
 import {
   countPendingInvitesByOrganization,
@@ -9,6 +14,51 @@ import { unstable_noStore as noStore } from "next/cache";
 
 function notNull<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined;
+}
+
+const BUSINESS_METRICS_TIME_ZONE = "America/Buenos_Aires";
+
+type OrganizationCommercialStatus = "paid_active" | "free_trial" | "expired_without_plan";
+
+function normalizeBillingPaymentStatus(status: string | null | undefined) {
+  return (status ?? "unknown").toLowerCase();
+}
+
+function getYearMonthKeyInTimeZone(isoDate: string, timeZone = BUSINESS_METRICS_TIME_ZONE) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit"
+  }).formatToParts(new Date(isoDate));
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  return year && month ? `${year}-${month}` : null;
+}
+
+function formatMonthLabel(date: Date, timeZone = BUSINESS_METRICS_TIME_ZONE) {
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone,
+    month: "long",
+    year: "numeric"
+  }).format(date);
+}
+
+function getOrganizationCommercialStatus(params: {
+  organizationCreatedAt: string;
+  subscription: { status: string | null; current_period_end: string | null } | null | undefined;
+}): OrganizationCommercialStatus {
+  const { organizationCreatedAt, subscription } = params;
+  if (hasActiveOrganizationSubscription(subscription)) {
+    return "paid_active";
+  }
+
+  const trialEndsAt = getOrganizationTrialEndsAt(organizationCreatedAt);
+  if (!isIsoDateExpired(trialEndsAt)) {
+    return "free_trial";
+  }
+
+  return "expired_without_plan";
 }
 
 function isGuestSchemaMissing(error: { message: string } | null) {
@@ -353,6 +403,13 @@ type OrgMatchesAggregate = {
 
 export type SuperAdminDashboardMetrics = {
   generatedAt: string;
+  currentMonth: {
+    label: string;
+    timezone: string;
+    approvedRevenueArs: number;
+    approvedPayments: number;
+    organizationsWithApprovedPayments: number;
+  };
   totals: {
     organizations: number;
     admins: number;
@@ -376,6 +433,12 @@ export type SuperAdminDashboardMetrics = {
     organizationsWithoutPlayers: number;
     organizationsWithoutAdmins: number;
   };
+  business: {
+    activePaidOrganizations: number;
+    freeTrialOrganizations: number;
+    expiredWithoutPlanOrganizations: number;
+    organizationsWithAnyApprovedPayment: number;
+  };
   last30Days: {
     organizationsCreated: number;
     playersCreated: number;
@@ -392,6 +455,9 @@ export type SuperAdminDashboardMetrics = {
     finishedMatches: number;
     admins: number;
     pendingInvites: number;
+    commercialStatus: OrganizationCommercialStatus;
+    trialEndsAt: string;
+    subscriptionCurrentPeriodEnd: string | null;
     createdAt: string;
   }>;
   topOrganizations: Array<{
@@ -404,6 +470,9 @@ export type SuperAdminDashboardMetrics = {
     finishedMatches: number;
     admins: number;
     pendingInvites: number;
+    commercialStatus: OrganizationCommercialStatus;
+    trialEndsAt: string;
+    subscriptionCurrentPeriodEnd: string | null;
     createdAt: string;
   }>;
 };
@@ -428,6 +497,8 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
     { data: organizations, error: organizationsError },
     { data: players, error: playersError },
     { data: matches, error: matchesError },
+    { data: subscriptions, error: subscriptionsError },
+    { data: billingPayments, error: billingPaymentsError },
     { data: orgAdmins, error: orgAdminsError },
     pendingInvites,
     { count: adminsCount, error: adminsCountError },
@@ -440,6 +511,12 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
       .order("created_at", { ascending: true }),
     supabase.from("players").select("id, organization_id, active, created_at"),
     supabase.from("matches").select("id, organization_id, status, created_at, finished_at"),
+    supabase
+      .from("organization_billing_subscriptions")
+      .select("organization_id, status, current_period_end"),
+    supabase
+      .from("organization_billing_payments")
+      .select("organization_id, status, amount, approved_at"),
     supabase.from("organization_admins").select("organization_id"),
     countPendingInvitesByOrganization(supabase),
     supabase.from("admins").select("id", { count: "exact", head: true }),
@@ -450,6 +527,12 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
   if (organizationsError) throw new Error(organizationsError.message);
   if (playersError) throw new Error(playersError.message);
   if (matchesError) throw new Error(matchesError.message);
+  if (subscriptionsError && !isBillingSchemaMissing(subscriptionsError)) {
+    throw new Error(subscriptionsError.message);
+  }
+  if (billingPaymentsError && !isBillingSchemaMissing(billingPaymentsError)) {
+    throw new Error(billingPaymentsError.message);
+  }
   if (orgAdminsError) throw new Error(orgAdminsError.message);
   if (adminsCountError) throw new Error(adminsCountError.message);
   if (resultsCountError) throw new Error(resultsCountError.message);
@@ -458,6 +541,10 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
   const safeOrganizations = organizations ?? [];
   const safePlayers = players ?? [];
   const safeMatches = matches ?? [];
+  const safeSubscriptions =
+    subscriptionsError && isBillingSchemaMissing(subscriptionsError) ? [] : subscriptions ?? [];
+  const safeBillingPayments =
+    billingPaymentsError && isBillingSchemaMissing(billingPaymentsError) ? [] : billingPayments ?? [];
   const safeOrgAdmins = orgAdmins ?? [];
   const safePendingInvites = pendingInvites;
 
@@ -498,6 +585,32 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
     pendingInvitesByOrg.set(invite.organization_id, (pendingInvitesByOrg.get(invite.organization_id) ?? 0) + 1);
   }
 
+  const subscriptionsByOrg = new Map(
+    safeSubscriptions.map((subscription) => [subscription.organization_id, subscription])
+  );
+
+  const currentMonthLabel = formatMonthLabel(new Date());
+  const currentMonthKey = getYearMonthKeyInTimeZone(generatedAt);
+  const approvedPayments = safeBillingPayments.filter(
+    (payment) =>
+      normalizeBillingPaymentStatus(payment.status) === "approved" &&
+      typeof payment.approved_at === "string" &&
+      payment.approved_at.length > 0
+  );
+  const approvedPaymentsThisMonth = approvedPayments.filter(
+    (payment) => payment.approved_at && getYearMonthKeyInTimeZone(payment.approved_at) === currentMonthKey
+  );
+  const organizationsWithAnyApprovedPayment = new Set(
+    approvedPayments.map((payment) => payment.organization_id).filter(Boolean)
+  ).size;
+  const organizationsWithApprovedPaymentsThisMonth = new Set(
+    approvedPaymentsThisMonth.map((payment) => payment.organization_id).filter(Boolean)
+  ).size;
+  const approvedRevenueThisMonth = approvedPaymentsThisMonth.reduce(
+    (sum, payment) => sum + Number(payment.amount ?? 0),
+    0
+  );
+
   const totalOrganizations = safeOrganizations.length;
   const totalPlayers = safePlayers.length;
   const totalActivePlayers = safePlayers.filter((player) => player.active).length;
@@ -519,6 +632,10 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
     return orgAdminsCount === 0;
   }).length;
 
+  let activePaidOrganizations = 0;
+  let freeTrialOrganizations = 0;
+  let expiredWithoutPlanOrganizations = 0;
+
   const organizationsBreakdown = safeOrganizations
     .map((organization) => {
       const orgPlayers = playersByOrg.get(organization.id) ?? { total: 0, active: 0, inactive: 0 };
@@ -529,6 +646,16 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
         finished: 0,
         cancelled: 0
       };
+      const subscription = subscriptionsByOrg.get(organization.id) ?? null;
+      const commercialStatus = getOrganizationCommercialStatus({
+        organizationCreatedAt: organization.created_at,
+        subscription
+      });
+      const trialEndsAt = getOrganizationTrialEndsAt(organization.created_at);
+
+      if (commercialStatus === "paid_active") activePaidOrganizations += 1;
+      if (commercialStatus === "free_trial") freeTrialOrganizations += 1;
+      if (commercialStatus === "expired_without_plan") expiredWithoutPlanOrganizations += 1;
 
       return {
         id: organization.id,
@@ -540,6 +667,9 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
         finishedMatches: orgMatches.finished,
         admins: adminsByOrg.get(organization.id) ?? 0,
         pendingInvites: pendingInvitesByOrg.get(organization.id) ?? 0,
+        commercialStatus,
+        trialEndsAt,
+        subscriptionCurrentPeriodEnd: subscription?.current_period_end ?? null,
         createdAt: organization.created_at
       };
     })
@@ -551,6 +681,13 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
 
   return {
     generatedAt,
+    currentMonth: {
+      label: currentMonthLabel,
+      timezone: BUSINESS_METRICS_TIME_ZONE,
+      approvedRevenueArs: formatMetricNumber(approvedRevenueThisMonth),
+      approvedPayments: approvedPaymentsThisMonth.length,
+      organizationsWithApprovedPayments: organizationsWithApprovedPaymentsThisMonth
+    },
     totals: {
       organizations: totalOrganizations,
       admins: adminsCount ?? 0,
@@ -573,6 +710,12 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
       completionRatePercent: totalMatches ? formatMetricNumber((totalFinishedMatches / totalMatches) * 100) : 0,
       organizationsWithoutPlayers,
       organizationsWithoutAdmins
+    },
+    business: {
+      activePaidOrganizations,
+      freeTrialOrganizations,
+      expiredWithoutPlanOrganizations,
+      organizationsWithAnyApprovedPayment
     },
     last30Days: {
       organizationsCreated: safeOrganizations.filter((organization) => isRecentDate(organization.created_at, sinceDate))

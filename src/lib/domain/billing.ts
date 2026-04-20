@@ -41,11 +41,22 @@ export function hasActiveOrganizationSubscription(
   return !isIsoDateExpired(subscription.current_period_end);
 }
 
-export function resolveNextOrganizationBillingPeriod(previousPeriodEnd: string | null | undefined) {
+export function resolveNextOrganizationBillingPeriod(
+  previousPeriodEnd: string | null | undefined,
+  accessValidUntil?: string | null | undefined
+) {
   const now = new Date();
-  const previousEndDate = previousPeriodEnd ? new Date(previousPeriodEnd) : null;
-  const periodStart =
-    previousEndDate && previousEndDate.getTime() > now.getTime() ? previousEndDate.toISOString() : now.toISOString();
+  const candidateDates = [previousPeriodEnd, accessValidUntil]
+    .map((value) => (value ? new Date(value) : null))
+    .filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()));
+
+  const futureCandidate = candidateDates.reduce<Date | null>((latest, candidate) => {
+    if (candidate.getTime() <= now.getTime()) return latest;
+    if (!latest) return candidate;
+    return candidate.getTime() > latest.getTime() ? candidate : latest;
+  }, null);
+
+  const periodStart = futureCandidate ? futureCandidate.toISOString() : now.toISOString();
   const periodEnd = addMonthsToIsoDate(periodStart, 1);
 
   return {
