@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   addDaysToIsoDate,
+  addMonthsToIsoDate,
   getOrganizationTrialEndsAt,
   hasActiveOrganizationSubscription,
   resolveNextOrganizationBillingPeriod
@@ -22,6 +23,11 @@ describe("billing helpers", () => {
 
     expect(addDaysToIsoDate(createdAt, 30)).toBe("2026-05-01T00:00:00.000Z");
     expect(getOrganizationTrialEndsAt(createdAt)).toBe("2026-05-01T00:00:00.000Z");
+  });
+
+  it("suma meses en UTC sin depender del timezone de la maquina", () => {
+    expect(addMonthsToIsoDate("2026-05-01T00:00:00.000Z", 1)).toBe("2026-06-01T00:00:00.000Z");
+    expect(addMonthsToIsoDate("2026-04-19T12:00:00.000Z", 1)).toBe("2026-05-19T12:00:00.000Z");
   });
 
   it("detecta una suscripcion activa solo si sigue vigente", () => {
@@ -51,7 +57,7 @@ describe("billing helpers", () => {
     const period = resolveNextOrganizationBillingPeriod("2026-05-01T00:00:00.000Z");
 
     expect(period.periodStart).toBe("2026-05-01T00:00:00.000Z");
-    expect(period.periodEnd).toBe("2026-05-31T00:00:00.000Z");
+    expect(period.periodEnd).toBe("2026-06-01T00:00:00.000Z");
   });
 
   it("arranca desde ahora si no habia periodo o ya vencio", () => {
