@@ -4,6 +4,7 @@ type TableName =
   | "admins"
   | "organizations"
   | "organization_admins"
+  | "organization_invites"
   | "organization_billing_payments"
   | "organization_billing_subscriptions"
   | "players"
@@ -50,6 +51,7 @@ function createEmptyDatabase(): FakeDatabase {
     admins: [],
     organizations: [],
     organization_admins: [],
+    organization_invites: [],
     organization_billing_payments: [],
     organization_billing_subscriptions: [],
     players: [],

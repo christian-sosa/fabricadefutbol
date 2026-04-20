@@ -66,4 +66,21 @@ describe("billing helpers", () => {
     expect(period.periodStart).toBe("2026-04-19T12:00:00.000Z");
     expect(period.periodEnd).toBe("2026-05-19T12:00:00.000Z");
   });
+
+  it("si el trial sigue vigente usa ese fin como inicio del mes pago", () => {
+    const period = resolveNextOrganizationBillingPeriod(null, "2026-05-01T00:00:00.000Z");
+
+    expect(period.periodStart).toBe("2026-05-01T00:00:00.000Z");
+    expect(period.periodEnd).toBe("2026-06-01T00:00:00.000Z");
+  });
+
+  it("prioriza la fecha mas lejana entre suscripcion activa y trial", () => {
+    const period = resolveNextOrganizationBillingPeriod(
+      "2026-06-10T00:00:00.000Z",
+      "2026-05-01T00:00:00.000Z"
+    );
+
+    expect(period.periodStart).toBe("2026-06-10T00:00:00.000Z");
+    expect(period.periodEnd).toBe("2026-07-10T00:00:00.000Z");
+  });
 });

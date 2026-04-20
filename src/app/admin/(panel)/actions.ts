@@ -22,7 +22,12 @@ import {
   syncOrganizationBillingPaymentFromMercadoPago
 } from "@/lib/domain/billing-workflow";
 import {
+  deleteOrganizationDeep
+} from "@/lib/domain/organization-workflow";
+import {
+  getPlayerPhotosBucket,
   getMercadoPagoWebhookBaseUrl,
+  getSupabaseDbSchema,
   shouldUseMercadoPagoSandboxCheckout
 } from "@/lib/env";
 import { isNextRedirectError } from "@/lib/next-redirect";
@@ -683,7 +688,11 @@ export async function deleteOrganizationAction(formData: FormData) {
       redirect(buildAdminPath(undefined, parsed.error.issues[0]?.message ?? "Datos invalidos."));
     }
 
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabaseAdminClient();
+    if (!supabase) {
+      redirect(buildAdminPath(undefined, "Falta configurar el cliente admin para borrar organizaciones."));
+    }
+
     const { data: organization, error: organizationError } = await supabase
       .from("organizations")
       .select("id")
@@ -698,14 +707,12 @@ export async function deleteOrganizationAction(formData: FormData) {
       redirect(buildAdminPath(undefined, "La organizacion ya no existe."));
     }
 
-    const { error: deleteError } = await supabase
-      .from("organizations")
-      .delete()
-      .eq("id", parsed.data.organizationId);
-
-    if (deleteError) {
-      redirect(buildAdminPath(undefined, toUserMessage(deleteError, "No se pudo borrar la organizacion.")));
-    }
+    await deleteOrganizationDeep({
+      supabase,
+      organizationId: parsed.data.organizationId,
+      playerPhotosBucket: getPlayerPhotosBucket(),
+      schemaName: getSupabaseDbSchema()
+    });
 
     revalidatePath("/admin");
     revalidatePath("/");

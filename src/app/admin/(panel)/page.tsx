@@ -167,13 +167,16 @@ export default async function AdminDashboardPage({
             <Card className="border-danger/40 bg-danger/10">
               <CardTitle className="text-danger">Zona super admin</CardTitle>
               <CardDescription className="mt-1 text-slate-200">
-                Esta accion elimina la organizacion seleccionada y todos sus datos asociados.
+                Esta accion elimina la organizacion seleccionada y todos sus datos asociados, incluyendo fotos,
+                jugadores, partidos, historial, admins e invitaciones.
               </CardDescription>
               <form action={deleteOrganizationAction} className="mt-4">
                 <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-                <Button type="submit" variant="danger">
-                  Borrar organizacion
-                </Button>
+                <ConfirmSubmitButton
+                  confirmMessage={`Estas seguro de borrar ${selectedOrganization.name}? Se perderan definitivamente todas las fotos, jugadores, partidos, historial, admins, invitaciones y pagos asociados. Esta accion no se puede deshacer.`}
+                  label="Borrar organizacion"
+                  variant="danger"
+                />
               </form>
             </Card>
           ) : null}

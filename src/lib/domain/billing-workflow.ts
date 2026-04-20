@@ -1,4 +1,4 @@
-import { resolveNextOrganizationBillingPeriod } from "@/lib/domain/billing";
+import { getOrganizationTrialEndsAt, resolveNextOrganizationBillingPeriod } from "@/lib/domain/billing";
 import { getMercadoPagoPaymentById } from "@/lib/payments/mercadopago";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -123,15 +123,29 @@ async function applyApprovedPaymentPeriod(params: {
   if (paymentRow.subscription_applied_at) return;
   const organizationId = targetOrganizationId ?? paymentRow.organization_id;
 
-  const { data: subscription, error: subscriptionError } = await supabase
-    .from("organization_billing_subscriptions")
-    .select("organization_id, current_period_end")
-    .eq("organization_id", organizationId)
-    .maybeSingle();
+  const [{ data: subscription, error: subscriptionError }, { data: organization, error: organizationError }] =
+    await Promise.all([
+      supabase
+        .from("organization_billing_subscriptions")
+        .select("organization_id, current_period_end")
+        .eq("organization_id", organizationId)
+        .maybeSingle(),
+      supabase
+        .from("organizations")
+        .select("created_at")
+        .eq("id", organizationId)
+        .maybeSingle()
+    ]);
   if (subscriptionError) throw new Error(subscriptionError.message);
+  if (organizationError) throw new Error(organizationError.message);
+
+  const organizationTrialEndsAt = organization?.created_at
+    ? getOrganizationTrialEndsAt(organization.created_at)
+    : null;
 
   const { periodStart, periodEnd } = resolveNextOrganizationBillingPeriod(
-    subscription?.current_period_end ?? null
+    subscription?.current_period_end ?? null,
+    organizationTrialEndsAt
   );
 
   const { error: upsertSubscriptionError } = await supabase
