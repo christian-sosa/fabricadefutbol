@@ -15,8 +15,7 @@ import {
   getOrganizationQueryKeyById
 } from "@/lib/auth/admin";
 import {
-  ORGANIZATION_BILLING_CURRENCY,
-  ORGANIZATION_MONTHLY_PRICE_ARS
+  ORGANIZATION_BILLING_CURRENCY
 } from "@/lib/constants";
 import { syncOrganizationBillingPaymentFromMercadoPago } from "@/lib/domain/billing-workflow";
 import {
@@ -72,6 +71,8 @@ const syncCheckoutPaymentSchema = z.object({
   organizationId: z.string().uuid(),
   paymentId: z.string().min(1, "paymentId invalido.")
 });
+
+const MERCADOPAGO_TEST_CHARGE_ARS = 100;
 
 function buildAdminPath(organizationKey?: string, error?: string) {
   const basePath = withOrgQuery("/admin", organizationKey ?? null);
@@ -263,7 +264,7 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
       .insert({
         organization_id: parsed.data.organizationId,
         created_by: admin.userId,
-        amount: ORGANIZATION_MONTHLY_PRICE_ARS,
+        amount: MERCADOPAGO_TEST_CHARGE_ARS,
         currency_id: ORGANIZATION_BILLING_CURRENCY,
         status: "pending",
         mp_external_reference: externalReference,
@@ -286,7 +287,7 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
 
     const preference = await createCheckoutProPreference({
       title: `Crear nueva organizacion (${normalizedOrgName})`,
-      unitPrice: ORGANIZATION_MONTHLY_PRICE_ARS,
+      unitPrice: MERCADOPAGO_TEST_CHARGE_ARS,
       currencyId: ORGANIZATION_BILLING_CURRENCY,
       quantity: 1,
       externalReference,
@@ -386,7 +387,7 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
       .insert({
         organization_id: organization.id,
         created_by: admin.userId,
-        amount: ORGANIZATION_MONTHLY_PRICE_ARS,
+        amount: MERCADOPAGO_TEST_CHARGE_ARS,
         currency_id: ORGANIZATION_BILLING_CURRENCY,
         status: "pending",
         mp_external_reference: externalReference,
@@ -406,7 +407,7 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
 
     const preference = await createCheckoutProPreference({
       title: `Plan mensual ${organization.name}`,
-      unitPrice: ORGANIZATION_MONTHLY_PRICE_ARS,
+      unitPrice: MERCADOPAGO_TEST_CHARGE_ARS,
       currencyId: ORGANIZATION_BILLING_CURRENCY,
       quantity: 1,
       externalReference,
