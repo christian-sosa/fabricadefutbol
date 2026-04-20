@@ -12,9 +12,17 @@ export function addDaysToIsoDate(isoDate: string, days: number) {
 
 export function addMonthsToIsoDate(isoDate: string, months: number) {
   const base = new Date(isoDate);
-  const next = new Date(base);
-  next.setMonth(next.getMonth() + months);
-  return next.toISOString();
+  return new Date(
+    Date.UTC(
+      base.getUTCFullYear(),
+      base.getUTCMonth() + months,
+      base.getUTCDate(),
+      base.getUTCHours(),
+      base.getUTCMinutes(),
+      base.getUTCSeconds(),
+      base.getUTCMilliseconds()
+    )
+  ).toISOString();
 }
 
 export function isIsoDateExpired(isoDate: string) {
