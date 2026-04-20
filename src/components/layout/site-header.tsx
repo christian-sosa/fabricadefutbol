@@ -95,11 +95,11 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
           <div className="flex items-center justify-between gap-3">
             <Link className="flex min-w-0 items-center gap-3" href="/">
               <Image
-                alt="Logo placeholder de Fabrica de Futbol"
-                className="h-9 w-9 rounded-lg border border-slate-700 bg-slate-900 object-cover"
-                height={36}
-                src="/logo-placeholder.svg"
-                width={36}
+                alt="Logo de Fabrica de Futbol"
+                className="h-10 w-10 rounded-full border border-slate-700 bg-white object-cover"
+                height={40}
+                src="/logo.png"
+                width={40}
               />
               <div className="min-w-0">
                 <p className="truncate text-sm font-extrabold uppercase tracking-[0.18em] text-slate-100">

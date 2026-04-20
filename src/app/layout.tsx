@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 
 import "@/app/globals.css";
 import { BetaNotice } from "@/components/layout/beta-notice";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ReactQueryProvider } from "@/components/providers/react-query-provider";
 import { shouldRenderAds } from "@/lib/env";
@@ -53,7 +54,12 @@ export const metadata: Metadata = {
       "Organiza partidos de futbol entre amigos: convocatoria, equipos balanceados, ranking y estadisticas."
   },
   icons: {
-    icon: "/favicon.ico"
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" }
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png"
   }
 };
 
@@ -86,6 +92,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8" id="contenido-principal">
             {children}
           </main>
+          <Suspense fallback={<div className="h-[280px] border-t border-slate-800 bg-slate-950/80" />}>
+            <SiteFooter />
+          </Suspense>
         </ReactQueryProvider>
         <Analytics />
       </body>
