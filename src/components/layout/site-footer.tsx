@@ -89,10 +89,10 @@ export function SiteFooter() {
             <div className="flex items-center gap-3">
               <Image
                 alt="Logo de Fabrica de Futbol"
-                className="h-12 w-12 rounded-full border border-slate-700 bg-white object-cover"
-                height={48}
+                className="h-14 w-14 object-contain drop-shadow-[0_12px_24px_rgba(15,23,42,0.35)]"
+                height={56}
                 src="/logo.png"
-                width={48}
+                width={56}
               />
               <div>
                 <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-slate-100">

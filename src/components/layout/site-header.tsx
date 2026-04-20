@@ -96,10 +96,10 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
             <Link className="flex min-w-0 items-center gap-3" href="/">
               <Image
                 alt="Logo de Fabrica de Futbol"
-                className="h-10 w-10 rounded-full border border-slate-700 bg-white object-cover"
-                height={40}
+                className="h-12 w-12 object-contain drop-shadow-[0_10px_18px_rgba(15,23,42,0.35)] md:h-14 md:w-14"
+                height={56}
                 src="/logo.png"
-                width={40}
+                width={56}
               />
               <div className="min-w-0">
                 <p className="truncate text-sm font-extrabold uppercase tracking-[0.18em] text-slate-100">
