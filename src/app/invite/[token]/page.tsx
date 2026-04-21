@@ -2,26 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { buildAdminLoginPath } from "@/lib/auth/redirects";
+import { deriveDisplayName } from "@/lib/auth/profile";
 import { getOrganizationQueryKeyById } from "@/lib/auth/admin";
 import { normalizeEmail, withOrgQuery } from "@/lib/org";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-function deriveDisplayName(email: string, metadata?: Record<string, unknown>) {
-  const fromMetadata =
-    typeof metadata?.display_name === "string"
-      ? metadata.display_name
-      : typeof metadata?.name === "string"
-        ? metadata.name
-        : null;
-
-  if (fromMetadata && fromMetadata.trim().length) {
-    return fromMetadata.trim().slice(0, 80);
-  }
-
-  const localPart = email.split("@")[0] ?? "admin";
-  return localPart.replace(/[._-]+/g, " ").trim().slice(0, 80) || "admin";
-}
 
 export default async function InviteByLinkPage({
   params
@@ -29,7 +15,9 @@ export default async function InviteByLinkPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
+  const loginHref = buildAdminLoginPath(`/invite/${token}`);
   const supabase = await createSupabaseServerClient();
+  const privilegedSupabase = createSupabaseAdminClient() ?? supabase;
 
   type InviteRow = {
     id: string;
@@ -42,7 +30,7 @@ export default async function InviteByLinkPage({
   // caemos al select legacy sin expiracion.
   let invite: InviteRow | null = null;
   {
-    const withExpires = await supabase
+    const withExpires = await privilegedSupabase
       .from("organization_invites")
       .select("id, organization_id, email, status, expires_at")
       .eq("invite_token", token)
@@ -52,7 +40,7 @@ export default async function InviteByLinkPage({
     if (!withExpires.error) {
       invite = (withExpires.data ?? null) as InviteRow | null;
     } else {
-      const legacy = await supabase
+      const legacy = await privilegedSupabase
         .from("organization_invites")
         .select("id, organization_id, email, status")
         .eq("invite_token", token)
@@ -73,7 +61,7 @@ export default async function InviteByLinkPage({
           <CardDescription>
             Este link no existe, ya fue usado o fue cancelado.
           </CardDescription>
-          <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href="/admin/login">
+          <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href={loginHref}>
             Ir a login
           </Link>
         </Card>
@@ -91,7 +79,7 @@ export default async function InviteByLinkPage({
             <CardDescription>
               Este link ya expiro. Pedi una nueva invitacion a tu admin.
             </CardDescription>
-            <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href="/admin/login">
+            <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href={loginHref}>
               Ir a login
             </Link>
           </Card>
@@ -105,7 +93,7 @@ export default async function InviteByLinkPage({
   } = await supabase.auth.getUser();
 
   if (!user?.id || !user.email) {
-    redirect("/admin/login");
+    redirect(loginHref);
   }
 
   const userEmail = normalizeEmail(user.email);
@@ -118,15 +106,13 @@ export default async function InviteByLinkPage({
           <CardDescription>
             Esta invitacion corresponde a <strong>{invite.email}</strong>, pero estas logueado con <strong>{user.email}</strong>.
           </CardDescription>
-          <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href="/admin/login">
+          <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href={loginHref}>
             Cambiar de cuenta
           </Link>
         </Card>
       </div>
     );
   }
-
-  const privilegedSupabase = createSupabaseAdminClient() ?? supabase;
 
   const { error: ensureAdminError } = await privilegedSupabase.from("admins").upsert(
     {

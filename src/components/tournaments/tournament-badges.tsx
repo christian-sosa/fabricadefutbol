@@ -3,7 +3,9 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { TournamentMatchStatus, TournamentStatus } from "@/types/domain";
 
-const tournamentStatusLabels: Record<TournamentStatus, string> = {
+export const TOURNAMENT_STATUS_OPTIONS: TournamentStatus[] = ["draft", "active", "finished", "archived"];
+
+export const TOURNAMENT_STATUS_LABELS: Record<TournamentStatus, string> = {
   draft: "Borrador",
   active: "Activo",
   finished: "Finalizado",
@@ -17,7 +19,14 @@ const tournamentStatusStyles: Record<TournamentStatus, string> = {
   archived: "border-amber-500/40 bg-amber-500/10 text-amber-200"
 };
 
-const matchStatusLabels: Record<TournamentMatchStatus, string> = {
+export const TOURNAMENT_MATCH_STATUS_OPTIONS: TournamentMatchStatus[] = [
+  "draft",
+  "scheduled",
+  "played",
+  "cancelled"
+];
+
+export const TOURNAMENT_MATCH_STATUS_LABELS: Record<TournamentMatchStatus, string> = {
   draft: "Borrador",
   scheduled: "Programado",
   played: "Jugado",
@@ -45,9 +54,9 @@ function BadgeFrame({ className, children }: { className: string; children: Reac
 }
 
 export function TournamentStatusBadge({ status }: { status: TournamentStatus }) {
-  return <BadgeFrame className={tournamentStatusStyles[status]}>{tournamentStatusLabels[status]}</BadgeFrame>;
+  return <BadgeFrame className={tournamentStatusStyles[status]}>{TOURNAMENT_STATUS_LABELS[status]}</BadgeFrame>;
 }
 
 export function TournamentMatchStatusBadge({ status }: { status: TournamentMatchStatus }) {
-  return <BadgeFrame className={matchStatusStyles[status]}>{matchStatusLabels[status]}</BadgeFrame>;
+  return <BadgeFrame className={matchStatusStyles[status]}>{TOURNAMENT_MATCH_STATUS_LABELS[status]}</BadgeFrame>;
 }

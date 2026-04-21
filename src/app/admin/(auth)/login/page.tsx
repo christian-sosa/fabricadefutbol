@@ -1,15 +1,18 @@
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { LoginForm } from "@/app/admin/(auth)/login/login-form";
+import { resolveSafeNextPath } from "@/lib/auth/redirects";
 
 type AdminLoginPageProps = {
   searchParams: Promise<{
     confirmed?: string;
     error?: string;
+    next?: string;
   }>;
 };
 
 export default async function AdminLoginPage({ searchParams }: AdminLoginPageProps) {
   const resolvedSearchParams = await searchParams;
+  const nextPath = resolveSafeNextPath(resolvedSearchParams.next, "/admin");
   return (
     <div className="space-y-4 py-6">
       <h1 className="mb-4 text-center text-3xl font-black text-slate-100">Acceso al Panel</h1>
@@ -30,7 +33,7 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
         </Card>
       ) : null}
 
-      <LoginForm />
+      <LoginForm nextPath={nextPath} />
     </div>
   );
 }

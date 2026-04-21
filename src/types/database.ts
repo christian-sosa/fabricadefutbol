@@ -387,6 +387,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      tournament_team_captains: {
+        Row: {
+          captain_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          team_id: string;
+          tournament_id: string;
+        };
+        Insert: {
+          captain_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          team_id: string;
+          tournament_id: string;
+        };
+        Update: {
+          captain_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          team_id?: string;
+          tournament_id?: string;
+        };
+        Relationships: [];
+      };
+      tournament_captain_invites: {
+        Row: {
+          created_at: string;
+          created_by: string;
+          email: string;
+          expires_at: string;
+          id: string;
+          invite_token: string;
+          team_id: string;
+          tournament_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by: string;
+          email: string;
+          expires_at?: string;
+          id?: string;
+          invite_token: string;
+          team_id: string;
+          tournament_id: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string;
+          email?: string;
+          expires_at?: string;
+          id?: string;
+          invite_token?: string;
+          team_id?: string;
+          tournament_id?: string;
+        };
+        Relationships: [];
+      };
       tournament_teams: {
         Row: {
           created_at: string;

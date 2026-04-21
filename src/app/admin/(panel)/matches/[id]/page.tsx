@@ -12,7 +12,7 @@ import { MatchLineupEditor } from "@/components/admin/match-lineup-editor";
 import { MatchResultEditorQuery } from "@/components/admin/match-result-editor-query";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { TeamOptionCard } from "@/components/matches/team-option-card";
-import { MatchStatusBadge } from "@/components/ui/badge";
+import { MATCH_STATUS_LABELS, MatchStatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -133,10 +133,11 @@ export default async function AdminMatchDetailPage({
               Estado
             </label>
             <Select defaultValue={details.match.status} id="status" name="status">
-              <option value="draft">draft</option>
-              <option value="confirmed">confirmed</option>
-              <option value="finished">finished</option>
-              <option value="cancelled">cancelled</option>
+              {(["draft", "confirmed", "finished", "cancelled"] as const).map((status) => (
+                <option key={status} value={status}>
+                  {MATCH_STATUS_LABELS[status]}
+                </option>
+              ))}
             </Select>
           </div>
           <div className="flex items-end">

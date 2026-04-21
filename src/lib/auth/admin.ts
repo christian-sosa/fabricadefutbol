@@ -8,6 +8,7 @@ import {
   isIsoDateExpired,
   toShortDate
 } from "@/lib/domain/billing";
+import { deriveDisplayName } from "@/lib/auth/profile";
 import { maskEmail, maskUserId } from "@/lib/log-pii";
 import { normalizeEmail } from "@/lib/org";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -59,22 +60,6 @@ function findOrganizationByKey(organizations: AdminOrganization[], organizationK
       (organization) => organization.slug.toLowerCase() === normalizedKey || organization.id === organizationKey
     ) ?? null
   );
-}
-
-function deriveDisplayName(email: string, metadata?: Record<string, unknown>) {
-  const fromMetadata =
-    typeof metadata?.display_name === "string"
-      ? metadata.display_name
-      : typeof metadata?.name === "string"
-        ? metadata.name
-        : null;
-
-  if (fromMetadata && fromMetadata.trim().length) {
-    return fromMetadata.trim().slice(0, 80);
-  }
-
-  const localPart = email.split("@")[0] ?? "admin";
-  return localPart.replace(/[._-]+/g, " ").trim().slice(0, 80) || "admin";
 }
 
 async function ensureAdminProfile(params: {

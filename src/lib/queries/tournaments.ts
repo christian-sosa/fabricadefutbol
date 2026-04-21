@@ -34,6 +34,29 @@ type TournamentRecord = {
   created_at: string;
 };
 
+type TournamentTeamCaptainRow = {
+  id: string;
+  tournament_id: string;
+  team_id: string;
+  captain_id: string;
+  created_at: string;
+};
+
+type TournamentCaptainInviteRow = {
+  id: string;
+  tournament_id: string;
+  team_id: string;
+  email: string;
+  invite_token: string;
+  expires_at: string;
+  created_at: string;
+};
+
+type AdminProfileRow = {
+  id: string;
+  display_name: string;
+};
+
 function normalizeTournamentRecord(record: TournamentRecord): TournamentListItem {
   return {
     id: record.id,
@@ -230,6 +253,30 @@ export async function getAdminTournamentDetails(tournamentId: string) {
   const bundle = await loadTournamentBundle(tournamentId);
   if (!bundle.tournament) return null;
 
+  const supabase = await createSupabaseServerClient();
+  const [{ data: teamCaptainRows, error: teamCaptainsError }, { data: captainInviteRows, error: captainInvitesError }] =
+    await Promise.all([
+      supabase
+        .from("tournament_team_captains")
+        .select("id, tournament_id, team_id, captain_id, created_at")
+        .eq("tournament_id", tournamentId),
+      supabase
+        .from("tournament_captain_invites")
+        .select("id, tournament_id, team_id, email, invite_token, expires_at, created_at")
+        .eq("tournament_id", tournamentId)
+        .order("created_at", { ascending: false })
+    ]);
+
+  if (teamCaptainsError) throw new Error(teamCaptainsError.message);
+  if (captainInvitesError) throw new Error(captainInvitesError.message);
+
+  const captainIds = Array.from(new Set((teamCaptainRows ?? []).map((row) => row.captain_id)));
+  const { data: captainProfiles, error: captainProfilesError } = captainIds.length
+    ? await supabase.from("admins").select("id, display_name").in("id", captainIds)
+    : { data: [], error: null };
+
+  if (captainProfilesError) throw new Error(captainProfilesError.message);
+
   const standings = buildTournamentStandings({
     teams: bundle.teams,
     matches: bundle.matches,
@@ -249,12 +296,45 @@ export async function getAdminTournamentDetails(tournamentId: string) {
     playersByTeam.set(player.team_id, current);
   }
 
+  const captainProfilesById = new Map(
+    ((captainProfiles ?? []) as AdminProfileRow[]).map((profile) => [profile.id, profile])
+  );
+  const teamCaptainsByTeam = new Map(
+    ((teamCaptainRows ?? []) as TournamentTeamCaptainRow[]).map((captainRow) => [
+      captainRow.team_id,
+      {
+        id: captainRow.id,
+        tournamentId: captainRow.tournament_id,
+        teamId: captainRow.team_id,
+        captainId: captainRow.captain_id,
+        displayName: captainProfilesById.get(captainRow.captain_id)?.display_name ?? "Capitan",
+        createdAt: captainRow.created_at
+      }
+    ])
+  );
+  const captainInvitesByTeam = new Map(
+    ((captainInviteRows ?? []) as TournamentCaptainInviteRow[]).map((inviteRow) => [
+      inviteRow.team_id,
+      {
+        id: inviteRow.id,
+        tournamentId: inviteRow.tournament_id,
+        teamId: inviteRow.team_id,
+        email: inviteRow.email,
+        inviteToken: inviteRow.invite_token,
+        expiresAt: inviteRow.expires_at,
+        createdAt: inviteRow.created_at
+      }
+    ])
+  );
+
   return {
     tournament: normalizeTournamentRecord(bundle.tournament as TournamentRecord),
     teams: bundle.teams,
     rounds: bundle.rounds,
     players: bundle.players,
     playersByTeam,
+    teamCaptainsByTeam,
+    captainInvitesByTeam,
     matches: bundle.matches,
     results: bundle.results,
     playerStats: bundle.playerStats,
@@ -273,6 +353,45 @@ export async function getAdminTournamentDetails(tournamentId: string) {
       matches: bundle.matches,
       results: bundle.results
     })
+  };
+}
+
+export async function getCaptainTournamentTeamPanelData(params: {
+  tournamentId: string;
+  teamId: string;
+}) {
+  noStore();
+
+  const { tournamentId, teamId } = params;
+  const bundle = await loadTournamentBundle(tournamentId);
+  if (!bundle.tournament) return null;
+
+  const team = bundle.teams.find((row) => row.id === teamId) ?? null;
+  if (!team) return null;
+
+  const standings = buildTournamentStandings({
+    teams: bundle.teams,
+    matches: bundle.matches,
+    results: bundle.results
+  });
+  const fixture = buildTournamentFixture({
+    teams: bundle.teams,
+    rounds: bundle.rounds,
+    matches: bundle.matches,
+    results: bundle.results
+  });
+  const teamMatches = fixture.filter((match) => match.homeTeamId === teamId || match.awayTeamId === teamId);
+  const roster = bundle.players
+    .filter((player) => player.team_id === teamId)
+    .sort((left, right) => left.full_name.localeCompare(right.full_name, "es"));
+
+  return {
+    tournament: normalizeTournamentRecord(bundle.tournament as TournamentRecord),
+    team,
+    roster,
+    standings,
+    standingRow: standings.find((row) => row.teamId === teamId) ?? null,
+    teamMatches
   };
 }
 

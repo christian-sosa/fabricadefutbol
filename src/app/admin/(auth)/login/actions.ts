@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { resolveSafeNextPath } from "@/lib/auth/redirects";
 import { toUserMessage } from "@/lib/errors";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -33,6 +34,10 @@ export type RegisterState = {
 };
 
 export async function loginAdminAction(_: LoginState, formData: FormData): Promise<LoginState> {
+  const nextPath = resolveSafeNextPath(
+    typeof formData.get("next") === "string" ? String(formData.get("next")) : null,
+    "/admin"
+  );
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password")
@@ -80,10 +85,14 @@ export async function loginAdminAction(_: LoginState, formData: FormData): Promi
     };
   }
 
-  redirect("/admin");
+  redirect(nextPath);
 }
 
 export async function registerAdminAction(_: RegisterState, formData: FormData): Promise<RegisterState> {
+  const nextPath = resolveSafeNextPath(
+    typeof formData.get("next") === "string" ? String(formData.get("next")) : null,
+    "/admin"
+  );
   const parsed = registerSchema.safeParse({
     displayName: formData.get("displayName"),
     email: formData.get("email"),
@@ -101,7 +110,10 @@ export async function registerAdminAction(_: RegisterState, formData: FormData):
   const supabase = await createSupabaseServerClient();
   const appUrl = process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
   const emailRedirectTo = appUrl
-    ? new URL("/auth/confirm-email?next=/admin/login", appUrl.replace(/\/+$/, "")).toString()
+    ? new URL(
+        `/auth/confirm-email?next=${encodeURIComponent(nextPath)}`,
+        appUrl.replace(/\/+$/, "")
+      ).toString()
     : undefined;
 
   const { data, error } = await supabase.auth.signUp({
@@ -144,7 +156,7 @@ export async function registerAdminAction(_: RegisterState, formData: FormData):
   }
 
   if (data.session) {
-    redirect("/admin");
+    redirect(nextPath);
   }
 
   return {

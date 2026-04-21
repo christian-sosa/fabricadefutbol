@@ -5,30 +5,36 @@ import {
   addTournamentPlayerAction,
   addTournamentTeamAction,
   createManualTournamentMatchAction,
+  deleteTournamentCaptainInviteAction,
   deleteTournamentPlayerAction,
   deleteTournamentTeamAction,
   generateTournamentFixtureAction,
+  inviteTournamentCaptainAction,
+  removeTournamentCaptainAction,
   updateTournamentAction,
   updateTournamentMatchAction,
-  updateTournamentTeamAction
+  updateTournamentTeamAction,
+  uploadTournamentPlayerPhotoAction
 } from "@/app/admin/(panel)/tournaments/[id]/actions";
 import { TournamentFixtureTable } from "@/components/tournaments/tournament-fixture-table";
-import { TournamentMatchStatusBadge, TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
+import {
+  TOURNAMENT_MATCH_STATUS_LABELS,
+  TOURNAMENT_STATUS_LABELS,
+  TournamentMatchStatusBadge,
+  TournamentStatusBadge
+} from "@/components/tournaments/tournament-badges";
 import { TournamentStandingsTable } from "@/components/tournaments/tournament-standings-table";
-import { TournamentTabs } from "@/components/tournaments/tournament-tabs";
+import { PhotoUploadInput } from "@/components/admin/photo-upload-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { requireAdminTournament } from "@/lib/auth/tournaments";
 import { findBestDefenseRows, findTopFigureRows, findTopScorerRows, getAdminTournamentDetails, groupFixtureByRound } from "@/lib/queries/tournaments";
 import { formatDateTime } from "@/lib/utils";
-
-function buildTabHref(tournamentId: string, tab: string) {
-  return `/admin/tournaments/${tournamentId}?tab=${encodeURIComponent(tab)}`;
-}
 
 function toInputDateTime(isoDate: string | null) {
   if (!isoDate) return "";
@@ -39,6 +45,13 @@ function toInputDateTime(isoDate: string | null) {
 
 function formatMatchSchedule(value: string | null) {
   return value ? formatDateTime(value) : "Sin horario";
+}
+
+function buildCaptainInviteUrl(inviteToken: string) {
+  const pathname = `/captain/invite/${inviteToken}`;
+  const appUrl = process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (!appUrl) return pathname;
+  return new URL(pathname, appUrl.replace(/\/+$/, "")).toString();
 }
 
 export default async function AdminTournamentDetailPage({
@@ -55,14 +68,6 @@ export default async function AdminTournamentDetailPage({
   if (!details) notFound();
 
   const selectedTab = resolvedSearchParams.tab ?? "summary";
-  const tabs = [
-    { key: "summary", label: "Resumen" },
-    { key: "teams", label: "Equipos" },
-    { key: "players", label: "Jugadores" },
-    { key: "fixture", label: "Fixture" },
-    { key: "results", label: "Resultados" },
-    { key: "stats", label: "Estadisticas" }
-  ];
 
   const groupedFixture = groupFixtureByRound(details.fixture);
   const playedMatches = details.fixture.filter((row) => row.status === "played").length;
@@ -102,16 +107,6 @@ export default async function AdminTournamentDetailPage({
         </div>
         {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
         {resolvedSearchParams.success ? <p className="mt-3 text-sm font-semibold text-emerald-300">{resolvedSearchParams.success}</p> : null}
-      </Card>
-
-      <Card>
-        <TournamentTabs
-          items={tabs.map((tab) => ({
-            href: buildTabHref(id, tab.key),
-            label: tab.label,
-            active: selectedTab === tab.key
-          }))}
-        />
       </Card>
 
       {selectedTab === "summary" ? (
@@ -161,10 +156,11 @@ export default async function AdminTournamentDetailPage({
                   Estado
                 </label>
                 <Select defaultValue={details.tournament.status} id="status" name="status">
-                  <option value="draft">draft</option>
-                  <option value="active">active</option>
-                  <option value="finished">finished</option>
-                  <option value="archived">archived</option>
+                  {(["draft", "active", "finished", "archived"] as const).map((status) => (
+                    <option key={status} value={status}>
+                      {TOURNAMENT_STATUS_LABELS[status]}
+                    </option>
+                  ))}
                 </Select>
               </div>
               <div className="flex items-end">
@@ -257,6 +253,13 @@ export default async function AdminTournamentDetailPage({
           <div className="space-y-4">
             {details.teams.map((team) => (
               <Card key={team.id}>
+                {(() => {
+                  const currentCaptain = details.teamCaptainsByTeam.get(team.id) ?? null;
+                  const pendingInvite = details.captainInvitesByTeam.get(team.id) ?? null;
+                  const captainInviteUrl = pendingInvite ? buildCaptainInviteUrl(pendingInvite.inviteToken) : null;
+
+                  return (
+                    <>
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <CardTitle>{team.name}</CardTitle>
@@ -275,6 +278,92 @@ export default async function AdminTournamentDetailPage({
                   </form>
                 </div>
 
+                <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                      Capitan actual
+                    </p>
+                    {currentCaptain ? (
+                      <div className="mt-3 space-y-3">
+                        <div>
+                          <p className="font-semibold text-slate-100">{currentCaptain.displayName}</p>
+                          <p className="text-xs text-slate-500">
+                            Asignado el {formatDateTime(currentCaptain.createdAt)}
+                          </p>
+                        </div>
+                        <form action={removeTournamentCaptainAction.bind(null, id)}>
+                          <input name="teamId" type="hidden" value={team.id} />
+                          <Button type="submit" variant="ghost">
+                            Quitar capitan
+                          </Button>
+                        </form>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-400">
+                        Este equipo todavia no tiene capitan asignado.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">
+                      Invitacion de capitan
+                    </p>
+                    {pendingInvite ? (
+                      <div className="mt-3 space-y-3">
+                        <div>
+                          <p className="font-semibold text-slate-100">{pendingInvite.email}</p>
+                          <p className="text-xs text-slate-500">
+                            Vence {formatDateTime(pendingInvite.expiresAt)}
+                          </p>
+                        </div>
+                        {captainInviteUrl ? (
+                          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                            <Link
+                              className="text-sm font-semibold text-emerald-300 hover:underline"
+                              href={captainInviteUrl}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              Abrir link de invitacion
+                            </Link>
+                            <p className="mt-2 break-all text-xs text-slate-500">{captainInviteUrl}</p>
+                          </div>
+                        ) : null}
+                        <form action={deleteTournamentCaptainInviteAction.bind(null, id)}>
+                          <input name="inviteId" type="hidden" value={pendingInvite.id} />
+                          <Button type="submit" variant="ghost">
+                            Revocar invitacion
+                          </Button>
+                        </form>
+                      </div>
+                    ) : currentCaptain ? (
+                      <p className="mt-3 text-sm text-slate-400">
+                        Este equipo ya tiene capitan. Si quieres reasignarlo, primero quitale el acceso actual.
+                      </p>
+                    ) : (
+                      <form action={inviteTournamentCaptainAction.bind(null, id)} className="mt-3 space-y-3">
+                        <input name="teamId" type="hidden" value={team.id} />
+                        <div>
+                          <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`captain-email-${team.id}`}>
+                            Email del capitan
+                          </label>
+                          <Input
+                            id={`captain-email-${team.id}`}
+                            name="email"
+                            placeholder="capitan@equipo.com"
+                            required
+                            type="email"
+                          />
+                        </div>
+                        <Button type="submit" variant="secondary">
+                          Generar invitacion
+                        </Button>
+                      </form>
+                    )}
+                  </div>
+                </div>
+
                 <form action={updateTournamentTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
                   <input name="teamId" type="hidden" value={team.id} />
                   <Input defaultValue={team.name} name="name" required />
@@ -287,6 +376,9 @@ export default async function AdminTournamentDetailPage({
                     </Button>
                   </div>
                 </form>
+                    </>
+                  );
+                })()}
               </Card>
             ))}
 
@@ -301,6 +393,29 @@ export default async function AdminTournamentDetailPage({
 
       {selectedTab === "players" ? (
         <>
+          <Card>
+            <CardTitle>Subir foto de jugador</CardTitle>
+            <CardDescription>
+              La imagen se optimiza y se guarda en Supabase Storage. Cada foto queda asociada al jugador del torneo.
+            </CardDescription>
+            <form action={uploadTournamentPlayerPhotoAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+              <Select name="playerId" required>
+                <option value="">Selecciona jugador</option>
+                {details.teams.flatMap((team) =>
+                  (details.playersByTeam.get(team.id) ?? []).map((player) => (
+                    <option key={player.id} value={player.id}>
+                      {team.name} - {player.full_name}
+                    </option>
+                  ))
+                )}
+              </Select>
+              <PhotoUploadInput />
+              <Button disabled={!details.players.length} type="submit" variant="secondary">
+                Subir foto
+              </Button>
+            </form>
+          </Card>
+
           <Card>
             <CardTitle>Agregar jugador al torneo</CardTitle>
             <form action={addTournamentPlayerAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
@@ -362,7 +477,15 @@ export default async function AdminTournamentDetailPage({
                       <TBody>
                         {players.map((player) => (
                           <tr className="transition-colors hover:bg-slate-800/70" key={player.id}>
-                            <TD className="font-semibold text-slate-100">{player.full_name}</TD>
+                            <TD className="font-semibold text-slate-100">
+                              <div className="flex items-center gap-3">
+                                <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
+                                <div>
+                                  <p className="font-semibold text-slate-100">{player.full_name}</p>
+                                  <p className="text-xs text-slate-500">Foto ID: {player.id}</p>
+                                </div>
+                              </div>
+                            </TD>
                             <TD>{player.shirt_number ?? "-"}</TD>
                             <TD>{player.position ?? "-"}</TD>
                             <TD>{player.active ? "Si" : "No"}</TD>
@@ -467,9 +590,11 @@ export default async function AdminTournamentDetailPage({
                   Estado
                 </label>
                 <Select defaultValue="scheduled" id="status" name="status">
-                  <option value="draft">draft</option>
-                  <option value="scheduled">scheduled</option>
-                  <option value="cancelled">cancelled</option>
+                  {(["draft", "scheduled", "cancelled"] as const).map((status) => (
+                    <option key={status} value={status}>
+                      {TOURNAMENT_MATCH_STATUS_LABELS[status]}
+                    </option>
+                  ))}
                 </Select>
               </div>
               <div className="md:col-span-3">
@@ -556,9 +681,11 @@ export default async function AdminTournamentDetailPage({
                         <div>
                           <label className="mb-1 block text-sm font-semibold text-slate-200">Estado</label>
                           <Select defaultValue={match.status} disabled={match.status === "played"} name="status">
-                            <option value="draft">draft</option>
-                            <option value="scheduled">scheduled</option>
-                            <option value="cancelled">cancelled</option>
+                            {(["draft", "scheduled", "cancelled"] as const).map((status) => (
+                              <option key={status} value={status}>
+                                {TOURNAMENT_MATCH_STATUS_LABELS[status]}
+                              </option>
+                            ))}
                           </Select>
                         </div>
                         <div className="md:col-span-3">
