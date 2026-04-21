@@ -1,7 +1,15 @@
 import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { ORGANIZATION_BILLING_CURRENCY, ORGANIZATION_MONTHLY_PRICE_ARS } from "@/lib/constants";
 import { resolvePublicModule, withPublicQuery } from "@/lib/org";
+
+function formatArs(amount: number) {
+  return new Intl.NumberFormat("es-AR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+}
 
 export default async function PricingPage({
   searchParams
@@ -21,79 +29,84 @@ export default async function PricingPage({
   });
   const plans = [
     {
-      title: "Organizaciones",
-      cadence: "Por organizacion / mes",
+      title: "Plan Organizaciones",
+      price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(ORGANIZATION_MONTHLY_PRICE_ARS)} / mes`,
+      badge: "30 dias gratis",
       description:
-        "Pensado para grupos que gestionan jugadores, convocatorias, partidos balanceados, historial y ranking competitivo.",
+        "Ideal para grupos que quieren dejar de discutir equipos y empezar a llevar ranking, historial y estadisticas reales.",
       items: [
-        "Gestion de jugadores y admins",
-        "Armado de partidos y equipos balanceados",
-        "Ranking, historial y proximos encuentros",
-        "Facturacion independiente del modulo torneos"
+        "Hasta 30 jugadores por organizacion",
+        "Armado de partidos y equipos equilibrados",
+        "Ranking automatico despues de cada resultado",
+        "Historial completo y proximos partidos",
+        "Admins del grupo y facturacion independiente"
       ]
     },
     {
-      title: "Torneos",
-      cadence: "Por torneo / temporada",
+      title: "Plan Torneos",
+      price: "ARS XXX / temporada",
+      badge: "Valor a definir",
       description:
-        "Orientado a ligas simples con equipos, capitanes, planteles propios, fixture, actas, tabla y estadisticas.",
+        "Pensado para ligas y organizadores que necesitan equipos, planteles propios, fixture, actas y estadisticas publicas.",
       items: [
-        "Equipos, jugadores y fotos del torneo",
-        "Invitaciones a capitanes para completar planteles",
-        "Fixture, resultados, figuras y goleadores",
-        "Billing separado para cada competicion"
+        "Equipos, jugadores y fotos por torneo",
+        "Invitaciones para capitanes",
+        "Fixture, resultados, goleadores y figuras",
+        "Tabla de posiciones y vallas menos vencidas",
+        "Billing separado del modulo Organizaciones"
       ]
     }
   ] as const;
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-slate-800 bg-slate-900/75 p-5 shadow-[0_24px_40px_-30px_rgba(16,185,129,0.7)] md:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-400">Precios</p>
-        <h1 className="mt-2 text-3xl font-black text-slate-100 md:text-5xl">Planes listos para ambos modulos</h1>
+      <section className="rounded-[2rem] border border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.18),transparent_32%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-6 shadow-[0_28px_60px_-34px_rgba(16,185,129,0.7)] md:p-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Precios</p>
+        <h1 className="mt-2 text-3xl font-black text-white md:text-5xl">Planes claros en ARS para cada necesidad</h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-          La misma cuenta admin puede manejar Organizaciones y Torneos, pero cada modulo tendra su propia logica de
-          facturacion. Por ahora dejamos el esquema armado con precio placeholder hasta definir el valor final.
+          Un mismo admin puede gestionar Organizaciones y Torneos, pero cada modulo tiene su propia logica y su propia facturacion.
+          Aqui ves rapido que incluye cada plan y como se cobra.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
-            className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(16,185,129,1)]"
-            href={withPublicQuery("/admin/login", {
-              organizationKey
-            })}
+            className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+            href="/admin/login"
           >
-            Ingresar al panel
+            Crear mi grupo gratis
           </Link>
           <Link
-            className="rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
-            href={helpPath}
-          >
-            Ver ayuda
-          </Link>
-          <Link
-            className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
+            className="rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
             href={contactPath}
           >
             Consultar precios
           </Link>
+          <Link
+            className="rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
+            href={helpPath}
+          >
+            Ver ayuda
+          </Link>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
+      <section className="grid gap-4 lg:grid-cols-2">
         {plans.map((plan) => (
-          <Card key={plan.title}>
-            <CardDescription>{plan.cadence}</CardDescription>
-            <div className="mt-2 flex items-end justify-between gap-3">
-              <CardTitle className="text-2xl">{plan.title}</CardTitle>
-              <div className="text-right">
-                <p className="text-3xl font-black text-slate-100">XXX</p>
-                <p className="text-xs uppercase tracking-[0.18em] text-amber-300">Precio a definir</p>
+          <Card className="p-5" key={plan.title}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">{plan.badge}</p>
+                <CardTitle className="mt-2 text-2xl">{plan.title}</CardTitle>
+              </div>
+              <div className="rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-right">
+                <p className="text-sm font-black text-white">{plan.price}</p>
               </div>
             </div>
-            <CardDescription className="mt-3">{plan.description}</CardDescription>
-            <div className="mt-4 space-y-2 text-sm text-slate-300">
+            <CardDescription className="mt-4">{plan.description}</CardDescription>
+            <div className="mt-5 space-y-3">
               {plan.items.map((item) => (
-                <p key={item}>- {item}</p>
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-sm text-slate-200" key={item}>
+                  {item}
+                </div>
               ))}
             </div>
           </Card>
@@ -102,17 +115,15 @@ export default async function PricingPage({
 
       <section className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardTitle>Como queda pensado el billing</CardTitle>
-          <CardDescription className="mt-2">
-            Un mismo admin podra contratar solo Organizaciones, solo Torneos o ambos modulos. La autenticacion se
-            comparte, pero la facturacion se resolvera por modulo para evitar mezclar necesidades distintas.
+          <CardTitle>Que incluye el modulo Organizaciones</CardTitle>
+          <CardDescription className="mt-3">
+            El plan cubre la gestion diaria del grupo: jugadores, partidos, equilibrio de equipos, ranking automatico, historial y proximos encuentros.
           </CardDescription>
         </Card>
         <Card>
-          <CardTitle>Que pasa si un modulo vence</CardTitle>
-          <CardDescription className="mt-2">
-            La idea es mantener la informacion publica visible y dejar el modulo correspondiente en modo lectura hasta
-            reactivar la suscripcion. El detalle final de esa politica tambien queda sujeto al esquema comercial.
+          <CardTitle>Que incluye el modulo Torneos</CardTitle>
+          <CardDescription className="mt-3">
+            El plan cubre la operacion de una competicion: equipos, capitanes, planteles, fixture, carga de resultados y estadisticas publicas.
           </CardDescription>
         </Card>
       </section>

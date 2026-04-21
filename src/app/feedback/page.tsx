@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { submitFeedbackAction } from "@/app/feedback/actions";
-import { PublicModuleToggle } from "@/components/layout/public-module-toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,28 +32,46 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
   });
   const moduleDescription =
     currentModule === "tournaments"
-      ? "Escribenos sobre torneos, capitanes, planteles, fixture, resultados o estadisticas."
-      : "Escribenos sobre organizaciones, jugadores, partidos balanceados, ranking o facturacion.";
+      ? "Si tu consulta es por torneos, capitanes, fixture o resultados, la dejamos lista para soporte."
+      : "Si tu consulta es por organizaciones, ranking o partidos equilibrados, la recibimos por aqui.";
   const targetPlaceholder =
     currentModule === "tournaments" ? "Ej: Copa Apertura 2026" : "Ej: La Cantera de LQ";
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle>Contacto, sugerencias y soporte</CardTitle>
-        <CardDescription className="mt-2">
-          Envia comentarios para mejorar Fabrica de Futbol. Te responderemos por email si dejas un contacto valido.
+      <Card className="rounded-[2rem] p-5 md:p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Contacto</p>
+        <CardTitle className="mt-2 text-3xl">Necesitas ayuda?</CardTitle>
+        <CardDescription className="mt-3 text-base">
+          Estamos para ayudarte a configurar tu grupo, resolver dudas y ordenar tu flujo sin romper nada.
         </CardDescription>
-        <p className="mt-2 text-sm text-slate-300">{moduleDescription}</p>
-        <p className="mt-2 text-xs text-slate-400">
-          Tambien puedes escribir directo a <span className="font-semibold text-slate-200">info@fabricadefutbol.com.ar</span>.
-        </p>
-        <PublicModuleToggle
-          basePath="/feedback"
-          className="mt-4"
-          currentModule={currentModule}
-          organizationKey={organizationKey}
-        />
+        <p className="mt-3 text-sm text-slate-300">{moduleDescription}</p>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">WhatsApp</p>
+            <p className="mt-2 text-sm font-semibold text-white">En configuracion</p>
+            <p className="mt-2 text-sm text-slate-400">
+              Cuando definamos el numero oficial, lo vas a ver publicado aqui.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Mail</p>
+            <a
+              className="mt-2 block text-sm font-semibold text-emerald-300 transition hover:underline"
+              href="mailto:info@fabricadefutbol.com.ar"
+            >
+              info@fabricadefutbol.com.ar
+            </a>
+            <p className="mt-2 text-sm text-slate-400">Canal principal de soporte y consultas comerciales.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Confianza</p>
+            <p className="mt-2 text-sm text-slate-300">
+              Respondemos consultas reales de grupos, admins y organizadores. Si ya tienes datos cargados, cuidamos no romper tu flujo actual.
+            </p>
+          </div>
+        </div>
       </Card>
 
       {resolvedSearchParams.sent ? (
