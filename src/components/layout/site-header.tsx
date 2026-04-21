@@ -14,7 +14,7 @@ type SiteHeaderProps = {
   initialIsAuthenticated?: boolean;
 };
 
-const ORGANIZATION_SECTION_PATHS = ["/ranking", "/players", "/matches", "/upcoming"] as const;
+const ORGANIZATION_SECTION_PATHS = ["/organizations", "/ranking", "/players", "/matches", "/upcoming"] as const;
 
 function isActivePath(currentPath: string, href: string) {
   if (href === "/") {
@@ -66,7 +66,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
 
   const isOrganizationSection = isOrganizationSectionPath(safePathname);
   const shouldShowOrganizationSubnav = mounted && isOrganizationSection;
-  const organizationHubHref = withOrgQuery("/ranking", organizationId);
+  const organizationHubHref = withOrgQuery("/organizations", organizationId);
   const currentOrganizationLabel = organizationId?.trim() ? organizationId.trim() : null;
 
   useEffect(() => {

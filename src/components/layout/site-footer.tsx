@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { PUBLIC_NAV_ITEMS } from "@/lib/constants";
+import { ORGANIZATION_PUBLIC_NAV_ITEMS, PRIMARY_PUBLIC_NAV_ITEMS } from "@/lib/constants";
 import { withOrgQuery } from "@/lib/org";
 import { cn } from "@/lib/utils";
 
@@ -127,7 +127,7 @@ export function SiteFooter() {
           <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur-sm">
             <FooterSectionTitle>Navegacion</FooterSectionTitle>
             <nav className="mt-4 space-y-2">
-              {PUBLIC_NAV_ITEMS.map((item) => (
+              {PRIMARY_PUBLIC_NAV_ITEMS.map((item) => (
                 <Link
                   className="block rounded-xl border border-transparent px-3 py-2 text-sm text-slate-300 transition hover:border-slate-700 hover:bg-slate-950/70 hover:text-slate-100"
                   href={withOrgQuery(item.href, organizationId)}
@@ -137,6 +137,23 @@ export function SiteFooter() {
                 </Link>
               ))}
             </nav>
+
+            <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Modulo Organizaciones
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {ORGANIZATION_PUBLIC_NAV_ITEMS.map((item) => (
+                  <Link
+                    className="rounded-full border border-slate-700/80 px-3 py-1 text-xs font-semibold text-slate-300 transition hover:border-slate-500 hover:bg-slate-900"
+                    href={withOrgQuery(item.href, organizationId)}
+                    key={item.href}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
           </section>
 
           <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur-sm">

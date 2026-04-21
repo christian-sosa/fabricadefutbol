@@ -61,8 +61,8 @@ export const PUBLIC_NAV_ITEMS = [
 
 export const PRIMARY_PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
+  { href: "/organizations", label: "Organizaciones" },
   { href: "/tournaments", label: "Torneos" },
-  { href: "/ranking", label: "Organizaciones" },
   { href: "/pricing", label: "Precios" },
   { href: "/feedback", label: "Contacto" },
   { href: "/help", label: "Ayuda" }
