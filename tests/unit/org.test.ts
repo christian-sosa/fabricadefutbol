@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeEmail, slugifyOrganizationName, withOrgQuery } from "@/lib/org";
+import { normalizeEmail, slugifyOrganizationName, slugifyTournamentName, withOrgQuery } from "@/lib/org";
 
 describe("org helpers", () => {
   it("agrega org al query string sin romper params existentes", () => {
     expect(withOrgQuery("/ranking", "liga-a")).toBe("/ranking?org=liga-a");
     expect(withOrgQuery("/matches?page=2", "liga a")).toBe("/matches?page=2&org=liga%20a");
+    expect(withOrgQuery("/tournaments", null)).toBe("/tournaments");
   });
 
   it("normaliza emails", () => {
@@ -14,8 +15,12 @@ describe("org helpers", () => {
 
   it("slugifica nombres con acentos y basura", () => {
     expect(slugifyOrganizationName("  La Fabrica del Futbol!!!  ")).toBe("la-fabrica-del-futbol");
-    expect(slugifyOrganizationName("Club Atletico San Martin y Compañia Limitada")).toBe(
+    expect(slugifyOrganizationName("Club Atletico San Martin y Compania Limitada")).toBe(
       "club-atletico-san-martin-y-compania-limitada"
     );
+  });
+
+  it("slugifica torneos reutilizando la misma regla base", () => {
+    expect(slugifyTournamentName("Torneo Apertura 2026 / Zona Norte")).toBe("torneo-apertura-2026-zona-norte");
   });
 });
