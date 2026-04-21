@@ -59,6 +59,22 @@ export const PUBLIC_NAV_ITEMS = [
   { href: "/help", label: "Ayuda" }
 ];
 
+export const PRIMARY_PUBLIC_NAV_ITEMS = [
+  { href: "/", label: "Inicio" },
+  { href: "/tournaments", label: "Torneos" },
+  { href: "/ranking", label: "Organizaciones" },
+  { href: "/pricing", label: "Precios" },
+  { href: "/feedback", label: "Contacto" },
+  { href: "/help", label: "Ayuda" }
+];
+
+export const ORGANIZATION_PUBLIC_NAV_ITEMS = [
+  { href: "/ranking", label: "Ranking" },
+  { href: "/players", label: "Jugadores" },
+  { href: "/matches", label: "Historial" },
+  { href: "/upcoming", label: "Proximos" }
+];
+
 export const ADMIN_NAV_ITEMS = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/tournaments", label: "Torneos" },
