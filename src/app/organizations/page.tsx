@@ -46,7 +46,6 @@ export default async function OrganizationsPage({
   return (
     <div className="space-y-6">
       <section className="rounded-3xl border border-slate-800 bg-slate-900/75 p-5 shadow-[0_24px_40px_-30px_rgba(16,185,129,0.7)] md:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-400">Modulo publico</p>
         <h1 className="mt-2 text-3xl font-black text-slate-100 md:text-5xl">Organizaciones</h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
           Elegi una organizacion y navega su ranking, jugadores, historial y proximos partidos desde un solo lugar.
@@ -126,7 +125,7 @@ export default async function OrganizationsPage({
             </Card>
 
             <Card>
-              <CardTitle>Proximos confirmados</CardTitle>
+              <CardTitle>Proximos</CardTitle>
               <CardDescription className="mt-2">
                 Acceso rapido a los partidos ya programados de la organizacion.
               </CardDescription>

@@ -63,11 +63,11 @@ const testimonials = [
 ] as const;
 
 const fallbackRankingPreview = [
-  { name: "Mati", points: 1048, trend: "up" },
-  { name: "Lucho", points: 1032, trend: "up" },
-  { name: "Franco", points: 1015, trend: "same" },
-  { name: "Nico", points: 998, trend: "down" },
-  { name: "Tomi", points: 986, trend: "up" }
+  { name: "Mati", points: 1040, trend: "up" },
+  { name: "Lucho", points: 1030, trend: "up" },
+  { name: "Franco", points: 1020, trend: "same" },
+  { name: "Nico", points: 1000, trend: "down" },
+  { name: "Tomi", points: 990, trend: "up" }
 ] as const satisfies ReadonlyArray<{
   name: string;
   points: number;
@@ -266,13 +266,13 @@ export default async function HomePage({
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[0.92fr_1.08fr]" id="ranking-preview">
-        <Card>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Ranking real</p>
-          <CardTitle className="mt-2 text-3xl">ELO simple, entendible y automatico</CardTitle>
-          <CardDescription className="mt-3 text-base">
-            Despues de cada partido, los jugadores ganan o pierden puntos segun el resultado.
-          </CardDescription>
+        <section className="grid gap-4 lg:grid-cols-[0.92fr_1.08fr]" id="ranking-preview">
+          <Card>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Ranking real</p>
+            <CardTitle className="mt-2 text-3xl">Sistema de puntos simple, claro y automatico</CardTitle>
+            <CardDescription className="mt-3 text-base">
+              Despues de cada partido, los jugadores ganan o pierden puntos segun el resultado.
+            </CardDescription>
           <div className="mt-5 space-y-3">
             <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
               <p className="text-sm font-semibold text-white">Si ganas</p>
@@ -603,8 +603,7 @@ export default async function HomePage({
       <AdPlaceholder slot="home-bottom-banner" />
 
       <section className="rounded-[2rem] border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.14),rgba(15,23,42,0.98))] p-6 text-center shadow-[0_24px_60px_-38px_rgba(16,185,129,0.75)] md:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-200">CTA final</p>
-        <h2 className="mt-3 text-3xl font-black text-white md:text-4xl">Empezar gratis</h2>
+        <h2 className="text-3xl font-black text-white md:text-4xl">Empeza gratis</h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm text-slate-200 md:text-base">
           Crea tu grupo, arma partidos equilibrados y empieza a construir un ranking que de verdad represente lo que pasa en la cancha.
         </p>
@@ -613,7 +612,7 @@ export default async function HomePage({
             className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-95"
             href="/admin/login"
           >
-            Empezar gratis
+            Empeza gratis
           </Link>
         </div>
       </section>

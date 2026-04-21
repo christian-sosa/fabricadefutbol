@@ -8,13 +8,6 @@ import { PRIMARY_PUBLIC_NAV_ITEMS } from "@/lib/constants";
 import { parsePublicModule, withPublicQuery } from "@/lib/org";
 import { cn } from "@/lib/utils";
 
-const PRODUCT_LINKS = [
-  { href: "/pricing", label: "Precios" },
-  { href: "/feedback", label: "Contacto" },
-  { href: "/help", label: "Ayuda" },
-  { href: "/admin", label: "Panel" }
-] as const;
-
 const COMPANY_LINKS = [{ href: "/about", label: "Sobre nosotros" }] as const;
 
 const LEGAL_LINKS = [
@@ -82,21 +75,6 @@ export function SiteFooter() {
                 </p>
               </div>
             </div>
-
-            <div className="mt-5 rounded-2xl border border-emerald-400/15 bg-[linear-gradient(135deg,rgba(15,23,42,0.95),rgba(8,47,73,0.92))] p-4">
-              <FooterSectionTitle>CTA</FooterSectionTitle>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                Si quieres dejar de perder tiempo armando equipos a mano, empieza hoy con tu grupo y ve el ranking moverse fecha a fecha.
-              </p>
-              <div className="mt-4">
-                <Link
-                  className="inline-flex rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
-                  href="/admin/login"
-                >
-                  Empezar gratis
-                </Link>
-              </div>
-            </div>
           </section>
 
           <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
@@ -120,18 +98,6 @@ export function SiteFooter() {
           <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
             <FooterSectionTitle>Empresa</FooterSectionTitle>
             <div className="mt-4 space-y-2">
-              {PRODUCT_LINKS.map((item) => (
-                <Link
-                  className="block rounded-xl border border-transparent px-3 py-2 text-sm text-slate-300 transition hover:border-slate-700 hover:bg-slate-950/70 hover:text-slate-100"
-                  href={withPublicQuery(item.href, {
-                    organizationKey: organizationId,
-                    module: publicModule
-                  })}
-                  key={item.href}
-                >
-                  {item.label}
-                </Link>
-              ))}
               {COMPANY_LINKS.map((item) => (
                 <Link
                   className="block rounded-xl border border-transparent px-3 py-2 text-sm text-slate-300 transition hover:border-slate-700 hover:bg-slate-950/70 hover:text-slate-100"
