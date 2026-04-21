@@ -583,9 +583,9 @@ export default async function HomePage({
             </CardDescription>
           </Card>
           <Card>
-            <CardTitle className="text-base">Confianza</CardTitle>
+            <CardTitle className="text-base">Sugerencias</CardTitle>
             <CardDescription className="mt-2">
-              Soporte humano para admins, grupos y organizadores. Te ayudamos a ordenar el flujo sin romper lo que ya usas.
+              Si tienes una idea para mejorar Fabrica de Futbol, puedes escribirnos por mail o formulario. Las sugerencias son bienvenidas.
             </CardDescription>
           </Card>
         </div>

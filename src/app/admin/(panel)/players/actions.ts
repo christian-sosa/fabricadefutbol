@@ -37,8 +37,7 @@ const rowSchema = z.object({
   id: z.string().uuid(),
   fullName: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
   initialRank: z.number().int().positive("El rank inicial debe ser un numero entero positivo."),
-  currentRating: z.number().positive("El rating debe ser un numero positivo."),
-  active: z.boolean()
+  currentRating: z.number().positive("El rating debe ser un numero positivo.")
 });
 
 function parseDecimalField(value: FormDataEntryValue | null) {
@@ -139,8 +138,7 @@ async function persistRankAssignments(params: {
       .update({
         full_name: row.fullName,
         initial_rank: assignment.finalRank,
-        current_rating: Number(row.currentRating.toFixed(2)),
-        active: row.active
+        current_rating: Number(row.currentRating.toFixed(2))
       })
       .eq("id", row.id)
       .eq("organization_id", organizationId);
@@ -233,14 +231,12 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
     const fullNames = formData.getAll("fullName").map((value) => String(value));
     const initialRanks = formData.getAll("initialRank").map((value) => Number(value));
     const currentRatings = formData.getAll("currentRating").map((value) => parseDecimalField(value));
-    const statuses = formData.getAll("activeStatus").map((value) => String(value));
 
     if (
       !playerIds.length ||
       playerIds.length !== fullNames.length ||
       playerIds.length !== initialRanks.length ||
-      playerIds.length !== currentRatings.length ||
-      playerIds.length !== statuses.length
+      playerIds.length !== currentRatings.length
     ) {
       redirect(withMessage(organizationQueryKey, "La planilla enviada es invalida o incompleta."));
     }
@@ -250,8 +246,7 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
         id,
         fullName: fullNames[index],
         initialRank: initialRanks[index],
-        currentRating: currentRatings[index],
-        active: statuses[index] === "true"
+        currentRating: currentRatings[index]
       });
 
       if (!parsedRow.success) {

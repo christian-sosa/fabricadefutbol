@@ -66,9 +66,9 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
             <p className="mt-2 text-sm text-slate-400">Canal principal de soporte y consultas comerciales.</p>
           </div>
           <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Confianza</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sugerencias</p>
             <p className="mt-2 text-sm text-slate-300">
-              Respondemos consultas reales de grupos, admins y organizadores. Si ya tienes datos cargados, cuidamos no romper tu flujo actual.
+              Si tienes una idea para mejorar Fabrica de Futbol, tambien puedes escribirnos. Las sugerencias son bienvenidas.
             </p>
           </div>
         </div>

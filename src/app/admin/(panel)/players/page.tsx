@@ -13,7 +13,6 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
-import { Select } from "@/components/ui/select";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { getAdminPlayers } from "@/lib/queries/admin";
 import { withOrgQuery } from "@/lib/org";
@@ -84,25 +83,24 @@ export default async function AdminPlayersPage({
         </form>
 
         <div className="mt-4 space-y-3">
-          <div className="hidden grid-cols-[2.2fr_0.8fr_1fr_0.8fr_1.7fr_auto] gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 md:grid">
+          <div className="hidden grid-cols-[2.3fr_0.75fr_0.95fr_1.8fr_auto] gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 md:grid">
             <span>Jugador</span>
             <span>Rank</span>
             <span>Rating</span>
-            <span>Estado</span>
             <span>Foto</span>
             <span>Acciones</span>
           </div>
 
           {players.map((player) => (
             <div
-              className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3 md:grid-cols-[2.2fr_0.8fr_1fr_0.8fr_1.7fr_auto] md:items-center"
+              className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3 md:grid-cols-[2.3fr_0.75fr_0.95fr_1.8fr_auto] md:items-start"
               key={player.id}
             >
               <input form={bulkFormId} name="playerId" type="hidden" value={player.id} />
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-1.5">
                 <div className="flex items-center gap-2">
                   <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
-                  <Input defaultValue={player.full_name} form={bulkFormId} name="fullName" required />
+                  <Input className="min-w-0" defaultValue={player.full_name} form={bulkFormId} name="fullName" required />
                 </div>
                 <p className="text-xs text-slate-400">
                   Creado {new Date(player.created_at).toLocaleDateString("es-AR")}
@@ -118,11 +116,7 @@ export default async function AdminPlayersPage({
                 required
                 type="text"
               />
-              <Select defaultValue={player.active ? "true" : "false"} form={bulkFormId} name="activeStatus">
-                <option value="true">Activo</option>
-                <option value="false">Inactivo</option>
-              </Select>
-              <form action={uploadPlayerPhotoAction} className="space-y-2">
+              <form action={uploadPlayerPhotoAction} className="space-y-2 md:self-start">
                 <input name="organizationId" type="hidden" value={selectedOrganization.id} />
                 <input name="playerId" type="hidden" value={player.id} />
                 <PhotoUploadInput compact hint="JPG, PNG o WEBP. Reemplaza la foto actual." />
@@ -130,7 +124,7 @@ export default async function AdminPlayersPage({
                   Subir foto
                 </Button>
               </form>
-              <form action={deletePlayerAction} className="md:justify-self-end">
+              <form action={deletePlayerAction} className="md:self-start md:justify-self-end">
                 <input name="organizationId" type="hidden" value={selectedOrganization.id} />
                 <input name="deletePlayerId" type="hidden" value={player.id} />
                 <ConfirmSubmitButton
