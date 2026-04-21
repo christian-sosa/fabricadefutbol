@@ -34,8 +34,8 @@ export default async function AdminPlayersPage({
   const players = await getAdminPlayers(selectedOrganization.id);
   const error = resolvedSearchParams.error;
   const success = resolvedSearchParams.success;
-  const photoSuccess = success?.toLowerCase().includes("foto") ? success : null;
   const formRenderKey = `${selectedOrganization.id}:${resolvedSearchParams.refresh ?? "base"}`;
+  const bulkFormId = `bulk-players-form-${selectedOrganization.id}`;
 
   return (
     <div className="space-y-4">
@@ -71,89 +71,82 @@ export default async function AdminPlayersPage({
       </Card>
 
       <Card>
-        <CardTitle>Subir foto de jugador</CardTitle>
-        <CardDescription>La imagen se optimiza y se guarda en Supabase Storage, reemplazando la foto anterior.</CardDescription>
-        <form action={uploadPlayerPhotoAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-          <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-          <Select name="playerId" required>
-            <option value="">Selecciona jugador</option>
-            {players.map((player) => (
-              <option key={player.id} value={player.id}>
-                #{player.initial_rank} - {player.full_name}
-              </option>
-            ))}
-          </Select>
-          <PhotoUploadInput />
-          <Button type="submit" variant="secondary">
-            Subir foto
-          </Button>
-        </form>
-        {photoSuccess ? <p className="mt-3 text-sm font-semibold text-emerald-300">{photoSuccess}</p> : null}
-      </Card>
-
-      <Card>
         <CardTitle>Editar planilla de jugadores</CardTitle>
         <CardDescription>
-          Modifica la planilla y guarda una sola vez. Si cambias el rank de alguien, el resto se reordena automaticamente.
+          Modifica la planilla y guarda una sola vez. La foto ahora se actualiza en la fila de cada jugador.
         </CardDescription>
 
         {error ? <p className="mt-3 text-sm font-semibold text-danger">{error}</p> : null}
         {success ? <p className="mt-3 text-sm font-semibold text-emerald-300">{success}</p> : null}
 
-        <form action={bulkUpdatePlayersAction} className="mt-4 space-y-3" key={formRenderKey}>
+        <form action={bulkUpdatePlayersAction} id={bulkFormId} key={formRenderKey}>
           <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-          <input name="deletePlayerId" type="hidden" value="" />
+        </form>
 
-          <div className="hidden grid-cols-[2.2fr_0.8fr_1fr_0.8fr_1.2fr] gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 md:grid">
+        <div className="mt-4 space-y-3">
+          <div className="hidden grid-cols-[2.2fr_0.8fr_1fr_0.8fr_1.7fr_auto] gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 md:grid">
             <span>Jugador</span>
             <span>Rank</span>
             <span>Rating</span>
             <span>Estado</span>
-            <span>Foto / meta</span>
+            <span>Foto</span>
+            <span>Acciones</span>
           </div>
 
           {players.map((player) => (
             <div
-              className="grid gap-2 rounded-xl border border-slate-800 bg-slate-900 p-3 md:grid-cols-[2.2fr_0.8fr_1fr_0.8fr_1.2fr] md:items-center"
+              className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3 md:grid-cols-[2.2fr_0.8fr_1fr_0.8fr_1.7fr_auto] md:items-center"
               key={player.id}
             >
-              <input name="playerId" type="hidden" value={player.id} />
-              <div className="flex items-center gap-2">
-                <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
-                <Input defaultValue={player.full_name} name="fullName" required />
+              <input form={bulkFormId} name="playerId" type="hidden" value={player.id} />
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
+                  <Input defaultValue={player.full_name} form={bulkFormId} name="fullName" required />
+                </div>
+                <p className="text-xs text-slate-400">
+                  Creado {new Date(player.created_at).toLocaleDateString("es-AR")}
+                </p>
               </div>
-              <Input defaultValue={player.initial_rank} min={1} name="initialRank" required type="number" />
+              <Input defaultValue={player.initial_rank} form={bulkFormId} min={1} name="initialRank" required type="number" />
               <Input
-                defaultValue={Number(player.current_rating).toFixed(2)}
-                min={1}
+                defaultValue={String(Number(player.current_rating))}
+                form={bulkFormId}
+                inputMode="decimal"
                 name="currentRating"
+                placeholder="1000"
                 required
-                step="0.01"
-                type="number"
+                type="text"
               />
-              <Select defaultValue={player.active ? "true" : "false"} name="activeStatus">
+              <Select defaultValue={player.active ? "true" : "false"} form={bulkFormId} name="activeStatus">
                 <option value="true">Activo</option>
                 <option value="false">Inactivo</option>
               </Select>
-              <p className="text-xs text-slate-400">
-                ID foto: {player.id}
-                <br />
-                Creado {new Date(player.created_at).toLocaleDateString("es-AR")}
-              </p>
-              <ConfirmSubmitButton
-                className="mt-2 h-8 px-3 text-xs"
-                confirmMessage={`Estas seguro de eliminar a ${player.full_name}? El ranking se reordenara automaticamente.`}
-                formAction={deletePlayerAction}
-                formNoValidate
-                label="Eliminar jugador"
-                setHiddenField={{ name: "deletePlayerId", value: player.id }}
-                variant="danger"
-              />
+              <form action={uploadPlayerPhotoAction} className="space-y-2">
+                <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+                <input name="playerId" type="hidden" value={player.id} />
+                <PhotoUploadInput compact hint="JPG, PNG o WEBP. Reemplaza la foto actual." />
+                <Button className="w-full" type="submit" variant="secondary">
+                  Subir foto
+                </Button>
+              </form>
+              <form action={deletePlayerAction} className="md:justify-self-end">
+                <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+                <input name="deletePlayerId" type="hidden" value={player.id} />
+                <ConfirmSubmitButton
+                  className="h-8 px-3 text-xs"
+                  confirmMessage={`Estas seguro de eliminar a ${player.full_name}? El ranking se reordenara automaticamente.`}
+                  label="Eliminar"
+                  variant="danger"
+                />
+              </form>
             </div>
           ))}
 
-          <Button type="submit">Guardar toda la planilla</Button>
-        </form>
+          <Button form={bulkFormId} type="submit">
+            Guardar toda la planilla
+          </Button>
+        </div>
       </Card>
     </div>
   );

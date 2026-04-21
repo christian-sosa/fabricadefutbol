@@ -7,13 +7,20 @@ import { Input } from "@/components/ui/input";
 const MAX_PHOTO_SIZE_MB = 20;
 const MAX_PHOTO_SIZE_BYTES = MAX_PHOTO_SIZE_MB * 1024 * 1024;
 
-export function PhotoUploadInput() {
+type PhotoUploadInputProps = {
+  compact?: boolean;
+  hint?: string;
+};
+
+export function PhotoUploadInput({ compact = false, hint }: PhotoUploadInputProps) {
   const [error, setError] = useState<string | null>(null);
+  const helperText = hint ?? `Formato recomendado: JPG/PNG. Se optimiza a WEBP (${MAX_PHOTO_SIZE_MB} MB max).`;
 
   return (
     <div>
       <Input
         accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+        className={compact ? "px-2 py-1.5 text-xs" : undefined}
         name="photo"
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
@@ -33,8 +40,8 @@ export function PhotoUploadInput() {
         required
         type="file"
       />
-      <p className={`mt-1 text-xs ${error ? "text-danger" : "text-slate-500"}`}>
-        {error ?? `Formato recomendado: JPG/PNG. Se optimiza a WEBP (${MAX_PHOTO_SIZE_MB} MB max).`}
+      <p className={`mt-1 text-xs ${compact ? "leading-4" : ""} ${error ? "text-danger" : "text-slate-500"}`}>
+        {error ?? helperText}
       </p>
     </div>
   );
