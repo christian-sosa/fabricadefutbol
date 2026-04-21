@@ -29,7 +29,7 @@ export default async function PricingPage({
   });
   const plans = [
     {
-      title: "Plan Organizaciones",
+      title: "Pack Organizaciones",
       price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(ORGANIZATION_MONTHLY_PRICE_ARS)} / mes`,
       badge: "30 dias gratis",
       description:
@@ -38,12 +38,11 @@ export default async function PricingPage({
         "Hasta 30 jugadores por organizacion",
         "Armado de partidos y equipos equilibrados",
         "Ranking automatico despues de cada resultado",
-        "Historial completo y proximos partidos",
-        "Admins del grupo y facturacion independiente"
+        "Historial completo y proximos partidos"
       ]
     },
     {
-      title: "Plan Torneos",
+      title: "Pack Torneos",
       price: "ARS XXX / temporada",
       badge: "Valor a definir",
       description:
@@ -52,8 +51,7 @@ export default async function PricingPage({
         "Equipos, jugadores y fotos por torneo",
         "Invitaciones para capitanes",
         "Fixture, resultados, goleadores y figuras",
-        "Tabla de posiciones y vallas menos vencidas",
-        "Billing separado del modulo Organizaciones"
+        "Tabla de posiciones y vallas menos vencidas"
       ]
     }
   ] as const;
@@ -62,10 +60,10 @@ export default async function PricingPage({
     <div className="space-y-6">
       <section className="rounded-[2rem] border border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.18),transparent_32%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-6 shadow-[0_28px_60px_-34px_rgba(16,185,129,0.7)] md:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Precios</p>
-        <h1 className="mt-2 text-3xl font-black text-white md:text-5xl">Planes claros en ARS para cada necesidad</h1>
+        <h1 className="mt-2 text-3xl font-black text-white md:text-5xl">Packs claros en pesos para cada necesidad</h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
           Un mismo admin puede gestionar Organizaciones y Torneos, pero cada modulo tiene su propia logica y su propia facturacion.
-          Aqui ves rapido que incluye cada plan y como se cobra.
+          Aqui ves rapido que incluye cada pack y como se cobra.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
