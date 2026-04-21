@@ -34,7 +34,7 @@ function RegisterSubmitButton() {
   );
 }
 
-export function LoginForm() {
+export function LoginForm({ nextPath = "/admin" }: { nextPath?: string }) {
   const [loginState, loginAction] = useActionState(loginAdminAction, initialLoginState);
   const [registerState, registerAction] = useActionState(registerAdminAction, initialRegisterState);
 
@@ -45,6 +45,7 @@ export function LoginForm() {
         <CardDescription>Accede al panel con tu email y contrasena.</CardDescription>
 
         <form action={loginAction} className="mt-4 space-y-3">
+          <input name="next" type="hidden" value={nextPath} />
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="email">
               Email
@@ -70,6 +71,7 @@ export function LoginForm() {
         </CardDescription>
 
         <form action={registerAction} className="mt-4 space-y-3">
+          <input name="next" type="hidden" value={nextPath} />
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="displayName">
               Nombre

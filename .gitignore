@@ -36,7 +36,14 @@ pnpm-debug.log*
 *.tsbuildinfo
 
 # project-specific private files
-/supabase/
+/supabase/*
+!/supabase/generated/
+/supabase/generated/*
+!/supabase/generated/policies.storage.sql
+!/supabase/migrations/
+/supabase/migrations/*
+!/supabase/migrations/2026_04_21_tournament_captains_core.sql
+!/supabase/migrations/2026_04_21_tournament_player_photo_storage.sql
 /public/players/
 /README.md
 

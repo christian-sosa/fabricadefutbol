@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import sharp from "sharp";
 import { z } from "zod";
 
 import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/lib/auth/admin";
@@ -10,6 +9,12 @@ import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
+import {
+  getOrganizationPlayerPhotoObjectPath,
+  inferPlayerPhotoExtension,
+  MAX_PLAYER_PHOTO_SIZE_MB,
+  optimizePlayerAvatarImage
+} from "@/lib/player-photos";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const createSchema = z.object({
@@ -36,16 +41,6 @@ const rowSchema = z.object({
   active: z.boolean()
 });
 
-const MAX_PHOTO_SIZE_MB = 20;
-const PLAYER_AVATAR_SIZE_PX = 400;
-const PLAYER_AVATAR_QUALITY = 80;
-
-const CONTENT_TYPE_EXTENSION: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp"
-};
-
 function withMessage(organizationId: string, error: string | null) {
   const basePath = withOrgQuery("/admin/players", organizationId);
   if (!error) return basePath;
@@ -58,32 +53,6 @@ function withSuccess(organizationId: string, success: string | null) {
   if (!success) return basePath;
   const separator = basePath.includes("?") ? "&" : "?";
   return `${basePath}${separator}success=${encodeURIComponent(success)}&refresh=${Date.now()}`;
-}
-
-function inferFileExtension(file: File) {
-  if (file.type in CONTENT_TYPE_EXTENSION) {
-    return CONTENT_TYPE_EXTENSION[file.type] as keyof typeof CONTENT_TYPE_EXTENSION;
-  }
-
-  const ext = file.name.split(".").pop()?.toLowerCase();
-  if (!ext) return null;
-  if (["jpg", "jpeg", "png", "webp"].includes(ext)) return ext;
-  return null;
-}
-
-function getPlayerPhotoObjectPath(schema: string, organizationId: string, playerId: string) {
-  return `${schema}/${organizationId}/${playerId}.webp`;
-}
-
-async function optimizePlayerAvatarImage(file: File) {
-  const sourceBuffer = Buffer.from(await file.arrayBuffer());
-  const optimized = await sharp(sourceBuffer)
-    .rotate()
-    .resize(PLAYER_AVATAR_SIZE_PX, PLAYER_AVATAR_SIZE_PX, { fit: "cover", position: "center" })
-    .webp({ quality: PLAYER_AVATAR_QUALITY })
-    .toBuffer();
-
-  return optimized;
 }
 
 function buildRankAssignments(params: {
@@ -464,12 +433,12 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
       redirect(withMessage(organizationQueryKey, "Selecciona una imagen para subir."));
     }
 
-    const sizeLimitBytes = MAX_PHOTO_SIZE_MB * 1024 * 1024;
+    const sizeLimitBytes = MAX_PLAYER_PHOTO_SIZE_MB * 1024 * 1024;
     if (file.size > sizeLimitBytes) {
-      redirect(withMessage(organizationQueryKey, `La imagen no puede superar ${MAX_PHOTO_SIZE_MB} MB.`));
+      redirect(withMessage(organizationQueryKey, `La imagen no puede superar ${MAX_PLAYER_PHOTO_SIZE_MB} MB.`));
     }
 
-    const extension = inferFileExtension(file);
+    const extension = inferPlayerPhotoExtension(file);
     if (!extension) {
       redirect(withMessage(organizationQueryKey, "Formato no soportado. Usa JPG, JPEG, PNG o WEBP."));
     }
@@ -487,7 +456,7 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
     }
 
     const optimizedBuffer = await optimizePlayerAvatarImage(file);
-    const objectPath = getPlayerPhotoObjectPath(
+    const objectPath = getOrganizationPlayerPhotoObjectPath(
       getSupabaseDbSchema(),
       parsed.data.organizationId,
       parsed.data.playerId

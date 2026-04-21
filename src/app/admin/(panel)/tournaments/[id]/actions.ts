@@ -1,14 +1,23 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { assertTournamentMembershipAction, getTournamentSlugById } from "@/lib/auth/tournaments";
 import { generateTournamentFixture, validateTournamentMatchPair } from "@/lib/domain/tournament-workflow";
+import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
 import { isNextRedirectError } from "@/lib/next-redirect";
-import { slugifyTournamentName } from "@/lib/org";
+import { normalizeEmail, slugifyTournamentName } from "@/lib/org";
+import {
+  getTournamentPlayerPhotoObjectPath,
+  inferPlayerPhotoExtension,
+  MAX_PLAYER_PHOTO_SIZE_MB,
+  optimizePlayerAvatarImage
+} from "@/lib/player-photos";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const updateTournamentSchema = z.object({
@@ -26,6 +35,19 @@ const teamSchema = z.object({
   displayOrder: z.coerce.number().int().positive("El orden debe ser positivo.")
 });
 
+const captainInviteSchema = z.object({
+  teamId: z.string().uuid(),
+  email: z.string().email("Ingresa un email valido.")
+});
+
+const teamCaptainSchema = z.object({
+  teamId: z.string().uuid()
+});
+
+const captainInviteDeleteSchema = z.object({
+  inviteId: z.string().uuid()
+});
+
 const playerSchema = z.object({
   teamId: z.string().uuid(),
   fullName: z.string().min(2, "El jugador debe tener al menos 2 caracteres.").max(80),
@@ -34,6 +56,10 @@ const playerSchema = z.object({
     z.number().int().positive().max(99).nullable()
   ),
   position: z.string().max(30).optional()
+});
+
+const playerPhotoSchema = z.object({
+  playerId: z.string().uuid()
 });
 
 const manualMatchSchema = z.object({
@@ -85,6 +111,10 @@ function parseNextSlug(baseSlug: string, existingSlugs: string[]) {
 function normalizeScheduledAt(value: string | undefined) {
   if (!value?.trim()) return null;
   return new Date(value).toISOString();
+}
+
+function buildCaptainInviteExpiresAt() {
+  return new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
 }
 
 async function revalidateTournamentPaths(tournamentId: string) {
@@ -380,6 +410,213 @@ export async function deleteTournamentTeamAction(tournamentId: string, formData:
   }
 }
 
+export async function inviteTournamentCaptainAction(tournamentId: string, formData: FormData) {
+  try {
+    const admin = await assertTournamentMembershipAction(tournamentId);
+    const parsed = captainInviteSchema.safeParse({
+      teamId: formData.get("teamId"),
+      email: formData.get("email")
+    });
+
+    if (!parsed.success) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "teams",
+          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
+        })
+      );
+    }
+
+    const normalizedEmail = normalizeEmail(parsed.data.email);
+    const supabase = await createSupabaseServerClient();
+    const [{ data: team, error: teamError }, { data: currentCaptain, error: captainError }] = await Promise.all([
+      supabase
+        .from("tournament_teams")
+        .select("id")
+        .eq("id", parsed.data.teamId)
+        .eq("tournament_id", tournamentId)
+        .maybeSingle(),
+      supabase
+        .from("tournament_team_captains")
+        .select("id")
+        .eq("tournament_id", tournamentId)
+        .eq("team_id", parsed.data.teamId)
+        .maybeSingle()
+    ]);
+
+    if (teamError || !team) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "teams",
+          error: "No se encontro el equipo dentro de este torneo."
+        })
+      );
+    }
+
+    if (captainError) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "teams",
+          error: toUserMessage(captainError, "No se pudo preparar la invitacion del capitan.")
+        })
+      );
+    }
+
+    if (currentCaptain) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "teams",
+          error: "Este equipo ya tiene un capitan asignado. Quitalo antes de invitar a otro."
+        })
+      );
+    }
+
+    const inviteToken = randomUUID();
+    const { error } = await supabase.from("tournament_captain_invites").upsert(
+      {
+        tournament_id: tournamentId,
+        team_id: parsed.data.teamId,
+        email: normalizedEmail,
+        invite_token: inviteToken,
+        created_by: admin.userId,
+        expires_at: buildCaptainInviteExpiresAt()
+      },
+      {
+        onConflict: "team_id"
+      }
+    );
+
+    if (error) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "teams",
+          error: toUserMessage(error, "No se pudo preparar la invitacion del capitan.")
+        })
+      );
+    }
+
+    await revalidateTournamentPaths(tournamentId);
+    redirect(
+      buildTournamentDetailPath({
+        tournamentId,
+        tab: "teams",
+        success: "Invitacion de capitan preparada."
+      })
+    );
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(
+      buildTournamentDetailPath({
+        tournamentId,
+        tab: "teams",
+        error: toUserMessage(error, "No se pudo preparar la invitacion del capitan.")
+      })
+    );
+  }
+}
+
+export async function deleteTournamentCaptainInviteAction(tournamentId: string, formData: FormData) {
+  try {
+    await assertTournamentMembershipAction(tournamentId);
+    const parsed = captainInviteDeleteSchema.safeParse({
+      inviteId: formData.get("inviteId")
+    });
+
+    if (!parsed.success) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "teams",
+          error: parsed.error.issues[0]?.message ?? "Falta la invitacion a revocar."
+        })
+      );
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase
+      .from("tournament_captain_invites")
+      .delete()
+      .eq("id", parsed.data.inviteId)
+      .eq("tournament_id", tournamentId);
+
+    if (error) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "teams",
+          error: toUserMessage(error, "No se pudo revocar la invitacion.")
+        })
+      );
+    }
+
+    await revalidateTournamentPaths(tournamentId);
+    redirect(buildTournamentDetailPath({ tournamentId, tab: "teams", success: "Invitacion revocada." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(
+      buildTournamentDetailPath({
+        tournamentId,
+        tab: "teams",
+        error: toUserMessage(error, "No se pudo revocar la invitacion.")
+      })
+    );
+  }
+}
+
+export async function removeTournamentCaptainAction(tournamentId: string, formData: FormData) {
+  try {
+    await assertTournamentMembershipAction(tournamentId);
+    const parsed = teamCaptainSchema.safeParse({
+      teamId: formData.get("teamId")
+    });
+
+    if (!parsed.success) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "teams",
+          error: parsed.error.issues[0]?.message ?? "Falta el capitan a quitar."
+        })
+      );
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase
+      .from("tournament_team_captains")
+      .delete()
+      .eq("tournament_id", tournamentId)
+      .eq("team_id", parsed.data.teamId);
+
+    if (error) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "teams",
+          error: toUserMessage(error, "No se pudo quitar al capitan.")
+        })
+      );
+    }
+
+    revalidatePath("/captain");
+    await revalidateTournamentPaths(tournamentId);
+    redirect(buildTournamentDetailPath({ tournamentId, tab: "teams", success: "Capitan removido." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(
+      buildTournamentDetailPath({
+        tournamentId,
+        tab: "teams",
+        error: toUserMessage(error, "No se pudo quitar al capitan.")
+      })
+    );
+  }
+}
+
 export async function addTournamentPlayerAction(tournamentId: string, formData: FormData) {
   try {
     await assertTournamentMembershipAction(tournamentId);
@@ -468,6 +705,117 @@ export async function deleteTournamentPlayerAction(tournamentId: string, formDat
         tournamentId,
         tab: "players",
         error: toUserMessage(error, "No se pudo borrar el jugador.")
+      })
+    );
+  }
+}
+
+export async function uploadTournamentPlayerPhotoAction(tournamentId: string, formData: FormData) {
+  try {
+    await assertTournamentMembershipAction(tournamentId);
+    const parsed = playerPhotoSchema.safeParse({
+      playerId: formData.get("playerId")
+    });
+
+    if (!parsed.success) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "players",
+          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
+        })
+      );
+    }
+
+    const file = formData.get("photo");
+    if (!(file instanceof File) || file.size <= 0) {
+      redirect(buildTournamentDetailPath({ tournamentId, tab: "players", error: "Selecciona una imagen para subir." }));
+    }
+
+    const sizeLimitBytes = MAX_PLAYER_PHOTO_SIZE_MB * 1024 * 1024;
+    if (file.size > sizeLimitBytes) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "players",
+          error: `La imagen no puede superar ${MAX_PLAYER_PHOTO_SIZE_MB} MB.`
+        })
+      );
+    }
+
+    const extension = inferPlayerPhotoExtension(file);
+    if (!extension) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "players",
+          error: "Formato no soportado. Usa JPG, JPEG, PNG o WEBP."
+        })
+      );
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { data: player, error: playerError } = await supabase
+      .from("tournament_players")
+      .select("id")
+      .eq("id", parsed.data.playerId)
+      .eq("tournament_id", tournamentId)
+      .maybeSingle();
+
+    if (playerError || !player) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "players",
+          error: "No se encontro el jugador en el torneo seleccionado."
+        })
+      );
+    }
+
+    const optimizedBuffer = await optimizePlayerAvatarImage(file);
+    const objectPath = getTournamentPlayerPhotoObjectPath(
+      getSupabaseDbSchema(),
+      tournamentId,
+      parsed.data.playerId
+    );
+    const bucketName = getPlayerPhotosBucket();
+    const { error: uploadError } = await supabase.storage.from(bucketName).upload(objectPath, optimizedBuffer, {
+      upsert: true,
+      contentType: "image/webp",
+      cacheControl: "31536000"
+    });
+
+    if (uploadError) {
+      console.error("[tournaments] storage upload failed", {
+        tournamentId,
+        playerId: parsed.data.playerId,
+        message: uploadError.message
+      });
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "players",
+          error: "No se pudo guardar la foto en Storage. Intenta nuevamente."
+        })
+      );
+    }
+
+    await revalidateTournamentPaths(tournamentId);
+    revalidatePath(`/api/player-photo/${parsed.data.playerId}`);
+    redirect(
+      buildTournamentDetailPath({
+        tournamentId,
+        tab: "players",
+        success: "Foto de jugador subida correctamente."
+      })
+    );
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(
+      buildTournamentDetailPath({
+        tournamentId,
+        tab: "players",
+        error: toUserMessage(error, "No se pudo subir la foto.")
       })
     );
   }

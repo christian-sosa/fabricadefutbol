@@ -111,7 +111,16 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
 
   const renderAuthControls = (compact = false) =>
     isAuthenticated ? (
-      <div className={cn("flex items-center gap-2", compact ? "w-full" : "")}>
+      <div className={cn("flex flex-wrap items-center gap-2", compact ? "w-full" : "")}>
+        <Link
+          className={cn(
+            "rounded-xl border border-sky-400/35 px-3 py-2 text-xs font-semibold text-sky-200 transition hover:bg-sky-500/10 md:text-sm",
+            compact ? "flex-1 text-center" : ""
+          )}
+          href="/captain"
+        >
+          Mi equipo
+        </Link>
         <Link
           className={cn(
             "rounded-xl border border-emerald-400/40 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/10 md:text-sm",

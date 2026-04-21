@@ -1,16 +1,8 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 
+import { resolveSafeNextPath } from "@/lib/auth/redirects";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-function resolveNextPath(next: string | null) {
-  if (!next) return "/admin/login";
-  if (!next.startsWith("/")) return "/admin/login";
-  // Bloquea rutas protocol-relative ("//evil.com") y variantes con backslash
-  // que algunos navegadores normalizan como "/" y permitirian redireccion abierta.
-  if (next.startsWith("//") || next.startsWith("/\\")) return "/admin/login";
-  return next;
-}
 
 function buildRedirectUrl(request: NextRequest, pathname: string, searchParams?: Record<string, string>) {
   const destination = request.nextUrl.clone();
@@ -28,7 +20,7 @@ function buildRedirectUrl(request: NextRequest, pathname: string, searchParams?:
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
-  const nextPath = resolveNextPath(requestUrl.searchParams.get("next"));
+  const nextPath = resolveSafeNextPath(requestUrl.searchParams.get("next"), "/admin/login");
   const tokenHash = requestUrl.searchParams.get("token_hash");
   const type = requestUrl.searchParams.get("type") as EmailOtpType | null;
   const code = requestUrl.searchParams.get("code");

@@ -1,4 +1,5 @@
 import { AdminNav } from "@/components/admin/admin-nav";
+import { AdminSubnav } from "@/components/admin/admin-subnav";
 import { SignOutButton } from "@/components/admin/sign-out-button";
 import { requireAdminSession } from "@/lib/auth/admin";
 
@@ -22,6 +23,8 @@ export default async function AdminPanelLayout({ children }: { children: React.R
           <AdminNav isSuperAdmin={admin.isSuperAdmin} />
         </div>
       </section>
+
+      <AdminSubnav />
 
       {children}
     </div>

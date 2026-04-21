@@ -9,6 +9,8 @@ type TableName =
   | "organization_billing_subscriptions"
   | "tournaments"
   | "tournament_admins"
+  | "tournament_team_captains"
+  | "tournament_captain_invites"
   | "tournament_teams"
   | "tournament_players"
   | "tournament_rounds"
@@ -64,6 +66,8 @@ function createEmptyDatabase(): FakeDatabase {
     organization_billing_subscriptions: [],
     tournaments: [],
     tournament_admins: [],
+    tournament_team_captains: [],
+    tournament_captain_invites: [],
     tournament_teams: [],
     tournament_players: [],
     tournament_rounds: [],
@@ -123,6 +127,14 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
     case "tournament_admins":
       if (!normalized.role) normalized.role = "editor";
       if (!("created_by" in normalized)) normalized.created_by = null;
+      break;
+    case "tournament_team_captains":
+      if (!("created_by" in normalized)) normalized.created_by = null;
+      break;
+    case "tournament_captain_invites":
+      if (!normalized.expires_at) {
+        normalized.expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
+      }
       break;
     case "tournament_teams":
       if (!("short_name" in normalized)) normalized.short_name = null;
@@ -244,6 +256,30 @@ class FakeSupabaseState {
       }
     }
 
+    if (table === "tournament_team_captains") {
+      const teamId = String(row.team_id ?? "");
+      const existing = this.db.tournament_team_captains.find(
+        (candidate) => String(candidate.team_id) === teamId
+      );
+
+      if (existing) {
+        Object.assign(existing, cloneRow(row));
+        return existing;
+      }
+    }
+
+    if (table === "tournament_captain_invites") {
+      const teamId = String(row.team_id ?? "");
+      const existing = this.db.tournament_captain_invites.find(
+        (candidate) => String(candidate.team_id) === teamId
+      );
+
+      if (existing) {
+        Object.assign(existing, cloneRow(row));
+        return existing;
+      }
+    }
+
     const normalized = applyDefaults(table, cloneRow(row), () => this.nextId());
     this.db[table].push(normalized);
 
@@ -287,6 +323,19 @@ class FakeSupabaseState {
       );
       this.db.tournament_match_player_stats = this.db.tournament_match_player_stats.filter(
         (row) => !deletedMatchIds.has(String(row.match_id))
+      );
+    }
+
+    if (table === "tournament_teams") {
+      const deletedTeamIds = new Set(deletedRows.map((row) => String(row.id)));
+      this.db.tournament_players = this.db.tournament_players.filter(
+        (row) => !deletedTeamIds.has(String(row.team_id))
+      );
+      this.db.tournament_team_captains = this.db.tournament_team_captains.filter(
+        (row) => !deletedTeamIds.has(String(row.team_id))
+      );
+      this.db.tournament_captain_invites = this.db.tournament_captain_invites.filter(
+        (row) => !deletedTeamIds.has(String(row.team_id))
       );
     }
   }

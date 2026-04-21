@@ -3,6 +3,15 @@ import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 import type { MatchStatus } from "@/types/domain";
 
+export const MATCH_STATUS_OPTIONS: MatchStatus[] = ["draft", "confirmed", "finished", "cancelled"];
+
+export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
+  draft: "Borrador",
+  confirmed: "Confirmado",
+  finished: "Finalizado",
+  cancelled: "Cancelado"
+};
+
 const matchStatusStyles: Record<MatchStatus, string> = {
   draft: "border border-slate-600 bg-slate-800/80 text-slate-200",
   confirmed: "border border-cyan-500/40 bg-cyan-500/15 text-cyan-200",
@@ -15,11 +24,5 @@ export function Badge({ className, ...props }: HTMLAttributes<HTMLSpanElement>) 
 }
 
 export function MatchStatusBadge({ status }: { status: MatchStatus }) {
-  const labels: Record<MatchStatus, string> = {
-    draft: "Borrador",
-    confirmed: "Confirmado",
-    finished: "Finalizado",
-    cancelled: "Cancelado"
-  };
-  return <Badge className={matchStatusStyles[status]}>{labels[status]}</Badge>;
+  return <Badge className={matchStatusStyles[status]}>{MATCH_STATUS_LABELS[status]}</Badge>;
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { resolveSafeNextPath } from "@/lib/auth/redirects";
 
 type ConfirmEmailPageProps = {
   searchParams: Promise<{
@@ -11,18 +12,11 @@ type ConfirmEmailPageProps = {
   }>;
 };
 
-function resolveNextPath(next?: string) {
-  if (!next) return "/admin/login";
-  if (!next.startsWith("/")) return "/admin/login";
-  if (next.startsWith("//") || next.startsWith("/\\")) return "/admin/login";
-  return next;
-}
-
 export default async function ConfirmEmailPage({ searchParams }: ConfirmEmailPageProps) {
   const resolvedSearchParams = await searchParams;
   const tokenHash = resolvedSearchParams.token_hash?.trim() ?? "";
   const type = resolvedSearchParams.type?.trim() ?? "email";
-  const nextPath = resolveNextPath(resolvedSearchParams.next);
+  const nextPath = resolveSafeNextPath(resolvedSearchParams.next, "/admin/login");
 
   if (!tokenHash) {
     return (
