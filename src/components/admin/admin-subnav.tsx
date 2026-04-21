@@ -117,7 +117,7 @@ export function AdminSubnav() {
 
   return (
     <section className="rounded-2xl border border-slate-800 bg-slate-950/75 px-4 py-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="space-y-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-400">
             {isTournamentArea ? "Contexto torneos" : "Contexto organizaciones"}
@@ -129,11 +129,11 @@ export function AdminSubnav() {
           </p>
         </div>
 
-        <nav className="flex flex-wrap gap-2">
+        <nav className="flex flex-nowrap gap-2 overflow-x-auto pb-1">
           {items.map((item) => (
             <Link
               className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-semibold transition md:text-sm",
+                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition md:text-sm",
                 item.active
                   ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
                   : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"

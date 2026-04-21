@@ -1,16 +1,18 @@
 import Link from "next/link";
 
 import { submitFeedbackAction } from "@/app/feedback/actions";
+import { PublicModuleToggle } from "@/components/layout/public-module-toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { withOrgQuery } from "@/lib/org";
+import { resolvePublicModule, withPublicQuery } from "@/lib/org";
 
 type FeedbackPageProps = {
   searchParams: Promise<{
     org?: string;
+    module?: string;
     sent?: string;
     error?: string;
   }>;
@@ -19,21 +21,40 @@ type FeedbackPageProps = {
 export default async function FeedbackPage({ searchParams }: FeedbackPageProps) {
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
-  const submitAction = submitFeedbackAction.bind(null, organizationKey);
-  const homePath = withOrgQuery("/", organizationKey);
-  const helpPath = withOrgQuery("/help", organizationKey);
+  const currentModule = resolvePublicModule(resolvedSearchParams.module);
+  const submitAction = submitFeedbackAction.bind(null, organizationKey, currentModule);
+  const homePath = withPublicQuery("/", {
+    organizationKey,
+    module: currentModule
+  });
+  const helpPath = withPublicQuery("/help", {
+    organizationKey,
+    module: currentModule
+  });
+  const moduleDescription =
+    currentModule === "tournaments"
+      ? "Escribenos sobre torneos, capitanes, planteles, fixture, resultados o estadisticas."
+      : "Escribenos sobre organizaciones, jugadores, partidos balanceados, ranking o facturacion.";
+  const targetPlaceholder =
+    currentModule === "tournaments" ? "Ej: Copa Apertura 2026" : "Ej: La Cantera de LQ";
 
   return (
     <div className="space-y-4">
       <Card>
-        <CardTitle>Sugerencias, quejas y contacto</CardTitle>
+        <CardTitle>Contacto, sugerencias y soporte</CardTitle>
         <CardDescription className="mt-2">
-          Envia comentarios para mejorar Fabrica de Futbol. Te responderemos por email si dejas un
-          contacto valido.
+          Envia comentarios para mejorar Fabrica de Futbol. Te responderemos por email si dejas un contacto valido.
         </CardDescription>
+        <p className="mt-2 text-sm text-slate-300">{moduleDescription}</p>
         <p className="mt-2 text-xs text-slate-400">
           Tambien puedes escribir directo a <span className="font-semibold text-slate-200">info@fabricadefutbol.com.ar</span>.
         </p>
+        <PublicModuleToggle
+          basePath="/feedback"
+          className="mt-4"
+          currentModule={currentModule}
+          organizationKey={organizationKey}
+        />
       </Card>
 
       {resolvedSearchParams.sent ? (
@@ -87,11 +108,22 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="organization">
-                Organizacion (opcional)
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="module">
+                Consulta sobre
               </label>
-              <Input id="organization" name="organization" placeholder="Ej: F5 Lunes" />
+              <Select defaultValue={currentModule} id="module" name="module">
+                <option value="organizations">Organizaciones</option>
+                <option value="tournaments">Torneos</option>
+                <option value="both">Ambos modulos</option>
+              </Select>
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="organization">
+              Organizacion o torneo (opcional)
+            </label>
+            <Input id="organization" name="organization" placeholder={targetPlaceholder} />
           </div>
 
           <div>

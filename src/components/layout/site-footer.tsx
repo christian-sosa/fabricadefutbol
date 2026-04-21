@@ -5,14 +5,14 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { ORGANIZATION_PUBLIC_NAV_ITEMS, PRIMARY_PUBLIC_NAV_ITEMS } from "@/lib/constants";
-import { withOrgQuery } from "@/lib/org";
+import { parsePublicModule, withPublicQuery } from "@/lib/org";
 import { cn } from "@/lib/utils";
 
 const PRODUCT_LINKS = [
-  { href: "/pricing", label: "Planes y suscripciones" },
-  { href: "/feedback", label: "Sugerencias y contacto" },
+  { href: "/pricing", label: "Precios por modulo" },
+  { href: "/feedback", label: "Contacto y sugerencias" },
   { href: "/help", label: "Centro de ayuda" },
-  { href: "/admin", label: "Panel de organizaciones" }
+  { href: "/admin", label: "Paneles de gestion" }
 ] as const;
 
 const CONTACT_PLACEHOLDERS = [
@@ -70,6 +70,7 @@ function FooterSectionTitle({
 export function SiteFooter() {
   const searchParams = useSearchParams();
   const organizationId = searchParams.get("org");
+  const publicModule = parsePublicModule(searchParams.get("module"));
   const year = new Date().getFullYear();
 
   return (
@@ -99,7 +100,7 @@ export function SiteFooter() {
                   Fabrica de Futbol
                 </p>
                 <p className="mt-1 text-xs text-slate-400">
-                  Plataforma para ordenar partidos, convocatorias, ranking y seguimiento de tu grupo.
+                  Plataforma para gestionar organizaciones, torneos, planteles, fixtures y estadisticas publicas.
                 </p>
               </div>
             </div>
@@ -107,8 +108,8 @@ export function SiteFooter() {
             <div className="mt-5 rounded-2xl border border-emerald-400/15 bg-[linear-gradient(135deg,rgba(15,23,42,0.95),rgba(8,47,73,0.92))] p-4">
               <FooterSectionTitle>Espacio Comercial</FooterSectionTitle>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                Deja aqui tu propuesta de valor corta, links destacados, sponsors, promos o una invitacion a crear una
-                organizacion.
+                Deja aqui tu propuesta de valor corta, sponsors, promos o una invitacion a crear una organizacion o
+                lanzar un torneo.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className="rounded-full border border-slate-700/80 bg-slate-950/70 px-3 py-1 text-xs font-semibold text-slate-300">
@@ -130,7 +131,10 @@ export function SiteFooter() {
               {PRIMARY_PUBLIC_NAV_ITEMS.map((item) => (
                 <Link
                   className="block rounded-xl border border-transparent px-3 py-2 text-sm text-slate-300 transition hover:border-slate-700 hover:bg-slate-950/70 hover:text-slate-100"
-                  href={withOrgQuery(item.href, organizationId)}
+                  href={withPublicQuery(item.href, {
+                    organizationKey: organizationId,
+                    module: publicModule
+                  })}
                   key={item.href}
                 >
                   {item.label}
@@ -140,13 +144,16 @@ export function SiteFooter() {
 
             <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Modulo Organizaciones
+                Organizaciones Publicas
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {ORGANIZATION_PUBLIC_NAV_ITEMS.map((item) => (
                   <Link
                     className="rounded-full border border-slate-700/80 px-3 py-1 text-xs font-semibold text-slate-300 transition hover:border-slate-500 hover:bg-slate-900"
-                    href={withOrgQuery(item.href, organizationId)}
+                    href={withPublicQuery(item.href, {
+                      organizationKey: organizationId,
+                      module: publicModule
+                    })}
                     key={item.href}
                   >
                     {item.label}
@@ -162,7 +169,10 @@ export function SiteFooter() {
               {PRODUCT_LINKS.map((item) => (
                 <Link
                   className="block rounded-xl border border-transparent px-3 py-2 text-sm text-slate-300 transition hover:border-slate-700 hover:bg-slate-950/70 hover:text-slate-100"
-                  href={withOrgQuery(item.href, organizationId)}
+                  href={withPublicQuery(item.href, {
+                    organizationKey: organizationId,
+                    module: publicModule
+                  })}
                   key={item.href}
                 >
                   {item.label}
@@ -173,7 +183,7 @@ export function SiteFooter() {
             <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Preparado para sumar</p>
               <p className="mt-2 text-sm text-slate-400">
-                FAQ corto, video demo, changelog, app de admins o cualquier enlace comercial que quieras destacar.
+                FAQ corto, video demo, changelog, panel de capitanes o cualquier enlace comercial que quieras destacar.
               </p>
             </div>
           </section>
@@ -226,7 +236,7 @@ export function SiteFooter() {
             legales.
           </p>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Hecho para grupos, canchas, torneos y organizaciones
+            Hecho para grupos, organizaciones, torneos y comunidades
           </p>
         </div>
       </div>

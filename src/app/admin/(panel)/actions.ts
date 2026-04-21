@@ -111,6 +111,43 @@ function buildMercadoPagoPreferenceExpirationDate() {
   return new Date(Date.now() + MERCADOPAGO_PREFERENCE_TTL_MS).toISOString();
 }
 
+async function organizationAlreadyHasAdminWithEmail(params: {
+  organizationId: string;
+  normalizedEmail: string;
+}) {
+  const supabaseAdmin = createSupabaseAdminClient();
+  if (!supabaseAdmin) return false;
+
+  const { data: memberships, error: membershipsError } = await supabaseAdmin
+    .from("organization_admins")
+    .select("admin_id")
+    .eq("organization_id", params.organizationId);
+
+  if (membershipsError) {
+    throw new Error(membershipsError.message);
+  }
+
+  const adminIds = Array.from(new Set((memberships ?? []).map((row) => row.admin_id)));
+  if (!adminIds.length) return false;
+
+  const { data: authUsers, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000
+  });
+
+  if (authUsersError) {
+    throw new Error(authUsersError.message);
+  }
+
+  const currentAdminEmails = new Map(
+    (authUsers?.users ?? [])
+      .filter((user) => adminIds.includes(user.id))
+      .map((user) => [user.id, normalizeEmail(user.email ?? "")])
+  );
+
+  return adminIds.some((adminId) => currentAdminEmails.get(adminId) === params.normalizedEmail);
+}
+
 async function resolveServerBaseUrl() {
   const configuredPublicBaseUrl = getMercadoPagoWebhookBaseUrl();
   if (configuredPublicBaseUrl) {
@@ -535,6 +572,15 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
 
     if (normalizedEmail === admin.email) {
       redirect(buildAdminPath(organizationQueryKey, "Tu usuario ya administra esta organizacion."));
+    }
+
+    if (
+      await organizationAlreadyHasAdminWithEmail({
+        organizationId: parsed.data.organizationId,
+        normalizedEmail
+      })
+    ) {
+      redirect(buildAdminPath(organizationQueryKey, "Ese email ya administra esta organizacion."));
     }
 
     const supabase = await createSupabaseServerClient();

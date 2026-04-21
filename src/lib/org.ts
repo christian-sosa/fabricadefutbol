@@ -1,7 +1,42 @@
-export function withOrgQuery(path: string, organizationKey?: string | null) {
-  if (!organizationKey) return path;
+export type PublicModuleContext = "organizations" | "tournaments";
+
+export function parsePublicModule(value: string | null | undefined): PublicModuleContext | null {
+  if (value === "organizations" || value === "tournaments") return value;
+  return null;
+}
+
+export function resolvePublicModule(value: string | null | undefined): PublicModuleContext {
+  return parsePublicModule(value) ?? "organizations";
+}
+
+export function withPublicQuery(
+  path: string,
+  params?: {
+    organizationKey?: string | null;
+    module?: PublicModuleContext | null;
+  }
+) {
+  const query = new URLSearchParams();
+
+  if (params?.organizationKey) {
+    query.set("org", params.organizationKey);
+  }
+
+  if (params?.module) {
+    query.set("module", params.module);
+  }
+
+  const queryString = query.toString().replace(/\+/g, "%20");
+  if (!queryString) return path;
+
   const separator = path.includes("?") ? "&" : "?";
-  return `${path}${separator}org=${encodeURIComponent(organizationKey)}`;
+  return `${path}${separator}${queryString}`;
+}
+
+export function withOrgQuery(path: string, organizationKey?: string | null) {
+  return withPublicQuery(path, {
+    organizationKey
+  });
 }
 
 export function normalizeEmail(email: string) {
