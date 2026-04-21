@@ -321,6 +321,300 @@ export type Database = {
         };
         Relationships: [];
       };
+      tournaments: {
+        Row: {
+          created_at: string;
+          created_by: string;
+          description: string | null;
+          id: string;
+          is_public: boolean;
+          name: string;
+          season_label: string;
+          slug: string;
+          status: "draft" | "active" | "finished" | "archived";
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by: string;
+          description?: string | null;
+          id?: string;
+          is_public?: boolean;
+          name: string;
+          season_label: string;
+          slug: string;
+          status?: "draft" | "active" | "finished" | "archived";
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string;
+          description?: string | null;
+          id?: string;
+          is_public?: boolean;
+          name?: string;
+          season_label?: string;
+          slug?: string;
+          status?: "draft" | "active" | "finished" | "archived";
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      tournament_admins: {
+        Row: {
+          admin_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          role: "owner" | "editor";
+          tournament_id: string;
+        };
+        Insert: {
+          admin_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          role?: "owner" | "editor";
+          tournament_id: string;
+        };
+        Update: {
+          admin_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          role?: "owner" | "editor";
+          tournament_id?: string;
+        };
+        Relationships: [];
+      };
+      tournament_teams: {
+        Row: {
+          created_at: string;
+          display_order: number;
+          id: string;
+          name: string;
+          notes: string | null;
+          short_name: string | null;
+          slug: string;
+          tournament_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          display_order: number;
+          id?: string;
+          name: string;
+          notes?: string | null;
+          short_name?: string | null;
+          slug: string;
+          tournament_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          display_order?: number;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          short_name?: string | null;
+          slug?: string;
+          tournament_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      tournament_players: {
+        Row: {
+          active: boolean;
+          created_at: string;
+          full_name: string;
+          id: string;
+          position: string | null;
+          shirt_number: number | null;
+          team_id: string;
+          tournament_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          active?: boolean;
+          created_at?: string;
+          full_name: string;
+          id?: string;
+          position?: string | null;
+          shirt_number?: number | null;
+          team_id: string;
+          tournament_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          active?: boolean;
+          created_at?: string;
+          full_name?: string;
+          id?: string;
+          position?: string | null;
+          shirt_number?: number | null;
+          team_id?: string;
+          tournament_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      tournament_rounds: {
+        Row: {
+          created_at: string;
+          ends_at: string | null;
+          id: string;
+          name: string;
+          round_number: number;
+          starts_at: string | null;
+          tournament_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          ends_at?: string | null;
+          id?: string;
+          name: string;
+          round_number: number;
+          starts_at?: string | null;
+          tournament_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          ends_at?: string | null;
+          id?: string;
+          name?: string;
+          round_number?: number;
+          starts_at?: string | null;
+          tournament_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      tournament_matches: {
+        Row: {
+          away_team_id: string;
+          created_at: string;
+          created_by: string;
+          home_team_id: string;
+          id: string;
+          round_id: string | null;
+          scheduled_at: string | null;
+          status: "draft" | "scheduled" | "played" | "cancelled";
+          tournament_id: string;
+          updated_at: string;
+          venue: string | null;
+        };
+        Insert: {
+          away_team_id: string;
+          created_at?: string;
+          created_by: string;
+          home_team_id: string;
+          id?: string;
+          round_id?: string | null;
+          scheduled_at?: string | null;
+          status?: "draft" | "scheduled" | "played" | "cancelled";
+          tournament_id: string;
+          updated_at?: string;
+          venue?: string | null;
+        };
+        Update: {
+          away_team_id?: string;
+          created_at?: string;
+          created_by?: string;
+          home_team_id?: string;
+          id?: string;
+          round_id?: string | null;
+          scheduled_at?: string | null;
+          status?: "draft" | "scheduled" | "played" | "cancelled";
+          tournament_id?: string;
+          updated_at?: string;
+          venue?: string | null;
+        };
+        Relationships: [];
+      };
+      tournament_match_results: {
+        Row: {
+          away_score: number;
+          created_at: string;
+          created_by: string;
+          home_score: number;
+          id: string;
+          match_id: string;
+          mvp_player_id: string | null;
+          mvp_player_name: string;
+          notes: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          away_score: number;
+          created_at?: string;
+          created_by: string;
+          home_score: number;
+          id?: string;
+          match_id: string;
+          mvp_player_id?: string | null;
+          mvp_player_name: string;
+          notes?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          away_score?: number;
+          created_at?: string;
+          created_by?: string;
+          home_score?: number;
+          id?: string;
+          match_id?: string;
+          mvp_player_id?: string | null;
+          mvp_player_name?: string;
+          notes?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      tournament_match_player_stats: {
+        Row: {
+          created_at: string;
+          goals: number;
+          id: string;
+          is_mvp: boolean;
+          match_id: string;
+          player_id: string | null;
+          player_name: string;
+          red_cards: number;
+          team_id: string;
+          updated_at: string;
+          yellow_cards: number;
+        };
+        Insert: {
+          created_at?: string;
+          goals?: number;
+          id?: string;
+          is_mvp?: boolean;
+          match_id: string;
+          player_id?: string | null;
+          player_name: string;
+          red_cards?: number;
+          team_id: string;
+          updated_at?: string;
+          yellow_cards?: number;
+        };
+        Update: {
+          created_at?: string;
+          goals?: number;
+          id?: string;
+          is_mvp?: boolean;
+          match_id?: string;
+          player_id?: string | null;
+          player_name?: string;
+          red_cards?: number;
+          team_id?: string;
+          updated_at?: string;
+          yellow_cards?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       public_match_cards: {
@@ -361,16 +655,31 @@ export type Database = {
       };
     };
     Functions: {
+      can_read_tournament: {
+        Args: {
+          tournament_id: string;
+        };
+        Returns: boolean;
+      };
       is_admin: {
         Args: Record<string, never>;
+        Returns: boolean;
+      };
+      is_tournament_admin: {
+        Args: {
+          tournament_id: string;
+        };
         Returns: boolean;
       };
     };
     Enums: {
       match_modality: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
       match_status: "draft" | "confirmed" | "finished" | "cancelled";
-      winner_team: "A" | "B" | "DRAW";
       team_side: "A" | "B";
+      tournament_admin_role: "owner" | "editor";
+      tournament_match_status: "draft" | "scheduled" | "played" | "cancelled";
+      tournament_status: "draft" | "active" | "finished" | "archived";
+      winner_team: "A" | "B" | "DRAW";
     };
     CompositeTypes: {
       [_ in never]: never;

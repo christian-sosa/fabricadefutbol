@@ -8,7 +8,7 @@ export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-export function slugifyOrganizationName(value: string) {
+function slugifyName(value: string) {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -17,4 +17,12 @@ export function slugifyOrganizationName(value: string) {
     .replace(/^-+|-+$/g, "")
     .replace(/-{2,}/g, "-")
     .slice(0, 50);
+}
+
+export function slugifyOrganizationName(value: string) {
+  return slugifyName(value);
+}
+
+export function slugifyTournamentName(value: string) {
+  return slugifyName(value);
 }
