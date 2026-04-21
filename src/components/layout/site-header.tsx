@@ -6,12 +6,13 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { ORGANIZATION_PUBLIC_NAV_ITEMS, PRIMARY_PUBLIC_NAV_ITEMS } from "@/lib/constants";
-import { withOrgQuery } from "@/lib/org";
+import { parsePublicModule, withPublicQuery } from "@/lib/org";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type SiteHeaderProps = {
   initialIsAuthenticated?: boolean;
+  initialHasCaptainAssignments?: boolean;
 };
 
 const ORGANIZATION_SECTION_PATHS = ["/organizations", "/ranking", "/players", "/matches", "/upcoming"] as const;
@@ -53,20 +54,28 @@ function MenuToggleIcon({ open }: { open: boolean }) {
   );
 }
 
-export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) {
+export function SiteHeader({
+  initialIsAuthenticated = false,
+  initialHasCaptainAssignments = false
+}: SiteHeaderProps) {
   const pathname = usePathname();
   const safePathname = pathname ?? "";
   const router = useRouter();
   const searchParams = useSearchParams();
   const organizationId = searchParams.get("org");
+  const publicModule = parsePublicModule(searchParams.get("module"));
   const searchKey = searchParams.toString();
   const [mounted, setMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(initialIsAuthenticated);
+  const [hasCaptainAssignments, setHasCaptainAssignments] = useState(initialHasCaptainAssignments);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const isOrganizationSection = isOrganizationSectionPath(safePathname);
   const shouldShowOrganizationSubnav = mounted && isOrganizationSection;
-  const organizationHubHref = withOrgQuery("/organizations", organizationId);
+  const organizationHubHref = withPublicQuery("/organizations", {
+    organizationKey: organizationId,
+    module: publicModule
+  });
   const currentOrganizationLabel = organizationId?.trim() ? organizationId.trim() : null;
 
   useEffect(() => {
@@ -78,18 +87,43 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
   }, [initialIsAuthenticated]);
 
   useEffect(() => {
+    setHasCaptainAssignments(initialHasCaptainAssignments);
+  }, [initialHasCaptainAssignments]);
+
+  useEffect(() => {
     const supabase = createSupabaseBrowserClient();
 
+    const syncCaptainAccess = async (userId?: string | null) => {
+      if (!userId) {
+        setHasCaptainAssignments(false);
+        return;
+      }
+
+      const { count, error } = await supabase
+        .from("tournament_team_captains")
+        .select("id", { count: "exact", head: true })
+        .eq("captain_id", userId);
+
+      if (error) {
+        setHasCaptainAssignments(false);
+        return;
+      }
+
+      setHasCaptainAssignments((count ?? 0) > 0);
+    };
+
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
       setIsAuthenticated(Boolean(data.session?.user));
+      await syncCaptainAccess(data.session?.user?.id ?? null);
     });
 
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(Boolean(session?.user));
+      void syncCaptainAccess(session?.user?.id ?? null);
     });
 
     return () => {
@@ -106,27 +140,32 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
     const supabase = createSupabaseBrowserClient();
     await supabase.auth.signOut();
     setIsAuthenticated(false);
+    setHasCaptainAssignments(false);
     router.refresh();
   };
 
   const renderAuthControls = (compact = false) =>
     isAuthenticated ? (
       <div className={cn("flex flex-wrap items-center gap-2", compact ? "w-full" : "")}>
-        <Link
-          className={cn(
-            "rounded-xl border border-sky-400/35 px-3 py-2 text-xs font-semibold text-sky-200 transition hover:bg-sky-500/10 md:text-sm",
-            compact ? "flex-1 text-center" : ""
-          )}
-          href="/captain"
-        >
-          Mi equipo
-        </Link>
+        {hasCaptainAssignments ? (
+          <Link
+            className={cn(
+              "rounded-xl border border-sky-400/35 px-3 py-2 text-xs font-semibold text-sky-200 transition hover:bg-sky-500/10 md:text-sm",
+              compact ? "flex-1 text-center" : ""
+            )}
+            href="/captain"
+          >
+            Mi equipo
+          </Link>
+        ) : null}
         <Link
           className={cn(
             "rounded-xl border border-emerald-400/40 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/10 md:text-sm",
             compact ? "flex-1 text-center" : ""
           )}
-          href={withOrgQuery("/admin", organizationId)}
+          href={withPublicQuery("/admin", {
+            organizationKey: organizationId
+          })}
         >
           Panel
         </Link>
@@ -147,7 +186,9 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
           "rounded-xl border border-emerald-400/40 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/10 md:text-sm",
           compact ? "block w-full text-center" : ""
         )}
-        href="/admin/login"
+        href={withPublicQuery("/admin/login", {
+          organizationKey: organizationId
+        })}
       >
         Ingresar / Registro
       </Link>
@@ -180,7 +221,13 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
                   (item.label === "Organizaciones"
                     ? isOrganizationSection
                     : isActivePath(safePathname, item.href));
-                const href = item.label === "Organizaciones" ? organizationHubHref : withOrgQuery(item.href, organizationId);
+                const href =
+                  item.label === "Organizaciones"
+                    ? organizationHubHref
+                    : withPublicQuery(item.href, {
+                        organizationKey: organizationId,
+                        module: publicModule
+                      });
 
                 return (
                   <Link
@@ -241,7 +288,10 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
                           ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
                           : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
                       )}
-                      href={withOrgQuery(item.href, organizationId)}
+                      href={withPublicQuery(item.href, {
+                        organizationKey: organizationId,
+                        module: publicModule
+                      })}
                       key={item.href}
                     >
                       {item.label}
@@ -267,7 +317,13 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
                     (item.label === "Organizaciones"
                       ? isOrganizationSection
                       : isActivePath(safePathname, item.href));
-                  const href = item.label === "Organizaciones" ? organizationHubHref : withOrgQuery(item.href, organizationId);
+                  const href =
+                    item.label === "Organizaciones"
+                      ? organizationHubHref
+                      : withPublicQuery(item.href, {
+                          organizationKey: organizationId,
+                          module: publicModule
+                        });
 
                   return (
                     <Link
@@ -302,7 +358,10 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
                           ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
                           : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
                       )}
-                      href={withOrgQuery(item.href, organizationId)}
+                      href={withPublicQuery(item.href, {
+                        organizationKey: organizationId,
+                        module: publicModule
+                      })}
                       key={item.href}
                     >
                       {item.label}

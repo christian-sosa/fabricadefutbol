@@ -2,11 +2,13 @@ import { getFeedbackFromEmail, getFeedbackInboxEmail, getResendApiKey } from "@/
 import { normalizeEmail } from "@/lib/org";
 
 export type FeedbackCategory = "sugerencia" | "queja" | "error" | "otro";
+export type FeedbackModule = "organizations" | "tournaments" | "both";
 
 type SendFeedbackEmailInput = {
   fullName: string;
   email: string;
   category: FeedbackCategory;
+  module: FeedbackModule;
   organization: string | null;
   message: string;
   submittedAtIso: string;
@@ -27,6 +29,17 @@ function categoryLabel(category: FeedbackCategory) {
   }
 }
 
+function moduleLabel(module: FeedbackModule) {
+  switch (module) {
+    case "organizations":
+      return "Organizaciones";
+    case "tournaments":
+      return "Torneos";
+    default:
+      return "Ambos modulos";
+  }
+}
+
 function sanitizeMultilineText(value: string) {
   return value.replace(/\r\n/g, "\n").trim();
 }
@@ -43,12 +56,14 @@ export async function sendFeedbackEmail(input: SendFeedbackEmailInput) {
   const fromEmail = getFeedbackFromEmail();
   const normalizedSenderEmail = normalizeEmail(input.email);
   const category = categoryLabel(input.category);
-  const subject = `[${category}] Contacto Fabrica de Futbol`;
+  const moduleName = moduleLabel(input.module);
+  const subject = `[${category}][${moduleName}] Contacto Fabrica de Futbol`;
   const textBody = [
     `Categoria: ${category}`,
+    `Modulo: ${moduleName}`,
     `Nombre: ${input.fullName}`,
     `Email: ${normalizedSenderEmail}`,
-    `Organizacion: ${input.organization ?? "No informada"}`,
+    `Organizacion / torneo: ${input.organization ?? "No informado"}`,
     `Enviado: ${input.submittedAtIso}`,
     `User-Agent: ${input.userAgent ?? "No informado"}`,
     `Referer: ${input.referer ?? "No informado"}`,

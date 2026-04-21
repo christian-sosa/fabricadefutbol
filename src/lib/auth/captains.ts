@@ -20,6 +20,19 @@ export type CaptainAssignment = {
   createdAt: string;
 };
 
+function isMissingCaptainTableError(error: { message?: string | null } | null | undefined) {
+  const message = String(error?.message ?? "").toLowerCase();
+  if (!message) return false;
+
+  return (
+    (message.includes("tournament_team_captains") &&
+      (message.includes("schema cache") ||
+        message.includes("could not find the table") ||
+        message.includes("does not exist"))) ||
+    message.includes("relation \"public.tournament_team_captains\" does not exist")
+  );
+}
+
 function buildCaptainSelectionPath(params: { tournamentId?: string | null; teamId?: string | null }) {
   const searchParams = new URLSearchParams();
   if (params.tournamentId) searchParams.set("tournament", params.tournamentId);
@@ -46,6 +59,9 @@ export async function getCaptainAssignments(userId: string): Promise<CaptainAssi
     .order("created_at", { ascending: true });
 
   if (captainError) {
+    if (isMissingCaptainTableError(captainError)) {
+      return [];
+    }
     throw new Error(captainError.message);
   }
 
@@ -104,6 +120,11 @@ export async function getCaptainAssignments(userId: string): Promise<CaptainAssi
       if (tournamentComparison !== 0) return tournamentComparison;
       return left.teamName.localeCompare(right.teamName, "es");
     });
+}
+
+export async function hasCaptainAssignments(userId: string) {
+  const assignments = await getCaptainAssignments(userId);
+  return assignments.length > 0;
 }
 
 function findSelectedAssignment(params: {

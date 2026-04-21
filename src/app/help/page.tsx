@@ -1,171 +1,367 @@
 import Link from "next/link";
 
 import { AdPlaceholder } from "@/components/layout/ad-placeholder";
+import { PublicModuleToggle } from "@/components/layout/public-module-toggle";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { ORGANIZATION_BILLING_CURRENCY, ORGANIZATION_MONTHLY_PRICE_ARS } from "@/lib/constants";
+import { type PublicModuleContext, resolvePublicModule, withPublicQuery } from "@/lib/org";
 
-function formatCurrencyArs(amount: number) {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: ORGANIZATION_BILLING_CURRENCY,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount);
-}
+type HelpSectionItem = {
+  title: string;
+  description: string;
+};
 
-const gettingStartedSteps = [
-  {
-    title: "1. Crea tu cuenta y activa tu organizacion",
+type HelpFaqItem = {
+  question: string;
+  answer: string;
+};
+
+type HelpContent = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  capabilities: string[];
+  focusTitle: string;
+  focusDescription: string;
+  gettingStartedLabel: string;
+  gettingStarted: HelpSectionItem[];
+  workflowLabel: string;
+  workflow: HelpSectionItem[];
+  detailLabel: string;
+  detail: HelpSectionItem[];
+  highlightCards: HelpSectionItem[];
+  faq: HelpFaqItem[];
+};
+
+const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
+  organizations: {
+    eyebrow: "Centro de ayuda",
+    title: "Como funciona el modulo Organizaciones",
     description:
-      "Ingresa al panel, registrate con tu email y crea la organizacion que vas a administrar. Desde ese momento ya puedes empezar a cargar tu plantel y trabajar sobre tus partidos."
+      "Organizaciones esta pensado para grupos de futbol amateur que quieren ordenar su plantel, convocar jugadores, generar equipos balanceados, registrar resultados y mantener un ranking competitivo actualizado.",
+    capabilities: [
+      "Administrar una o varias organizaciones desde la misma cuenta.",
+      "Cargar jugadores, ordenar el plantel y sumar invitados puntuales.",
+      "Crear partidos, convocar participantes y generar equipos.",
+      "Registrar resultados y actualizar automaticamente el ranking."
+    ],
+    focusTitle: "En que conviene enfocarse al principio",
+    focusDescription:
+      "Lo ideal es construir primero una buena base de jugadores, luego crear los primeros partidos y finalmente empezar a cargar resultados para que el ranking gane valor con el tiempo.",
+    gettingStartedLabel: "Primeros pasos",
+    gettingStarted: [
+      {
+        title: "1. Crea tu cuenta y activa tu organizacion",
+        description:
+          "Ingresa al panel, registrate con tu email y crea la organizacion que vas a administrar. Desde ese momento ya puedes empezar a cargar tu plantel y trabajar sobre tus partidos."
+      },
+      {
+        title: "2. Carga tu plantel base",
+        description:
+          "En la seccion Jugadores agrega a cada integrante del equipo. El nombre es obligatorio y el orden inicial te sirve para ordenar tu plantel desde el primer dia."
+      },
+      {
+        title: "3. Crea tu primer partido",
+        description:
+          "En Nuevo Partido eliges modalidad, fecha y convocatoria. Puedes trabajar solo con jugadores registrados o sumar invitados puntuales con un rating manual."
+      },
+      {
+        title: "4. Confirma equipos y carga el resultado",
+        description:
+          "La app genera opciones equilibradas para que elijas una formacion final. Cuando el partido se juega, cargas el resultado y el sistema actualiza automaticamente el ranking competitivo."
+      }
+    ],
+    workflowLabel: "Como se gestiona el dia a dia",
+    workflow: [
+      {
+        title: "Convocatoria clara",
+        description:
+          "El sistema arma los equipos a partir de la lista de convocados del partido. Eso te permite trabajar con la disponibilidad real de cada fecha."
+      },
+      {
+        title: "Equipos balanceados",
+        description:
+          "Las opciones automaticas buscan reducir la diferencia entre ambos lados usando como referencia el orden inicial del plantel y el puntaje manual de los invitados."
+      },
+      {
+        title: "Flexibilidad para la cancha real",
+        description:
+          "Si hubo ausencias, reemplazos o invitados de ultimo momento, puedes ajustar la formacion antes de cargar el resultado final para que el historial quede fiel a lo que paso."
+      }
+    ],
+    detailLabel: "Ranking de jugadores",
+    detail: [
+      {
+        title: "Orden inicial del plantel",
+        description:
+          "Es una referencia manual definida por el administrador para ordenar a los jugadores dentro de la organizacion y hoy tambien sirve como base para balancear equipos."
+      },
+      {
+        title: "Punto de partida del rating",
+        description:
+          "Cada jugador registrado comienza con un rating competitivo de 1000 puntos. Ese valor es dinamico y funciona como base para medir su evolucion."
+      },
+      {
+        title: "Como se actualiza",
+        description:
+          "Cuando cargas un resultado, una victoria suma 10 puntos a los jugadores del equipo ganador y una derrota resta 10 al equipo que pierde. Si empatan, el rating no se modifica."
+      },
+      {
+        title: "Partidos en inferioridad",
+        description:
+          "Si un equipo juega con menos jugadores, el ajuste se adapta para no medir igual una desventaja numerica. Una victoria en inferioridad se premia mas."
+      }
+    ],
+    highlightCards: [
+      {
+        title: "Como interpretar el ranking",
+        description:
+          "Hay dos referencias distintas dentro de la plataforma: el orden inicial del plantel, que es manual, y el ranking competitivo, que se calcula con el rating actual de cada jugador."
+      },
+      {
+        title: "Consejo practico",
+        description:
+          "Si el grupo es nuevo o todavia no tiene historial, empieza cargando a todos los jugadores y juega algunos partidos con normalidad. A medida que se sumen resultados, el ranking competitivo va a reflejar mejor la realidad."
+      }
+    ],
+    faq: [
+      {
+        question: "Que informacion es publica?",
+        answer:
+          "Las organizaciones publicas muestran ranking, jugadores, historial de partidos y proximos encuentros. La gestion y edicion quedan reservadas para los administradores."
+      },
+      {
+        question: "Cuantos administradores puede tener una organizacion?",
+        answer:
+          "Cada organizacion admite hasta 4 administradores activos o pendientes de invitacion. Eso permite repartir la gestion sin perder control."
+      },
+      {
+        question: "La plataforma tiene costo?",
+        answer:
+          "El modulo ya esta preparado para facturacion, pero el valor publico final se esta terminando de definir. En Precios veras el esquema placeholder con XXX mientras cerramos ese dato."
+      },
+      {
+        question: "Que pasa cuando termina el periodo contratado?",
+        answer:
+          "La idea es mantener la informacion visible y dejar la organizacion en modo lectura hasta reactivar el plan. Esa politica comercial fina tambien se mostrara en la pagina de precios."
+      },
+      {
+        question: "Donde puedo hacer consultas o reportar un problema?",
+        answer:
+          "En la seccion Contacto puedes enviar sugerencias, consultas o reportes de error para que el equipo los revise."
+      }
+    ]
   },
-  {
-    title: "2. Carga tu plantel base",
+  tournaments: {
+    eyebrow: "Centro de ayuda",
+    title: "Como funciona el modulo Torneos",
     description:
-      "En la seccion Jugadores agrega a cada integrante del equipo. El nombre es obligatorio y el orden inicial te sirve para ordenar tu plantel desde el primer dia. Ese orden no se modifica solo con los partidos: solo cambia si un administrador decide editarlo."
-  },
-  {
-    title: "3. Crea tu primer partido",
-    description:
-      "En Nuevo Partido eliges modalidad, fecha y convocatoria. Puedes trabajar solo con jugadores registrados o sumar invitados puntuales con un rating manual si participaron esa fecha pero no forman parte fija del plantel."
-  },
-  {
-    title: "4. Confirma equipos y carga el resultado",
-    description:
-      "La app genera opciones equilibradas para que elijas una formacion final. Ese balance toma como referencia el orden inicial del plantel y el valor manual que asignes a invitados. Cuando el partido se juega, cargas el resultado y el sistema actualiza automaticamente el ranking competitivo."
+      "Torneos esta pensado para competencias tipo liga simple. Permite cargar equipos, planteles propios del torneo, invitar capitanes, generar fixture, registrar actas y publicar tabla y estadisticas.",
+    capabilities: [
+      "Crear torneos independientes del modulo Organizaciones.",
+      "Cargar equipos, jugadores y fotos dentro del mismo torneo.",
+      "Invitar capitanes para que completen y mantengan su plantel.",
+      "Generar fixture, resultados, tabla, goleadores, figuras y vallas."
+    ],
+    focusTitle: "En que conviene enfocarse al principio",
+    focusDescription:
+      "Primero conviene definir el torneo, cargar los equipos y dejar claras las responsabilidades. Despues puedes avanzar con capitanes, planteles completos y fixture para que la carga de resultados sea mucho mas fluida.",
+    gettingStartedLabel: "Primeros pasos",
+    gettingStarted: [
+      {
+        title: "1. Crea el torneo",
+        description:
+          "Desde el panel de Torneos das de alta nombre, slug, temporada, estado y visibilidad publica. El admin creador queda asociado automaticamente a esa competencia."
+      },
+      {
+        title: "2. Carga los equipos",
+        description:
+          "Agrega los equipos participantes con nombre, nombre corto y orden visual. Ese plantel es totalmente independiente del modulo Organizaciones."
+      },
+      {
+        title: "3. Invita capitanes o carga el plantel tu mismo",
+        description:
+          "Puedes asignar un capitan por equipo para que, al iniciar sesion, complete los jugadores y sus fotos. Si prefieres, tambien puedes cargar todo desde admin."
+      },
+      {
+        title: "4. Genera el fixture y publica la competencia",
+        description:
+          "Cuando ya tienes al menos dos equipos, puedes crear el fixture tipo round robin o cargarlo manualmente con fecha, horario y sede."
+      }
+    ],
+    workflowLabel: "Como se gestiona el dia a dia",
+    workflow: [
+      {
+        title: "Fixture flexible",
+        description:
+          "Puedes generar todas las fechas en forma automatica o editar partido por partido para ajustar horarios, sedes y estados antes de jugar."
+      },
+      {
+        title: "Capitanes con acceso acotado",
+        description:
+          "El capitan solo ve su equipo dentro del torneo y puede completar sus jugadores y fotos sin tocar la configuracion general de la competencia."
+      },
+      {
+        title: "Carga de actas simple",
+        description:
+          "En cada partido puedes registrar marcador, figura, goles y tarjetas. Si falta un jugador en el plantel, el acta permite cargar nombre libre para no frenar la carga."
+      }
+    ],
+    detailLabel: "Tabla y estadisticas",
+    detail: [
+      {
+        title: "Tabla de posiciones",
+        description:
+          "La tabla se calcula automaticamente con 3 puntos por victoria, 1 por empate y 0 por derrota. Los desempates usan diferencia de gol, goles a favor y nombre del equipo."
+      },
+      {
+        title: "Goleadores y figuras",
+        description:
+          "Los leaderboards se construyen a partir de las actas cargadas. No necesitas mantener tablas manuales de goleadores ni MVPs."
+      },
+      {
+        title: "Vallas menos vencidas",
+        description:
+          "En esta primera version se muestran por equipo, calculando los goles recibidos por cada club a lo largo del torneo."
+      },
+      {
+        title: "Partidos jugados",
+        description:
+          "Una vez que un partido queda como jugado, se bloquean los cambios estructurales de equipos o localia. A partir de ahi solo editas el acta y los datos del resultado."
+      }
+    ],
+    highlightCards: [
+      {
+        title: "Que se publica",
+        description:
+          "El publico puede ver listado de torneos, tabla, fixture, detalle de partidos, goleadores, figuras y vallas menos vencidas cuando el torneo esta marcado como publico."
+      },
+      {
+        title: "Consejo practico",
+        description:
+          "Si vas a trabajar con capitanes, define los equipos primero y enviales la invitacion antes de empezar a cargar resultados. Eso ordena mucho la calidad del plantel y las fotos."
+      }
+    ],
+    faq: [
+      {
+        question: "Los torneos usan los mismos jugadores que organizaciones?",
+        answer:
+          "No. El modulo Torneos tiene su propia tabla de jugadores para mantener completamente separado ese dominio del flujo actual de organizaciones."
+      },
+      {
+        question: "Que puede hacer un capitan?",
+        answer:
+          "El capitan inicia sesion con su cuenta y solo accede al equipo que el admin le asigno dentro del torneo. Desde ahi puede cargar o editar jugadores y sus fotos."
+      },
+      {
+        question: "Se puede regenerar el fixture despues de empezarlo?",
+        answer:
+          "En V1 no. El fixture automatico solo se genera cuando todavia no existen partidos. Una vez creado, los ajustes pasan a ser manuales."
+      },
+      {
+        question: "La plataforma tiene costo?",
+        answer:
+          "El esquema comercial del modulo Torneos ya esta contemplado, pero el valor final sigue en definicion. Por eso en Precios veras el placeholder XXX."
+      },
+      {
+        question: "Que pasa si falta un jugador en el plantel al cargar un partido?",
+        answer:
+          "El acta permite registrar estadisticas con nombre libre sin exigir que ese jugador exista previamente en el plantel, asi no se rompe el flujo operativo."
+      }
+    ]
   }
-];
+};
 
-const matchFlowItems = [
-  {
-    title: "Convocatoria clara",
-    description:
-      "El sistema arma los equipos a partir de la lista de convocados del partido. Eso te permite trabajar con la disponibilidad real de cada fecha y no solo con el plantel completo."
-  },
-  {
-    title: "Equipos balanceados",
-    description:
-      "Las opciones automaticas buscan reducir la diferencia entre ambos lados usando como referencia el orden inicial del plantel y el puntaje manual de los invitados. Ademas, penalizan combinaciones donde los jugadores mejor ubicados quedan juntos en el mismo equipo."
-  },
-  {
-    title: "Flexibilidad para la cancha real",
-    description:
-      "Si hubo ausencias, reemplazos o invitados de ultimo momento, puedes ajustar la formacion antes de cargar el resultado final para que el historial quede fiel a lo que paso en el partido."
-  }
-];
+export default async function HelpPage({
+  searchParams
+}: {
+  searchParams: Promise<{ org?: string; module?: string }>;
+}) {
+  const resolvedSearchParams = await searchParams;
+  const organizationKey = resolvedSearchParams.org ?? null;
+  const currentModule = resolvePublicModule(resolvedSearchParams.module);
+  const content = helpContentByModule[currentModule];
+  const panelPath =
+    currentModule === "tournaments"
+      ? withPublicQuery("/admin/tournaments", { organizationKey })
+      : withPublicQuery("/admin", { organizationKey });
+  const listingPath =
+    currentModule === "tournaments"
+      ? withPublicQuery("/tournaments", {
+          organizationKey,
+          module: currentModule
+        })
+      : withPublicQuery("/organizations", {
+          organizationKey,
+          module: currentModule
+        });
+  const pricingPath = withPublicQuery("/pricing", {
+    organizationKey,
+    module: currentModule
+  });
+  const feedbackPath = withPublicQuery("/feedback", {
+    organizationKey,
+    module: currentModule
+  });
 
-const ratingPrinciples = [
-  {
-    title: "Orden inicial del plantel",
-    description:
-      "El ranking inicial del plantel es una referencia manual definida por el administrador para ordenar a los jugadores dentro de la organizacion. Ese orden no se mueve automaticamente con los resultados: solo cambia si el admin decide editarlo. Hoy, ademas, es la base que usa el armado automatico de equipos."
-  },
-  {
-    title: "Punto de partida del rating",
-    description:
-      "Cada jugador registrado comienza con un rating competitivo de 1000 puntos. Ese valor si es dinamico y funciona como base para medir su evolucion con el paso de los partidos."
-  },
-  {
-    title: "Como se actualiza",
-    description:
-      "Cuando cargas un resultado, una victoria suma 10 puntos a los jugadores del equipo ganador y una derrota resta 10 al equipo que pierde. Si el partido termina empatado, el rating no se modifica."
-  },
-  {
-    title: "Partidos en inferioridad",
-    description:
-      "Si un equipo juega con menos jugadores, el ajuste se adapta para no medir igual una desventaja numerica. Una victoria en inferioridad se premia mas, y una derrota en esa condicion recibe un tratamiento mas suave."
-  },
-  {
-    title: "Orden del ranking",
-    description:
-      "La tabla publica de ranking se ordena por el rating actual de cada jugador. Cuanto mejor sea su rendimiento acumulado, mas arriba aparecera en la clasificacion."
-  }
-];
-
-const faqItems = [
-  {
-    question: "Que informacion es publica?",
-    answer:
-      "Las organizaciones publicas muestran ranking, jugadores, historial de partidos y proximos encuentros. La gestion y edicion quedan reservadas para los administradores."
-  },
-  {
-    question: "Cuantos administradores puede tener una organizacion?",
-    answer:
-      "Cada organizacion admite hasta 4 administradores activos o pendientes de invitacion. Eso permite repartir la gestion sin perder control."
-  },
-  {
-    question: "La plataforma tiene costo?",
-    answer:
-      `Cada organizacion cuenta con 1 mes gratis desde su creacion. Finalizado ese periodo, el costo es ${formatCurrencyArs(ORGANIZATION_MONTHLY_PRICE_ARS)} por mes por organizacion para mantener la edicion habilitada.`
-  },
-  {
-    question: "Que pasa cuando termina el periodo gratis?",
-    answer:
-      "La organizacion queda en modo solo lectura. La informacion se conserva y sigue visible, pero se bloquean las acciones de alta, edicion y borrado hasta reactivar el plan."
-  },
-  {
-    question: "Donde puedo hacer consultas o reportar un problema?",
-    answer:
-      "En la seccion Contacto puedes enviar sugerencias, consultas o reportes de error para que el equipo los revise."
-  }
-];
-
-export default function HelpPage() {
   return (
     <div className="space-y-6">
       <section className="rounded-3xl border border-slate-800 bg-slate-900/75 p-5 shadow-[0_24px_40px_-30px_rgba(16,185,129,0.7)] md:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-400">Centro de ayuda</p>
-        <h1 className="mt-2 text-3xl font-black text-slate-100 md:text-5xl">Como funciona Fabrica de Futbol</h1>
-        <p className="mt-3 max-w-4xl text-sm text-slate-300 md:text-base">
-          Fabrica de Futbol es una plataforma para organizar futbol amateur de manera ordenada y profesional.
-          Te permite administrar tu plantel, convocar jugadores, generar equipos equilibrados, registrar resultados
-          y mantener un ranking actualizado de rendimiento.
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-400">{content.eyebrow}</p>
+        <h1 className="mt-2 text-3xl font-black text-slate-100 md:text-5xl">{content.title}</h1>
+        <p className="mt-3 max-w-4xl text-sm text-slate-300 md:text-base">{content.description}</p>
+        <PublicModuleToggle
+          basePath="/help"
+          className="mt-5"
+          currentModule={currentModule}
+          organizationKey={organizationKey}
+        />
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
             className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(16,185,129,1)]"
-            href="/admin/login"
+            href={panelPath}
           >
-            Crear cuenta o ingresar
+            {currentModule === "tournaments" ? "Ir al panel de torneos" : "Ir al panel de organizaciones"}
           </Link>
           <Link
             className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
-            href="/pricing"
+            href={listingPath}
           >
-            Ver precios
+            {currentModule === "tournaments" ? "Ver torneos publicos" : "Ver organizaciones publicas"}
           </Link>
           <Link
             className="rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
-            href="/feedback"
+            href={feedbackPath}
           >
             Contacto
+          </Link>
+          <Link
+            className="rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
+            href={pricingPath}
+          >
+            Ver precios
           </Link>
         </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardTitle>Que puedes hacer en la plataforma</CardTitle>
+          <CardTitle>Que puedes hacer en este modulo</CardTitle>
           <div className="mt-3 space-y-2 text-sm text-slate-300">
-            <p>Administrar una o varias organizaciones.</p>
-            <p>Cargar jugadores y mantener un plantel ordenado.</p>
-            <p>Crear partidos, convocar participantes y generar equipos.</p>
-            <p>Registrar resultados y actualizar automaticamente el ranking.</p>
+            {content.capabilities.map((item) => (
+              <p key={item}>{item}</p>
+            ))}
           </div>
         </Card>
         <Card>
-          <CardTitle>En que conviene enfocarse al principio</CardTitle>
-          <CardDescription className="mt-2">
-            Si estas empezando, lo mas recomendable es construir primero una buena base de jugadores, luego crear tus
-            primeros partidos y finalmente empezar a cargar resultados para que el ranking gane valor con el tiempo.
-          </CardDescription>
+          <CardTitle>{content.focusTitle}</CardTitle>
+          <CardDescription className="mt-2">{content.focusDescription}</CardDescription>
         </Card>
       </section>
 
       <section className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Primeros pasos</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{content.gettingStartedLabel}</p>
         <div className="grid gap-4 md:grid-cols-2">
-          {gettingStartedSteps.map((step) => (
+          {content.gettingStarted.map((step) => (
             <Card key={step.title}>
               <CardTitle>{step.title}</CardTitle>
               <CardDescription className="mt-2">{step.description}</CardDescription>
@@ -177,9 +373,9 @@ export default function HelpPage() {
       <AdPlaceholder slot="help-top-banner" />
 
       <section className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Como arrancar a cargar tu equipo</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{content.workflowLabel}</p>
         <div className="grid gap-4 md:grid-cols-3">
-          {matchFlowItems.map((item) => (
+          {content.workflow.map((item) => (
             <Card key={item.title}>
               <CardTitle>{item.title}</CardTitle>
               <CardDescription className="mt-2">{item.description}</CardDescription>
@@ -189,9 +385,9 @@ export default function HelpPage() {
       </section>
 
       <section className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Ranking de jugadores</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{content.detailLabel}</p>
         <div className="grid gap-4 md:grid-cols-2">
-          {ratingPrinciples.map((item) => (
+          {content.detail.map((item) => (
             <Card key={item.title}>
               <CardTitle>{item.title}</CardTitle>
               <CardDescription className="mt-2">{item.description}</CardDescription>
@@ -201,29 +397,18 @@ export default function HelpPage() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardTitle>Como interpretar el ranking</CardTitle>
-          <CardDescription className="mt-2">
-            Hay dos referencias distintas dentro de la plataforma. Por un lado, el orden inicial del plantel, que es
-            manual y lo administra tu equipo, y que hoy tambien sirve como base para balancear equipos. Por otro, el
-            ranking competitivo, que se calcula con el rating actual de cada jugador y si evoluciona con los
-            resultados cargados.
-          </CardDescription>
-        </Card>
-        <Card>
-          <CardTitle>Consejo practico</CardTitle>
-          <CardDescription className="mt-2">
-            Si el grupo es nuevo o todavia no tiene historial, empieza cargando a todos los jugadores y juega algunos
-            partidos con normalidad. A medida que se sumen resultados, el ranking competitivo va a reflejar mejor la
-            realidad del equipo.
-          </CardDescription>
-        </Card>
+        {content.highlightCards.map((item) => (
+          <Card key={item.title}>
+            <CardTitle>{item.title}</CardTitle>
+            <CardDescription className="mt-2">{item.description}</CardDescription>
+          </Card>
+        ))}
       </section>
 
       <section className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Preguntas frecuentes</p>
         <div className="space-y-3">
-          {faqItems.map((item) => (
+          {content.faq.map((item) => (
             <Card key={item.question}>
               <CardTitle>{item.question}</CardTitle>
               <CardDescription className="mt-2">{item.answer}</CardDescription>

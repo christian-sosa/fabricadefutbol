@@ -4,18 +4,20 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { sendFeedbackEmail } from "@/lib/feedback-email";
-import { normalizeEmail, withOrgQuery } from "@/lib/org";
+import { sendFeedbackEmail, type FeedbackModule } from "@/lib/feedback-email";
+import type { PublicModuleContext } from "@/lib/org";
+import { normalizeEmail, withPublicQuery } from "@/lib/org";
 import { checkRateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
 
 const feedbackSchema = z.object({
   fullName: z.string().trim().min(2, "Escribe tu nombre.").max(80, "El nombre es demasiado largo."),
   email: z.string().trim().email("Ingresa un email valido."),
   category: z.enum(["sugerencia", "queja", "error", "otro"]),
+  module: z.enum(["organizations", "tournaments", "both"]),
   organization: z
     .string()
     .trim()
-    .max(80, "El nombre de la organizacion es demasiado largo.")
+    .max(80, "El nombre de la organizacion o torneo es demasiado largo.")
     .optional(),
   message: z
     .string()
@@ -25,8 +27,34 @@ const feedbackSchema = z.object({
   website: z.string().optional()
 });
 
-function buildFeedbackPath(params: { organizationKey: string | null; sent?: boolean; error?: string }) {
-  const basePath = withOrgQuery("/feedback", params.organizationKey);
+function normalizeFeedbackModule(
+  value: FormDataEntryValue | null,
+  fallback: PublicModuleContext
+): FeedbackModule {
+  if (value === "organizations" || value === "tournaments" || value === "both") {
+    return value;
+  }
+
+  return fallback;
+}
+
+function toPageModule(module: FeedbackModule, fallback: PublicModuleContext): PublicModuleContext {
+  if (module === "tournaments") return "tournaments";
+  if (module === "organizations") return "organizations";
+  return fallback;
+}
+
+function buildFeedbackPath(params: {
+  organizationKey: string | null;
+  module: PublicModuleContext;
+  sent?: boolean;
+  error?: string;
+}) {
+  const basePath = withPublicQuery("/feedback", {
+    organizationKey: params.organizationKey,
+    module: params.module
+  });
+
   if (params.sent) {
     const separator = basePath.includes("?") ? "&" : "?";
     return `${basePath}${separator}sent=1`;
@@ -61,11 +89,19 @@ function buildFriendlyFeedbackErrorMessage(error: unknown) {
   return fallback;
 }
 
-export async function submitFeedbackAction(organizationKey: string | null, formData: FormData) {
+export async function submitFeedbackAction(
+  organizationKey: string | null,
+  defaultModule: PublicModuleContext,
+  formData: FormData
+) {
+  const submittedModule = normalizeFeedbackModule(formData.get("module"), defaultModule);
+  const pageModule = toPageModule(submittedModule, defaultModule);
+
   const parsed = feedbackSchema.safeParse({
     fullName: formData.get("fullName"),
     email: formData.get("email"),
     category: formData.get("category"),
+    module: formData.get("module"),
     organization: formData.get("organization"),
     message: formData.get("message"),
     website: formData.get("website")
@@ -75,29 +111,37 @@ export async function submitFeedbackAction(organizationKey: string | null, formD
     redirect(
       buildFeedbackPath({
         organizationKey,
+        module: pageModule,
         error: parsed.error.issues[0]?.message ?? "No se pudo enviar tu mensaje."
       })
     );
   }
 
   if ((parsed.data.website ?? "").trim().length > 0) {
-    redirect(buildFeedbackPath({ organizationKey, sent: true }));
+    redirect(
+      buildFeedbackPath({
+        organizationKey,
+        module: pageModule,
+        sent: true
+      })
+    );
   }
 
   const headerStore = await headers();
   const clientIp = getClientIpFromHeaders(headerStore);
-  // Max 3 envios por IP cada 5 minutos. Mitiga spam/abuso del formulario.
   const rateLimit = checkRateLimit({
     key: `feedback:${clientIp}`,
     limit: 3,
     windowMs: 5 * 60 * 1000
   });
+
   if (!rateLimit.allowed) {
     const retryMinutes = Math.max(1, Math.ceil(rateLimit.retryAfterMs / 60_000));
     redirect(
       buildFeedbackPath({
         organizationKey,
-        error: `Enviaste demasiados mensajes seguidos. Probá de nuevo en ${retryMinutes} minuto(s).`
+        module: pageModule,
+        error: `Enviaste demasiados mensajes seguidos. Proba de nuevo en ${retryMinutes} minuto(s).`
       })
     );
   }
@@ -107,6 +151,7 @@ export async function submitFeedbackAction(organizationKey: string | null, formD
       fullName: parsed.data.fullName,
       email: normalizeEmail(parsed.data.email),
       category: parsed.data.category,
+      module: parsed.data.module,
       organization: parsed.data.organization?.trim() || null,
       message: parsed.data.message,
       submittedAtIso: new Date().toISOString(),
@@ -118,10 +163,17 @@ export async function submitFeedbackAction(organizationKey: string | null, formD
     redirect(
       buildFeedbackPath({
         organizationKey,
+        module: pageModule,
         error: buildFriendlyFeedbackErrorMessage(error)
       })
     );
   }
 
-  redirect(buildFeedbackPath({ organizationKey, sent: true }));
+  redirect(
+    buildFeedbackPath({
+      organizationKey,
+      module: pageModule,
+      sent: true
+    })
+  );
 }
