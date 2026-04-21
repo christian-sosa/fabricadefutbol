@@ -35,11 +35,19 @@ const photoSchema = z.object({
 
 const rowSchema = z.object({
   id: z.string().uuid(),
-  fullName: z.string().min(3),
-  initialRank: z.number().int().positive(),
-  currentRating: z.number().positive(),
+  fullName: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
+  initialRank: z.number().int().positive("El rank inicial debe ser un numero entero positivo."),
+  currentRating: z.number().positive("El rating debe ser un numero positivo."),
   active: z.boolean()
 });
+
+function parseDecimalField(value: FormDataEntryValue | null) {
+  const normalized = String(value ?? "")
+    .trim()
+    .replace(",", ".");
+
+  return Number(normalized);
+}
 
 function withMessage(organizationId: string, error: string | null) {
   const basePath = withOrgQuery("/admin/players", organizationId);
@@ -224,7 +232,7 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
     const playerIds = formData.getAll("playerId").map((value) => String(value));
     const fullNames = formData.getAll("fullName").map((value) => String(value));
     const initialRanks = formData.getAll("initialRank").map((value) => Number(value));
-    const currentRatings = formData.getAll("currentRating").map((value) => Number(value));
+    const currentRatings = formData.getAll("currentRating").map((value) => parseDecimalField(value));
     const statuses = formData.getAll("activeStatus").map((value) => String(value));
 
     if (
@@ -237,15 +245,26 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
       redirect(withMessage(organizationQueryKey, "La planilla enviada es invalida o incompleta."));
     }
 
-    const rows = playerIds.map((id, index) =>
-      rowSchema.parse({
+    const rows = playerIds.map((id, index) => {
+      const parsedRow = rowSchema.safeParse({
         id,
         fullName: fullNames[index],
         initialRank: initialRanks[index],
         currentRating: currentRatings[index],
         active: statuses[index] === "true"
-      })
-    );
+      });
+
+      if (!parsedRow.success) {
+        redirect(
+          withMessage(
+            organizationQueryKey,
+            parsedRow.error.issues[0]?.message ?? `No se pudo validar la fila de ${fullNames[index] || "un jugador"}.`
+          )
+        );
+      }
+
+      return parsedRow.data;
+    });
 
     const idsSet = new Set(rows.map((row) => row.id));
     if (idsSet.size !== rows.length) {

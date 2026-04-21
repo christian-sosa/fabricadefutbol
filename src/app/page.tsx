@@ -19,7 +19,7 @@ const problemItems = [
 ] as const;
 
 const solutionItems = [
-  "Equipos equilibrados automaticamente",
+  "Equipos parejos automaticamente",
   "Ranking real",
   "Historial completo"
 ] as const;
@@ -74,6 +74,9 @@ const fallbackRankingPreview = [
   trend: RankingTrend;
 }>;
 
+const rankingPreviewDescription = "Ejemplo con datos ficticios de como se ve un ranking dentro de la plataforma.";
+const rankingPreviewMatchCount = 24;
+
 function getTrendMeta(trend: RankingTrend) {
   switch (trend) {
     case "up":
@@ -112,15 +115,7 @@ export default async function HomePage({
   const summary = await getHomeSummary(selectedOrganization?.id ?? null);
   const selectedOrganizationSlug = selectedOrganization?.slug ?? null;
   const featuredTournaments = tournaments.slice(0, 3);
-  const trendPattern: RankingTrend[] = ["up", "up", "same", "down", "up"];
-
-  const rankingPreviewRows = summary.topPlayers.length
-    ? summary.topPlayers.slice(0, 5).map((player, index) => ({
-        name: player.full_name,
-        points: Math.round(Number(player.current_rating)),
-        trend: trendPattern[index] ?? "same"
-      }))
-    : [...fallbackRankingPreview];
+  const rankingPreviewRows = fallbackRankingPreview;
 
   return (
     <div className="space-y-8">
@@ -131,7 +126,7 @@ export default async function HomePage({
               Futbol amateur sin discusiones
             </p>
             <h1 className="mt-3 max-w-4xl text-4xl font-black leading-tight text-white md:text-5xl lg:text-6xl">
-              Deja de discutir equipos. Arma partidos equilibrados y lleva el ranking real de tu grupo.
+              Deja de discutir equipos. Arma partidos parejos y lleva el ranking real de tu grupo.
             </h1>
             <p className="mt-4 max-w-2xl text-base text-slate-300 md:text-lg">
               Organiza partidos, genera estadisticas y conoce quien es realmente el mejor.
@@ -154,7 +149,7 @@ export default async function HomePage({
 
             <div className="mt-6 flex flex-wrap gap-2">
               {[
-                "Equipos equilibrados",
+                "Equipos parejos",
                 "Ranking automatico",
                 "Historial de partidos",
                 "30 dias gratis"
@@ -175,15 +170,11 @@ export default async function HomePage({
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">KPI Visual</p>
                   <CardTitle className="mt-2 text-2xl">Ranking del grupo</CardTitle>
-                  <CardDescription className="mt-2">
-                    {selectedOrganization
-                      ? `Vista previa basada en ${selectedOrganization.name}.`
-                      : "Vista previa de como se ve un ranking real dentro de la plataforma."}
-                  </CardDescription>
+                  <CardDescription className="mt-2">{rankingPreviewDescription}</CardDescription>
                 </div>
                 <div className="rounded-2xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-right">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Partidos</p>
-                  <p className="mt-1 text-2xl font-black text-white">{summary.totalFinishedMatches || 24}</p>
+                  <p className="mt-1 text-2xl font-black text-white">{rankingPreviewMatchCount}</p>
                 </div>
               </div>
 
@@ -605,7 +596,7 @@ export default async function HomePage({
       <section className="rounded-[2rem] border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.14),rgba(15,23,42,0.98))] p-6 text-center shadow-[0_24px_60px_-38px_rgba(16,185,129,0.75)] md:p-8">
         <h2 className="text-3xl font-black text-white md:text-4xl">Empeza gratis</h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm text-slate-200 md:text-base">
-          Crea tu grupo, arma partidos equilibrados y empieza a construir un ranking que de verdad represente lo que pasa en la cancha.
+          Crea tu grupo, arma partidos parejos y empieza a construir un ranking que de verdad represente lo que pasa en la cancha.
         </p>
         <div className="mt-6 flex justify-center">
           <Link
