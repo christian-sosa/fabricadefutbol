@@ -7,6 +7,14 @@ type TableName =
   | "organization_invites"
   | "organization_billing_payments"
   | "organization_billing_subscriptions"
+  | "tournaments"
+  | "tournament_admins"
+  | "tournament_teams"
+  | "tournament_players"
+  | "tournament_rounds"
+  | "tournament_matches"
+  | "tournament_match_results"
+  | "tournament_match_player_stats"
   | "players"
   | "matches"
   | "match_players"
@@ -54,6 +62,14 @@ function createEmptyDatabase(): FakeDatabase {
     organization_invites: [],
     organization_billing_payments: [],
     organization_billing_subscriptions: [],
+    tournaments: [],
+    tournament_admins: [],
+    tournament_teams: [],
+    tournament_players: [],
+    tournament_rounds: [],
+    tournament_matches: [],
+    tournament_match_results: [],
+    tournament_match_player_stats: [],
     players: [],
     matches: [],
     match_players: [],
@@ -98,6 +114,51 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!normalized.purpose) normalized.purpose = "organization_subscription";
       if (!normalized.updated_at) normalized.updated_at = now;
       if (!("subscription_applied_at" in normalized)) normalized.subscription_applied_at = null;
+      break;
+    case "tournaments":
+      if (!("is_public" in normalized)) normalized.is_public = true;
+      if (!normalized.status) normalized.status = "draft";
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "tournament_admins":
+      if (!normalized.role) normalized.role = "editor";
+      if (!("created_by" in normalized)) normalized.created_by = null;
+      break;
+    case "tournament_teams":
+      if (!("short_name" in normalized)) normalized.short_name = null;
+      if (!("notes" in normalized)) normalized.notes = null;
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "tournament_players":
+      if (!("shirt_number" in normalized)) normalized.shirt_number = null;
+      if (!("position" in normalized)) normalized.position = null;
+      if (!("active" in normalized)) normalized.active = true;
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "tournament_rounds":
+      if (!("starts_at" in normalized)) normalized.starts_at = null;
+      if (!("ends_at" in normalized)) normalized.ends_at = null;
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "tournament_matches":
+      if (!("round_id" in normalized)) normalized.round_id = null;
+      if (!("scheduled_at" in normalized)) normalized.scheduled_at = null;
+      if (!("venue" in normalized)) normalized.venue = null;
+      if (!normalized.status) normalized.status = "draft";
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "tournament_match_results":
+      if (!("mvp_player_id" in normalized)) normalized.mvp_player_id = null;
+      if (!("notes" in normalized)) normalized.notes = null;
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "tournament_match_player_stats":
+      if (!("player_id" in normalized)) normalized.player_id = null;
+      if (!("goals" in normalized)) normalized.goals = 0;
+      if (!("yellow_cards" in normalized)) normalized.yellow_cards = 0;
+      if (!("red_cards" in normalized)) normalized.red_cards = 0;
+      if (!("is_mvp" in normalized)) normalized.is_mvp = false;
+      if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "players":
       if (!("current_rating" in normalized)) normalized.current_rating = 1000;
@@ -169,8 +230,40 @@ class FakeSupabaseState {
   }
 
   insertRow(table: TableName, row: Row) {
+    if (table === "tournament_admins") {
+      const tournamentId = String(row.tournament_id ?? "");
+      const adminId = String(row.admin_id ?? "");
+      const existing = this.db.tournament_admins.find(
+        (candidate) =>
+          String(candidate.tournament_id) === tournamentId && String(candidate.admin_id) === adminId
+      );
+
+      if (existing) {
+        Object.assign(existing, cloneRow(row));
+        return existing;
+      }
+    }
+
     const normalized = applyDefaults(table, cloneRow(row), () => this.nextId());
     this.db[table].push(normalized);
+
+    if (table === "tournaments" && normalized.created_by) {
+      const ownerLinkExists = this.db.tournament_admins.some(
+        (candidate) =>
+          String(candidate.tournament_id) === String(normalized.id) &&
+          String(candidate.admin_id) === String(normalized.created_by)
+      );
+
+      if (!ownerLinkExists) {
+        this.insertRow("tournament_admins", {
+          tournament_id: normalized.id,
+          admin_id: normalized.created_by,
+          role: "owner",
+          created_by: normalized.created_by
+        });
+      }
+    }
+
     return normalized;
   }
 
@@ -184,6 +277,16 @@ class FakeSupabaseState {
       );
       this.db.team_option_guests = this.db.team_option_guests.filter(
         (row) => !deletedOptionIds.has(String(row.team_option_id))
+      );
+    }
+
+    if (table === "tournament_matches") {
+      const deletedMatchIds = new Set(deletedRows.map((row) => String(row.id)));
+      this.db.tournament_match_results = this.db.tournament_match_results.filter(
+        (row) => !deletedMatchIds.has(String(row.match_id))
+      );
+      this.db.tournament_match_player_stats = this.db.tournament_match_player_stats.filter(
+        (row) => !deletedMatchIds.has(String(row.match_id))
       );
     }
   }
@@ -342,6 +445,16 @@ class FakeQuery {
 
   is(column: string, value: unknown) {
     this.filters.push((row) => (value === null ? row[column] == null : row[column] === value));
+    return this;
+  }
+
+  ilike(column: string, pattern: string) {
+    const normalizedPattern = pattern
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/%/g, ".*")
+      .replace(/_/g, ".");
+    const regex = new RegExp(`^${normalizedPattern}$`, "i");
+    this.filters.push((row) => regex.test(String(row[column] ?? "")));
     return this;
   }
 

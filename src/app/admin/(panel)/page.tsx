@@ -85,6 +85,19 @@ export default async function AdminDashboardPage({
       </Card>
 
       <Card>
+        <CardTitle>Modulos separados</CardTitle>
+        <CardDescription>
+          Organizaciones sigue manejando jugadores, partidos balanceados e historial. El nuevo modulo `Torneos` vive por
+          separado con equipos, planteles propios, fixture y tabla.
+        </CardDescription>
+        <div className="mt-3">
+          <Link className="text-sm font-semibold text-emerald-300 hover:underline" href="/admin/tournaments">
+            Ir al panel de torneos
+          </Link>
+        </div>
+      </Card>
+
+      <Card>
         <CardTitle>Crear organizacion</CardTitle>
         <CardDescription>
           Proba 1 mes gratis por organizacion. Despues, {formatCurrencyArs(ORGANIZATION_MONTHLY_PRICE_ARS)} por mes por

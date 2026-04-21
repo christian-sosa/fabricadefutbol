@@ -49,6 +49,7 @@ export const TEAM_SIZE_BY_MODALITY: Record<MatchModality, number> = {
 
 export const PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
+  { href: "/tournaments", label: "Torneos" },
   { href: "/ranking", label: "Ranking" },
   { href: "/players", label: "Jugadores" },
   { href: "/matches", label: "Historial" },
@@ -60,6 +61,7 @@ export const PUBLIC_NAV_ITEMS = [
 
 export const ADMIN_NAV_ITEMS = [
   { href: "/admin", label: "Dashboard" },
+  { href: "/admin/tournaments", label: "Torneos" },
   { href: "/admin/players", label: "Jugadores" },
   { href: "/admin/matches/new", label: "Nuevo Partido" },
   { href: "/admin/matches", label: "Gestionar Partidos" },

@@ -3,6 +3,8 @@ export type MatchModality = "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
 export type TeamSide = "A" | "B";
 export type WinnerTeam = TeamSide | "DRAW";
 export type ResultAssignmentTeam = TeamSide | "OUT";
+export type TournamentStatus = "draft" | "active" | "finished" | "archived";
+export type TournamentMatchStatus = "draft" | "scheduled" | "played" | "cancelled";
 
 export type PlayerRatingInput = {
   id: string;
@@ -50,4 +52,89 @@ export type MatchResultInput = {
     }>;
     handicapTeam?: TeamSide | null;
   };
+};
+
+export type TournamentListItem = {
+  id: string;
+  name: string;
+  slug: string;
+  seasonLabel: string;
+  description: string | null;
+  isPublic: boolean;
+  status: TournamentStatus;
+  createdAt: string;
+};
+
+export type TournamentStandingRow = {
+  teamId: string;
+  teamName: string;
+  shortName: string | null;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+};
+
+export type TournamentFixtureRow = {
+  id: string;
+  roundId: string | null;
+  roundNumber: number;
+  roundName: string;
+  scheduledAt: string | null;
+  venue: string | null;
+  status: TournamentMatchStatus;
+  homeTeamId: string;
+  homeTeamName: string;
+  homeTeamShortName: string | null;
+  awayTeamId: string;
+  awayTeamName: string;
+  awayTeamShortName: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+};
+
+export type TournamentTopScorerRow = {
+  playerId: string | null;
+  playerName: string;
+  teamId: string;
+  teamName: string;
+  teamShortName: string | null;
+  goals: number;
+};
+
+export type TournamentTopFigureRow = {
+  playerId: string | null;
+  playerName: string;
+  teamId: string;
+  teamName: string;
+  teamShortName: string | null;
+  mvpCount: number;
+};
+
+export type TournamentBestDefenseRow = {
+  teamId: string;
+  teamName: string;
+  teamShortName: string | null;
+  goalsAgainst: number;
+  matchesPlayed: number;
+};
+
+export type TournamentMatchSheetInput = {
+  homeScore: number;
+  awayScore: number;
+  notes?: string;
+  mvpEntryKey: string;
+  stats: Array<{
+    entryKey: string;
+    teamId: string;
+    playerId?: string | null;
+    playerName: string;
+    goals: number;
+    yellowCards: number;
+    redCards: number;
+  }>;
 };
