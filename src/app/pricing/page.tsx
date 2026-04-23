@@ -4,9 +4,8 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import {
   ORGANIZATION_BILLING_CURRENCY,
   ORGANIZATION_MONTHLY_PRICE_ARS,
-  TOURNAMENT_SEASON_PRICE_ARS
+  TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS
 } from "@/lib/constants";
-import { resolvePublicModule, withPublicQuery } from "@/lib/org";
 
 function formatArs(amount: number) {
   return new Intl.NumberFormat("es-AR", {
@@ -15,18 +14,7 @@ function formatArs(amount: number) {
   }).format(amount);
 }
 
-export default async function PricingPage({
-  searchParams
-}: {
-  searchParams: Promise<{ org?: string; module?: string }>;
-}) {
-  const resolvedSearchParams = await searchParams;
-  const organizationKey = resolvedSearchParams.org ?? null;
-  const currentModule = resolvePublicModule(resolvedSearchParams.module);
-  const helpPath = withPublicQuery("/help", {
-    organizationKey,
-    module: currentModule
-  });
+export default function PricingPage() {
   const plans = [
     {
       title: "Pack Organizaciones",
@@ -36,17 +24,18 @@ export default async function PricingPage({
         `1 mes de prueba gratis por organización. Después, $${formatArs(ORGANIZATION_MONTHLY_PRICE_ARS)}/mes para seguir creando.`,
       items: [
         "Hasta 30 jugadores por organizacion",
-        "Armado de partidos y equipos equilibrados",
+        "Creá partidos con equipos parejos",
         "Ranking automatico despues de cada resultado",
-        "Historial completo y proximos partidos"
+        "Historial completo",
+        "Comparte el proximo partido y los equipos con tus companeros apenas lo generas"
       ]
     },
     {
       title: "Pack Torneos",
-      price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(TOURNAMENT_SEASON_PRICE_ARS)} / temporada`,
+      price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS)} / mes`,
       badge: "Multiples subtorneos",
       description:
-        "Pensado para ligas y organizadores que necesitan crear y administrar varios subtorneos dentro del mismo ciclo.",
+        "Pensado para ligas y organizadores que necesitan crear y administrar varios torneos o subtorneos con un pack mensual.",
       items: [
         "Varios torneos o subtorneos por organizador",
         "Fixture automatico o armado manual fecha por fecha",
@@ -62,8 +51,9 @@ export default async function PricingPage({
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Precios</p>
         <h1 className="mt-2 text-3xl font-black text-white md:text-5xl">Packs claros en pesos para cada necesidad</h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-          Un mismo admin puede gestionar Organizaciones y Torneos, pero cada modulo tiene su propia logica y su propia facturacion.
-          Aqui ves rapido que incluye cada pack, como se cobra y que cubre el modulo Torneos para subtorneos y ligas.
+          Un mismo admin puede gestionar Organizaciones y Torneos, pero cada pack tiene su propia logica y su propia
+          facturacion. Aqui ves rapido que incluye cada pack, como se cobra y que cubre el pack Torneos para
+          subtorneos y ligas.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
@@ -71,12 +61,6 @@ export default async function PricingPage({
             href="/admin/login"
           >
             Crear mi grupo gratis
-          </Link>
-          <Link
-            className="rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
-            href={helpPath}
-          >
-            Ver ayuda
           </Link>
         </div>
       </section>
@@ -107,15 +91,17 @@ export default async function PricingPage({
 
       <section className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardTitle>Que incluye el modulo Organizaciones</CardTitle>
+          <CardTitle>Que incluye el pack Organizaciones</CardTitle>
           <CardDescription className="mt-3">
-            El plan cubre la gestion diaria del grupo: jugadores, partidos, equilibrio de equipos, ranking automatico, historial y proximos encuentros.
+            El pack cubre la gestion diaria del grupo: jugadores, partidos, equipos parejos, ranking automatico,
+            historial completo y la posibilidad de compartir el proximo partido ya armado.
           </CardDescription>
         </Card>
         <Card>
-          <CardTitle>Que incluye el modulo Torneos</CardTitle>
+          <CardTitle>Que incluye el pack Torneos</CardTitle>
           <CardDescription className="mt-3">
-            El plan cubre la operacion de una competicion: varios subtorneos, fixture automatico o manual, capitanes opcionales, hasta 4 admins y estadisticas publicas.
+            El pack cubre la operacion de una competicion: varios subtorneos, fixture automatico o manual, capitanes
+            opcionales, hasta 4 admins y estadisticas publicas.
           </CardDescription>
         </Card>
       </section>
