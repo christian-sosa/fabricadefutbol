@@ -16,11 +16,14 @@ test("mantiene la organizacion al navegar por la parte publica", async ({ page }
   await page.goto(`/?org=${ORG_SLUG}`);
 
   await expect(page).toHaveURL(new RegExp(`\\?org=${ORG_SLUG}$`));
+  await publicNavLink(page, "Organizaciones").click();
+  await expect(page).toHaveURL(new RegExp(`/organizations\\?org=${ORG_SLUG}$`));
+
   await publicNavLink(page, "Ranking").click();
   await expect(page).toHaveURL(new RegExp(`/ranking\\?org=${ORG_SLUG}$`));
 
-  await publicNavLink(page, "Jugadores").click();
-  await expect(page).toHaveURL(new RegExp(`/players\\?org=${ORG_SLUG}$`));
+  await page.goto(`/players?org=${ORG_SLUG}`);
+  await expect(page).toHaveURL(new RegExp(`/ranking\\?org=${ORG_SLUG}$`));
 
   await publicNavLink(page, "Historial").click();
   await expect(page).toHaveURL(new RegExp(`/matches\\?org=${ORG_SLUG}$`));

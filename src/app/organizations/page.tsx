@@ -12,12 +12,7 @@ const organizationModuleLinks = [
   {
     href: "/ranking",
     title: "Ranking",
-    description: "Tabla completa de rendimiento y posiciones actuales."
-  },
-  {
-    href: "/players",
-    title: "Jugadores",
-    description: "Plantel, foto y estadisticas resumidas por jugador."
+    description: "Posiciones actuales y estadisticas completas de cada jugador."
   },
   {
     href: "/matches",
@@ -48,7 +43,7 @@ export default async function OrganizationsPage({
       <section className="rounded-3xl border border-slate-800 bg-slate-900/75 p-5 shadow-[0_24px_40px_-30px_rgba(16,185,129,0.7)] md:p-8">
         <h1 className="mt-2 text-3xl font-black text-slate-100 md:text-5xl">Organizaciones</h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-          Elegi una organizacion y navega su ranking, jugadores, historial y proximos partidos desde un solo lugar.
+          Elegi una organizacion y navega su ranking completo, historial y proximos partidos desde un solo lugar.
         </p>
 
         <div className="mt-6">
@@ -81,7 +76,7 @@ export default async function OrganizationsPage({
             </Card>
           </section>
 
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <section className="grid gap-4 md:grid-cols-3">
             {organizationModuleLinks.map((item) => (
               <Card key={item.href}>
                 <CardTitle>{item.title}</CardTitle>

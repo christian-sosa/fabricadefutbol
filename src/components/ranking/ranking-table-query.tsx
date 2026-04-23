@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { PlayerPhotoModalTrigger } from "@/components/ui/player-photo-modal-trigger";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { useOrganizationStandingsQuery } from "@/lib/query/hooks";
-import { cn } from "@/lib/utils";
+import { cn, formatPercent } from "@/lib/utils";
 import type { PlayerComputedStats } from "@/types/domain";
 
 const PODIUM_RANK_STYLES: Record<number, string> = {
@@ -14,6 +14,39 @@ const PODIUM_RANK_STYLES: Record<number, string> = {
   2: "border-slate-300/70 bg-slate-300/20 text-slate-100",
   3: "border-orange-300/70 bg-orange-400/20 text-orange-200"
 };
+
+const STAT_CARDS = [
+  {
+    key: "matchesPlayed",
+    label: "PJ",
+    value: (player: PlayerComputedStats) => player.matchesPlayed,
+    className: "text-slate-100"
+  },
+  {
+    key: "wins",
+    label: "PG",
+    value: (player: PlayerComputedStats) => player.wins,
+    className: "text-slate-100"
+  },
+  {
+    key: "draws",
+    label: "PE",
+    value: (player: PlayerComputedStats) => player.draws,
+    className: "text-slate-100"
+  },
+  {
+    key: "losses",
+    label: "PP",
+    value: (player: PlayerComputedStats) => player.losses,
+    className: "text-slate-100"
+  },
+  {
+    key: "winRate",
+    label: "Win Rate",
+    value: (player: PlayerComputedStats) => formatPercent(player.winRate),
+    className: "text-emerald-300"
+  }
+] as const;
 
 type RankingTableQueryProps = {
   organizationId: string | null;
@@ -54,8 +87,22 @@ export function RankingTableQuery({ organizationId, initialPlayers }: RankingTab
                 <div className="text-right">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Rating</p>
                   <p className="text-2xl font-black text-emerald-300">{player.currentRating.toFixed(2)}</p>
-                  <p className="mt-2 text-sm text-slate-400">PJ: {player.matchesPlayed}</p>
                 </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                {STAT_CARDS.map((item) => (
+                  <div
+                    className={cn(
+                      "rounded-xl border border-slate-800 bg-slate-900 px-3 py-2",
+                      item.key === "winRate" ? "col-span-2" : ""
+                    )}
+                    key={item.key}
+                  >
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500">{item.label}</p>
+                    <p className={cn("mt-1 font-semibold", item.className)}>{item.value(player)}</p>
+                  </div>
+                ))}
               </div>
             </article>
           );
@@ -76,6 +123,12 @@ export function RankingTableQuery({ organizationId, initialPlayers }: RankingTab
               <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm">Jugador</TH>
               <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm">Rating</TH>
               <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm">PJ</TH>
+              <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm">PG</TH>
+              <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm">PE</TH>
+              <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm">PP</TH>
+              <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm">
+                Win Rate
+              </TH>
             </tr>
           </THead>
           <TBody className="divide-slate-800">
@@ -100,13 +153,19 @@ export function RankingTableQuery({ organizationId, initialPlayers }: RankingTab
                     {player.currentRating.toFixed(2)}
                   </TD>
                   <TD className="px-6 py-5 text-lg font-medium text-slate-300 md:text-xl">{player.matchesPlayed}</TD>
+                  <TD className="px-6 py-5 text-lg font-medium text-slate-300 md:text-xl">{player.wins}</TD>
+                  <TD className="px-6 py-5 text-lg font-medium text-slate-300 md:text-xl">{player.draws}</TD>
+                  <TD className="px-6 py-5 text-lg font-medium text-slate-300 md:text-xl">{player.losses}</TD>
+                  <TD className="px-6 py-5 text-lg font-semibold text-emerald-300 md:text-xl">
+                    {formatPercent(player.winRate)}
+                  </TD>
                 </tr>
               );
             })}
 
             {!players.length ? (
               <tr>
-                <TD className="px-6 py-6 text-sm text-slate-400" colSpan={4}>
+                <TD className="px-6 py-6 text-sm text-slate-400" colSpan={8}>
                   {isFetching ? "Cargando ranking..." : "No hay jugadores para esta organizacion."}
                 </TD>
               </tr>

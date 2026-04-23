@@ -49,12 +49,12 @@ const howItWorksSteps = [
 
 const testimonials = [
   {
-    quote: "Desde que usamos Fabrica no discutimos mas los equipos. Llegamos, armamos y jugamos.",
+    quote: "Desde que usamos Fabrica no discutimos mas los equipos. Los armamos antes de jugar, llegamos y jugamos.",
     author: "Equipo La Quinta"
   },
   {
-    quote: "El ranking le dio mucha mas seriedad al grupo. Ahora todos quieren subir puestos de verdad.",
-    author: "Los del Jueves"
+    quote: "Desde que arrancamos, todo el mundo quiere jugar y sumar puntos para estar arriba en el ranking. Ahora todos los partidos se viven como una final.",
+    author: "Equipo La Quinta"
   },
   {
     quote: "Tener historial y partidos guardados nos ordeno todo. Ya no dependemos de la memoria del admin.",
@@ -63,11 +63,11 @@ const testimonials = [
 ] as const;
 
 const fallbackRankingPreview = [
-  { name: "Mati", points: 1040, trend: "up" },
-  { name: "Lucho", points: 1030, trend: "up" },
-  { name: "Franco", points: 1020, trend: "same" },
-  { name: "Nico", points: 1000, trend: "down" },
-  { name: "Tomi", points: 990, trend: "up" }
+  { name: "Juan", points: 1180, trend: "up" },
+  { name: "Mati", points: 1165, trend: "up" },
+  { name: "Nico", points: 1158, trend: "same" },
+  { name: "Fede", points: 1140, trend: "down" },
+  { name: "Tomi", points: 1128, trend: "up" }
 ] as const satisfies ReadonlyArray<{
   name: string;
   points: number;
@@ -75,7 +75,7 @@ const fallbackRankingPreview = [
 }>;
 
 const rankingPreviewDescription = "Ejemplo con datos ficticios de como se ve un ranking dentro de la plataforma.";
-const rankingPreviewMatchCount = 24;
+const rankingPreviewMatchCount = 148;
 
 function getTrendMeta(trend: RankingTrend) {
   switch (trend) {
@@ -123,7 +123,7 @@ export default async function HomePage({
         <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
-              Futbol amateur sin discusiones
+              Futbol entre amigos sin discusiones
             </p>
             <h1 className="mt-3 max-w-4xl text-4xl font-black leading-tight text-white md:text-5xl lg:text-6xl">
               Deja de discutir equipos. Arma partidos parejos y lleva el ranking real de tu grupo.
@@ -168,8 +168,7 @@ export default async function HomePage({
             <Card className="border-emerald-400/20 bg-slate-950/70 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">KPI Visual</p>
-                  <CardTitle className="mt-2 text-2xl">Ranking del grupo</CardTitle>
+                  <CardTitle className="text-2xl">Ranking del grupo</CardTitle>
                   <CardDescription className="mt-2">{rankingPreviewDescription}</CardDescription>
                 </div>
                 <div className="rounded-2xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-right">
@@ -289,8 +288,11 @@ export default async function HomePage({
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista de ranking</p>
-              <CardTitle className="mt-2">Posicion, flechas y puntos</CardTitle>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Lectura rapida</p>
+              <CardTitle className="mt-2">Que ves en el ranking</CardTitle>
+              <CardDescription className="mt-3 text-base">
+                Cada fila te muestra puesto actual, movimiento reciente y puntos acumulados para leer el momento del grupo en segundos.
+              </CardDescription>
             </div>
             <Link
               className="text-sm font-semibold text-emerald-300 hover:underline"
@@ -300,29 +302,32 @@ export default async function HomePage({
             </Link>
           </div>
 
-          <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800">
-            <div className="grid grid-cols-[72px_1fr_92px_92px] bg-slate-950/80 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              <span>Puesto</span>
-              <span>Jugador</span>
-              <span>Mov.</span>
-              <span>Puntos</span>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <p className="text-sm font-semibold text-white">Puesto actual</p>
+              <p className="mt-2 text-sm text-slate-300">
+                Te muestra quien esta arriba hoy y como viene ordenado el grupo.
+              </p>
             </div>
-            <div className="divide-y divide-slate-800">
-              {rankingPreviewRows.map((player, index) => {
-                const trend = getTrendMeta(player.trend);
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <p className="text-sm font-semibold text-white">Movimiento</p>
+              <p className="mt-2 text-sm text-slate-300">
+                Las flechas indican quien viene subiendo, bajando o manteniendose fecha a fecha.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <p className="text-sm font-semibold text-white">Puntos</p>
+              <p className="mt-2 text-sm text-slate-300">
+                El puntaje se actualiza automaticamente despues de cada resultado cargado.
+              </p>
+            </div>
+          </div>
 
-                return (
-                  <div className="grid grid-cols-[72px_1fr_92px_92px] items-center bg-slate-900/80 px-4 py-3" key={`${player.name}-row`}>
-                    <span className="text-sm font-black text-slate-300">#{index + 1}</span>
-                    <span className="truncate text-sm font-semibold text-white">{player.name}</span>
-                    <span className="text-sm font-semibold" title={trend.label}>
-                      <span className={trend.className.replace("border ", "").replace("bg-slate-800 ", "")}>{trend.icon}</span>
-                    </span>
-                    <span className="text-sm font-semibold text-emerald-200">{player.points}</span>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="mt-4 rounded-2xl border border-emerald-400/15 bg-emerald-500/5 p-4">
+            <p className="text-sm font-semibold text-white">Lo importante</p>
+            <p className="mt-2 text-sm text-slate-300">
+              Cuando ya tienes varios partidos cargados, el ranking deja de ser una opinion y empieza a mostrar lo que realmente pasa en la cancha.
+            </p>
           </div>
         </Card>
       </section>
@@ -478,7 +483,7 @@ export default async function HomePage({
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           {testimonials.map((testimonial) => (
-            <Card key={testimonial.author}>
+            <Card key={`${testimonial.author}-${testimonial.quote}`}>
               <p className="text-base leading-7 text-slate-200">
                 &ldquo;{testimonial.quote}&rdquo;
               </p>

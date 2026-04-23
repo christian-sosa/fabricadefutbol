@@ -52,7 +52,6 @@ export const PUBLIC_NAV_ITEMS = [
   { href: "/organizations", label: "Organizaciones" },
   { href: "/tournaments", label: "Torneos" },
   { href: "/ranking", label: "Ranking" },
-  { href: "/players", label: "Jugadores" },
   { href: "/matches", label: "Historial" },
   { href: "/upcoming", label: "Proximos" },
   { href: "/pricing", label: "Precios" },
@@ -71,7 +70,6 @@ export const PRIMARY_PUBLIC_NAV_ITEMS = [
 
 export const ORGANIZATION_PUBLIC_NAV_ITEMS = [
   { href: "/ranking", label: "Ranking" },
-  { href: "/players", label: "Jugadores" },
   { href: "/matches", label: "Historial" },
   { href: "/upcoming", label: "Proximos" }
 ];

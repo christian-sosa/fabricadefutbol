@@ -15,7 +15,7 @@ type SiteHeaderProps = {
   initialHasCaptainAssignments?: boolean;
 };
 
-const ORGANIZATION_SECTION_PATHS = ["/organizations", "/ranking", "/players", "/matches", "/upcoming"] as const;
+const ORGANIZATION_SECTION_PATHS = ["/organizations", "/ranking", "/matches", "/upcoming"] as const;
 
 function isActivePath(currentPath: string, href: string) {
   if (href === "/") {
