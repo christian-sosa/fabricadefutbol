@@ -23,6 +23,9 @@ export default async function RankingPage({
           <h1 className="text-3xl font-black tracking-tight text-white md:text-4xl">
             Ranking Actual {selectedOrganization ? `- ${selectedOrganization.name}` : ""}
           </h1>
+          <p className="max-w-3xl text-sm text-slate-300 md:text-base">
+            Puesto actual, rating y rendimiento completo de cada jugador en una sola vista.
+          </p>
         </div>
 
         <OrganizationSwitcher
