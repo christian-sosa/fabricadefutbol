@@ -23,7 +23,7 @@ export default async function AdminTournamentsPage({
       <Card>
         <CardTitle>Torneos</CardTitle>
         <CardDescription>
-          Crea y administra ligas o torneos independientes del flujo actual de organizaciones.
+          Crea y administra ligas, torneos o subtorneos independientes del flujo actual de organizaciones.
         </CardDescription>
         {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
         {resolvedSearchParams.success ? (
@@ -32,7 +32,10 @@ export default async function AdminTournamentsPage({
       </Card>
 
       <Card>
-        <CardTitle>Nuevo torneo</CardTitle>
+        <CardTitle>Nuevo torneo o subtorneo</CardTitle>
+        <CardDescription className="mt-2">
+          Puedes usar este modulo para manejar varios torneos del mismo organizador, por ejemplo Viernes A1, Viernes A2 y sus tablas por separado.
+        </CardDescription>
         <form action={createTournamentAction} className="mt-4 grid gap-3 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="name">
@@ -64,7 +67,7 @@ export default async function AdminTournamentsPage({
 
       <Card>
         <CardTitle>Mis torneos</CardTitle>
-        <CardDescription>Entra a cada torneo para cargar equipos, planteles, fixture y resultados.</CardDescription>
+        <CardDescription>Entra a cada torneo o subtorneo para cargar equipos, planteles, fixture y resultados.</CardDescription>
 
         <div className="mt-4 space-y-3">
           {tournaments.length ? (

@@ -18,6 +18,7 @@ import {
   MAX_PLAYER_PHOTO_SIZE_MB,
   optimizePlayerAvatarImage
 } from "@/lib/player-photos";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const updateTournamentSchema = z.object({
@@ -38,6 +39,18 @@ const teamSchema = z.object({
 const captainInviteSchema = z.object({
   teamId: z.string().uuid(),
   email: z.string().email("Ingresa un email valido.")
+});
+
+const tournamentAdminInviteSchema = z.object({
+  email: z.string().email("Ingresa un email valido.")
+});
+
+const removeTournamentAdminSchema = z.object({
+  adminId: z.string().uuid()
+});
+
+const tournamentAdminInviteDeleteSchema = z.object({
+  inviteId: z.string().uuid()
 });
 
 const teamCaptainSchema = z.object({
@@ -115,6 +128,43 @@ function normalizeScheduledAt(value: string | undefined) {
 
 function buildCaptainInviteExpiresAt() {
   return new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
+}
+
+async function tournamentAlreadyHasAdminWithEmail(params: {
+  tournamentId: string;
+  normalizedEmail: string;
+}) {
+  const supabaseAdmin = createSupabaseAdminClient();
+  if (!supabaseAdmin) return false;
+
+  const { data: memberships, error: membershipsError } = await supabaseAdmin
+    .from("tournament_admins")
+    .select("admin_id")
+    .eq("tournament_id", params.tournamentId);
+
+  if (membershipsError) {
+    throw new Error(membershipsError.message);
+  }
+
+  const adminIds = Array.from(new Set((memberships ?? []).map((row) => row.admin_id)));
+  if (!adminIds.length) return false;
+
+  const { data: authUsers, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000
+  });
+
+  if (authUsersError) {
+    throw new Error(authUsersError.message);
+  }
+
+  const currentAdminEmails = new Map(
+    (authUsers?.users ?? [])
+      .filter((user) => adminIds.includes(user.id))
+      .map((user) => [user.id, normalizeEmail(user.email ?? "")])
+  );
+
+  return adminIds.some((adminId) => currentAdminEmails.get(adminId) === params.normalizedEmail);
 }
 
 async function revalidateTournamentPaths(tournamentId: string) {
@@ -217,6 +267,295 @@ export async function updateTournamentAction(tournamentId: string, formData: For
         tournamentId,
         tab: "summary",
         error: toUserMessage(error, "No se pudo actualizar el torneo.")
+      })
+    );
+  }
+}
+
+export async function inviteTournamentAdminAction(tournamentId: string, formData: FormData) {
+  try {
+    const admin = await assertTournamentMembershipAction(tournamentId);
+    const parsed = tournamentAdminInviteSchema.safeParse({
+      email: formData.get("email")
+    });
+
+    if (!parsed.success) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
+        })
+      );
+    }
+
+    const normalizedEmail = normalizeEmail(parsed.data.email);
+    if (normalizedEmail === admin.email) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: "Tu usuario ya administra este torneo."
+        })
+      );
+    }
+
+    if (await tournamentAlreadyHasAdminWithEmail({ tournamentId, normalizedEmail })) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: "Ese email ya administra este torneo."
+        })
+      );
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const [{ count: currentAdmins, error: adminCountError }, { data: inviteRows, error: inviteRowsError }] =
+      await Promise.all([
+        supabase
+          .from("tournament_admins")
+          .select("id", { count: "exact", head: true })
+          .eq("tournament_id", tournamentId),
+        supabase
+          .from("tournament_admin_invites")
+          .select("id, expires_at")
+          .eq("tournament_id", tournamentId)
+          .eq("status", "pending")
+      ]);
+
+    if (adminCountError) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: toUserMessage(adminCountError, "No se pudo verificar los admins actuales.")
+        })
+      );
+    }
+
+    if (inviteRowsError) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: toUserMessage(inviteRowsError, "No se pudo verificar invitaciones pendientes.")
+        })
+      );
+    }
+
+    const activePendingInvites = (inviteRows ?? []).filter((row) => {
+      const expiresAt = Date.parse(row.expires_at);
+      return !Number.isFinite(expiresAt) || expiresAt > Date.now();
+    });
+    const slotsUsed = (currentAdmins ?? 0) + activePendingInvites.length;
+    if (slotsUsed >= 4) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: "Este torneo ya alcanzo el maximo de 4 administradores."
+        })
+      );
+    }
+
+    const { error: cleanupInviteError } = await supabase
+      .from("tournament_admin_invites")
+      .delete()
+      .eq("tournament_id", tournamentId)
+      .eq("email", normalizedEmail)
+      .eq("status", "pending")
+      .lte("expires_at", new Date().toISOString());
+
+    if (cleanupInviteError) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: toUserMessage(cleanupInviteError, "No se pudo preparar la invitacion.")
+        })
+      );
+    }
+
+    const { error: inviteError } = await supabase.from("tournament_admin_invites").insert({
+      tournament_id: tournamentId,
+      email: normalizedEmail,
+      invited_by: admin.userId,
+      status: "pending",
+      expires_at: buildCaptainInviteExpiresAt()
+    });
+
+    if (inviteError) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error:
+            inviteError.code === "23505"
+              ? "Ese email ya tiene una invitacion pendiente."
+              : toUserMessage(inviteError, "No se pudo generar la invitacion.")
+        })
+      );
+    }
+
+    await revalidateTournamentPaths(tournamentId);
+    redirect(
+      buildTournamentDetailPath({
+        tournamentId,
+        tab: "summary",
+        success: "Invitacion de admin preparada."
+      })
+    );
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(
+      buildTournamentDetailPath({
+        tournamentId,
+        tab: "summary",
+        error: toUserMessage(error, "No se pudo generar la invitacion.")
+      })
+    );
+  }
+}
+
+export async function revokeTournamentAdminInviteAction(tournamentId: string, formData: FormData) {
+  try {
+    await assertTournamentMembershipAction(tournamentId);
+    const parsed = tournamentAdminInviteDeleteSchema.safeParse({
+      inviteId: formData.get("inviteId")
+    });
+
+    if (!parsed.success) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
+        })
+      );
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase
+      .from("tournament_admin_invites")
+      .delete()
+      .eq("id", parsed.data.inviteId)
+      .eq("tournament_id", tournamentId);
+
+    if (error) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: toUserMessage(error, "No se pudo cancelar la invitacion.")
+        })
+      );
+    }
+
+    await revalidateTournamentPaths(tournamentId);
+    redirect(
+      buildTournamentDetailPath({
+        tournamentId,
+        tab: "summary",
+        success: "Invitacion cancelada."
+      })
+    );
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(
+      buildTournamentDetailPath({
+        tournamentId,
+        tab: "summary",
+        error: toUserMessage(error, "No se pudo cancelar la invitacion.")
+      })
+    );
+  }
+}
+
+export async function removeTournamentAdminAction(tournamentId: string, formData: FormData) {
+  try {
+    const actingAdmin = await assertTournamentMembershipAction(tournamentId);
+    const parsed = removeTournamentAdminSchema.safeParse({
+      adminId: formData.get("adminId")
+    });
+
+    if (!parsed.success) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
+        })
+      );
+    }
+
+    if (actingAdmin.userId === parsed.data.adminId) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: "No puedes quitarte a ti mismo como admin de este torneo."
+        })
+      );
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { count: adminsCount, error: adminsCountError } = await supabase
+      .from("tournament_admins")
+      .select("id", { count: "exact", head: true })
+      .eq("tournament_id", tournamentId);
+
+    if (adminsCountError) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: toUserMessage(adminsCountError, "No se pudo contar los admins actuales.")
+        })
+      );
+    }
+
+    if ((adminsCount ?? 0) <= 1) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: "El torneo debe mantener al menos 1 admin activo."
+        })
+      );
+    }
+
+    const { error: deleteError } = await supabase
+      .from("tournament_admins")
+      .delete()
+      .eq("tournament_id", tournamentId)
+      .eq("admin_id", parsed.data.adminId);
+
+    if (deleteError) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: toUserMessage(deleteError, "No se pudo quitar al administrador.")
+        })
+      );
+    }
+
+    await revalidateTournamentPaths(tournamentId);
+    redirect(
+      buildTournamentDetailPath({
+        tournamentId,
+        tab: "summary",
+        success: "Administrador quitado."
+      })
+    );
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(
+      buildTournamentDetailPath({
+        tournamentId,
+        tab: "summary",
+        error: toUserMessage(error, "No se pudo quitar al administrador.")
       })
     );
   }

@@ -387,6 +387,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      tournament_admin_invites: {
+        Row: {
+          accepted_at: string | null;
+          accepted_by: string | null;
+          created_at: string;
+          email: string;
+          expires_at: string;
+          id: string;
+          invite_token: string;
+          invited_by: string;
+          status: "pending" | "accepted" | "revoked";
+          tournament_id: string;
+        };
+        Insert: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          created_at?: string;
+          email: string;
+          expires_at?: string;
+          id?: string;
+          invite_token?: string;
+          invited_by: string;
+          status?: "pending" | "accepted" | "revoked";
+          tournament_id: string;
+        };
+        Update: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          created_at?: string;
+          email?: string;
+          expires_at?: string;
+          id?: string;
+          invite_token?: string;
+          invited_by?: string;
+          status?: "pending" | "accepted" | "revoked";
+          tournament_id?: string;
+        };
+        Relationships: [];
+      };
       tournament_team_captains: {
         Row: {
           captain_id: string;
