@@ -9,6 +9,7 @@ type TableName =
   | "organization_billing_subscriptions"
   | "tournaments"
   | "tournament_admins"
+  | "tournament_admin_invites"
   | "tournament_team_captains"
   | "tournament_captain_invites"
   | "tournament_teams"
@@ -66,6 +67,7 @@ function createEmptyDatabase(): FakeDatabase {
     organization_billing_subscriptions: [],
     tournaments: [],
     tournament_admins: [],
+    tournament_admin_invites: [],
     tournament_team_captains: [],
     tournament_captain_invites: [],
     tournament_teams: [],
@@ -127,6 +129,15 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
     case "tournament_admins":
       if (!normalized.role) normalized.role = "editor";
       if (!("created_by" in normalized)) normalized.created_by = null;
+      break;
+    case "tournament_admin_invites":
+      if (!normalized.invite_token) normalized.invite_token = nextId();
+      if (!normalized.status) normalized.status = "pending";
+      if (!("accepted_by" in normalized)) normalized.accepted_by = null;
+      if (!("accepted_at" in normalized)) normalized.accepted_at = null;
+      if (!normalized.expires_at) {
+        normalized.expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
+      }
       break;
     case "tournament_team_captains":
       if (!("created_by" in normalized)) normalized.created_by = null;
@@ -260,6 +271,23 @@ class FakeSupabaseState {
       const teamId = String(row.team_id ?? "");
       const existing = this.db.tournament_team_captains.find(
         (candidate) => String(candidate.team_id) === teamId
+      );
+
+      if (existing) {
+        Object.assign(existing, cloneRow(row));
+        return existing;
+      }
+    }
+
+    if (table === "tournament_admin_invites") {
+      const tournamentId = String(row.tournament_id ?? "");
+      const email = String(row.email ?? "").toLowerCase();
+      const status = String(row.status ?? "pending").toLowerCase();
+      const existing = this.db.tournament_admin_invites.find(
+        (candidate) =>
+          String(candidate.tournament_id) === tournamentId &&
+          String(candidate.email ?? "").toLowerCase() === email &&
+          String(candidate.status ?? "pending").toLowerCase() === status
       );
 
       if (existing) {
