@@ -14,6 +14,7 @@ import {
   type TournamentRoundReference,
   type TournamentTeamReference
 } from "@/lib/domain/tournament-stats";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   TournamentBestDefenseRow,
@@ -42,6 +43,24 @@ type TournamentTeamCaptainRow = {
   created_at: string;
 };
 
+type TournamentAdminRow = {
+  id: string;
+  tournament_id: string;
+  admin_id: string;
+  role: "owner" | "editor";
+  created_at: string;
+};
+
+type TournamentAdminInviteRow = {
+  id: string;
+  tournament_id: string;
+  email: string;
+  invite_token: string;
+  expires_at: string;
+  created_at: string;
+  status: "pending" | "accepted" | "revoked";
+};
+
 type TournamentCaptainInviteRow = {
   id: string;
   tournament_id: string;
@@ -56,6 +75,31 @@ type AdminProfileRow = {
   id: string;
   display_name: string;
 };
+
+async function resolveAdminEmailsById(adminIds: string[]) {
+  const adminClient = createSupabaseAdminClient();
+  const emailsById = new Map<string, string>();
+  if (!adminClient || !adminIds.length) {
+    return emailsById;
+  }
+
+  const { data: authUsers, error } = await adminClient.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  for (const user of authUsers?.users ?? []) {
+    if (!adminIds.includes(user.id)) continue;
+    if (!user.email) continue;
+    emailsById.set(user.id, user.email.toLowerCase());
+  }
+
+  return emailsById;
+}
 
 function normalizeTournamentRecord(record: TournamentRecord): TournamentListItem {
   return {
@@ -248,24 +292,81 @@ export async function getAdminTournamentList() {
   }));
 }
 
+async function getTournamentAdminData(tournamentId: string) {
+  const supabase = await createSupabaseServerClient();
+  const [{ data: adminRows, error: adminRowsError }, { data: inviteRows, error: inviteRowsError }] = await Promise.all([
+    supabase
+      .from("tournament_admins")
+      .select("id, tournament_id, admin_id, role, created_at")
+      .eq("tournament_id", tournamentId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("tournament_admin_invites")
+      .select("id, tournament_id, email, invite_token, expires_at, created_at, status")
+      .eq("tournament_id", tournamentId)
+      .eq("status", "pending")
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+  ]);
+
+  if (adminRowsError) throw new Error(adminRowsError.message);
+  if (inviteRowsError) throw new Error(inviteRowsError.message);
+
+  const uniqueAdminIds = Array.from(new Set((adminRows ?? []).map((row) => row.admin_id)));
+  const [{ data: profiles, error: profilesError }, emailsById] = await Promise.all([
+    uniqueAdminIds.length
+      ? supabase.from("admins").select("id, display_name").in("id", uniqueAdminIds)
+      : Promise.resolve({ data: [], error: null }),
+    resolveAdminEmailsById(uniqueAdminIds)
+  ]);
+
+  if (profilesError) throw new Error(profilesError.message);
+
+  const profilesById = new Map(((profiles ?? []) as AdminProfileRow[]).map((profile) => [profile.id, profile]));
+
+  return {
+    admins: ((adminRows ?? []) as TournamentAdminRow[]).map((row) => ({
+      id: row.admin_id,
+      membershipId: row.id,
+      displayName: profilesById.get(row.admin_id)?.display_name ?? "Admin",
+      email: emailsById.get(row.admin_id) ?? null,
+      role: row.role,
+      createdAt: row.created_at
+    })),
+    pendingInvites: ((inviteRows ?? []) as TournamentAdminInviteRow[]).map((row) => ({
+      id: row.id,
+      tournamentId: row.tournament_id,
+      email: row.email,
+      inviteToken: row.invite_token,
+      expiresAt: row.expires_at,
+      createdAt: row.created_at,
+      status: row.status
+    }))
+  };
+}
+
 export async function getAdminTournamentDetails(tournamentId: string) {
   noStore();
   const bundle = await loadTournamentBundle(tournamentId);
   if (!bundle.tournament) return null;
 
   const supabase = await createSupabaseServerClient();
-  const [{ data: teamCaptainRows, error: teamCaptainsError }, { data: captainInviteRows, error: captainInvitesError }] =
-    await Promise.all([
-      supabase
-        .from("tournament_team_captains")
-        .select("id, tournament_id, team_id, captain_id, created_at")
-        .eq("tournament_id", tournamentId),
-      supabase
-        .from("tournament_captain_invites")
-        .select("id, tournament_id, team_id, email, invite_token, expires_at, created_at")
-        .eq("tournament_id", tournamentId)
-        .order("created_at", { ascending: false })
-    ]);
+  const [
+    { data: teamCaptainRows, error: teamCaptainsError },
+    { data: captainInviteRows, error: captainInvitesError },
+    tournamentAdminData
+  ] = await Promise.all([
+    supabase
+      .from("tournament_team_captains")
+      .select("id, tournament_id, team_id, captain_id, created_at")
+      .eq("tournament_id", tournamentId),
+    supabase
+      .from("tournament_captain_invites")
+      .select("id, tournament_id, team_id, email, invite_token, expires_at, created_at")
+      .eq("tournament_id", tournamentId)
+      .order("created_at", { ascending: false }),
+    getTournamentAdminData(tournamentId)
+  ]);
 
   if (teamCaptainsError) throw new Error(teamCaptainsError.message);
   if (captainInvitesError) throw new Error(captainInvitesError.message);
@@ -333,6 +434,7 @@ export async function getAdminTournamentDetails(tournamentId: string) {
     rounds: bundle.rounds,
     players: bundle.players,
     playersByTeam,
+    tournamentAdmins: tournamentAdminData,
     teamCaptainsByTeam,
     captainInvitesByTeam,
     matches: bundle.matches,

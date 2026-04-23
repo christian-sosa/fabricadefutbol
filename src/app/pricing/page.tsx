@@ -1,7 +1,11 @@
 import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { ORGANIZATION_BILLING_CURRENCY, ORGANIZATION_MONTHLY_PRICE_ARS } from "@/lib/constants";
+import {
+  ORGANIZATION_BILLING_CURRENCY,
+  ORGANIZATION_MONTHLY_PRICE_ARS,
+  TOURNAMENT_SEASON_PRICE_ARS
+} from "@/lib/constants";
 import { resolvePublicModule, withPublicQuery } from "@/lib/org";
 
 function formatArs(amount: number) {
@@ -23,17 +27,13 @@ export default async function PricingPage({
     organizationKey,
     module: currentModule
   });
-  const contactPath = withPublicQuery("/feedback", {
-    organizationKey,
-    module: currentModule
-  });
   const plans = [
     {
       title: "Pack Organizaciones",
       price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(ORGANIZATION_MONTHLY_PRICE_ARS)} / mes`,
-      badge: "30 dias gratis",
+      badge: "1 mes gratis",
       description:
-        "Ideal para grupos que quieren dejar de discutir equipos y empezar a llevar ranking, historial y estadisticas reales.",
+        `1 mes de prueba gratis por organización. Después, $${formatArs(ORGANIZATION_MONTHLY_PRICE_ARS)}/mes para seguir creando.`,
       items: [
         "Hasta 30 jugadores por organizacion",
         "Armado de partidos y equipos equilibrados",
@@ -43,15 +43,15 @@ export default async function PricingPage({
     },
     {
       title: "Pack Torneos",
-      price: "ARS XXX / temporada",
-      badge: "Valor a definir",
+      price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(TOURNAMENT_SEASON_PRICE_ARS)} / temporada`,
+      badge: "Multiples subtorneos",
       description:
-        "Pensado para ligas y organizadores que necesitan equipos, planteles propios, fixture, actas y estadisticas publicas.",
+        "Pensado para ligas y organizadores que necesitan crear y administrar varios subtorneos dentro del mismo ciclo.",
       items: [
-        "Equipos, jugadores y fotos por torneo",
-        "Invitaciones para capitanes",
-        "Fixture, resultados, goleadores y figuras",
-        "Tabla de posiciones y vallas menos vencidas"
+        "Varios torneos o subtorneos por organizador",
+        "Fixture automatico o armado manual fecha por fecha",
+        "Capitanes opcionales segun cada admin",
+        "Hasta 4 administradores por torneo"
       ]
     }
   ] as const;
@@ -63,7 +63,7 @@ export default async function PricingPage({
         <h1 className="mt-2 text-3xl font-black text-white md:text-5xl">Packs claros en pesos para cada necesidad</h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
           Un mismo admin puede gestionar Organizaciones y Torneos, pero cada modulo tiene su propia logica y su propia facturacion.
-          Aqui ves rapido que incluye cada pack y como se cobra.
+          Aqui ves rapido que incluye cada pack, como se cobra y que cubre el modulo Torneos para subtorneos y ligas.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
@@ -71,12 +71,6 @@ export default async function PricingPage({
             href="/admin/login"
           >
             Crear mi grupo gratis
-          </Link>
-          <Link
-            className="rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
-            href={contactPath}
-          >
-            Consultar precios
           </Link>
           <Link
             className="rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
@@ -121,7 +115,7 @@ export default async function PricingPage({
         <Card>
           <CardTitle>Que incluye el modulo Torneos</CardTitle>
           <CardDescription className="mt-3">
-            El plan cubre la operacion de una competicion: equipos, capitanes, planteles, fixture, carga de resultados y estadisticas publicas.
+            El plan cubre la operacion de una competicion: varios subtorneos, fixture automatico o manual, capitanes opcionales, hasta 4 admins y estadisticas publicas.
           </CardDescription>
         </Card>
       </section>

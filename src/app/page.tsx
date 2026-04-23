@@ -10,8 +10,6 @@ import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization 
 import { getPublicTournaments } from "@/lib/queries/tournaments";
 import { formatDateTime } from "@/lib/utils";
 
-type RankingTrend = "up" | "down" | "same";
-
 const problemItems = [
   "Equipos desbalanceados",
   "Discusiones constantes",
@@ -63,42 +61,19 @@ const testimonials = [
 ] as const;
 
 const fallbackRankingPreview = [
-  { name: "Juan", points: 1180, trend: "up" },
-  { name: "Mati", points: 1165, trend: "up" },
-  { name: "Nico", points: 1158, trend: "same" },
-  { name: "Fede", points: 1140, trend: "down" },
-  { name: "Tomi", points: 1128, trend: "up" }
+  { name: "Juan", points: 1180 },
+  { name: "Mati", points: 1170 },
+  { name: "Nico", points: 1160 },
+  { name: "Fede", points: 1150 },
+  { name: "Tomi", points: 1140 }
 ] as const satisfies ReadonlyArray<{
   name: string;
   points: number;
-  trend: RankingTrend;
 }>;
 
 const rankingPreviewDescription = "Ejemplo con datos ficticios de como se ve un ranking dentro de la plataforma.";
-const rankingPreviewMatchCount = 148;
+const rankingPreviewMatchCount = 150;
 
-function getTrendMeta(trend: RankingTrend) {
-  switch (trend) {
-    case "up":
-      return {
-        icon: "↑",
-        label: "Sube",
-        className: "border-emerald-400/35 bg-emerald-500/10 text-emerald-200"
-      };
-    case "down":
-      return {
-        icon: "↓",
-        label: "Baja",
-        className: "border-rose-400/35 bg-rose-500/10 text-rose-200"
-      };
-    default:
-      return {
-        icon: "•",
-        label: "Se mantiene",
-        className: "border-slate-600 bg-slate-800 text-slate-200"
-      };
-  }
-}
 
 export default async function HomePage({
   searchParams
@@ -178,26 +153,16 @@ export default async function HomePage({
               </div>
 
               <div className="mt-5 space-y-2">
-                {rankingPreviewRows.map((player, index) => {
-                  const trend = getTrendMeta(player.trend);
-
-                  return (
-                    <div
-                      className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 px-3 py-3"
-                      key={`${player.name}-${index}`}
-                    >
-                      <span className="text-lg font-black text-slate-400">{index + 1}</span>
-                      <span className="truncate text-sm font-semibold text-slate-100">{player.name}</span>
-                      <span
-                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${trend.className}`}
-                        title={trend.label}
-                      >
-                        {trend.icon}
-                      </span>
-                      <span className="text-sm font-semibold text-emerald-200">{player.points} pts</span>
-                    </div>
-                  );
-                })}
+                {rankingPreviewRows.map((player, index) => (
+                  <div
+                    className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 px-3 py-3"
+                    key={`${player.name}-${index}`}
+                  >
+                    <span className="text-lg font-black text-slate-400">#{index + 1}</span>
+                    <span className="truncate text-sm font-semibold text-slate-100">{player.name}</span>
+                    <span className="text-sm font-semibold text-emerald-200">{player.points} pts</span>
+                  </div>
+                ))}
               </div>
             </Card>
           </div>
@@ -266,16 +231,14 @@ export default async function HomePage({
           <div className="mt-5 space-y-3">
             <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
               <p className="text-sm font-semibold text-white">Si ganas</p>
-              <p className="mt-2 flex items-center gap-2 text-sm text-emerald-200">
-                <span className="text-base font-black">↑</span>
-                Subes puntos y mejoras tu posicion.
+              <p className="mt-2 text-sm text-emerald-200">
+                Sumas puntos y mejoras tu ubicacion en la tabla.
               </p>
             </div>
             <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
               <p className="text-sm font-semibold text-white">Si pierdes</p>
-              <p className="mt-2 flex items-center gap-2 text-sm text-rose-200">
-                <span className="text-base font-black">↓</span>
-                Bajas puntos y se actualiza la tabla.
+              <p className="mt-2 text-sm text-rose-200">
+                Pierdes puntos y el ranking se recalcula automaticamente.
               </p>
             </div>
             <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
@@ -291,7 +254,7 @@ export default async function HomePage({
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Lectura rapida</p>
               <CardTitle className="mt-2">Que ves en el ranking</CardTitle>
               <CardDescription className="mt-3 text-base">
-                Cada fila te muestra puesto actual, movimiento reciente y puntos acumulados para leer el momento del grupo en segundos.
+                Cada fila te muestra puesto actual, jugador, rating y rendimiento para leer el momento del grupo en segundos.
               </CardDescription>
             </div>
             <Link
@@ -310,15 +273,15 @@ export default async function HomePage({
               </p>
             </div>
             <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-              <p className="text-sm font-semibold text-white">Movimiento</p>
+              <p className="text-sm font-semibold text-white">Rendimiento</p>
               <p className="mt-2 text-sm text-slate-300">
-                Las flechas indican quien viene subiendo, bajando o manteniendose fecha a fecha.
+                Ves rapido como viene cada jugador con sus partidos, victorias, empates y derrotas.
               </p>
             </div>
             <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-              <p className="text-sm font-semibold text-white">Puntos</p>
+              <p className="text-sm font-semibold text-white">Rating</p>
               <p className="mt-2 text-sm text-slate-300">
-                El puntaje se actualiza automaticamente despues de cada resultado cargado.
+                El rating se actualiza automaticamente despues de cada resultado cargado.
               </p>
             </div>
           </div>
@@ -498,7 +461,8 @@ export default async function HomePage({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Tambien para ligas</p>
           <CardTitle className="mt-2">Cuando tu grupo crece, tambien puedes lanzar torneos</CardTitle>
           <CardDescription className="mt-3">
-            Equipos, fixture, resultados, figuras, goleadores y acceso para capitanes dentro de un modulo separado.
+            Equipos, subtorneos, fixture automatico o manual, resultados, figuras y capitanes opcionales dentro de un
+            modulo separado.
           </CardDescription>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link
@@ -542,7 +506,8 @@ export default async function HomePage({
           ) : (
             <Card>
               <CardDescription>
-                El modulo Torneos ya esta listo para mostrar ligas y competiciones publicas cuando se publiquen.
+                El modulo Torneos ya esta listo para mostrar ligas, subtorneos y competiciones publicas cuando se
+                publiquen.
               </CardDescription>
             </Card>
           )}

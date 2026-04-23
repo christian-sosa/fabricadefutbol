@@ -155,22 +155,22 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
     eyebrow: "Centro de ayuda",
     title: "Como funciona el modulo Torneos",
     description:
-      "Torneos esta pensado para competencias tipo liga simple. Permite cargar equipos, planteles propios del torneo, invitar capitanes, generar fixture, registrar actas y publicar tabla y estadisticas.",
+      "Torneos esta pensado para ligas y competencias con uno o varios subtorneos. Permite cargar equipos, planteles propios, definir admins, elegir si usas capitanes, armar fixture y publicar tabla y estadisticas.",
     capabilities: [
-      "Crear torneos independientes del modulo Organizaciones.",
-      "Cargar equipos, jugadores y fotos dentro del mismo torneo.",
-      "Invitar capitanes para que completen y mantengan su plantel.",
-      "Generar fixture, resultados, tabla, goleadores, figuras y vallas."
+      "Crear varios torneos o subtorneos independientes del modulo Organizaciones.",
+      "Cargar equipos, jugadores y fotos dentro de cada torneo.",
+      "Definir hasta 4 administradores por torneo.",
+      "Elegir entre fixture automatico o armado manual fecha por fecha."
     ],
     focusTitle: "En que conviene enfocarse al principio",
     focusDescription:
-      "Primero conviene definir el torneo, cargar los equipos y dejar claras las responsabilidades. Despues puedes avanzar con capitanes, planteles completos y fixture para que la carga de resultados sea mucho mas fluida.",
+      "Primero conviene definir el torneo o subtorneo, cargar los equipos y dejar claras las responsabilidades. Despues puedes decidir si usaras capitanes o si toda la carga quedara en admins, y avanzar con el fixture para ordenar la operacion.",
     gettingStartedLabel: "Primeros pasos",
     gettingStarted: [
       {
-        title: "1. Crea el torneo",
+        title: "1. Crea el torneo o subtorneo",
         description:
-          "Desde el panel de Torneos das de alta nombre, slug, temporada, estado y visibilidad publica. El admin creador queda asociado automaticamente a esa competencia."
+          "Desde el panel de Torneos das de alta nombre, slug, temporada, estado y visibilidad publica. La misma cuenta puede crear varios torneos o subtorneos como Viernes A1 y Viernes A2."
       },
       {
         title: "2. Carga los equipos",
@@ -180,12 +180,12 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "3. Invita capitanes o carga el plantel tu mismo",
         description:
-          "Puedes asignar un capitan por equipo para que, al iniciar sesion, complete los jugadores y sus fotos. Si prefieres, tambien puedes cargar todo desde admin."
+          "Puedes asignar un capitan por equipo para que complete jugadores y fotos, pero es opcional. Si prefieres, todo el plantel puede quedar administrado solo por el equipo admin del torneo."
       },
       {
         title: "4. Genera el fixture y publica la competencia",
         description:
-          "Cuando ya tienes al menos dos equipos, puedes crear el fixture tipo round robin o cargarlo manualmente con fecha, horario y sede."
+          "Cuando ya tienes al menos dos equipos, puedes crear el fixture tipo round robin o armarlo manualmente fecha por fecha con horario, sede y cruces definidos por ti."
       }
     ],
     workflowLabel: "Como se gestiona el dia a dia",
@@ -193,12 +193,12 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "Fixture flexible",
         description:
-          "Puedes generar todas las fechas en forma automatica o editar partido por partido para ajustar horarios, sedes y estados antes de jugar."
+          "Puedes generar todas las fechas en forma automatica o armar y editar el fixture manualmente partido por partido para ajustar cruces, horarios, sedes y estados."
       },
       {
         title: "Capitanes con acceso acotado",
         description:
-          "El capitan solo ve su equipo dentro del torneo y puede completar sus jugadores y fotos sin tocar la configuracion general de la competencia."
+          "Si decides usar capitanes, cada uno solo ve su equipo dentro del torneo y puede completar jugadores y fotos sin tocar la configuracion general de la competencia."
       },
       {
         title: "Carga de actas simple",
@@ -238,7 +238,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "Consejo practico",
         description:
-          "Si vas a trabajar con capitanes, define los equipos primero y enviales la invitacion antes de empezar a cargar resultados. Eso ordena mucho la calidad del plantel y las fotos."
+          "Si vas a trabajar con capitanes, define los equipos primero y enviales la invitacion antes de empezar a cargar resultados. Si no, puedes resolver todo desde admins y simplificar el arranque."
       }
     ],
     faq: [
@@ -250,7 +250,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         question: "Que puede hacer un capitan?",
         answer:
-          "El capitan inicia sesion con su cuenta y solo accede al equipo que el admin le asigno dentro del torneo. Desde ahi puede cargar o editar jugadores y sus fotos."
+          "El capitan inicia sesion con su cuenta y solo accede al equipo que el admin le asigno dentro del torneo. Desde ahi puede cargar o editar jugadores y sus fotos, pero usar capitanes es opcional."
       },
       {
         question: "Se puede regenerar el fixture despues de empezarlo?",
@@ -260,7 +260,12 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         question: "La plataforma tiene costo?",
         answer:
-          "El esquema comercial del modulo Torneos ya esta contemplado, pero el valor final sigue en definicion. Por eso en Precios veras el placeholder XXX."
+          "Si. El Pack Torneos esta planteado en ARS 50.000 por temporada y cubre varios torneos o subtorneos del mismo organizador."
+      },
+      {
+        question: "Cuantos admins puede tener un torneo?",
+        answer:
+          "Cada torneo puede tener hasta 4 administradores. Asi puedes repartir la gestion sin perder control del torneo o subtorneo."
       },
       {
         question: "Que pasa si falta un jugador en el plantel al cargar un partido?",

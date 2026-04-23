@@ -20,16 +20,14 @@ import {
   getOrganizationQueryKeyById,
   getOrganizationWriteAccess
 } from "@/lib/auth/admin";
-import { ORGANIZATION_BILLING_CURRENCY, ORGANIZATION_MONTHLY_PRICE_ARS } from "@/lib/constants";
+import { ORGANIZATION_MONTHLY_PRICE_ARS } from "@/lib/constants";
 import { syncOrganizationBillingPaymentFromMercadoPago } from "@/lib/domain/billing-workflow";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminDashboardData, getOrganizationAdminData } from "@/lib/queries/admin";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-function formatCurrencyArs(amount: number) {
+function formatAmountArs(amount: number) {
   return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: ORGANIZATION_BILLING_CURRENCY,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(amount);
@@ -87,8 +85,8 @@ export default async function AdminDashboardPage({
       <Card>
         <CardTitle>Crear organizacion</CardTitle>
         <CardDescription>
-          Proba 1 mes gratis por organizacion. Despues, {formatCurrencyArs(ORGANIZATION_MONTHLY_PRICE_ARS)} por mes por
-          organizacion para mantener edicion y crear nuevas.
+          1 mes de prueba gratis por organización. Después, $
+          {formatAmountArs(ORGANIZATION_MONTHLY_PRICE_ARS)}/mes para seguir creando.
         </CardDescription>
         <form
           action={creationAccess.canCreateOrganization ? createOrganizationAction : startOrganizationCreationCheckoutAction}
