@@ -260,7 +260,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         question: "La plataforma tiene costo?",
         answer:
-          "Si. El Pack Torneos esta planteado en ARS 50.000 por temporada y cubre varios torneos o subtorneos del mismo organizador."
+          "Si. El Pack Torneos esta planteado en ARS 50.000 por mes y cubre varios torneos o subtorneos del mismo organizador."
       },
       {
         question: "Cuantos admins puede tener un torneo?",

@@ -37,7 +37,9 @@ export function isSuperAdminConfigured() {
 
 export const FREE_TRIAL_DAYS = 30;
 export const ORGANIZATION_MONTHLY_PRICE_ARS = 5000;
-export const TOURNAMENT_SEASON_PRICE_ARS = 50000;
+export const TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS = 100;
+// Referencia comercial publica mientras la activacion de torneos siga en modo debug.
+export const TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS = 50000;
 export const ORGANIZATION_BILLING_CURRENCY = "ARS";
 
 export const TEAM_SIZE_BY_MODALITY: Record<MatchModality, number> = {
