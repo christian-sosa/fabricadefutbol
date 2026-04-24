@@ -227,4 +227,48 @@ describe("tournament captains", () => {
       })
     );
   });
+
+  it("tolera tablas auxiliares faltantes del schema admin", async () => {
+    const fake = createFakeSupabase({
+      tournaments: [
+        {
+          id: "t-1",
+          name: "Apertura",
+          slug: "apertura",
+          season_label: "2026",
+          status: "draft",
+          is_public: false,
+          created_by: "admin-1"
+        }
+      ],
+      tournament_teams: [
+        { id: "team-a", tournament_id: "t-1", name: "Alfa", short_name: "ALF", slug: "alfa", display_order: 1 }
+      ],
+      queryFailures: {
+        tournament_admin_invites: {
+          select: "Could not find the table 'app_prod.tournament_admin_invites' in the schema cache"
+        },
+        tournament_team_captains: {
+          select: "Could not find the table 'app_prod.tournament_team_captains' in the schema cache"
+        },
+        tournament_captain_invites: {
+          select: "Could not find the table 'app_prod.tournament_captain_invites' in the schema cache"
+        }
+      }
+    });
+
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+
+    const details = await getAdminTournamentDetails("t-1");
+
+    expect(details?.tournament.name).toBe("Apertura");
+    expect(details?.tournamentAdmins.pendingInvites).toEqual([]);
+    expect(details?.teamCaptainsByTeam.size).toBe(0);
+    expect(details?.captainInvitesByTeam.size).toBe(0);
+    expect(details?.schemaSupport).toEqual({
+      tournamentAdminInvites: false,
+      tournamentTeamCaptains: false,
+      tournamentCaptainInvites: false
+    });
+  });
 });
