@@ -170,7 +170,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "1. Crea el torneo o subtorneo",
         description:
-          "Desde el panel de Torneos das de alta nombre, slug, temporada, estado y visibilidad publica. La misma cuenta puede crear varios torneos o subtorneos como Viernes A1 y Viernes A2."
+          "Desde el panel de Torneos cargas un nombre unico y arrancas el alta desde Mercado Pago. La misma cuenta puede crear varios torneos o subtorneos como Viernes A1 y Viernes A2."
       },
       {
         title: "2. Carga los equipos",
@@ -260,7 +260,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         question: "La plataforma tiene costo?",
         answer:
-          "Por ahora no. El modulo Torneos esta liberado gratis mientras terminamos de definir su esquema comercial."
+          "Si. El pack Torneos se inicia desde Mercado Pago y su referencia comercial publica esta en la seccion Precios."
       },
       {
         question: "Cuantos admins puede tener un torneo?",

@@ -10,6 +10,7 @@ type TableName =
   | "tournaments"
   | "tournament_admins"
   | "tournament_admin_invites"
+  | "tournament_billing_payments"
   | "tournament_team_captains"
   | "tournament_captain_invites"
   | "tournament_teams"
@@ -68,6 +69,7 @@ function createEmptyDatabase(): FakeDatabase {
     tournaments: [],
     tournament_admins: [],
     tournament_admin_invites: [],
+    tournament_billing_payments: [],
     tournament_team_captains: [],
     tournament_captain_invites: [],
     tournament_teams: [],
@@ -138,6 +140,12 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!normalized.expires_at) {
         normalized.expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
       }
+      break;
+    case "tournament_billing_payments":
+      if (!normalized.status) normalized.status = "pending";
+      if (!("approved_at" in normalized)) normalized.approved_at = null;
+      if (!("created_tournament_id" in normalized)) normalized.created_tournament_id = null;
+      if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "tournament_team_captains":
       if (!("created_by" in normalized)) normalized.created_by = null;

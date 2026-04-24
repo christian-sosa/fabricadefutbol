@@ -43,7 +43,7 @@ export default async function TournamentDetailPage({
               <TournamentStatusBadge status={data.tournament.status} />
             </div>
             <CardDescription className="mt-2">
-              {data.tournament.seasonLabel} - {data.tournament.description || "Sin descripcion"}
+              {data.tournament.description || "Fixture, tabla y estadisticas del torneo."}
             </CardDescription>
             <p className="mt-2 text-xs text-slate-500">
               {data.tournament.isPublic ? "Torneo publico" : "Solo lectura admin"}

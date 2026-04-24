@@ -426,6 +426,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      tournament_billing_payments: {
+        Row: {
+          admin_id: string;
+          amount: number;
+          approved_at: string | null;
+          checkout_sandbox_url: string | null;
+          checkout_url: string | null;
+          created_at: string;
+          created_tournament_id: string | null;
+          currency_id: string;
+          id: string;
+          mp_external_reference: string;
+          mp_payment_id: string | null;
+          mp_preference_id: string | null;
+          raw_payment: Json | null;
+          requested_tournament_name: string;
+          requested_tournament_slug: string;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          admin_id: string;
+          amount: number;
+          approved_at?: string | null;
+          checkout_sandbox_url?: string | null;
+          checkout_url?: string | null;
+          created_at?: string;
+          created_tournament_id?: string | null;
+          currency_id: string;
+          id?: string;
+          mp_external_reference: string;
+          mp_payment_id?: string | null;
+          mp_preference_id?: string | null;
+          raw_payment?: Json | null;
+          requested_tournament_name: string;
+          requested_tournament_slug: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          admin_id?: string;
+          amount?: number;
+          approved_at?: string | null;
+          checkout_sandbox_url?: string | null;
+          checkout_url?: string | null;
+          created_at?: string;
+          created_tournament_id?: string | null;
+          currency_id?: string;
+          id?: string;
+          mp_external_reference?: string;
+          mp_payment_id?: string | null;
+          mp_preference_id?: string | null;
+          raw_payment?: Json | null;
+          requested_tournament_name?: string;
+          requested_tournament_slug?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       tournament_team_captains: {
         Row: {
           captain_id: string;

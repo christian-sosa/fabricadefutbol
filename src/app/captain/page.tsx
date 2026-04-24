@@ -116,9 +116,6 @@ export default async function CaptainPage({
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <CardTitle>{panelData.team.name}</CardTitle>
               <TournamentStatusBadge status={panelData.tournament.status} />
-              <span className="rounded-full border border-slate-700 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
-                {panelData.tournament.seasonLabel}
-              </span>
             </div>
             <CardDescription className="mt-2">
               Gestiona los datos de tu plantel y mantén al día las fotos del equipo dentro de {panelData.tournament.name}.

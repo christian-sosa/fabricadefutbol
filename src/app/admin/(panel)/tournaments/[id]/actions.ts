@@ -23,8 +23,6 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const updateTournamentSchema = z.object({
   name: z.string().min(3, "El nombre del torneo debe tener al menos 3 caracteres.").max(100),
-  seasonLabel: z.string().min(2, "La temporada debe tener al menos 2 caracteres.").max(50),
-  description: z.string().max(600).optional(),
   isPublic: z.boolean().default(false),
   status: z.enum(["draft", "active", "finished", "archived"])
 });
@@ -126,6 +124,29 @@ function normalizeScheduledAt(value: string | undefined) {
   return new Date(value).toISOString();
 }
 
+async function validateTournamentNameAvailability(params: {
+  name: string;
+  ignoreTournamentId: string;
+}) {
+  const supabase = createSupabaseAdminClient() ?? (await createSupabaseServerClient());
+  const { data, error } = await supabase
+    .from("tournaments")
+    .select("id")
+    .ilike("name", params.name)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (data && String(data.id) !== params.ignoreTournamentId) {
+    return "Ya existe un torneo con ese nombre.";
+  }
+
+  return null;
+}
+
 function buildCaptainInviteExpiresAt() {
   return new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
 }
@@ -220,8 +241,6 @@ export async function updateTournamentAction(tournamentId: string, formData: For
     await assertTournamentMembershipAction(tournamentId);
     const parsed = updateTournamentSchema.safeParse({
       name: formData.get("name"),
-      seasonLabel: formData.get("seasonLabel"),
-      description: formData.get("description"),
       isPublic: formData.get("isPublic") === "on",
       status: formData.get("status")
     });
@@ -236,13 +255,26 @@ export async function updateTournamentAction(tournamentId: string, formData: For
       );
     }
 
+    const normalizedName = parsed.data.name.trim();
+    const duplicateNameMessage = await validateTournamentNameAvailability({
+      name: normalizedName,
+      ignoreTournamentId: tournamentId
+    });
+    if (duplicateNameMessage) {
+      redirect(
+        buildTournamentDetailPath({
+          tournamentId,
+          tab: "summary",
+          error: duplicateNameMessage
+        })
+      );
+    }
+
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase
       .from("tournaments")
       .update({
-        name: parsed.data.name.trim(),
-        season_label: parsed.data.seasonLabel.trim(),
-        description: parsed.data.description?.trim() || null,
+        name: normalizedName,
         is_public: parsed.data.isPublic,
         status: parsed.data.status
       })

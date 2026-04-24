@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import {
   ORGANIZATION_BILLING_CURRENCY,
-  ORGANIZATION_MONTHLY_PRICE_ARS
+  ORGANIZATION_MONTHLY_PRICE_ARS,
+  TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS
 } from "@/lib/constants";
 
 function formatArs(amount: number) {
@@ -31,10 +32,10 @@ export default function PricingPage() {
     },
     {
       title: "Pack Torneos",
-      price: "Gratis por ahora",
-      badge: "Acceso temporal",
+      price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS)} / mes`,
+      badge: "Competencia completa",
       description:
-        "Pensado para ligas y organizadores que necesitan crear y administrar varios torneos o subtorneos. Por ahora el acceso esta liberado sin cobro.",
+        "Pensado para ligas y organizadores que necesitan crear y administrar varios torneos o subtorneos. El alta se inicia desde Mercado Pago antes de habilitar cada nuevo torneo.",
       items: [
         "Varios torneos o subtorneos por organizador",
         "Fixture automatico o armado manual fecha por fecha",
@@ -51,8 +52,8 @@ export default function PricingPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Precios</p>
         <h1 className="mt-2 text-3xl font-black text-white md:text-5xl">Packs claros en pesos para cada necesidad</h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-          Un mismo admin puede gestionar Grupos y Torneos. Hoy Grupos tiene facturacion activa y Torneos esta
-          liberado gratis de forma temporal mientras terminamos de definir ese esquema.
+          Un mismo admin puede gestionar Grupos y Torneos. Cada pack tiene su propio esquema y el alta de torneos se
+          inicia desde Mercado Pago.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
@@ -99,7 +100,7 @@ export default function PricingPage() {
         <Card>
           <CardTitle>Que incluye el pack Torneos</CardTitle>
           <CardDescription className="mt-3">
-            El acceso actual cubre la operacion de una competicion: varios subtorneos, fixture automatico o manual,
+            El pack cubre la operacion de una competicion: varios subtorneos, fixture automatico o manual,
             capitanes opcionales, hasta 4 admins y estadisticas publicas.
           </CardDescription>
         </Card>

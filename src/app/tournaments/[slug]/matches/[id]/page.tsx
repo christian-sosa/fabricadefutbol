@@ -32,9 +32,7 @@ export default async function TournamentMatchDetailPage({
             <CardTitle>
               {data.match.homeTeamName} vs {data.match.awayTeamName}
             </CardTitle>
-            <CardDescription className="mt-2">
-              {data.tournament.name} - {data.tournament.seasonLabel}
-            </CardDescription>
+            <CardDescription className="mt-2">{data.tournament.name}</CardDescription>
             <p className="mt-2 text-sm text-slate-400">
               {formatScheduledAt(data.match.scheduledAt)} - {data.match.venue || "Sin sede"}
             </p>
