@@ -41,6 +41,10 @@ export const TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS = 100;
 // Referencia comercial publica mientras la activacion de torneos siga en modo debug.
 export const TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS = 50000;
 export const ORGANIZATION_BILLING_CURRENCY = "ARS";
+// Atajo temporal para debug en produccion: mantiene el flujo local de cobro
+// de torneos, pero saltea el checkout externo. Volver a `false` reactiva
+// Mercado Pago sin tocar la estructura del workflow.
+export const TEMP_SKIP_TOURNAMENT_CHECKOUT = true;
 
 export const TEAM_SIZE_BY_MODALITY: Record<MatchModality, number> = {
   "5v5": 5,

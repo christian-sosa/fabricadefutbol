@@ -362,24 +362,3 @@ export function shouldUseMercadoPagoSandboxCheckout() {
 
   return parseBooleanEnv(selected ?? fallback, targetEnv === "development");
 }
-
-export function shouldSkipTournamentMercadoPagoCheckout() {
-  const targetEnv = getSupabaseTargetEnv();
-  const selected =
-    targetEnv === "development"
-      ? firstServerDefined([
-          "MERCADOPAGO_SKIP_TOURNAMENT_CHECKOUT_DEV",
-          "MERCADOPAGO_SKIP_TOURNAMENT_CHECKOUT"
-        ])
-      : firstServerDefined([
-          "MERCADOPAGO_SKIP_TOURNAMENT_CHECKOUT",
-          "MERCADOPAGO_SKIP_TOURNAMENT_CHECKOUT_PROD"
-        ]);
-  const fallback = firstServerDefined([
-    "MERCADOPAGO_SKIP_TOURNAMENT_CHECKOUT",
-    "MERCADOPAGO_SKIP_TOURNAMENT_CHECKOUT_DEV",
-    "MERCADOPAGO_SKIP_TOURNAMENT_CHECKOUT_PROD"
-  ]);
-
-  return parseBooleanEnv(selected ?? fallback, false);
-}
