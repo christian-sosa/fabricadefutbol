@@ -76,6 +76,16 @@ type AdminProfileRow = {
   display_name: string;
 };
 
+function isMissingSupabaseTableError(error: { code?: string | null; message: string } | null | undefined) {
+  if (!error) return false;
+  const code = error.code?.trim().toUpperCase();
+  const message = error.message.toLowerCase();
+  return (
+    code === "PGRST205" ||
+    (message.includes("could not find the table") && message.includes("schema cache"))
+  );
+}
+
 async function resolveAdminEmailsById(adminIds: string[]) {
   const adminClient = createSupabaseAdminClient();
   const emailsById = new Map<string, string>();
@@ -294,7 +304,7 @@ export async function getAdminTournamentList() {
 
 async function getTournamentAdminData(tournamentId: string) {
   const supabase = await createSupabaseServerClient();
-  const [{ data: adminRows, error: adminRowsError }, { data: inviteRows, error: inviteRowsError }] = await Promise.all([
+  const [{ data: adminRows, error: adminRowsError }, inviteRowsResult] = await Promise.all([
     supabase
       .from("tournament_admins")
       .select("id, tournament_id, admin_id, role, created_at")
@@ -310,7 +320,11 @@ async function getTournamentAdminData(tournamentId: string) {
   ]);
 
   if (adminRowsError) throw new Error(adminRowsError.message);
-  if (inviteRowsError) throw new Error(inviteRowsError.message);
+  const supportsTournamentAdminInvites = !isMissingSupabaseTableError(inviteRowsResult.error);
+  if (inviteRowsResult.error && supportsTournamentAdminInvites) {
+    throw new Error(inviteRowsResult.error.message);
+  }
+  const inviteRows = supportsTournamentAdminInvites ? inviteRowsResult.data ?? [] : [];
 
   const uniqueAdminIds = Array.from(new Set((adminRows ?? []).map((row) => row.admin_id)));
   const [{ data: profiles, error: profilesError }, emailsById] = await Promise.all([
@@ -341,7 +355,10 @@ async function getTournamentAdminData(tournamentId: string) {
       expiresAt: row.expires_at,
       createdAt: row.created_at,
       status: row.status
-    }))
+    })),
+    schemaSupport: {
+      tournamentAdminInvites: supportsTournamentAdminInvites
+    }
   };
 }
 
@@ -352,8 +369,8 @@ export async function getAdminTournamentDetails(tournamentId: string) {
 
   const supabase = await createSupabaseServerClient();
   const [
-    { data: teamCaptainRows, error: teamCaptainsError },
-    { data: captainInviteRows, error: captainInvitesError },
+    teamCaptainRowsResult,
+    captainInviteRowsResult,
     tournamentAdminData
   ] = await Promise.all([
     supabase
@@ -368,10 +385,19 @@ export async function getAdminTournamentDetails(tournamentId: string) {
     getTournamentAdminData(tournamentId)
   ]);
 
-  if (teamCaptainsError) throw new Error(teamCaptainsError.message);
-  if (captainInvitesError) throw new Error(captainInvitesError.message);
+  const supportsTournamentTeamCaptains = !isMissingSupabaseTableError(teamCaptainRowsResult.error);
+  const supportsTournamentCaptainInvites = !isMissingSupabaseTableError(captainInviteRowsResult.error);
+  if (teamCaptainRowsResult.error && supportsTournamentTeamCaptains) {
+    throw new Error(teamCaptainRowsResult.error.message);
+  }
+  if (captainInviteRowsResult.error && supportsTournamentCaptainInvites) {
+    throw new Error(captainInviteRowsResult.error.message);
+  }
 
-  const captainIds = Array.from(new Set((teamCaptainRows ?? []).map((row) => row.captain_id)));
+  const teamCaptainRows = supportsTournamentTeamCaptains ? teamCaptainRowsResult.data ?? [] : [];
+  const captainInviteRows = supportsTournamentCaptainInvites ? captainInviteRowsResult.data ?? [] : [];
+
+  const captainIds = Array.from(new Set(teamCaptainRows.map((row) => row.captain_id)));
   const { data: captainProfiles, error: captainProfilesError } = captainIds.length
     ? await supabase.from("admins").select("id, display_name").in("id", captainIds)
     : { data: [], error: null };
@@ -437,6 +463,11 @@ export async function getAdminTournamentDetails(tournamentId: string) {
     tournamentAdmins: tournamentAdminData,
     teamCaptainsByTeam,
     captainInvitesByTeam,
+    schemaSupport: {
+      tournamentAdminInvites: tournamentAdminData.schemaSupport.tournamentAdminInvites,
+      tournamentTeamCaptains: supportsTournamentTeamCaptains,
+      tournamentCaptainInvites: supportsTournamentCaptainInvites
+    },
     matches: bundle.matches,
     results: bundle.results,
     playerStats: bundle.playerStats,

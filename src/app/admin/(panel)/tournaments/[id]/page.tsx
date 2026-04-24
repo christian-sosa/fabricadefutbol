@@ -86,6 +86,9 @@ export default async function AdminTournamentDetailPage({
   const topScorers = findTopScorerRows(details.topScorers);
   const topFigures = findTopFigureRows(details.topFigures);
   const bestDefense = findBestDefenseRows(details.bestDefense);
+  const tournamentAdminInvitesEnabled = details.schemaSupport.tournamentAdminInvites;
+  const captainManagementEnabled =
+    details.schemaSupport.tournamentTeamCaptains && details.schemaSupport.tournamentCaptainInvites;
 
   return (
     <div className="space-y-4">
@@ -183,12 +186,18 @@ export default async function AdminTournamentDetailPage({
               puede tener su propio equipo de administracion.
             </CardDescription>
 
-            <form action={inviteTournamentAdminAction.bind(null, id)} className="mt-4 flex flex-col gap-3 md:flex-row">
-              <Input name="email" placeholder="email@dominio.com" required type="email" />
-              <Button type="submit" variant="secondary">
-                Invitar admin
-              </Button>
-            </form>
+            {tournamentAdminInvitesEnabled ? (
+              <form action={inviteTournamentAdminAction.bind(null, id)} className="mt-4 flex flex-col gap-3 md:flex-row">
+                <Input name="email" placeholder="email@dominio.com" required type="email" />
+                <Button type="submit" variant="secondary">
+                  Invitar admin
+                </Button>
+              </form>
+            ) : (
+              <p className="mt-4 text-sm text-amber-300">
+                Las invitaciones de admins estan ocultas temporalmente porque faltan tablas auxiliares en el schema activo.
+              </p>
+            )}
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
@@ -232,7 +241,9 @@ export default async function AdminTournamentDetailPage({
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Invitaciones pendientes</p>
                 <div className="space-y-2">
-                  {details.tournamentAdmins.pendingInvites.length ? (
+                  {!tournamentAdminInvitesEnabled ? (
+                    <p className="text-sm text-slate-400">Esta funcion se habilita cuando el schema tenga las tablas de invitaciones.</p>
+                  ) : details.tournamentAdmins.pendingInvites.length ? (
                     details.tournamentAdmins.pendingInvites.map((invite) => {
                       const inviteUrl = buildTournamentAdminInviteUrl(invite.inviteToken);
                       return (
@@ -366,11 +377,15 @@ export default async function AdminTournamentDetailPage({
                 </div>
 
                 <div className="mt-4 grid gap-3 xl:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
-                      Capitan actual
-                    </p>
-                    {currentCaptain ? (
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                        Capitan actual
+                      </p>
+                    {!captainManagementEnabled ? (
+                      <p className="mt-3 text-sm text-slate-400">
+                        La gestion de capitanes esta oculta temporalmente porque faltan tablas auxiliares en el schema activo.
+                      </p>
+                    ) : currentCaptain ? (
                       <div className="mt-3 space-y-3">
                         <div>
                           <p className="font-semibold text-slate-100">{currentCaptain.displayName}</p>
@@ -392,11 +407,15 @@ export default async function AdminTournamentDetailPage({
                     )}
                   </div>
 
-                  <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">
-                      Invitacion de capitan
-                    </p>
-                    {pendingInvite ? (
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">
+                        Invitacion de capitan
+                      </p>
+                    {!captainManagementEnabled ? (
+                      <p className="mt-3 text-sm text-slate-400">
+                        Esta funcion se habilita cuando el schema tenga las tablas de capitanes e invitaciones.
+                      </p>
+                    ) : pendingInvite ? (
                       <div className="mt-3 space-y-3">
                         <div>
                           <p className="font-semibold text-slate-100">{pendingInvite.email}</p>
