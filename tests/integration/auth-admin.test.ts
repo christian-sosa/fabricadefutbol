@@ -18,7 +18,7 @@ const ADMIN_SESSION = {
   isSuperAdmin: false
 } as const;
 
-describe("admin organization creation access", () => {
+describe("admin group creation access", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-19T12:00:00.000Z"));
@@ -29,7 +29,7 @@ describe("admin organization creation access", () => {
     vi.useRealTimers();
   });
 
-  it("permite crear la primera organizacion free si no administra ninguna", async () => {
+  it("permite crear el primer grupo free si no administra ninguno", async () => {
     const fake = createFakeSupabase();
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
 
@@ -39,7 +39,7 @@ describe("admin organization creation access", () => {
     });
   });
 
-  it("bloquea la organizacion free si ya creo una organizacion", async () => {
+  it("bloquea el grupo free si ya creo un grupo", async () => {
     const fake = createFakeSupabase({
       organizations: [
         {
@@ -56,11 +56,11 @@ describe("admin organization creation access", () => {
     await expect(getAdminOrganizationCreationAccess(ADMIN_SESSION)).resolves.toEqual({
       canCreateOrganization: false,
       reason:
-        "Ya consumiste tu organizacion free. Para crear una nueva vas a necesitar activar el plan pago."
+        "Ya consumiste tu grupo free. Para crear uno nuevo vas a necesitar activar el plan pago."
     });
   });
 
-  it("bloquea la organizacion free si ya administra una organizacion por invitacion", async () => {
+  it("bloquea el grupo free si ya administra un grupo por invitacion", async () => {
     const fake = createFakeSupabase({
       organizations: [
         {
@@ -84,7 +84,7 @@ describe("admin organization creation access", () => {
     await expect(getAdminOrganizationCreationAccess(ADMIN_SESSION)).resolves.toEqual({
       canCreateOrganization: false,
       reason:
-        "Ya administras una organizacion. Para crear una nueva vas a necesitar activar el plan pago."
+        "Ya administras un grupo. Para crear uno nuevo vas a necesitar activar el plan pago."
     });
   });
 });

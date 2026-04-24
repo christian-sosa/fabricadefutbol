@@ -508,7 +508,7 @@ describe("match workflow", () => {
     ).rejects.toThrow("ya tiene resultado");
   });
 
-  it("rechaza agregar un reemplazo que no pertenece a la organizacion", async () => {
+  it("rechaza agregar un reemplazo que no pertenece al grupo", async () => {
     const { fake } = seedConfirmedMatchWith({
       players: [
         {
@@ -537,7 +537,7 @@ describe("match workflow", () => {
           newPlayers: [{ playerId: "player-6", team: "A" }]
         }
       })
-    ).rejects.toThrow("no existe o no pertenece a esta organizacion");
+    ).rejects.toThrow("no existe o no pertenece a este grupo");
   });
 
   it("rechaza reemplazos duplicados en la formacion final", async () => {

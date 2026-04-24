@@ -186,7 +186,7 @@ describe("billing workflow", () => {
     ]);
   });
 
-  it("si la organizacion sigue en trial, suma el mes pago despues del trial gratis", async () => {
+  it("si el grupo sigue en trial, suma el mes pago despues del trial gratis", async () => {
     const fake = createFakeSupabase({
       organizations: [
         {
@@ -243,7 +243,7 @@ describe("billing workflow", () => {
     );
   });
 
-  it("rechaza sincronizar un pago que pertenece a otra organizacion", async () => {
+  it("rechaza sincronizar un pago que pertenece a otro grupo", async () => {
     const fake = createFakeSupabase({
       organizations: [
         { id: ORG_ID, name: "Liga A", slug: "liga-a" },
@@ -276,7 +276,7 @@ describe("billing workflow", () => {
 
     expect(result).toEqual({
       updated: false,
-      reason: "El pago no pertenece a esta organizacion."
+      reason: "El pago no pertenece a este grupo."
     });
     expect(fake.table("organization_billing_subscriptions")).toHaveLength(0);
     const paymentRow = fake.find("organization_billing_payments", (row) => row.id === PAYMENT_ID);
@@ -288,7 +288,7 @@ describe("billing workflow", () => {
     expect(paymentRow).not.toHaveProperty("mp_payment_id");
   });
 
-  it("crea una organizacion nueva cuando el pago es de alta", async () => {
+  it("crea un grupo nuevo cuando el pago es de alta", async () => {
     const fake = createFakeSupabase({
       admins: [{ id: ADMIN_ID, display_name: "Admin" }],
       organizations: [{ id: ORG_ID, name: "Base", slug: "base" }],
@@ -396,7 +396,7 @@ describe("billing workflow", () => {
     ]);
   });
 
-  it("si el alta aprobada no puede crear organizacion deja el pago sincronizado sin suscripcion nueva", async () => {
+  it("si el alta aprobada no puede crear el grupo deja el pago sincronizado sin suscripcion nueva", async () => {
     const fake = createFakeSupabase({
       admins: [{ id: ADMIN_ID, display_name: "Admin" }],
       organizations: [{ id: ORG_ID, name: "Base", slug: "base" }],
@@ -606,7 +606,7 @@ describe("billing workflow", () => {
     ]);
   });
 
-  it("si el alta ya estaba asociada a la misma organizacion evita reasignar y usa la hora actual cuando falta date_approved", async () => {
+  it("si el alta ya estaba asociada al mismo grupo evita reasignar y usa la hora actual cuando falta date_approved", async () => {
     const fake = createFakeSupabase({
       admins: [{ id: ADMIN_ID, display_name: "Admin" }],
       organizations: [
