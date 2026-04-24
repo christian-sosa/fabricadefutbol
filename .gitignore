@@ -45,6 +45,7 @@ pnpm-debug.log*
 !/supabase/migrations/2026_04_21_tournament_captains_core.sql
 !/supabase/migrations/2026_04_21_tournament_player_photo_storage.sql
 !/supabase/migrations/20260423211543_billing_rls_security_advisor.sql
+!/supabase/migrations/20260424103000_tournament_billing_payments_schema_fix.sql
 /public/players/
 /README.md
 

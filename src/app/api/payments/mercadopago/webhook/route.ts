@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { syncOrganizationBillingPaymentFromMercadoPago } from "@/lib/domain/billing-workflow";
+import { syncTournamentBillingPaymentFromMercadoPago } from "@/lib/domain/tournament-billing-workflow";
 import { getMercadoPagoWebhookSecret } from "@/lib/env";
 import { verifyMercadoPagoWebhookSignature } from "@/lib/payments/mercadopago";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -45,6 +46,15 @@ function getTopic(params: URLSearchParams, payload: Record<string, unknown>) {
     params.get("type") ??
     params.get("topic") ??
     (typeof payload.type === "string" ? payload.type : null)
+  );
+}
+
+function isMissingLocalOrder(result: unknown) {
+  if (!result || typeof result !== "object") return false;
+  const candidate = result as { updated?: unknown; reason?: unknown };
+  return (
+    candidate.updated === false &&
+    candidate.reason === "No hay orden local asociada para este pago."
   );
 }
 
@@ -113,10 +123,20 @@ export async function POST(request: Request) {
       }
     }
 
-    const syncResult = await syncOrganizationBillingPaymentFromMercadoPago({
+    let syncResult:
+      | Awaited<ReturnType<typeof syncOrganizationBillingPaymentFromMercadoPago>>
+      | Awaited<ReturnType<typeof syncTournamentBillingPaymentFromMercadoPago>> =
+      await syncOrganizationBillingPaymentFromMercadoPago({
       supabase: supabaseAdmin,
       mercadopagoPaymentId: dataId
     });
+
+    if (isMissingLocalOrder(syncResult)) {
+      syncResult = await syncTournamentBillingPaymentFromMercadoPago({
+        supabase: supabaseAdmin,
+        mercadopagoPaymentId: dataId
+      });
+    }
 
     return NextResponse.json({
       ok: true,

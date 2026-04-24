@@ -4,17 +4,17 @@ export default function AdminTournamentBillingPage() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardTitle>Torneos gratis por ahora</CardTitle>
+        <CardTitle>Facturacion de torneos</CardTitle>
         <CardDescription>
-          Hoy no estamos cobrando el modulo Torneos y no hay checkout activo para esta parte del producto.
+          El alta de nuevos torneos vuelve a iniciarse desde Mercado Pago antes de habilitar la competencia.
         </CardDescription>
       </Card>
 
       <Card>
         <CardTitle>Estado actual</CardTitle>
         <CardDescription className="mt-1">
-          Puedes crear y administrar torneos sin pagar. Cuando definamos el esquema comercial, lo volveremos a
-          conectar desde una iteracion separada.
+          El detalle fino de pagos todavia no tiene pantalla propia en este modulo, pero el checkout ya esta activo
+          desde el alta de torneos.
         </CardDescription>
       </Card>
     </div>

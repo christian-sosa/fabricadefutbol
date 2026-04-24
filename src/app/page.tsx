@@ -499,7 +499,7 @@ export default async function HomePage({
                   <TournamentStatusBadge status={tournament.status} />
                 </div>
                 <CardDescription className="mt-2">
-                  {tournament.seasonLabel} - {tournament.description || "Competencia publica disponible para consultar."}
+                  {tournament.description || "Competencia publica disponible para consultar."}
                 </CardDescription>
               </Link>
             ))

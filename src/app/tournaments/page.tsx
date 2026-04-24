@@ -24,7 +24,7 @@ export default async function TournamentsPage() {
               <TournamentStatusBadge status={tournament.status} />
             </div>
             <CardDescription className="mt-2">
-              {tournament.seasonLabel} - {tournament.description || "Sin descripcion"}
+              {tournament.description || "Competencia publica disponible para consultar."}
             </CardDescription>
             <div className="mt-4 flex items-center justify-between gap-3">
               <p className="text-xs text-slate-500">/{tournament.slug}</p>

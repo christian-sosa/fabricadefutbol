@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   syncOrganizationBillingPaymentFromMercadoPagoMock,
+  syncTournamentBillingPaymentFromMercadoPagoMock,
   getMercadoPagoWebhookSecretMock,
   verifyMercadoPagoWebhookSignatureMock,
   createSupabaseAdminClientMock
 } = vi.hoisted(() => ({
   syncOrganizationBillingPaymentFromMercadoPagoMock: vi.fn(),
+  syncTournamentBillingPaymentFromMercadoPagoMock: vi.fn(),
   getMercadoPagoWebhookSecretMock: vi.fn(),
   verifyMercadoPagoWebhookSignatureMock: vi.fn(),
   createSupabaseAdminClientMock: vi.fn()
@@ -15,6 +17,11 @@ const {
 vi.mock("@/lib/domain/billing-workflow", () => ({
   syncOrganizationBillingPaymentFromMercadoPago:
     syncOrganizationBillingPaymentFromMercadoPagoMock
+}));
+
+vi.mock("@/lib/domain/tournament-billing-workflow", () => ({
+  syncTournamentBillingPaymentFromMercadoPago:
+    syncTournamentBillingPaymentFromMercadoPagoMock
 }));
 
 vi.mock("@/lib/env", () => ({
@@ -36,6 +43,7 @@ describe("Mercado Pago webhook route", () => {
     vi.unstubAllEnvs();
     createSupabaseAdminClientMock.mockReset();
     syncOrganizationBillingPaymentFromMercadoPagoMock.mockReset();
+    syncTournamentBillingPaymentFromMercadoPagoMock.mockReset();
     getMercadoPagoWebhookSecretMock.mockReset();
     verifyMercadoPagoWebhookSignatureMock.mockReset();
 
@@ -43,6 +51,10 @@ describe("Mercado Pago webhook route", () => {
     syncOrganizationBillingPaymentFromMercadoPagoMock.mockResolvedValue({
       updated: true,
       organizationId: "org-1"
+    });
+    syncTournamentBillingPaymentFromMercadoPagoMock.mockResolvedValue({
+      updated: true,
+      createdTournamentId: "tournament-1"
     });
   });
 
@@ -229,6 +241,43 @@ describe("Mercado Pago webhook route", () => {
         updated: true,
         organizationId: "org-1"
       }
+    });
+  });
+
+  it("usa el workflow de torneos si no encuentra una orden local de grupos", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    getMercadoPagoWebhookSecretMock.mockReturnValue(null);
+    syncOrganizationBillingPaymentFromMercadoPagoMock.mockResolvedValue({
+      updated: false,
+      reason: "No hay orden local asociada para este pago."
+    });
+    syncTournamentBillingPaymentFromMercadoPagoMock.mockResolvedValue({
+      updated: true,
+      createdTournamentId: "tournament-77",
+      status: "approved"
+    });
+
+    const response = await POST(
+      new Request("https://example.com/api/payments/mercadopago/webhook?topic=payment&data.id=777", {
+        method: "POST",
+        body: JSON.stringify({})
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      topic: "payment",
+      dataId: "777",
+      syncResult: {
+        updated: true,
+        createdTournamentId: "tournament-77",
+        status: "approved"
+      }
+    });
+    expect(syncTournamentBillingPaymentFromMercadoPagoMock).toHaveBeenCalledWith({
+      supabase: { role: "service-role" },
+      mercadopagoPaymentId: "777"
     });
   });
 

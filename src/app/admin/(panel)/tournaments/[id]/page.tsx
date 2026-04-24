@@ -95,12 +95,9 @@ export default async function AdminTournamentDetailPage({
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle>{details.tournament.name}</CardTitle>
               <TournamentStatusBadge status={details.tournament.status} />
-              <span className="rounded-full border border-slate-700 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
-                {details.tournament.seasonLabel}
-              </span>
             </div>
             <CardDescription className="mt-2">
-              {details.tournament.description || "Sin descripcion cargada."}
+              Gestiona equipos, fixture, resultados y estadisticas del torneo desde este panel.
             </CardDescription>
             <p className="mt-2 text-xs text-slate-400">
               {details.tournament.isPublic ? "Visible publicamente" : "Solo visible en admin"} - /{details.tournament.slug}
@@ -149,18 +146,6 @@ export default async function AdminTournamentDetailPage({
                   Nombre
                 </label>
                 <Input defaultValue={details.tournament.name} id="name" name="name" required />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="seasonLabel">
-                  Temporada
-                </label>
-                <Input defaultValue={details.tournament.seasonLabel} id="seasonLabel" name="seasonLabel" required />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="description">
-                  Descripcion
-                </label>
-                <Textarea defaultValue={details.tournament.description ?? ""} id="description" name="description" rows={3} />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="status">

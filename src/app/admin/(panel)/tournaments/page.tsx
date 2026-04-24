@@ -1,22 +1,96 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { archiveTournamentAction, createTournamentAction } from "@/app/admin/(panel)/tournaments/actions";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { getAdminTournaments } from "@/lib/auth/tournaments";
 import { requireAdminSession } from "@/lib/auth/admin";
+import { getAdminTournaments } from "@/lib/auth/tournaments";
+import { syncTournamentBillingPaymentFromMercadoPago } from "@/lib/domain/tournament-billing-workflow";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export default async function AdminTournamentsPage({
   searchParams
 }: {
-  searchParams: Promise<{ error?: string; success?: string }>;
+  searchParams: Promise<{
+    checkout?: string;
+    error?: string;
+    payment_id?: string;
+    success?: string;
+  }>;
 }) {
   const admin = await requireAdminSession();
-  const tournaments = await getAdminTournaments(admin);
   const resolvedSearchParams = await searchParams;
+
+  let checkoutMessage: { tone: "danger" | "success" | "info"; text: string } | null = null;
+  if (resolvedSearchParams.payment_id) {
+    const supabaseAdmin = createSupabaseAdminClient();
+    if (!supabaseAdmin) {
+      checkoutMessage = {
+        tone: "danger",
+        text: "Falta SUPABASE_SERVICE_ROLE_KEY para confirmar el pago del torneo."
+      };
+    } else {
+      try {
+        const syncResult = await syncTournamentBillingPaymentFromMercadoPago({
+          supabase: supabaseAdmin,
+          mercadopagoPaymentId: resolvedSearchParams.payment_id
+        });
+
+        if (resolvedSearchParams.checkout === "success" && syncResult.updated && syncResult.createdTournamentId) {
+          redirect(
+            `/admin/tournaments/${syncResult.createdTournamentId}?success=${encodeURIComponent("Torneo creado despues de confirmar el pago.")}`
+          );
+        }
+
+        if (resolvedSearchParams.checkout === "failure") {
+          checkoutMessage = {
+            tone: "danger",
+            text: "El pago no se completo. Puedes intentarlo de nuevo cuando quieras."
+          };
+        } else if (resolvedSearchParams.checkout === "pending") {
+          checkoutMessage = {
+            tone: "info",
+            text: "El pago quedo pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear el torneo."
+          };
+        } else if (syncResult.updated && syncResult.status === "approved") {
+          checkoutMessage = {
+            tone: "success",
+            text: "Pago aprobado. Estamos terminando de preparar el torneo."
+          };
+        } else if (!syncResult.updated && "reason" in syncResult && syncResult.reason) {
+          checkoutMessage = {
+            tone: "danger",
+            text: syncResult.reason
+          };
+        }
+      } catch (error) {
+        checkoutMessage = {
+          tone: "danger",
+          text: error instanceof Error ? error.message : "No se pudo confirmar el pago del torneo."
+        };
+      }
+    }
+  } else if (resolvedSearchParams.checkout === "failure") {
+    checkoutMessage = {
+      tone: "danger",
+      text: "El pago no se completo. Puedes intentarlo de nuevo cuando quieras."
+    };
+  } else if (resolvedSearchParams.checkout === "pending") {
+    checkoutMessage = {
+      tone: "info",
+      text: "El pago quedo pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear el torneo."
+    };
+  }
+
+  const tournaments = await getAdminTournaments(admin);
+  const feedbackMessage = resolvedSearchParams.error
+    ? { tone: "danger" as const, text: resolvedSearchParams.error }
+    : resolvedSearchParams.success
+      ? { tone: "success" as const, text: resolvedSearchParams.success }
+      : checkoutMessage;
 
   return (
     <div className="space-y-4">
@@ -25,42 +99,35 @@ export default async function AdminTournamentsPage({
         <CardDescription>
           Crea y administra ligas, torneos o subtorneos independientes del flujo actual de grupos.
         </CardDescription>
-        {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
-        {resolvedSearchParams.success ? (
-          <p className="mt-3 text-sm font-semibold text-emerald-300">{resolvedSearchParams.success}</p>
+        {feedbackMessage ? (
+          <p
+            className={
+              feedbackMessage.tone === "danger"
+                ? "mt-3 text-sm font-semibold text-danger"
+                : feedbackMessage.tone === "success"
+                  ? "mt-3 text-sm font-semibold text-emerald-300"
+                  : "mt-3 text-sm font-semibold text-sky-300"
+            }
+          >
+            {feedbackMessage.text}
+          </p>
         ) : null}
       </Card>
 
       <Card>
         <CardTitle>Nuevo torneo o subtorneo</CardTitle>
         <CardDescription className="mt-2">
-          Puedes usar este modulo para manejar varios torneos del mismo organizador, por ejemplo Viernes A1, Viernes A2 y sus tablas por separado.
+          Ingresa un nombre unico y te llevamos a Mercado Pago para confirmar el alta antes de habilitar el torneo.
         </CardDescription>
-        <form action={createTournamentAction} className="mt-4 grid gap-3 md:grid-cols-2">
+        <form action={createTournamentAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="name">
               Nombre
             </label>
-            <Input id="name" name="name" placeholder="Liga del Sabado" required />
+            <Input id="name" name="name" placeholder="Viernes A1" required />
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="seasonLabel">
-              Temporada / edicion
-            </label>
-            <Input defaultValue="2026" id="seasonLabel" name="seasonLabel" placeholder="Apertura 2026" required />
-          </div>
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="description">
-              Descripcion
-            </label>
-            <Textarea id="description" name="description" placeholder="Descripcion opcional del torneo" rows={3} />
-          </div>
-          <label className="flex items-center gap-2 text-sm text-slate-200 md:col-span-2">
-            <input className="h-4 w-4 accent-emerald-400" defaultChecked name="isPublic" type="checkbox" />
-            Publicar este torneo en las paginas publicas
-          </label>
-          <div className="md:col-span-2">
-            <Button type="submit">Crear torneo</Button>
+          <div className="md:self-end">
+            <Button type="submit">Continuar a Mercado Pago</Button>
           </div>
         </form>
       </Card>
@@ -80,9 +147,6 @@ export default async function AdminTournamentsPage({
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-base font-semibold text-slate-100">{tournament.name}</p>
                     <TournamentStatusBadge status={tournament.status} />
-                    <span className="rounded-full border border-slate-700 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
-                      {tournament.season_label}
-                    </span>
                   </div>
                   <p className="mt-1 text-sm text-slate-400">/{tournament.slug}</p>
                   <p className="mt-1 text-xs text-slate-500">
