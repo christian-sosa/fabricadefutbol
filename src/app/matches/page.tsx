@@ -27,7 +27,7 @@ export default async function MatchesPage({
       <OrganizationSwitcher
         basePath="/matches"
         currentOrganizationSlug={selectedOrganization?.slug}
-        label="Elegir organizacion"
+        label="Elegir grupo"
         organizations={organizations}
         quickOrganizations={viewerAdminOrganizations}
       />

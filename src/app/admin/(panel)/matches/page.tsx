@@ -21,12 +21,12 @@ export default async function AdminMatchesPage({
   return (
     <div className="space-y-4">
       <Card>
-        <CardTitle>Organizacion activa: {selectedOrganization.name}</CardTitle>
+        <CardTitle>Grupo activo: {selectedOrganization.name}</CardTitle>
         <div className="mt-3">
           <OrganizationSwitcher
             basePath="/admin/matches"
             currentOrganizationSlug={selectedOrganization.slug}
-            label="Cambiar organizacion"
+            label="Cambiar grupo"
             organizations={organizations}
           />
         </div>
@@ -72,7 +72,7 @@ export default async function AdminMatchesPage({
               </div>
             ))
           ) : (
-            <p className="text-sm text-slate-400">Todavia no hay partidos cargados para esta organizacion.</p>
+            <p className="text-sm text-slate-400">Todavia no hay partidos cargados para este grupo.</p>
           )}
         </div>
       </Card>

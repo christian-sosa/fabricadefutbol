@@ -256,7 +256,7 @@ export default async function CaptainPage({
         <Card>
           <CardTitle>Plantel del equipo</CardTitle>
           <CardDescription className="mt-2">
-            Solo puedes editar jugadores de {panelData.team.name}. Los cambios impactan en el torneo, no en organizaciones.
+            Solo puedes editar jugadores de {panelData.team.name}. Los cambios impactan en el torneo, no en grupos.
           </CardDescription>
         </Card>
 

@@ -28,7 +28,7 @@ export default async function AdminPlayersPage({
   if (!writeAccess.canWrite) {
     const target = withOrgQuery("/admin", selectedOrganization.slug);
     const separator = target.includes("?") ? "&" : "?";
-    redirect(`${target}${separator}error=${encodeURIComponent(writeAccess.reason ?? "No tienes permisos para editar esta organizacion.")}`);
+    redirect(`${target}${separator}error=${encodeURIComponent(writeAccess.reason ?? "No tienes permisos para editar este grupo.")}`);
   }
   const players = await getAdminPlayers(selectedOrganization.id);
   const error = resolvedSearchParams.error;
@@ -39,12 +39,12 @@ export default async function AdminPlayersPage({
   return (
     <div className="space-y-4">
       <Card>
-        <CardTitle>Organizacion activa: {selectedOrganization.name}</CardTitle>
+        <CardTitle>Grupo activo: {selectedOrganization.name}</CardTitle>
         <div className="mt-3">
           <OrganizationSwitcher
             basePath="/admin/players"
             currentOrganizationSlug={selectedOrganization.slug}
-            label="Cambiar organizacion"
+            label="Cambiar grupo"
             organizations={organizations}
           />
         </div>
@@ -52,7 +52,7 @@ export default async function AdminPlayersPage({
 
       <Card>
         <CardTitle>Alta de jugador</CardTitle>
-        <CardDescription>Carga jugadores nuevos para la organizacion seleccionada.</CardDescription>
+        <CardDescription>Carga jugadores nuevos para el grupo seleccionado.</CardDescription>
         <form action={createPlayerAction} className="mt-4 grid gap-3 md:grid-cols-4">
           <input name="organizationId" type="hidden" value={selectedOrganization.id} />
           <Input name="fullName" placeholder="Nombre completo" required />

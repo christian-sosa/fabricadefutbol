@@ -3,8 +3,7 @@ import Link from "next/link";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import {
   ORGANIZATION_BILLING_CURRENCY,
-  ORGANIZATION_MONTHLY_PRICE_ARS,
-  TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS
+  ORGANIZATION_MONTHLY_PRICE_ARS
 } from "@/lib/constants";
 
 function formatArs(amount: number) {
@@ -17,30 +16,31 @@ function formatArs(amount: number) {
 export default function PricingPage() {
   const plans = [
     {
-      title: "Pack Organizaciones",
+      title: "Pack Grupos",
       price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(ORGANIZATION_MONTHLY_PRICE_ARS)} / mes`,
       badge: "1 mes gratis",
       description:
         `1 mes de prueba gratis por organización. Después, $${formatArs(ORGANIZATION_MONTHLY_PRICE_ARS)}/mes para seguir creando.`,
       items: [
-        "Hasta 30 jugadores por organizacion",
+        "Hasta 30 jugadores por grupo",
         "Creá partidos con equipos parejos",
+        "Comparte el proximo partido y los equipos con tus companeros apenas lo generas",
         "Ranking automatico despues de cada resultado",
-        "Historial completo",
-        "Comparte el proximo partido y los equipos con tus companeros apenas lo generas"
+        "Historial completo"
       ]
     },
     {
       title: "Pack Torneos",
-      price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS)} / mes`,
-      badge: "Multiples subtorneos",
+      price: "Gratis por ahora",
+      badge: "Acceso temporal",
       description:
-        "Pensado para ligas y organizadores que necesitan crear y administrar varios torneos o subtorneos con un pack mensual.",
+        "Pensado para ligas y organizadores que necesitan crear y administrar varios torneos o subtorneos. Por ahora el acceso esta liberado sin cobro.",
       items: [
         "Varios torneos o subtorneos por organizador",
         "Fixture automatico o armado manual fecha por fecha",
         "Capitanes opcionales segun cada admin",
-        "Hasta 4 administradores por torneo"
+        "Hasta 4 administradores por torneo",
+        "Tabla, fixture y estadisticas publicas para compartir"
       ]
     }
   ] as const;
@@ -51,9 +51,8 @@ export default function PricingPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Precios</p>
         <h1 className="mt-2 text-3xl font-black text-white md:text-5xl">Packs claros en pesos para cada necesidad</h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-          Un mismo admin puede gestionar Organizaciones y Torneos, pero cada pack tiene su propia logica y su propia
-          facturacion. Aqui ves rapido que incluye cada pack, como se cobra y que cubre el pack Torneos para
-          subtorneos y ligas.
+          Un mismo admin puede gestionar Grupos y Torneos. Hoy Grupos tiene facturacion activa y Torneos esta
+          liberado gratis de forma temporal mientras terminamos de definir ese esquema.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
@@ -91,7 +90,7 @@ export default function PricingPage() {
 
       <section className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardTitle>Que incluye el pack Organizaciones</CardTitle>
+          <CardTitle>Que incluye el pack Grupos</CardTitle>
           <CardDescription className="mt-3">
             El pack cubre la gestion diaria del grupo: jugadores, partidos, equipos parejos, ranking automatico,
             historial completo y la posibilidad de compartir el proximo partido ya armado.
@@ -100,8 +99,8 @@ export default function PricingPage() {
         <Card>
           <CardTitle>Que incluye el pack Torneos</CardTitle>
           <CardDescription className="mt-3">
-            El pack cubre la operacion de una competicion: varios subtorneos, fixture automatico o manual, capitanes
-            opcionales, hasta 4 admins y estadisticas publicas.
+            El acceso actual cubre la operacion de una competicion: varios subtorneos, fixture automatico o manual,
+            capitanes opcionales, hasta 4 admins y estadisticas publicas.
           </CardDescription>
         </Card>
       </section>

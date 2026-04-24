@@ -17,7 +17,7 @@ const feedbackSchema = z.object({
   organization: z
     .string()
     .trim()
-    .max(80, "El nombre de la organizacion o torneo es demasiado largo.")
+    .max(80, "El nombre del grupo o torneo es demasiado largo.")
     .optional(),
   message: z
     .string()

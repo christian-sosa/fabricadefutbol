@@ -16,8 +16,8 @@ test("mantiene la organizacion al navegar por la parte publica", async ({ page }
   await page.goto(`/?org=${ORG_SLUG}`);
 
   await expect(page).toHaveURL(new RegExp(`\\?org=${ORG_SLUG}$`));
-  await publicNavLink(page, "Organizaciones").click();
-  await expect(page).toHaveURL(new RegExp(`/organizations\\?org=${ORG_SLUG}$`));
+  await publicNavLink(page, "Grupos").click();
+  await expect(page).toHaveURL(new RegExp(`/groups\\?org=${ORG_SLUG}$`));
 
   await publicNavLink(page, "Ranking").click();
   await expect(page).toHaveURL(new RegExp(`/ranking\\?org=${ORG_SLUG}$`));

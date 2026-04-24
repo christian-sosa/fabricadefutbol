@@ -60,7 +60,7 @@ export default async function SuperAdminDashboardPage() {
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
-          <CardDescription>Organizaciones</CardDescription>
+          <CardDescription>Grupos</CardDescription>
           <CardTitle className="mt-1 text-3xl">{metricNumber(metrics.totals.organizations)}</CardTitle>
           <p className="mt-2 text-xs text-slate-400">Sin jugadores: {metricNumber(metrics.derived.organizationsWithoutPlayers)}</p>
         </Card>
@@ -82,7 +82,7 @@ export default async function SuperAdminDashboardPage() {
           <CardDescription>Recaudado en {metrics.currentMonth.label}</CardDescription>
           <CardTitle className="mt-1 text-3xl">{formatCurrencyArs(metrics.currentMonth.approvedRevenueArs)}</CardTitle>
           <p className="mt-2 text-xs text-slate-400">
-            Pagos aprobados {metricNumber(metrics.currentMonth.approvedPayments)} | Orgs cobradas{" "}
+            Pagos aprobados {metricNumber(metrics.currentMonth.approvedPayments)} | Grupos cobrados{" "}
             {metricNumber(metrics.currentMonth.organizationsWithApprovedPayments)}
           </p>
         </Card>
@@ -95,8 +95,8 @@ export default async function SuperAdminDashboardPage() {
             <p>Admins registrados: {metricNumber(metrics.totals.admins)}</p>
             <p>Asignaciones admin-org: {metricNumber(metrics.totals.orgAdminMemberships)}</p>
             <p>Invitaciones pendientes: {metricNumber(metrics.totals.pendingInvites)}</p>
-            <p>Promedio de jugadores por organizacion: {metrics.derived.avgPlayersPerOrganization.toFixed(2)}</p>
-            <p>Promedio de partidos por organizacion: {metrics.derived.avgMatchesPerOrganization.toFixed(2)}</p>
+            <p>Promedio de jugadores por grupo: {metrics.derived.avgPlayersPerOrganization.toFixed(2)}</p>
+            <p>Promedio de partidos por grupo: {metrics.derived.avgMatchesPerOrganization.toFixed(2)}</p>
             <p>Resultados cargados: {metricNumber(metrics.totals.matchResults)}</p>
             <p>Invitados en partidos: {metricNumber(metrics.totals.matchGuests)}</p>
           </div>
@@ -105,17 +105,17 @@ export default async function SuperAdminDashboardPage() {
         <Card>
           <CardTitle>Negocio y planes</CardTitle>
           <div className="mt-3 space-y-2 text-sm text-slate-200">
-            <p>Organizaciones con plan activo: {metricNumber(metrics.business.activePaidOrganizations)}</p>
-            <p>Organizaciones en trial gratis: {metricNumber(metrics.business.freeTrialOrganizations)}</p>
-            <p>Organizaciones sin plan vigente: {metricNumber(metrics.business.expiredWithoutPlanOrganizations)}</p>
-            <p>Organizaciones que alguna vez pagaron: {metricNumber(metrics.business.organizationsWithAnyApprovedPayment)}</p>
+            <p>Grupos con plan activo: {metricNumber(metrics.business.activePaidOrganizations)}</p>
+            <p>Grupos en trial gratis: {metricNumber(metrics.business.freeTrialOrganizations)}</p>
+            <p>Grupos sin plan vigente: {metricNumber(metrics.business.expiredWithoutPlanOrganizations)}</p>
+            <p>Grupos que alguna vez pagaron: {metricNumber(metrics.business.organizationsWithAnyApprovedPayment)}</p>
           </div>
         </Card>
 
         <Card>
           <CardTitle>Actividad ultimos 30 dias</CardTitle>
           <div className="mt-3 space-y-2 text-sm text-slate-200">
-            <p>Organizaciones creadas: {metricNumber(metrics.last30Days.organizationsCreated)}</p>
+            <p>Grupos creados: {metricNumber(metrics.last30Days.organizationsCreated)}</p>
             <p>Jugadores creados: {metricNumber(metrics.last30Days.playersCreated)}</p>
             <p>Partidos creados: {metricNumber(metrics.last30Days.matchesCreated)}</p>
             <p>Partidos finalizados: {metricNumber(metrics.last30Days.matchesFinished)}</p>
@@ -124,7 +124,7 @@ export default async function SuperAdminDashboardPage() {
       </section>
 
       <Card>
-        <CardTitle>Top organizaciones (por cantidad de jugadores)</CardTitle>
+        <CardTitle>Top grupos (por cantidad de jugadores)</CardTitle>
         <CardDescription className="mt-1">
           Ranking operativo para detectar donde hay mas carga de uso y administracion.
         </CardDescription>
@@ -132,7 +132,7 @@ export default async function SuperAdminDashboardPage() {
           <table className="min-w-full text-left text-sm text-slate-100">
             <thead className="bg-slate-800/80 text-slate-300">
               <tr>
-                <th className="px-4 py-3 font-semibold">Organizacion</th>
+                <th className="px-4 py-3 font-semibold">Grupo</th>
                 <th className="px-4 py-3 font-semibold">Jugadores</th>
                 <th className="px-4 py-3 font-semibold">Activos</th>
                 <th className="px-4 py-3 font-semibold">Partidos</th>
@@ -168,7 +168,7 @@ export default async function SuperAdminDashboardPage() {
               {!metrics.topOrganizations.length ? (
                 <tr>
                   <td className="px-4 py-4 text-slate-400" colSpan={8}>
-                    No hay organizaciones cargadas.
+                    No hay grupos cargados.
                   </td>
                 </tr>
               ) : null}
@@ -181,11 +181,11 @@ export default async function SuperAdminDashboardPage() {
         <CardTitle>Que te estoy mostrando y como se calcula</CardTitle>
         <div className="mt-3 space-y-2 text-sm text-slate-300">
           <p>
-            1. Totales globales: conteos directos de tablas principales (organizaciones, jugadores, partidos, admins,
+            1. Totales globales: conteos directos de tablas principales (grupos, jugadores, partidos, admins,
             resultados e invitados).
           </p>
           <p>
-            2. Metricas derivadas: promedios por organizacion y porcentaje de finalizacion, calculados sobre los datos
+            2. Metricas derivadas: promedios por grupo y porcentaje de finalizacion, calculados sobre los datos
             actuales del sistema.
           </p>
           <p>
@@ -197,10 +197,10 @@ export default async function SuperAdminDashboardPage() {
             {metrics.currentMonth.timezone}.
           </p>
           <p>
-            5. Estado comercial: clasifica cada organizacion entre plan activo, trial gratis o sin plan vigente.
+            5. Estado comercial: clasifica cada grupo entre plan activo, trial gratis o sin plan vigente.
           </p>
           <p>
-            6. Export CSV: descarga snapshot con timestamp, metricas globales y detalle por organizacion para analisis
+            6. Export CSV: descarga snapshot con timestamp, metricas globales y detalle por grupo para analisis
             en BI/Excel.
           </p>
         </div>

@@ -1,7 +1,8 @@
 export type PublicModuleContext = "organizations" | "tournaments";
 
 export function parsePublicModule(value: string | null | undefined): PublicModuleContext | null {
-  if (value === "organizations" || value === "tournaments") return value;
+  if (value === "organizations" || value === "groups") return "organizations";
+  if (value === "tournaments") return value;
   return null;
 }
 
@@ -23,7 +24,7 @@ export function withPublicQuery(
   }
 
   if (params?.module) {
-    query.set("module", params.module);
+    query.set("module", params.module === "organizations" ? "groups" : params.module);
   }
 
   const queryString = query.toString().replace(/\+/g, "%20");

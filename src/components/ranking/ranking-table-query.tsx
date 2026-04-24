@@ -110,7 +110,7 @@ export function RankingTableQuery({ organizationId, initialPlayers }: RankingTab
 
         {!players.length ? (
           <p className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-6 text-sm text-slate-400">
-            {isFetching ? "Cargando ranking..." : "No hay jugadores para esta organizacion."}
+            {isFetching ? "Cargando ranking..." : "No hay jugadores para este grupo."}
           </p>
         ) : null}
       </div>
@@ -166,7 +166,7 @@ export function RankingTableQuery({ organizationId, initialPlayers }: RankingTab
             {!players.length ? (
               <tr>
                 <TD className="px-6 py-6 text-sm text-slate-400" colSpan={8}>
-                  {isFetching ? "Cargando ranking..." : "No hay jugadores para esta organizacion."}
+                  {isFetching ? "Cargando ranking..." : "No hay jugadores para este grupo."}
                 </TD>
               </tr>
             ) : null}

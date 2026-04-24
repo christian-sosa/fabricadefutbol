@@ -221,7 +221,7 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
 
   try {
     if (!organizationId) {
-      redirect(withMessage("", "Falta la organizacion activa."));
+      redirect(withMessage("", "Falta el grupo activo."));
     }
 
     await assertOrganizationAdminAction(organizationId);
@@ -466,7 +466,7 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
       .maybeSingle();
 
     if (playerError || !player) {
-      redirect(withMessage(organizationQueryKey, "No se encontro el jugador en la organizacion seleccionada."));
+      redirect(withMessage(organizationQueryKey, "No se encontro el jugador en el grupo seleccionado."));
     }
 
     const optimizedBuffer = await optimizePlayerAvatarImage(file);

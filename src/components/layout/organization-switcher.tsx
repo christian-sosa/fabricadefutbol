@@ -27,7 +27,7 @@ export function OrganizationSwitcher({
   organizations,
   quickOrganizations = [],
   currentOrganizationSlug,
-  label = "Organizaciones"
+  label = "Grupos"
 }: {
   basePath: string;
   organizations: OrganizationOption[];
@@ -54,7 +54,7 @@ export function OrganizationSwitcher({
   if (!organizations.length) {
     return (
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">
-        Todavia no hay organizaciones creadas.
+        Todavia no hay grupos creados.
       </div>
     );
   }
@@ -65,7 +65,7 @@ export function OrganizationSwitcher({
 
       {safeQuickOrganizations.length ? (
         <div className="space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">Mis organizaciones</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">Mis grupos</p>
           <div className="flex flex-wrap gap-2">
             {safeQuickOrganizations.map((organization) => {
               const active = organization.slug === currentOrganizationSlug;
@@ -92,7 +92,7 @@ export function OrganizationSwitcher({
         <input
           className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/30"
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Buscar organizacion por nombre..."
+          placeholder="Buscar grupo por nombre..."
           type="search"
           value={query}
         />
@@ -118,7 +118,7 @@ export function OrganizationSwitcher({
         </div>
 
         {query.trim() && !visibleOrganizations.length ? (
-          <p className="text-sm text-slate-400">No encontramos organizaciones con ese termino.</p>
+          <p className="text-sm text-slate-400">No encontramos grupos con ese termino.</p>
         ) : null}
       </div>
     </div>

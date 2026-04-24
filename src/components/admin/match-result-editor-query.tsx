@@ -35,7 +35,7 @@ export function MatchResultEditorQuery(props: MatchResultEditorQueryProps) {
         {...editorProps}
         onSubmit={async (payload) => {
           await mutation.mutateAsync(payload);
-          setSuccessMessage("Resultado guardado. Se actualizaran solo los datos de esta organizacion.");
+          setSuccessMessage("Resultado guardado. Se actualizaran solo los datos de este grupo.");
         }}
       />
       {successMessage ? <p className="mt-2 text-sm font-semibold text-emerald-300">{successMessage}</p> : null}

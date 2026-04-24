@@ -40,8 +40,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 const createOrganizationSchema = z.object({
   name: z
     .string()
-    .min(3, "El nombre de la organizacion debe tener al menos 3 caracteres.")
-    .max(80, "El nombre de la organizacion es demasiado largo.")
+    .min(3, "El nombre del grupo debe tener al menos 3 caracteres.")
+    .max(80, "El nombre del grupo es demasiado largo.")
 });
 
 const inviteSchema = z.object({
@@ -71,8 +71,8 @@ const startOrganizationCreationCheckoutSchema = z.object({
   organizationId: z.string().uuid(),
   name: z
     .string()
-    .min(3, "El nombre de la organizacion debe tener al menos 3 caracteres.")
-    .max(80, "El nombre de la organizacion es demasiado largo.")
+    .min(3, "El nombre del grupo debe tener al menos 3 caracteres.")
+    .max(80, "El nombre del grupo es demasiado largo.")
 });
 
 const syncCheckoutPaymentSchema = z.object({
@@ -192,14 +192,14 @@ export async function createOrganizationAction(formData: FormData) {
 
     const supabase = await createSupabaseServerClient();
 
-    const baseSlug = slugifyOrganizationName(parsed.data.name) || `organizacion-${Date.now()}`;
+    const baseSlug = slugifyOrganizationName(parsed.data.name) || `grupo-${Date.now()}`;
     const { data: existingSlugsRows, error: existingSlugsError } = await supabase
       .from("organizations")
       .select("slug")
       .ilike("slug", `${baseSlug}%`);
 
     if (existingSlugsError) {
-      redirect(buildAdminPath(undefined, toUserMessage(existingSlugsError, "No se pudo crear la organizacion.")));
+      redirect(buildAdminPath(undefined, toUserMessage(existingSlugsError, "No se pudo crear el grupo.")));
     }
 
     const existingSlugs = (existingSlugsRows ?? []).map((row) => row.slug.toLowerCase());
@@ -217,7 +217,7 @@ export async function createOrganizationAction(formData: FormData) {
       .single();
 
     if (organizationError || !organization) {
-      redirect(buildAdminPath(undefined, toUserMessage(organizationError, "No se pudo crear la organizacion.")));
+      redirect(buildAdminPath(undefined, toUserMessage(organizationError, "No se pudo crear el grupo.")));
     }
 
     const { error: membershipError } = await supabase.from("organization_admins").insert({
@@ -227,7 +227,7 @@ export async function createOrganizationAction(formData: FormData) {
     });
 
     if (membershipError && membershipError.code !== "23505") {
-      redirect(buildAdminPath(undefined, toUserMessage(membershipError, "No se pudo asociar el admin a la organizacion.")));
+      redirect(buildAdminPath(undefined, toUserMessage(membershipError, "No se pudo asociar el admin al grupo.")));
     }
 
     revalidatePath("/admin");
@@ -239,7 +239,7 @@ export async function createOrganizationAction(formData: FormData) {
     redirect(withOrgQuery("/admin", slug));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo crear la organizacion.")));
+    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo crear el grupo.")));
   }
 }
 
@@ -262,7 +262,7 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
       redirect(
         buildAdminPath(
           organizationQueryKey,
-          "Tu cuenta ya puede crear una nueva organizacion sin necesidad de pagar."
+          "Tu cuenta ya puede crear un nuevo grupo sin necesidad de pagar."
         )
       );
     }
@@ -272,13 +272,13 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
       redirect(
         buildAdminPath(
           organizationQueryKey,
-          "Falta SUPABASE_SERVICE_ROLE_KEY para iniciar el pago de nueva organizacion."
+          "Falta SUPABASE_SERVICE_ROLE_KEY para iniciar el pago de un nuevo grupo."
         )
       );
     }
 
     const normalizedOrgName = parsed.data.name.trim();
-    const baseSlug = slugifyOrganizationName(normalizedOrgName) || `organizacion-${Date.now()}`;
+    const baseSlug = slugifyOrganizationName(normalizedOrgName) || `grupo-${Date.now()}`;
     const { data: existingSlugsRows, error: existingSlugsError } = await supabaseAdmin
       .from("organizations")
       .select("slug")
@@ -335,13 +335,13 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
       redirect(
         buildAdminPath(
           organizationQueryKey,
-          toUserMessage(insertPaymentError, "No se pudo registrar el pago para crear la organizacion.")
+          toUserMessage(insertPaymentError, "No se pudo registrar el pago para crear el grupo.")
         )
       );
     }
 
     const preference = await createCheckoutProPreference({
-      title: `Crear nueva organizacion (${normalizedOrgName})`,
+      title: `Crear nuevo grupo (${normalizedOrgName})`,
       unitPrice: MERCADOPAGO_TEST_CHARGE_ARS,
       currencyId: ORGANIZATION_BILLING_CURRENCY,
       quantity: 1,
@@ -388,7 +388,7 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
     redirect(redirectUrl);
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo iniciar el pago para crear la nueva organizacion.")));
+    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo iniciar el pago para crear el nuevo grupo.")));
   }
 }
 
@@ -424,7 +424,7 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
       redirect(
         buildBillingPath(
           organizationQueryKey,
-          toUserMessage(organizationError, "No se pudo leer la organizacion para facturar.")
+          toUserMessage(organizationError, "No se pudo leer el grupo para facturar.")
         )
       );
     }
@@ -571,7 +571,7 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
     const normalizedEmail = normalizeEmail(parsed.data.email);
 
     if (normalizedEmail === admin.email) {
-      redirect(buildAdminPath(organizationQueryKey, "Tu usuario ya administra esta organizacion."));
+      redirect(buildAdminPath(organizationQueryKey, "Tu usuario ya administra este grupo."));
     }
 
     if (
@@ -580,7 +580,7 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
         normalizedEmail
       })
     ) {
-      redirect(buildAdminPath(organizationQueryKey, "Ese email ya administra esta organizacion."));
+      redirect(buildAdminPath(organizationQueryKey, "Ese email ya administra este grupo."));
     }
 
     const supabase = await createSupabaseServerClient();
@@ -606,7 +606,7 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
 
     const slotsUsed = (currentAdmins ?? 0) + (pendingInvites ?? 0);
     if (slotsUsed >= 4) {
-      redirect(buildAdminPath(organizationQueryKey, "Esta organizacion ya alcanzo el maximo de 4 administradores."));
+      redirect(buildAdminPath(organizationQueryKey, "Este grupo ya alcanzo el maximo de 4 administradores."));
     }
 
     const { error: inviteError } = await supabase.from("organization_invites").insert({
@@ -685,7 +685,7 @@ export async function removeOrganizationAdminAction(formData: FormData) {
     const supabase = await createSupabaseServerClient();
 
     if (actingAdmin.userId === parsed.data.adminId) {
-      redirect(buildAdminPath(organizationQueryKey, "No puedes quitarte a ti mismo como admin de esta organizacion."));
+      redirect(buildAdminPath(organizationQueryKey, "No puedes quitarte a ti mismo como admin de este grupo."));
     }
 
     const { count: adminsCount, error: adminsCountError } = await supabase
@@ -698,7 +698,7 @@ export async function removeOrganizationAdminAction(formData: FormData) {
     }
 
     if ((adminsCount ?? 0) <= 1) {
-      redirect(buildAdminPath(organizationQueryKey, "La organizacion debe mantener al menos 1 admin activo."));
+      redirect(buildAdminPath(organizationQueryKey, "El grupo debe mantener al menos 1 admin activo."));
     }
 
     const { error: deleteError } = await supabase
@@ -723,7 +723,7 @@ export async function deleteOrganizationAction(formData: FormData) {
   try {
     const admin = await assertAdminAction();
     if (!admin.isSuperAdmin) {
-      redirect(buildAdminPath(undefined, "Solo el super admin puede borrar organizaciones."));
+      redirect(buildAdminPath(undefined, "Solo el super admin puede borrar grupos."));
     }
 
     const parsed = deleteOrganizationSchema.safeParse({
@@ -736,7 +736,7 @@ export async function deleteOrganizationAction(formData: FormData) {
 
     const supabase = createSupabaseAdminClient();
     if (!supabase) {
-      redirect(buildAdminPath(undefined, "Falta configurar el cliente admin para borrar organizaciones."));
+      redirect(buildAdminPath(undefined, "Falta configurar el cliente admin para borrar grupos."));
     }
 
     const { data: organization, error: organizationError } = await supabase
@@ -746,11 +746,11 @@ export async function deleteOrganizationAction(formData: FormData) {
       .maybeSingle();
 
     if (organizationError) {
-      redirect(buildAdminPath(undefined, toUserMessage(organizationError, "No se pudo leer la organizacion.")));
+      redirect(buildAdminPath(undefined, toUserMessage(organizationError, "No se pudo leer el grupo.")));
     }
 
     if (!organization) {
-      redirect(buildAdminPath(undefined, "La organizacion ya no existe."));
+      redirect(buildAdminPath(undefined, "El grupo ya no existe."));
     }
 
     await deleteOrganizationDeep({
@@ -769,6 +769,6 @@ export async function deleteOrganizationAction(formData: FormData) {
     redirect("/admin");
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo borrar la organizacion.")));
+    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo borrar el grupo.")));
   }
 }

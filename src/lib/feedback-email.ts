@@ -32,11 +32,11 @@ function categoryLabel(category: FeedbackCategory) {
 function moduleLabel(module: FeedbackModule) {
   switch (module) {
     case "organizations":
-      return "Organizaciones";
+      return "Grupos";
     case "tournaments":
       return "Torneos";
     default:
-      return "Ambos modulos";
+      return "General";
   }
 }
 
@@ -60,10 +60,10 @@ export async function sendFeedbackEmail(input: SendFeedbackEmailInput) {
   const subject = `[${category}][${moduleName}] Contacto Fabrica de Futbol`;
   const textBody = [
     `Categoria: ${category}`,
-    `Modulo: ${moduleName}`,
+    `Tema: ${moduleName}`,
     `Nombre: ${input.fullName}`,
     `Email: ${normalizedSenderEmail}`,
-    `Organizacion / torneo: ${input.organization ?? "No informado"}`,
+    `Grupo / torneo: ${input.organization ?? "No informado"}`,
     `Enviado: ${input.submittedAtIso}`,
     `User-Agent: ${input.userAgent ?? "No informado"}`,
     `Referer: ${input.referer ?? "No informado"}`,

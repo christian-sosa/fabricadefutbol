@@ -32,7 +32,7 @@ export default async function PrivacyPage({
         <Card>
           <CardTitle>Como lo tratamos</CardTitle>
           <CardDescription className="mt-3">
-            Limitamos el acceso segun permisos del sistema y evitamos mezclar dominios para no comprometer el flujo actual de organizaciones y torneos.
+            Limitamos el acceso segun permisos del sistema y evitamos mezclar dominios para no comprometer el flujo actual de grupos y torneos.
           </CardDescription>
         </Card>
       </section>

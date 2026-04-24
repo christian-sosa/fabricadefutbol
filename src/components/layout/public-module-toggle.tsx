@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 const MODULE_OPTIONS = [
   {
     value: "organizations",
-    label: "Organizaciones",
+    label: "Grupos",
     description: "Partidos, ranking y planteles"
   },
   {

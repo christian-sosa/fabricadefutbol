@@ -12,7 +12,7 @@ export default async function TournamentsPage() {
       <Card>
         <CardTitle>Torneos</CardTitle>
         <CardDescription>
-          Explora ligas y torneos independientes del modulo de organizaciones.
+          Explora ligas y torneos independientes del modulo de grupos.
         </CardDescription>
       </Card>
 

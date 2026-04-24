@@ -23,7 +23,7 @@ export default async function AdminTournamentsPage({
       <Card>
         <CardTitle>Torneos</CardTitle>
         <CardDescription>
-          Crea y administra ligas, torneos o subtorneos independientes del flujo actual de organizaciones.
+          Crea y administra ligas, torneos o subtorneos independientes del flujo actual de grupos.
         </CardDescription>
         {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
         {resolvedSearchParams.success ? (

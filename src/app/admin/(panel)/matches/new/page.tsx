@@ -18,7 +18,7 @@ export default async function NewMatchPage({
   if (!writeAccess.canWrite) {
     const target = withOrgQuery("/admin", selectedOrganization.slug);
     const separator = target.includes("?") ? "&" : "?";
-    redirect(`${target}${separator}error=${encodeURIComponent(writeAccess.reason ?? "No tienes permisos para editar esta organizacion.")}`);
+    redirect(`${target}${separator}error=${encodeURIComponent(writeAccess.reason ?? "No tienes permisos para editar este grupo.")}`);
   }
   const players = await getSelectablePlayers(selectedOrganization.id);
   const error = resolvedSearchParams.error;
@@ -26,12 +26,12 @@ export default async function NewMatchPage({
   return (
     <div className="space-y-4">
       <Card>
-        <CardTitle>Organizacion activa: {selectedOrganization.name}</CardTitle>
+        <CardTitle>Grupo activo: {selectedOrganization.name}</CardTitle>
         <div className="mt-3">
           <OrganizationSwitcher
             basePath="/admin/matches/new"
             currentOrganizationSlug={selectedOrganization.slug}
-            label="Cambiar organizacion"
+            label="Cambiar grupo"
             organizations={organizations}
           />
         </div>

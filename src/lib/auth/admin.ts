@@ -224,7 +224,7 @@ export async function getAdminOrganizationCreationAccess(admin: AdminSession) {
       return {
         canCreateOrganization: false,
         reason:
-          "Ya administras una organizacion. Para crear una nueva vas a necesitar activar el plan pago."
+          "Ya administras un grupo. Para crear uno nuevo vas a necesitar activar el plan pago."
       };
     }
 
@@ -237,7 +237,7 @@ export async function getAdminOrganizationCreationAccess(admin: AdminSession) {
   return {
     canCreateOrganization: false,
     reason:
-      "Ya consumiste tu organizacion free. Para crear una nueva vas a necesitar activar el plan pago."
+      "Ya consumiste tu grupo free. Para crear uno nuevo vas a necesitar activar el plan pago."
   };
 }
 
@@ -248,7 +248,7 @@ export async function assertCanCreateOrganization(admin: AdminSession) {
   if (creationAccess.canCreateOrganization) return;
   throw new Error(
     creationAccess.reason ??
-      "Cada cuenta tiene 1 organizacion free. Para crear una nueva organizacion tendras que activar el plan pago."
+      "Cada cuenta tiene 1 grupo free. Para crear un nuevo grupo tendras que activar el plan pago."
   );
 }
 
@@ -282,7 +282,7 @@ export async function getOrganizationWriteAccess(
   }
 
   if (!organization?.created_at) {
-    throw new Error("La organizacion no existe.");
+    throw new Error("El grupo no existe.");
   }
 
   const superAdminUserId = await resolveSuperAdminUserId();
@@ -328,7 +328,7 @@ export async function getOrganizationWriteAccess(
   if (organizationTrialExpired && !subscriptionActive) {
     return {
       canWrite: false,
-      reason: `La organizacion supero su mes free (vencio el ${toShortDate(
+      reason: `El grupo supero su mes free (vencio el ${toShortDate(
         organizationTrialEndsAt
       )}). Necesita activar el plan mensual para volver a gestionar.`,
       organizationTrialEndsAt,
@@ -510,11 +510,11 @@ async function assertOrganizationMembership(organizationId: string) {
 
   const hasAccess = Boolean(membership || createdByUser);
   if (!hasAccess && (membershipError || creatorError)) {
-    throw new Error(membershipError?.message ?? creatorError?.message ?? "No autorizado para administrar esta organizacion.");
+    throw new Error(membershipError?.message ?? creatorError?.message ?? "No autorizado para administrar este grupo.");
   }
 
   if (!hasAccess) {
-    throw new Error("No autorizado para administrar esta organizacion.");
+    throw new Error("No autorizado para administrar este grupo.");
   }
 
   return admin;
@@ -529,7 +529,7 @@ export async function assertOrganizationAdminAction(organizationId: string) {
 
   const writeAccess = await getOrganizationWriteAccess(admin, organizationId);
   if (!writeAccess.canWrite) {
-    throw new Error(writeAccess.reason ?? "No tienes acceso de escritura para esta organizacion.");
+    throw new Error(writeAccess.reason ?? "No tienes acceso de escritura para este grupo.");
   }
 
   return admin;

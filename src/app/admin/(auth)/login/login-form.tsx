@@ -67,7 +67,7 @@ export function LoginForm({ nextPath = "/admin" }: { nextPath?: string }) {
       <Card>
         <CardTitle>Registrarse</CardTitle>
         <CardDescription>
-          Crea una cuenta para administrar tu organizacion o aceptar invitaciones.
+            Crea una cuenta para administrar tu grupo o aceptar invitaciones.
         </CardDescription>
 
         <form action={registerAction} className="mt-4 space-y-3">
