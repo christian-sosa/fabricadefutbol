@@ -9,10 +9,13 @@ import { z } from "zod";
 
 import { assertAdminAction } from "@/lib/auth/admin";
 import { assertTournamentMembershipAction, getTournamentSlugById } from "@/lib/auth/tournaments";
-import { ORGANIZATION_BILLING_CURRENCY, TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS } from "@/lib/constants";
+import {
+  ORGANIZATION_BILLING_CURRENCY,
+  TEMP_SKIP_TOURNAMENT_CHECKOUT,
+  TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS
+} from "@/lib/constants";
 import {
   getMercadoPagoWebhookBaseUrl,
-  shouldSkipTournamentMercadoPagoCheckout,
   shouldUseMercadoPagoSandboxCheckout
 } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
@@ -177,7 +180,7 @@ export async function createTournamentAction(formData: FormData) {
       );
     }
 
-    if (shouldSkipTournamentMercadoPagoCheckout()) {
+    if (TEMP_SKIP_TOURNAMENT_CHECKOUT) {
       const debugApproval = await approveTournamentBillingPaymentForDebug({
         supabase: supabaseAdmin,
         localPaymentId: insertedPayment.id
@@ -195,9 +198,7 @@ export async function createTournamentAction(formData: FormData) {
       }
 
       redirect(
-        `/admin/tournaments/${debugApproval.createdTournamentId}?success=${encodeURIComponent(
-          "Torneo creado con pago simulado para debug."
-        )}`
+        `/admin/tournaments/${debugApproval.createdTournamentId}?success=${encodeURIComponent("Torneo creado.")}`
       );
     }
 

@@ -8,6 +8,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { requireAdminSession } from "@/lib/auth/admin";
 import { getAdminTournaments } from "@/lib/auth/tournaments";
+import { TEMP_SKIP_TOURNAMENT_CHECKOUT } from "@/lib/constants";
 import { syncTournamentBillingPaymentFromMercadoPago } from "@/lib/domain/tournament-billing-workflow";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -117,7 +118,9 @@ export default async function AdminTournamentsPage({
       <Card>
         <CardTitle>Nuevo torneo o subtorneo</CardTitle>
         <CardDescription className="mt-2">
-          Ingresa un nombre unico y te llevamos a Mercado Pago para confirmar el alta antes de habilitar el torneo.
+          {TEMP_SKIP_TOURNAMENT_CHECKOUT
+            ? "Ingresa un nombre unico y lo creamos directo. El cobro de torneos esta temporalmente simulado para debug."
+            : "Ingresa un nombre unico y te llevamos a Mercado Pago para confirmar el alta antes de habilitar el torneo."}
         </CardDescription>
         <form action={createTournamentAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
           <div>
@@ -127,7 +130,7 @@ export default async function AdminTournamentsPage({
             <Input id="name" name="name" placeholder="Viernes A1" required />
           </div>
           <div className="md:self-end">
-            <Button type="submit">Continuar a Mercado Pago</Button>
+            <Button type="submit">{TEMP_SKIP_TOURNAMENT_CHECKOUT ? "Crear torneo" : "Continuar a Mercado Pago"}</Button>
           </div>
         </form>
       </Card>
