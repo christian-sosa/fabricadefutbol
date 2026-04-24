@@ -161,6 +161,61 @@ async function createTournamentFromApprovedPayment(params: {
   return paymentRow.created_tournament_id;
 }
 
+export async function approveTournamentBillingPaymentForDebug(params: {
+  supabase: DbClient;
+  localPaymentId: string;
+}) {
+  const { supabase, localPaymentId } = params;
+  const paymentResult = await supabase
+    .from("tournament_billing_payments")
+    .select("*")
+    .eq("id", localPaymentId)
+    .maybeSingle();
+
+  if (paymentResult.error) throw new Error(paymentResult.error.message);
+  if (!paymentResult.data) {
+    return {
+      updated: false,
+      reason: "No hay orden local asociada para este pago."
+    };
+  }
+
+  const paymentRow = paymentResult.data as TournamentBillingPaymentRow;
+  const approvedAt = new Date().toISOString();
+  const simulatedPaymentId = paymentRow.mp_payment_id?.trim() || `debug-skip-${paymentRow.id}`;
+
+  const { error: updatePaymentError } = await supabase
+    .from("tournament_billing_payments")
+    .update({
+      mp_payment_id: simulatedPaymentId,
+      status: "approved",
+      approved_at: approvedAt,
+      raw_payment: {
+        id: simulatedPaymentId,
+        status: "approved",
+        external_reference: paymentRow.mp_external_reference,
+        date_approved: approvedAt,
+        debug_skip_checkout: true
+      }
+    })
+    .eq("id", paymentRow.id);
+
+  if (updatePaymentError) throw new Error(updatePaymentError.message);
+
+  const createdTournamentId = await createTournamentFromApprovedPayment({
+    supabase,
+    paymentRow
+  });
+
+  return {
+    updated: true,
+    localPaymentId: paymentRow.id,
+    status: "approved",
+    createdTournamentId,
+    skippedCheckout: true
+  };
+}
+
 export async function syncTournamentBillingPaymentFromMercadoPago(params: {
   supabase: DbClient;
   mercadopagoPaymentId: string | number;

@@ -9,6 +9,7 @@ vi.mock("@/lib/payments/mercadopago", () => ({
 }));
 
 import { syncTournamentBillingPaymentFromMercadoPago } from "@/lib/domain/tournament-billing-workflow";
+import { approveTournamentBillingPaymentForDebug } from "@/lib/domain/tournament-billing-workflow";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 const ADMIN_ID = "admin-1";
@@ -122,6 +123,47 @@ describe("tournament billing workflow", () => {
     });
 
     expect(secondResult.createdTournamentId).toBe(firstResult.createdTournamentId);
+    expect(fake.table("tournaments")).toHaveLength(1);
+  });
+
+  it("puede saltear Mercado Pago y aprobar localmente para debug", async () => {
+    const fake = createFakeSupabase({
+      admins: [{ id: ADMIN_ID, display_name: "Admin torneo" }],
+      tournament_billing_payments: [
+        {
+          id: PAYMENT_ID,
+          admin_id: ADMIN_ID,
+          requested_tournament_name: "Viernes Debug",
+          requested_tournament_slug: "viernes-debug",
+          mp_external_reference: "ext-tournament-debug",
+          mp_payment_id: null,
+          status: "pending",
+          created_tournament_id: null
+        }
+      ]
+    });
+
+    const result = await approveTournamentBillingPaymentForDebug({
+      supabase: fake.client as never,
+      localPaymentId: PAYMENT_ID
+    });
+
+    expect(result).toMatchObject({
+      updated: true,
+      localPaymentId: PAYMENT_ID,
+      status: "approved",
+      skippedCheckout: true
+    });
+    expect(result.createdTournamentId).toBeTruthy();
+
+    const createdTournamentId = String(result.createdTournamentId);
+    expect(fake.find("tournament_billing_payments", (row) => row.id === PAYMENT_ID)).toEqual(
+      expect.objectContaining({
+        mp_payment_id: `debug-skip-${PAYMENT_ID}`,
+        status: "approved",
+        created_tournament_id: createdTournamentId
+      })
+    );
     expect(fake.table("tournaments")).toHaveLength(1);
   });
 });
