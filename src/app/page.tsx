@@ -302,7 +302,7 @@ export default async function HomePage({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Prueba real</p>
-              <CardTitle className="mt-2">Explora una organizacion publica</CardTitle>
+              <CardTitle className="mt-2">Explora un grupo publico</CardTitle>
               <CardDescription className="mt-2">
                 Mira como se ve un grupo real con jugadores, ranking, historial y proximos partidos.
               </CardDescription>
@@ -313,7 +313,7 @@ export default async function HomePage({
             <OrganizationSwitcher
               basePath="/"
               currentOrganizationSlug={selectedOrganization?.slug}
-              label="Organizaciones publicas"
+              label="Grupos publicos"
               organizations={organizations}
               quickOrganizations={viewerAdminOrganizations}
             />
@@ -359,7 +359,7 @@ export default async function HomePage({
             </>
           ) : (
             <CardDescription className="mt-4">
-              Todavia no hay organizaciones publicas cargadas. Cuando aparezcan, vas a poder explorarlas desde aqui.
+              Todavia no hay grupos publicos cargados. Cuando aparezcan, vas a poder explorarlos desde aqui.
             </CardDescription>
           )}
         </Card>
@@ -405,7 +405,7 @@ export default async function HomePage({
           <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
             <p className="text-sm font-semibold text-white">Lo que gana tu grupo</p>
             <p className="mt-2 text-sm text-slate-300">
-              Menos discusiones, mejor organizacion y una referencia objetiva para ver quien sube y quien baja fecha a fecha.
+              Menos discusiones, mejor orden y una referencia objetiva para ver quien sube y quien baja fecha a fecha.
             </p>
           </div>
         </Card>

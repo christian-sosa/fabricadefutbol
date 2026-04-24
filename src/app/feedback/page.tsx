@@ -33,7 +33,7 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
   const moduleDescription =
     currentModule === "tournaments"
       ? "Si tu consulta es por torneos, capitanes, fixture o resultados, la dejamos lista para soporte."
-      : "Si tu consulta es por organizaciones, ranking o partidos equilibrados, la recibimos por aqui.";
+      : "Si tu consulta es por grupos, ranking o partidos equilibrados, la recibimos por aqui.";
   const targetPlaceholder =
     currentModule === "tournaments" ? "Ej: Copa Apertura 2026" : "Ej: La Cantera de LQ";
 
@@ -126,19 +126,19 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
 
             <div>
               <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="module">
-                Consulta sobre
+                Tema
               </label>
               <Select defaultValue={currentModule} id="module" name="module">
-                <option value="organizations">Organizaciones</option>
+                <option value="organizations">Grupos</option>
                 <option value="tournaments">Torneos</option>
-                <option value="both">Ambos modulos</option>
+                <option value="both">General</option>
               </Select>
             </div>
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="organization">
-              Organizacion o torneo (opcional)
+              Grupo o torneo (opcional)
             </label>
             <Input id="organization" name="organization" placeholder={targetPlaceholder} />
           </div>

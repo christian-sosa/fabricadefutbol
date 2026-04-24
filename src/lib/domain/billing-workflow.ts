@@ -261,7 +261,7 @@ export async function syncOrganizationBillingPaymentFromMercadoPago(params: {
   if (expectedOrganizationId && paymentRow.organization_id !== expectedOrganizationId) {
     return {
       updated: false,
-      reason: "El pago no pertenece a esta organizacion."
+    reason: "El pago no pertenece a este grupo."
     };
   }
 

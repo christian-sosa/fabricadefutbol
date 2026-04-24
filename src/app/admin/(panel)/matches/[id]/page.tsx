@@ -48,7 +48,7 @@ export default async function AdminMatchDetailPage({
   if (!writeAccess.canWrite) {
     const target = withOrgQuery("/admin", selectedOrganization.slug);
     const separator = target.includes("?") ? "&" : "?";
-    redirect(`${target}${separator}error=${encodeURIComponent(writeAccess.reason ?? "No tienes permisos para editar esta organizacion.")}`);
+    redirect(`${target}${separator}error=${encodeURIComponent(writeAccess.reason ?? "No tienes permisos para editar este grupo.")}`);
   }
   const details = await getAdminMatchDetails(id, selectedOrganization.id);
   if (!details) notFound();
@@ -94,12 +94,12 @@ export default async function AdminMatchDetailPage({
   return (
     <div className="space-y-4">
       <Card>
-        <CardTitle>Organizacion activa: {selectedOrganization.name}</CardTitle>
+        <CardTitle>Grupo activo: {selectedOrganization.name}</CardTitle>
         <div className="mt-3">
           <OrganizationSwitcher
             basePath={`/admin/matches/${id}`}
             currentOrganizationSlug={selectedOrganization.slug}
-            label="Cambiar organizacion"
+            label="Cambiar grupo"
             organizations={organizations}
           />
         </div>
@@ -245,7 +245,7 @@ export default async function AdminMatchDetailPage({
       )}
 
       <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery("/admin", selectedOrganization.slug)}>
-        Volver al panel de organizacion
+        Volver al panel del grupo
       </Link>
     </div>
   );

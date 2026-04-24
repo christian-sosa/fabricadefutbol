@@ -71,7 +71,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
 
         {!matches.length ? (
           <p className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-6 text-sm text-slate-400">
-            {isFetching ? "Cargando historial..." : "No hay partidos para esta organizacion."}
+            {isFetching ? "Cargando historial..." : "No hay partidos para este grupo."}
           </p>
         ) : null}
       </div>
@@ -110,7 +110,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
             {!matches.length ? (
               <tr>
                 <TD className="py-6 text-sm text-slate-400" colSpan={5}>
-                  {isFetching ? "Cargando historial..." : "No hay partidos para esta organizacion."}
+                  {isFetching ? "Cargando historial..." : "No hay partidos para este grupo."}
                 </TD>
               </tr>
             ) : null}

@@ -35,11 +35,11 @@ type HelpContent = {
 const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
   organizations: {
     eyebrow: "Centro de ayuda",
-    title: "Como funciona el modulo Organizaciones",
+    title: "Como funciona el modulo Grupos",
     description:
-      "Organizaciones esta pensado para grupos de futbol amateur que quieren ordenar su plantel, convocar jugadores, generar equipos balanceados, registrar resultados y mantener un ranking competitivo actualizado.",
+      "Grupos esta pensado para grupos de futbol amateur que quieren ordenar su plantel, convocar jugadores, generar equipos balanceados, registrar resultados y mantener un ranking competitivo actualizado.",
     capabilities: [
-      "Administrar una o varias organizaciones desde la misma cuenta.",
+      "Administrar uno o varios grupos desde la misma cuenta.",
       "Cargar jugadores, ordenar el plantel y sumar invitados puntuales.",
       "Crear partidos, convocar participantes y generar equipos.",
       "Registrar resultados y actualizar automaticamente el ranking."
@@ -50,9 +50,9 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
     gettingStartedLabel: "Primeros pasos",
     gettingStarted: [
       {
-        title: "1. Crea tu cuenta y activa tu organizacion",
+        title: "1. Crea tu cuenta y activa tu grupo",
         description:
-          "Ingresa al panel, registrate con tu email y crea la organizacion que vas a administrar. Desde ese momento ya puedes empezar a cargar tu plantel y trabajar sobre tus partidos."
+          "Ingresa al panel, registrate con tu email y crea el grupo que vas a administrar. Desde ese momento ya puedes empezar a cargar tu plantel y trabajar sobre tus partidos."
       },
       {
         title: "2. Carga tu plantel base",
@@ -93,7 +93,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "Orden inicial del plantel",
         description:
-          "Es una referencia manual definida por el administrador para ordenar a los jugadores dentro de la organizacion y hoy tambien sirve como base para balancear equipos."
+          "Es una referencia manual definida por el administrador para ordenar a los jugadores dentro del grupo y hoy tambien sirve como base para balancear equipos."
       },
       {
         title: "Punto de partida del rating",
@@ -127,12 +127,12 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         question: "Que informacion es publica?",
         answer:
-          "Las organizaciones publicas muestran ranking, jugadores, historial de partidos y proximos encuentros. La gestion y edicion quedan reservadas para los administradores."
+          "Los grupos publicos muestran ranking, jugadores, historial de partidos y proximos encuentros. La gestion y edicion quedan reservadas para los administradores."
       },
       {
-        question: "Cuantos administradores puede tener una organizacion?",
+        question: "Cuantos administradores puede tener un grupo?",
         answer:
-          "Cada organizacion admite hasta 4 administradores activos o pendientes de invitacion. Eso permite repartir la gestion sin perder control."
+          "Cada grupo admite hasta 4 administradores activos o pendientes de invitacion. Eso permite repartir la gestion sin perder control."
       },
       {
         question: "La plataforma tiene costo?",
@@ -142,7 +142,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         question: "Que pasa cuando termina el periodo contratado?",
         answer:
-          "La idea es mantener la informacion visible y dejar la organizacion en modo lectura hasta reactivar el plan. Esa politica comercial fina tambien se mostrara en la pagina de precios."
+          "La idea es mantener la informacion visible y dejar el grupo en modo lectura hasta reactivar el plan. Esa politica comercial fina tambien se mostrara en la pagina de precios."
       },
       {
         question: "Donde puedo hacer consultas o reportar un problema?",
@@ -157,7 +157,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
     description:
       "Torneos esta pensado para ligas y competencias con uno o varios subtorneos. Permite cargar equipos, planteles propios, definir admins, elegir si usas capitanes, armar fixture y publicar tabla y estadisticas.",
     capabilities: [
-      "Crear varios torneos o subtorneos independientes del modulo Organizaciones.",
+      "Crear varios torneos o subtorneos independientes del modulo Grupos.",
       "Cargar equipos, jugadores y fotos dentro de cada torneo.",
       "Definir hasta 4 administradores por torneo.",
       "Elegir entre fixture automatico o armado manual fecha por fecha."
@@ -175,7 +175,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "2. Carga los equipos",
         description:
-          "Agrega los equipos participantes con nombre, nombre corto y orden visual. Ese plantel es totalmente independiente del modulo Organizaciones."
+          "Agrega los equipos participantes con nombre, nombre corto y orden visual. Ese plantel es totalmente independiente del modulo Grupos."
       },
       {
         title: "3. Invita capitanes o carga el plantel tu mismo",
@@ -243,9 +243,9 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
     ],
     faq: [
       {
-        question: "Los torneos usan los mismos jugadores que organizaciones?",
+        question: "Los torneos usan los mismos jugadores que grupos?",
         answer:
-          "No. El modulo Torneos tiene su propia tabla de jugadores para mantener completamente separado ese dominio del flujo actual de organizaciones."
+          "No. El modulo Torneos tiene su propia tabla de jugadores para mantener completamente separado ese dominio del flujo actual de grupos."
       },
       {
         question: "Que puede hacer un capitan?",
@@ -260,7 +260,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         question: "La plataforma tiene costo?",
         answer:
-          "Si. El Pack Torneos esta planteado en ARS 50.000 por mes y cubre varios torneos o subtorneos del mismo organizador."
+          "Por ahora no. El modulo Torneos esta liberado gratis mientras terminamos de definir su esquema comercial."
       },
       {
         question: "Cuantos admins puede tener un torneo?",
@@ -295,7 +295,7 @@ export default async function HelpPage({
           organizationKey,
           module: currentModule
         })
-      : withPublicQuery("/organizations", {
+      : withPublicQuery("/groups", {
           organizationKey,
           module: currentModule
         });
@@ -325,13 +325,13 @@ export default async function HelpPage({
             className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(16,185,129,1)]"
             href={panelPath}
           >
-            {currentModule === "tournaments" ? "Ir al panel de torneos" : "Ir al panel de organizaciones"}
+            {currentModule === "tournaments" ? "Ir al panel de torneos" : "Ir al panel de grupos"}
           </Link>
           <Link
             className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
             href={listingPath}
           >
-            {currentModule === "tournaments" ? "Ver torneos publicos" : "Ver organizaciones publicas"}
+            {currentModule === "tournaments" ? "Ver torneos publicos" : "Ver grupos publicos"}
           </Link>
           <Link
             className="rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"

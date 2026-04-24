@@ -64,11 +64,6 @@ function buildTournamentItems(pathname: string, tournamentId: string | null, cur
         href: "/admin/tournaments",
         label: "Panel",
         active: pathname === "/admin/tournaments"
-      },
-      {
-        href: "/admin/tournaments/billing",
-        label: "Facturacion",
-        active: pathname === "/admin/tournaments/billing"
       }
     ];
   }
@@ -88,12 +83,7 @@ function buildTournamentItems(pathname: string, tournamentId: string | null, cur
       href: buildTournamentTabHref(tournamentId, item.key),
       label: item.label,
       active: activeTab === item.key
-    })),
-    {
-      href: "/admin/tournaments/billing",
-      label: "Facturacion",
-      active: pathname === "/admin/tournaments/billing"
-    }
+    }))
   ];
 }
 
@@ -120,12 +110,12 @@ export function AdminSubnav() {
       <div className="space-y-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-400">
-            {isTournamentArea ? "Contexto torneos" : "Contexto organizaciones"}
+            {isTournamentArea ? "Contexto torneos" : "Contexto grupos"}
           </p>
           <p className="mt-1 text-sm text-slate-400">
             {isTournamentArea
-              ? "Gestiona competiciones, fixture, resultados, estadisticas y billing sin mezclarte con organizaciones."
-              : "Gestiona jugadores, partidos, historial y billing de la organizacion activa desde un subpanel dedicado."}
+              ? "Gestiona competiciones, fixture, resultados y estadisticas sin mezclarte con grupos."
+              : "Gestiona jugadores, partidos, historial y billing del grupo activo desde un subpanel dedicado."}
           </p>
         </div>
 

@@ -78,12 +78,12 @@ export default async function AdminDashboardPage({
           {admin.displayName} ({admin.email})
         </CardDescription>
         <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-emerald-300">
-          Rol: {admin.isSuperAdmin ? "Super Admin" : "Admin de organizaciones"}
+          Rol: {admin.isSuperAdmin ? "Super Admin" : "Admin de grupos"}
         </p>
       </Card>
 
       <Card>
-        <CardTitle>Crear organizacion</CardTitle>
+        <CardTitle>Crear grupo</CardTitle>
         <CardDescription>
           1 mes de prueba gratis por organización. Después, $
           {formatAmountArs(ORGANIZATION_MONTHLY_PRICE_ARS)}/mes para seguir creando.
@@ -95,32 +95,32 @@ export default async function AdminDashboardPage({
           {selectedOrganization ? (
             <input name="organizationId" type="hidden" value={selectedOrganization.id} />
           ) : null}
-          <Input name="name" placeholder="Nombre de la organizacion" required />
+          <Input name="name" placeholder="Nombre del grupo" required />
           <Button disabled={!creationAccess.canCreateOrganization && !selectedOrganization} type="submit">
-            {creationAccess.canCreateOrganization ? "Crear organizacion" : "Pagar y crear organizacion"}
+            {creationAccess.canCreateOrganization ? "Crear grupo" : "Pagar y crear grupo"}
           </Button>
         </form>
         {!creationAccess.canCreateOrganization ? (
           <p className="mt-2 text-xs font-semibold text-amber-300">
-            {creationAccess.reason ?? "Para crear una nueva organizacion necesitas activar el plan pago."}{" "}
+            {creationAccess.reason ?? "Para crear un nuevo grupo necesitas activar el plan pago."}{" "}
             El alta se realiza automaticamente cuando Mercado Pago confirma el pago.
           </p>
         ) : null}
         {resolvedSearchParams.checkout === "created-org" ? (
           <p className="mt-2 text-xs font-semibold text-emerald-300">
-            Pago confirmado. La nueva organizacion ya fue creada y seleccionada.
+            Pago confirmado. El nuevo grupo ya fue creado y seleccionado.
           </p>
         ) : null}
         {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
       </Card>
 
       <Card>
-        <CardTitle>Organizaciones disponibles</CardTitle>
+        <CardTitle>Grupos disponibles</CardTitle>
         <div className="mt-3">
           <OrganizationSwitcher
             basePath="/admin"
             currentOrganizationSlug={selectedOrganization?.slug}
-            label="Seleccion de organizacion"
+            label="Seleccion de grupo"
             organizations={organizations}
           />
         </div>
@@ -130,10 +130,10 @@ export default async function AdminDashboardPage({
         <>
           {!canWriteSelectedOrganization ? (
             <Card className="border-amber-500/40 bg-amber-500/10">
-              <CardTitle className="text-amber-100">Organizacion en modo solo lectura</CardTitle>
+              <CardTitle className="text-amber-100">Grupo en modo solo lectura</CardTitle>
               <CardDescription className="mt-1 text-amber-200/90">
                 {organizationWriteAccess?.reason ??
-                  "Esta organizacion no tiene escritura habilitada en el plan actual."}
+                  "Este grupo no tiene escritura habilitada en el plan actual."}
               </CardDescription>
               <div className="mt-3">
                 <Link
@@ -165,14 +165,14 @@ export default async function AdminDashboardPage({
             <Card className="border-danger/40 bg-danger/10">
               <CardTitle className="text-danger">Zona super admin</CardTitle>
               <CardDescription className="mt-1 text-slate-200">
-                Esta accion elimina la organizacion seleccionada y todos sus datos asociados, incluyendo fotos,
+                Esta accion elimina el grupo seleccionado y todos sus datos asociados, incluyendo fotos,
                 jugadores, partidos, historial, admins e invitaciones.
               </CardDescription>
               <form action={deleteOrganizationAction} className="mt-4">
                 <input name="organizationId" type="hidden" value={selectedOrganization.id} />
                 <ConfirmSubmitButton
                   confirmMessage={`Estas seguro de borrar ${selectedOrganization.name}? Se perderan definitivamente todas las fotos, jugadores, partidos, historial, admins, invitaciones y pagos asociados. Esta accion no se puede deshacer.`}
-                  label="Borrar organizacion"
+                  label="Borrar grupo"
                   variant="danger"
                 />
               </form>
@@ -266,7 +266,7 @@ export default async function AdminDashboardPage({
         <Card>
           <CardTitle>Primer paso</CardTitle>
           <CardDescription>
-            Todavia no administras ninguna organizacion. Crea una desde el formulario superior.
+            Todavia no administras ningun grupo. Crea uno desde el formulario superior.
           </CardDescription>
         </Card>
       )}

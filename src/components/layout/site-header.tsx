@@ -15,7 +15,7 @@ type SiteHeaderProps = {
   initialHasCaptainAssignments?: boolean;
 };
 
-const ORGANIZATION_SECTION_PATHS = ["/organizations", "/ranking", "/matches", "/upcoming"] as const;
+const ORGANIZATION_SECTION_PATHS = ["/groups", "/organizations", "/ranking", "/matches", "/upcoming"] as const;
 
 function isActivePath(currentPath: string, href: string) {
   if (href === "/") {
@@ -72,7 +72,7 @@ export function SiteHeader({
 
   const isOrganizationSection = isOrganizationSectionPath(safePathname);
   const shouldShowOrganizationSubnav = mounted && isOrganizationSection;
-  const organizationHubHref = withPublicQuery("/organizations", {
+  const organizationHubHref = withPublicQuery("/groups", {
     organizationKey: organizationId,
     module: publicModule
   });
@@ -218,11 +218,11 @@ export function SiteHeader({
               {PRIMARY_PUBLIC_NAV_ITEMS.map((item) => {
                 const active =
                   mounted &&
-                  (item.label === "Organizaciones"
+                  (item.href === "/groups"
                     ? isOrganizationSection
                     : isActivePath(safePathname, item.href));
                 const href =
-                  item.label === "Organizaciones"
+                  item.href === "/groups"
                     ? organizationHubHref
                     : withPublicQuery(item.href, {
                         organizationKey: organizationId,
@@ -266,14 +266,14 @@ export function SiteHeader({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-emerald-400/25 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
-                  Organizaciones
+                  Grupos
                 </span>
                 {currentOrganizationLabel ? (
                   <span className="rounded-full border border-slate-700 px-3 py-1 text-xs font-semibold text-slate-300">
                     {currentOrganizationLabel}
                   </span>
                 ) : (
-                  <span className="text-xs text-slate-400">Elegi una organizacion para navegar el modulo publico.</span>
+                  <span className="text-xs text-slate-400">Elegi un grupo para navegar el modulo publico.</span>
                 )}
               </div>
 
@@ -314,11 +314,11 @@ export function SiteHeader({
                 {PRIMARY_PUBLIC_NAV_ITEMS.map((item) => {
                   const active =
                     mounted &&
-                    (item.label === "Organizaciones"
+                    (item.href === "/groups"
                       ? isOrganizationSection
                       : isActivePath(safePathname, item.href));
                   const href =
-                    item.label === "Organizaciones"
+                    item.href === "/groups"
                       ? organizationHubHref
                       : withPublicQuery(item.href, {
                           organizationKey: organizationId,
@@ -345,7 +345,7 @@ export function SiteHeader({
 
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Submenu de Organizaciones
+                Submenu de Grupos
               </p>
               <div className="flex flex-wrap gap-2">
                 {ORGANIZATION_PUBLIC_NAV_ITEMS.map((item) => {

@@ -29,7 +29,7 @@ export default async function UpcomingPage({
       <OrganizationSwitcher
         basePath="/upcoming"
         currentOrganizationSlug={selectedOrganization?.slug}
-        label="Elegir organizacion"
+        label="Elegir grupo"
         organizations={organizations}
         quickOrganizations={viewerAdminOrganizations}
       />

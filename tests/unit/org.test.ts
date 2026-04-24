@@ -19,6 +19,7 @@ describe("org helpers", () => {
 
   it("reconoce y resuelve el contexto publico del modulo", () => {
     expect(parsePublicModule("organizations")).toBe("organizations");
+    expect(parsePublicModule("groups")).toBe("organizations");
     expect(parsePublicModule("tournaments")).toBe("tournaments");
     expect(parsePublicModule("otra-cosa")).toBeNull();
     expect(parsePublicModule(undefined)).toBeNull();
@@ -31,7 +32,7 @@ describe("org helpers", () => {
       "/help?org=liga%20a&module=tournaments"
     );
     expect(withPublicQuery("/pricing?from=home", { module: "organizations" })).toBe(
-      "/pricing?from=home&module=organizations"
+      "/pricing?from=home&module=groups"
     );
     expect(withPublicQuery("/feedback")).toBe("/feedback");
   });

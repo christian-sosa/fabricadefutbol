@@ -50,7 +50,7 @@ function normalizePaymentStatusLabel(status: string) {
 
 function normalizePaymentPurposeLabel(purpose: string | null | undefined) {
   if ((purpose ?? "").toLowerCase() === "organization_creation") {
-    return "Alta de nueva organizacion";
+    return "Alta de nuevo grupo";
   }
   return "Suscripcion mensual";
 }
@@ -102,14 +102,14 @@ export default async function AdminBillingPage({
       <Card>
         <CardTitle>Facturacion</CardTitle>
         <CardDescription>
-          Mercado Pago por organizacion: {formatCurrencyArs(ORGANIZATION_MONTHLY_PRICE_ARS)} / 30
+          Mercado Pago por grupo: {formatCurrencyArs(ORGANIZATION_MONTHLY_PRICE_ARS)} / 30
           dias.
         </CardDescription>
         <div className="mt-3">
           <OrganizationSwitcher
             basePath="/admin/billing"
             currentOrganizationSlug={selectedOrganization.slug}
-            label="Cambiar organizacion"
+            label="Cambiar grupo"
             organizations={organizations}
           />
         </div>
@@ -164,7 +164,7 @@ export default async function AdminBillingPage({
         <CardTitle>Estado del acceso</CardTitle>
         <div className="mt-3 space-y-2 text-sm text-slate-200">
           <p>
-            Organizacion: <span className="font-semibold">{selectedOrganization.name}</span>
+            Grupo: <span className="font-semibold">{selectedOrganization.name}</span>
           </p>
           <p>
             Suscripcion valida hasta:{" "}
@@ -209,7 +209,7 @@ export default async function AdminBillingPage({
 
       <Card>
         <CardTitle>Historial de pagos</CardTitle>
-        <CardDescription>Ultimos intentos de pago en Mercado Pago para esta organizacion.</CardDescription>
+        <CardDescription>Ultimos intentos de pago en Mercado Pago para este grupo.</CardDescription>
         <div className="mt-3 space-y-2">
           {billingData.payments.length ? (
             billingData.payments.map((payment) => (
@@ -247,7 +247,7 @@ export default async function AdminBillingPage({
                 ) : null}
                 {payment.created_organization_id ? (
                   <p className="text-xs text-emerald-300">
-                    Organizacion creada automaticamente con este pago.
+                    Grupo creado automaticamente con este pago.
                   </p>
                 ) : null}
               </div>

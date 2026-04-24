@@ -52,7 +52,7 @@ export const TEAM_SIZE_BY_MODALITY: Record<MatchModality, number> = {
 
 export const PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
-  { href: "/organizations", label: "Organizaciones" },
+  { href: "/groups", label: "Grupos" },
   { href: "/tournaments", label: "Torneos" },
   { href: "/ranking", label: "Ranking" },
   { href: "/matches", label: "Historial" },
@@ -64,7 +64,7 @@ export const PUBLIC_NAV_ITEMS = [
 
 export const PRIMARY_PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
-  { href: "/organizations", label: "Organizaciones" },
+  { href: "/groups", label: "Grupos" },
   { href: "/tournaments", label: "Torneos" },
   { href: "/pricing", label: "Precios" },
   { href: "/feedback", label: "Contacto" },
@@ -78,6 +78,6 @@ export const ORGANIZATION_PUBLIC_NAV_ITEMS = [
 ];
 
 export const ADMIN_NAV_ITEMS = [
-  { href: "/admin", label: "Organizaciones" },
+  { href: "/admin", label: "Grupos" },
   { href: "/admin/tournaments", label: "Torneos" }
 ];

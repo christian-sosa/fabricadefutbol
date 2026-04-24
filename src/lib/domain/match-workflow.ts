@@ -180,7 +180,7 @@ async function assertMatchBelongsToOrganization(params: {
     .maybeSingle();
 
   if (error || !match) {
-    throw new Error("No se encontro el partido para la organizacion seleccionada.");
+    throw new Error("No se encontro el partido para el grupo seleccionado.");
   }
 }
 
@@ -873,7 +873,7 @@ async function resolveNewLineupPlayers(params: {
 
   const playersById = new Map((playerRows ?? []).map((row) => [row.id, row]));
   if (playersById.size !== playerIds.length) {
-    throw new Error("Al menos un jugador de reemplazo no existe o no pertenece a esta organizacion.");
+    throw new Error("Al menos un jugador de reemplazo no existe o no pertenece a este grupo.");
   }
 
   return players.map((player) => {
@@ -1148,7 +1148,7 @@ export async function saveConfirmedMatchLineup(params: {
     .eq("organization_id", organizationId)
     .maybeSingle();
   if (matchError || !match) {
-    throw new Error("No se encontro el partido para la organizacion seleccionada.");
+    throw new Error("No se encontro el partido para el grupo seleccionado.");
   }
 
   if (match.status !== "confirmed") {

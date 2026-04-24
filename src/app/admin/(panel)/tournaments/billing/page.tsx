@@ -4,17 +4,17 @@ export default function AdminTournamentBillingPage() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardTitle>Facturacion de torneos</CardTitle>
+        <CardTitle>Torneos gratis por ahora</CardTitle>
         <CardDescription>
-          Este subpanel queda separado del billing de organizaciones para evitar mezclar productos y permisos.
+          Hoy no estamos cobrando el modulo Torneos y no hay checkout activo para esta parte del producto.
         </CardDescription>
       </Card>
 
       <Card>
-        <CardTitle>Proximo paso</CardTitle>
+        <CardTitle>Estado actual</CardTitle>
         <CardDescription className="mt-1">
-          La estructura de navegacion ya quedo preparada para que `Torneos` tenga su propio billing, planes y estado de acceso.
-          En esta version todavia no conectamos cobros ni suscripciones del modulo torneo.
+          Puedes crear y administrar torneos sin pagar. Cuando definamos el esquema comercial, lo volveremos a
+          conectar desde una iteracion separada.
         </CardDescription>
       </Card>
     </div>

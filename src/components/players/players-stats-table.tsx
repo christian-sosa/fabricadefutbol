@@ -134,7 +134,7 @@ export function PlayersStatsTable({ players }: { players: PlayerStatsRow[] }) {
 
         {!sortedPlayers.length ? (
           <p className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-6 text-sm text-slate-400">
-            No hay jugadores para esta organizacion.
+            No hay jugadores para este grupo.
           </p>
         ) : null}
       </div>
@@ -183,7 +183,7 @@ export function PlayersStatsTable({ players }: { players: PlayerStatsRow[] }) {
             {!sortedPlayers.length ? (
               <tr>
                 <TD className="py-6 text-sm text-slate-400" colSpan={7}>
-                  No hay jugadores para esta organizacion.
+                  No hay jugadores para este grupo.
                 </TD>
               </tr>
             ) : null}

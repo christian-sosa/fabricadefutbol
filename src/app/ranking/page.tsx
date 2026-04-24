@@ -31,7 +31,7 @@ export default async function RankingPage({
         <OrganizationSwitcher
           basePath="/ranking"
           currentOrganizationSlug={selectedOrganization?.slug}
-          label="Elegir organizacion"
+          label="Elegir grupo"
           organizations={organizations}
           quickOrganizations={viewerAdminOrganizations}
         />
