@@ -10,8 +10,13 @@ import { z } from "zod";
 import { assertAdminAction } from "@/lib/auth/admin";
 import { assertTournamentMembershipAction, getTournamentSlugById } from "@/lib/auth/tournaments";
 import { ORGANIZATION_BILLING_CURRENCY, TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS } from "@/lib/constants";
-import { getMercadoPagoWebhookBaseUrl, shouldUseMercadoPagoSandboxCheckout } from "@/lib/env";
+import {
+  getMercadoPagoWebhookBaseUrl,
+  shouldSkipTournamentMercadoPagoCheckout,
+  shouldUseMercadoPagoSandboxCheckout
+} from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
+import { approveTournamentBillingPaymentForDebug } from "@/lib/domain/tournament-billing-workflow";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { slugifyTournamentName } from "@/lib/org";
 import { createCheckoutProPreference } from "@/lib/payments/mercadopago";
@@ -149,11 +154,6 @@ export async function createTournamentAction(formData: FormData) {
       (existingRows ?? []).map((row) => String(row.slug).toLowerCase())
     );
     const externalReference = `tournament-create:${admin.userId}:${Date.now()}:${randomUUID().slice(0, 8)}`;
-    const publicBaseUrl = await resolveServerBaseUrl();
-    const successPath = "/admin/tournaments?checkout=success";
-    const failurePath = "/admin/tournaments?checkout=failure";
-    const pendingPath = "/admin/tournaments?checkout=pending";
-    const notificationPath = "/api/payments/mercadopago/webhook";
 
     const { data: insertedPayment, error: insertPaymentError } = await supabaseAdmin
       .from("tournament_billing_payments")
@@ -176,6 +176,36 @@ export async function createTournamentAction(formData: FormData) {
         })
       );
     }
+
+    if (shouldSkipTournamentMercadoPagoCheckout()) {
+      const debugApproval = await approveTournamentBillingPaymentForDebug({
+        supabase: supabaseAdmin,
+        localPaymentId: insertedPayment.id
+      });
+
+      if (!debugApproval.updated || !debugApproval.createdTournamentId) {
+        redirect(
+          buildTournamentIndexPath({
+            error:
+              "reason" in debugApproval && debugApproval.reason
+                ? debugApproval.reason
+                : "No se pudo simular el pago del torneo."
+          })
+        );
+      }
+
+      redirect(
+        `/admin/tournaments/${debugApproval.createdTournamentId}?success=${encodeURIComponent(
+          "Torneo creado con pago simulado para debug."
+        )}`
+      );
+    }
+
+    const publicBaseUrl = await resolveServerBaseUrl();
+    const successPath = "/admin/tournaments?checkout=success";
+    const failurePath = "/admin/tournaments?checkout=failure";
+    const pendingPath = "/admin/tournaments?checkout=pending";
+    const notificationPath = "/api/payments/mercadopago/webhook";
 
     const preference = await createCheckoutProPreference({
       title: `Crear torneo (${normalizedName})`,
