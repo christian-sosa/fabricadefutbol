@@ -1,30 +1,14 @@
 import Link from "next/link";
 
+import { OrganizationImage } from "@/components/groups/organization-image";
 import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import { getOrganizationImageUrl } from "@/lib/organization-images";
 import { withOrgQuery } from "@/lib/org";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
 import { formatDateTime } from "@/lib/utils";
-
-const groupModuleLinks = [
-  {
-    href: "/ranking",
-    title: "Ranking",
-    description: "Posiciones actuales y estadisticas completas de cada jugador."
-  },
-  {
-    href: "/matches",
-    title: "Historial",
-    description: "Resultados ya jugados con detalle de cada encuentro."
-  },
-  {
-    href: "/upcoming",
-    title: "Proximos",
-    description: "Fechas confirmadas, convocados y detalle del partido."
-  }
-] as const;
 
 export default async function GroupsPage({
   searchParams
@@ -43,7 +27,7 @@ export default async function GroupsPage({
       <section className="rounded-3xl border border-slate-800 bg-slate-900/75 p-5 shadow-[0_24px_40px_-30px_rgba(16,185,129,0.7)] md:p-8">
         <h1 className="mt-2 text-3xl font-black text-slate-100 md:text-5xl">Grupos</h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-          Elige un grupo y navega su ranking completo, historial y proximos partidos desde un solo lugar.
+          Elige un grupo y recorre su ranking, historial y agenda confirmada desde un solo lugar.
         </p>
 
         <div className="mt-6">
@@ -61,37 +45,46 @@ export default async function GroupsPage({
 
       {selectedOrganization ? (
         <>
-          <section className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardDescription>Grupo activo</CardDescription>
-              <CardTitle className="mt-1 text-2xl md:text-3xl">{selectedOrganization.name}</CardTitle>
+          <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <Card className="overflow-hidden p-0">
+              <div className="relative">
+                <OrganizationImage
+                  alt={`Imagen de ${selectedOrganization.name}`}
+                  className="aspect-[16/9] min-h-[260px] rounded-none border-0"
+                  priority
+                  src={getOrganizationImageUrl(selectedOrganization.id)}
+                />
+                <div className="absolute inset-x-0 bottom-0 p-5 md:p-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200/90">
+                    Grupo seleccionado
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black text-white md:text-4xl">
+                    {selectedOrganization.name}
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-sm text-slate-200 md:text-base">
+                    Un vistazo rapido para entrar al grupo, ver quienes vienen arriba y seguir las fechas que ya quedaron confirmadas.
+                  </p>
+                </div>
+              </div>
             </Card>
-            <Card>
-              <CardDescription>Jugadores activos</CardDescription>
-              <CardTitle className="mt-1 text-3xl">{summary.totalPlayers}</CardTitle>
-            </Card>
-            <Card>
-              <CardDescription>Partidos finalizados</CardDescription>
-              <CardTitle className="mt-1 text-3xl">{summary.totalFinishedMatches}</CardTitle>
-            </Card>
-          </section>
 
-          <section className="grid gap-4 md:grid-cols-3">
-            {groupModuleLinks.map((item) => (
-              <Card key={item.href}>
-                <CardTitle>{item.title}</CardTitle>
-                <CardDescription className="mt-2">{item.description}</CardDescription>
-                <Link
-                  className="mt-4 inline-flex text-sm font-semibold text-emerald-300 hover:underline"
-                  href={withOrgQuery(item.href, selectedOrganization.slug)}
-                >
-                  Abrir {item.title.toLowerCase()}
-                </Link>
+            <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
+              <Card>
+                <CardDescription>Jugadores activos</CardDescription>
+                <CardTitle className="mt-1 text-3xl">{summary.totalPlayers}</CardTitle>
               </Card>
-            ))}
+              <Card>
+                <CardDescription>Partidos finalizados</CardDescription>
+                <CardTitle className="mt-1 text-3xl">{summary.totalFinishedMatches}</CardTitle>
+              </Card>
+              <Card>
+                <CardDescription>Agenda confirmada</CardDescription>
+                <CardTitle className="mt-1 text-3xl">{summary.upcomingMatches.length}</CardTitle>
+              </Card>
+            </div>
           </section>
 
-          <section className="grid gap-4 lg:grid-cols-2">
+          <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
             <Card>
               <CardTitle>Top jugadores</CardTitle>
               <CardDescription className="mt-2">
@@ -120,9 +113,9 @@ export default async function GroupsPage({
             </Card>
 
             <Card>
-              <CardTitle>Proximos</CardTitle>
+              <CardTitle>Lo que viene</CardTitle>
               <CardDescription className="mt-2">
-                Acceso rapido a los partidos ya programados del grupo.
+                Los partidos ya confirmados para {selectedOrganization.name}.
               </CardDescription>
               <div className="mt-4 space-y-2">
                 {summary.upcomingMatches.length ? (
@@ -131,15 +124,15 @@ export default async function GroupsPage({
                       className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm transition hover:border-slate-600 hover:bg-slate-800"
                       href={withOrgQuery(`/matches/${match.id}`, selectedOrganization.slug)}
                       key={match.id}
-                    >
-                      <span>
-                        {match.modality} - {formatDateTime(match.scheduled_at)}
+                      >
+                        <span>
+                          {match.modality} - {formatDateTime(match.scheduled_at)}
                       </span>
                       <span className="font-semibold text-emerald-300">Ver detalle</span>
                     </Link>
                   ))
                 ) : (
-                  <p className="text-sm text-slate-400">No hay partidos confirmados proximos.</p>
+                  <p className="text-sm text-slate-400">No hay partidos confirmados por ahora.</p>
                 )}
               </div>
             </Card>

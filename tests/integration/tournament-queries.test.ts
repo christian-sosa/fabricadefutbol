@@ -105,6 +105,7 @@ describe("league and competition public queries", () => {
           name: "LAFAB",
           slug: "lafab",
           description: "Liga amateur de los viernes",
+          photo_path: "app_dev/leagues/league-1.webp",
           venue_name: "Parque Norte",
           location_notes: "Canchas 1 y 2",
           is_public: true,
@@ -168,6 +169,7 @@ describe("league and competition public queries", () => {
         league: expect.objectContaining({
           slug: "lafab",
           logoUrl: "/api/league-logo/league-1",
+          photoUrl: "/api/league-photo/league-1",
           venueName: "Parque Norte",
           locationNotes: "Canchas 1 y 2",
           teamCount: 2,

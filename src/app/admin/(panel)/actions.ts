@@ -26,12 +26,19 @@ import {
 } from "@/lib/domain/organization-workflow";
 import {
   getPlayerPhotosBucket,
+  getOrganizationImagesBucket,
   getMercadoPagoWebhookBaseUrl,
   getSupabaseDbSchema,
   shouldUseMercadoPagoSandboxCheckout
 } from "@/lib/env";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { normalizeEmail, slugifyOrganizationName, withOrgQuery } from "@/lib/org";
+import {
+  getOrganizationImageObjectPath,
+  isSupportedOrganizationImageFile,
+  MAX_ORGANIZATION_IMAGE_SIZE_MB,
+  optimizeOrganizationImage
+} from "@/lib/organization-images";
 import { toUserMessage } from "@/lib/errors";
 import { createCheckoutProPreference } from "@/lib/payments/mercadopago";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -78,6 +85,10 @@ const startOrganizationCreationCheckoutSchema = z.object({
 const syncCheckoutPaymentSchema = z.object({
   organizationId: z.string().uuid(),
   paymentId: z.string().min(1, "paymentId invalido.")
+});
+
+const uploadOrganizationImageSchema = z.object({
+  organizationId: z.string().uuid()
 });
 
 const MERCADOPAGO_TEST_CHARGE_ARS = 100;
@@ -770,5 +781,108 @@ export async function deleteOrganizationAction(formData: FormData) {
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo borrar el grupo.")));
+  }
+}
+
+export async function uploadOrganizationImageAction(formData: FormData) {
+  try {
+    const parsed = uploadOrganizationImageSchema.safeParse({
+      organizationId: formData.get("organizationId")
+    });
+
+    if (!parsed.success) {
+      redirect(
+        buildAdminPath(
+          String(formData.get("organizationId") ?? ""),
+          parsed.error.issues[0]?.message ?? "Datos invalidos."
+        )
+      );
+    }
+
+    await assertOrganizationAdminAction(parsed.data.organizationId);
+    const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
+    const file = formData.get("image");
+
+    if (!(file instanceof File) || file.size <= 0) {
+      redirect(buildAdminPath(organizationQueryKey, "Selecciona una imagen para subir."));
+    }
+
+    const sizeLimitBytes = MAX_ORGANIZATION_IMAGE_SIZE_MB * 1024 * 1024;
+    if (file.size > sizeLimitBytes) {
+      redirect(
+        buildAdminPath(
+          organizationQueryKey,
+          `La imagen no puede superar ${MAX_ORGANIZATION_IMAGE_SIZE_MB} MB.`
+        )
+      );
+    }
+
+    if (!isSupportedOrganizationImageFile(file)) {
+      redirect(buildAdminPath(organizationQueryKey, "Formato no soportado. Usa JPG, PNG o WEBP."));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { data: organization, error: organizationError } = await supabase
+      .from("organizations")
+      .select("id")
+      .eq("id", parsed.data.organizationId)
+      .maybeSingle();
+
+    if (organizationError || !organization) {
+      redirect(buildAdminPath(organizationQueryKey, "No se encontro el grupo seleccionado."));
+    }
+
+    const optimizedBuffer = await optimizeOrganizationImage(file);
+    const objectPath = getOrganizationImageObjectPath(
+      getSupabaseDbSchema(),
+      parsed.data.organizationId
+    );
+
+    const { error: uploadError } = await supabase.storage
+      .from(getOrganizationImagesBucket())
+      .upload(objectPath, optimizedBuffer, {
+        upsert: true,
+        contentType: "image/webp",
+        cacheControl: "31536000"
+      });
+
+    if (uploadError) {
+      redirect(
+        buildAdminPath(
+          organizationQueryKey,
+          toUserMessage(uploadError, "No se pudo guardar la imagen del grupo.")
+        )
+      );
+    }
+
+    const { error: updateError } = await supabase
+      .from("organizations")
+      .update({
+        image_path: objectPath
+      })
+      .eq("id", parsed.data.organizationId);
+
+    if (updateError) {
+      redirect(
+        buildAdminPath(
+          organizationQueryKey,
+          toUserMessage(updateError, "No se pudo vincular la imagen al grupo.")
+        )
+      );
+    }
+
+    revalidatePath("/admin");
+    revalidatePath("/groups");
+    revalidatePath("/");
+    revalidatePath(`/api/organization-image/${parsed.data.organizationId}`);
+    redirect(buildAdminPath(organizationQueryKey));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(
+      buildAdminPath(
+        String(formData.get("organizationId") ?? ""),
+        toUserMessage(error, "No se pudo subir la imagen del grupo.")
+      )
+    );
   }
 }

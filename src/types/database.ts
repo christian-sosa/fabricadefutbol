@@ -21,6 +21,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      organizations: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          image_path: string | null;
+          is_public: boolean;
+          name: string;
+          slug: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          image_path?: string | null;
+          is_public?: boolean;
+          name: string;
+          slug: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          image_path?: string | null;
+          is_public?: boolean;
+          name?: string;
+          slug?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       players: {
         Row: {
           active: boolean;

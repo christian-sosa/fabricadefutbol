@@ -28,6 +28,22 @@ function isOrganizationSectionPath(currentPath: string) {
   return ORGANIZATION_SECTION_PATHS.some((href) => isActivePath(currentPath, href));
 }
 
+function humanizeOrganizationKey(value: string | null) {
+  if (!value) return null;
+
+  const normalized = value.trim();
+  if (!normalized) return null;
+
+  return normalized
+    .split("-")
+    .map((segment, index) => {
+      if (!segment) return segment;
+      if (index === 0) return segment.charAt(0).toUpperCase() + segment.slice(1);
+      return segment;
+    })
+    .join(" ");
+}
+
 function MenuToggleIcon({ open }: { open: boolean }) {
   return (
     <span aria-hidden="true" className="relative flex h-5 w-5 items-center justify-center">
@@ -58,20 +74,21 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
   const safePathname = pathname ?? "";
   const router = useRouter();
   const searchParams = useSearchParams();
-  const organizationId = searchParams.get("org");
+  const organizationKey = searchParams.get("org");
   const publicModule = parsePublicModule(searchParams.get("module"));
   const searchKey = searchParams.toString();
   const [mounted, setMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(initialIsAuthenticated);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [currentOrganizationName, setCurrentOrganizationName] = useState<string | null>(null);
 
   const isOrganizationSection = isOrganizationSectionPath(safePathname);
   const shouldShowOrganizationSubnav = mounted && isOrganizationSection;
   const organizationHubHref = withPublicQuery("/groups", {
-    organizationKey: organizationId,
+    organizationKey,
     module: publicModule
   });
-  const currentOrganizationLabel = organizationId?.trim() ? organizationId.trim() : null;
+  const currentOrganizationLabel = currentOrganizationName ?? humanizeOrganizationKey(organizationKey);
 
   useEffect(() => {
     setMounted(true);
@@ -106,6 +123,49 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
     setIsMobileMenuOpen(false);
   }, [safePathname, searchKey]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function resolveOrganizationName() {
+      if (!organizationKey?.trim()) {
+        setCurrentOrganizationName(null);
+        return;
+      }
+
+      setCurrentOrganizationName(null);
+      const supabase = createSupabaseBrowserClient();
+      const normalizedKey = organizationKey.trim();
+
+      const { data: bySlug } = await supabase
+        .from("organizations")
+        .select("name")
+        .eq("slug", normalizedKey)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (bySlug?.name) {
+        setCurrentOrganizationName(String(bySlug.name));
+        return;
+      }
+
+      const { data: byId } = await supabase
+        .from("organizations")
+        .select("name")
+        .eq("id", normalizedKey)
+        .maybeSingle();
+
+      if (cancelled) return;
+      setCurrentOrganizationName(byId?.name ? String(byId.name) : humanizeOrganizationKey(normalizedKey));
+    }
+
+    resolveOrganizationName();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationKey]);
+
   const handleSignOut = async () => {
     const supabase = createSupabaseBrowserClient();
     await supabase.auth.signOut();
@@ -122,7 +182,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
             compact ? "flex-1 text-center" : ""
           )}
           href={withPublicQuery("/admin", {
-            organizationKey: organizationId
+            organizationKey
           })}
         >
           Panel
@@ -145,7 +205,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
           compact ? "block w-full text-center" : ""
         )}
         href={withPublicQuery("/admin/login", {
-          organizationKey: organizationId
+          organizationKey
         })}
       >
         Ingresar / Registro
@@ -183,7 +243,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
                   item.href === "/groups"
                     ? organizationHubHref
                     : withPublicQuery(item.href, {
-                        organizationKey: organizationId,
+                        organizationKey,
                         module: publicModule
                       });
 
@@ -231,7 +291,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
                     {currentOrganizationLabel}
                   </span>
                 ) : (
-                  <span className="text-xs text-slate-400">Elegi un grupo para navegar el modulo publico.</span>
+                  <span className="text-xs text-slate-400">Explora un grupo para ver ranking, historial y proximos partidos.</span>
                 )}
               </div>
 
@@ -247,7 +307,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
                           : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
                       )}
                       href={withPublicQuery(item.href, {
-                        organizationKey: organizationId,
+                        organizationKey,
                         module: publicModule
                       })}
                       key={item.href}
@@ -279,7 +339,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
                     item.href === "/groups"
                       ? organizationHubHref
                       : withPublicQuery(item.href, {
-                          organizationKey: organizationId,
+                          organizationKey,
                           module: publicModule
                         });
 
@@ -305,6 +365,11 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Submenu de Grupos
               </p>
+              {currentOrganizationLabel ? (
+                <p className="text-sm font-semibold text-slate-200">{currentOrganizationLabel}</p>
+              ) : (
+                <p className="text-sm text-slate-400">Explora un grupo para ver el contenido publico.</p>
+              )}
               <div className="flex flex-wrap gap-2">
                 {ORGANIZATION_PUBLIC_NAV_ITEMS.map((item) => {
                   const active = mounted && isActivePath(safePathname, item.href);
@@ -317,7 +382,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
                           : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
                       )}
                       href={withPublicQuery(item.href, {
-                        organizationKey: organizationId,
+                        organizationKey,
                         module: publicModule
                       })}
                       key={item.href}

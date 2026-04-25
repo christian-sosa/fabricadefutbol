@@ -15,9 +15,11 @@ import {
   type TournamentRoundReference,
   type TournamentTeamReference
 } from "@/lib/domain/tournament-stats";
+import { getLeaguePhotoUrl } from "@/lib/league-photos";
 import { getLeagueLogoUrl } from "@/lib/league-logos";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getTeamLogoUrl } from "@/lib/team-logos";
 import type {
   CompetitionListItem,
   CompetitionPlayoffSize,
@@ -34,6 +36,7 @@ type LeagueRecord = {
   slug: string;
   description: string | null;
   logo_path: string | null;
+  photo_path: string | null;
   venue_name: string | null;
   location_notes: string | null;
   is_public: boolean;
@@ -62,6 +65,7 @@ type LeagueTeamRecord = {
   name: string;
   short_name: string | null;
   slug: string;
+  logo_path: string | null;
   notes: string | null;
   created_at: string;
 };
@@ -72,6 +76,7 @@ type CompetitionTeamRecord = {
   league_team_id: string;
   display_name: string;
   short_name: string | null;
+  logo_path: string | null;
   display_order: number;
   notes: string | null;
   created_at: string;
@@ -159,6 +164,7 @@ type LeagueTeamListItem = {
   name: string;
   shortName: string | null;
   slug: string;
+  logoUrl: string | null;
   notes: string | null;
   createdAt: string;
 };
@@ -169,6 +175,7 @@ type CompetitionTeamListItem = {
   leagueTeamId: string;
   displayName: string;
   shortName: string | null;
+  logoUrl: string | null;
   displayOrder: number;
   notes: string | null;
   createdAt: string;
@@ -246,6 +253,7 @@ function normalizeLeagueRecord(
     slug: record.slug,
     description: record.description,
     logoUrl: getLeagueLogoUrl(record.id),
+    photoUrl: record.photo_path ? getLeaguePhotoUrl(record.id) : null,
     venueName: record.venue_name,
     locationNotes: record.location_notes,
     isPublic: record.is_public,
@@ -281,6 +289,7 @@ function normalizeLeagueTeam(record: LeagueTeamRecord): LeagueTeamListItem {
     name: record.name,
     shortName: record.short_name,
     slug: record.slug,
+    logoUrl: record.logo_path ? getTeamLogoUrl(record.id) : null,
     notes: record.notes,
     createdAt: record.created_at
   };
@@ -293,6 +302,7 @@ function normalizeCompetitionTeam(record: CompetitionTeamRecord): CompetitionTea
     leagueTeamId: record.league_team_id,
     displayName: record.display_name,
     shortName: record.short_name,
+    logoUrl: record.logo_path ? getTeamLogoUrl(record.league_team_id) : null,
     displayOrder: Number(record.display_order),
     notes: record.notes,
     createdAt: record.created_at
@@ -409,7 +419,7 @@ async function loadLeagueById(leagueId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("leagues")
-    .select("id, name, slug, description, logo_path, venue_name, location_notes, is_public, status, created_at")
+    .select("id, name, slug, description, logo_path, photo_path, venue_name, location_notes, is_public, status, created_at")
     .eq("id", leagueId)
     .maybeSingle();
 
@@ -421,7 +431,7 @@ async function loadLeagueBySlug(leagueSlug: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("leagues")
-    .select("id, name, slug, description, logo_path, venue_name, location_notes, is_public, status, created_at")
+    .select("id, name, slug, description, logo_path, photo_path, venue_name, location_notes, is_public, status, created_at")
     .eq("slug", leagueSlug)
     .maybeSingle();
 
@@ -472,7 +482,7 @@ async function loadLeagueTeams(leagueId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("league_teams")
-    .select("id, league_id, name, short_name, slug, notes, created_at")
+    .select("id, league_id, name, short_name, slug, logo_path, notes, created_at")
     .eq("league_id", leagueId)
     .order("name", { ascending: true });
 
@@ -548,7 +558,7 @@ async function loadCompetitionCoreBundle(params: {
   ] = await Promise.all([
     supabase
       .from("competition_teams")
-      .select("id, competition_id, league_team_id, display_name, short_name, display_order, notes, created_at")
+      .select("id, competition_id, league_team_id, display_name, short_name, logo_path, display_order, notes, created_at")
       .eq("competition_id", competition.id)
       .order("display_order", { ascending: true }),
     supabase
@@ -917,7 +927,7 @@ export async function getAdminLeagueList() {
       {
         ...league,
         description: null,
-        logo_path: null
+        photo_path: null
       },
       {
         teamCount: teamCounts.get(league.id) ?? 0,

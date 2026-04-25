@@ -11,6 +11,10 @@ import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import {
+  assertPlayerPhotoUploadAllowed,
+  registerPlayerPhotoUploadEvent
+} from "@/lib/player-photo-upload-limits";
+import {
   getCompetitionPlayerPhotoObjectPath,
   inferPlayerPhotoExtension,
   MAX_PLAYER_PHOTO_SIZE_MB,
@@ -231,7 +235,7 @@ export async function uploadCaptainTournamentPlayerPhotoAction(formData: FormDat
       redirect(buildCaptainPanelPath({ competitionId: rawCompetitionId, teamId: rawTeamId, error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
-    await assertCaptainTeamAction({
+    const captain = await assertCaptainTeamAction({
       competitionId: parsed.data.competitionId,
       competitionTeamId: parsed.data.teamId
     });
@@ -263,6 +267,14 @@ export async function uploadCaptainTournamentPlayerPhotoAction(formData: FormDat
       redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, error: "No se encontró el jugador dentro de tu equipo." }));
     }
 
+    await assertPlayerPhotoUploadAllowed({
+      supabase: supabase as never,
+      uploaderId: captain.userId,
+      uploaderRole: "captain",
+      targetPlayerId: parsed.data.playerId,
+      targetType: "competition_player"
+    });
+
     const optimizedBuffer = await optimizePlayerAvatarImage(file);
     const objectPath = getCompetitionPlayerPhotoObjectPath(getSupabaseDbSchema(), parsed.data.competitionId, parsed.data.playerId);
     const bucketName = getPlayerPhotosBucket();
@@ -275,6 +287,14 @@ export async function uploadCaptainTournamentPlayerPhotoAction(formData: FormDat
     if (uploadError) {
       redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, error: "No se pudo guardar la foto del jugador." }));
     }
+
+    await registerPlayerPhotoUploadEvent({
+      supabase: supabase as never,
+      uploaderId: captain.userId,
+      uploaderRole: "captain",
+      targetPlayerId: parsed.data.playerId,
+      targetType: "competition_player"
+    });
 
     await revalidateCaptainPaths(parsed.data.competitionId);
     revalidatePath(`/api/player-photo/${parsed.data.playerId}`);

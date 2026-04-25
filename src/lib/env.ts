@@ -27,12 +27,30 @@ const NEXT_PUBLIC_ENV = {
     process.env.NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET_DEV,
   NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET_PROD:
     process.env.NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET_PROD,
+  NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET:
+    process.env.NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET,
+  NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_DEV:
+    process.env.NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_DEV,
+  NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD:
+    process.env.NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD,
   NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET:
     process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET,
   NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_DEV:
     process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_DEV,
   NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_PROD:
-    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_PROD
+    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_PROD,
+  NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET:
+    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET,
+  NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_DEV:
+    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_DEV,
+  NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_PROD:
+    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_PROD,
+  NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET:
+    process.env.NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET,
+  NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_DEV:
+    process.env.NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_DEV,
+  NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_PROD:
+    process.env.NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_PROD
 } as const;
 
 function getEnv(name: string) {
@@ -246,6 +264,35 @@ export function getPlayerPhotosBucket() {
   return value ?? "player-photos";
 }
 
+export function getOrganizationImagesBucket() {
+  const targetEnv = getSupabaseTargetEnv();
+  const selected =
+    targetEnv === "development"
+      ? firstDefined([
+          "SUPABASE_ORGANIZATION_IMAGES_BUCKET_DEV",
+          "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_DEV",
+          "SUPABASE_ORGANIZATION_IMAGES_BUCKET",
+          "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET"
+        ])
+      : firstDefined([
+          "SUPABASE_ORGANIZATION_IMAGES_BUCKET",
+          "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET",
+          "SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD",
+          "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD"
+        ]);
+  const fallback = firstDefined([
+    "SUPABASE_ORGANIZATION_IMAGES_BUCKET",
+    "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET",
+    "SUPABASE_ORGANIZATION_IMAGES_BUCKET_DEV",
+    "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_DEV",
+    "SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD",
+    "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD"
+  ]);
+  const value = selected ?? fallback;
+
+  return value ?? "organization-images";
+}
+
 export function getLeagueLogosBucket() {
   const targetEnv = getSupabaseTargetEnv();
   const selected =
@@ -273,6 +320,64 @@ export function getLeagueLogosBucket() {
   const value = selected ?? fallback;
 
   return value ?? "league-logos";
+}
+
+export function getLeaguePhotosBucket() {
+  const targetEnv = getSupabaseTargetEnv();
+  const selected =
+    targetEnv === "development"
+      ? firstDefined([
+          "SUPABASE_LEAGUE_PHOTOS_BUCKET_DEV",
+          "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_DEV",
+          "SUPABASE_LEAGUE_PHOTOS_BUCKET",
+          "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET"
+        ])
+      : firstDefined([
+          "SUPABASE_LEAGUE_PHOTOS_BUCKET",
+          "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET",
+          "SUPABASE_LEAGUE_PHOTOS_BUCKET_PROD",
+          "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_PROD"
+        ]);
+  const fallback = firstDefined([
+    "SUPABASE_LEAGUE_PHOTOS_BUCKET",
+    "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET",
+    "SUPABASE_LEAGUE_PHOTOS_BUCKET_DEV",
+    "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_DEV",
+    "SUPABASE_LEAGUE_PHOTOS_BUCKET_PROD",
+    "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_PROD"
+  ]);
+  const value = selected ?? fallback;
+
+  return value ?? "league-photos";
+}
+
+export function getTeamLogosBucket() {
+  const targetEnv = getSupabaseTargetEnv();
+  const selected =
+    targetEnv === "development"
+      ? firstDefined([
+          "SUPABASE_TEAM_LOGOS_BUCKET_DEV",
+          "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_DEV",
+          "SUPABASE_TEAM_LOGOS_BUCKET",
+          "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET"
+        ])
+      : firstDefined([
+          "SUPABASE_TEAM_LOGOS_BUCKET",
+          "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET",
+          "SUPABASE_TEAM_LOGOS_BUCKET_PROD",
+          "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_PROD"
+        ]);
+  const fallback = firstDefined([
+    "SUPABASE_TEAM_LOGOS_BUCKET",
+    "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET",
+    "SUPABASE_TEAM_LOGOS_BUCKET_DEV",
+    "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_DEV",
+    "SUPABASE_TEAM_LOGOS_BUCKET_PROD",
+    "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_PROD"
+  ]);
+  const value = selected ?? fallback;
+
+  return value ?? "team-logos";
 }
 
 export function getMercadoPagoAccessToken() {

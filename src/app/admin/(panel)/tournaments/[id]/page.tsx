@@ -11,8 +11,10 @@ import {
   revokeLeagueAdminInviteAction,
   updateLeagueAction,
   updateLeagueTeamAction,
-  uploadLeagueLogoAction
+  uploadLeagueLogoAction,
+  uploadLeaguePhotoAction
 } from "@/app/admin/(panel)/tournaments/[id]/actions";
+import { LeaguePhoto } from "@/components/tournaments/league-photo";
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { TOURNAMENT_STATUS_LABELS, TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Button } from "@/components/ui/button";
@@ -180,39 +182,78 @@ export default async function AdminLeagueDetailPage({
               </form>
             </Card>
 
-            <Card>
-              <CardTitle>Logo de la liga</CardTitle>
-              <CardDescription className="mt-2">
-                Se usa en home, en /tournaments y en la ficha publica de la liga. Si no subes nada, mostramos un placeholder.
-              </CardDescription>
-              <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-start">
-                <LeagueLogo alt={`Logo de ${details.league.name}`} size={120} src={details.league.logoUrl} />
-                <form
-                  action={uploadLeagueLogoAction.bind(null, id)}
-                  className="flex-1 space-y-3"
-                  encType="multipart/form-data"
-                >
-                  <div>
-                    <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="logo">
-                      Archivo
-                    </label>
-                    <Input
-                      accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml"
-                      id="logo"
-                      name="logo"
-                      required
-                      type="file"
-                    />
-                    <p className="mt-2 text-xs text-slate-500">
-                      Recomendado: fondo transparente o cuadrado. Lo optimizamos a WEBP automaticamente.
-                    </p>
-                  </div>
-                  <Button type="submit" variant="secondary">
-                    Guardar logo
-                  </Button>
-                </form>
-              </div>
-            </Card>
+            <div className="space-y-4">
+              <Card>
+                <CardTitle>Logo de la liga</CardTitle>
+                <CardDescription className="mt-2">
+                  Se usa en home, en /tournaments y en la ficha publica de la liga. Si no subes nada, mostramos un placeholder.
+                </CardDescription>
+                <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-start">
+                  <LeagueLogo alt={`Logo de ${details.league.name}`} size={120} src={details.league.logoUrl} />
+                  <form
+                    action={uploadLeagueLogoAction.bind(null, id)}
+                    className="flex-1 space-y-3"
+                    encType="multipart/form-data"
+                  >
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="logo">
+                        Archivo
+                      </label>
+                      <Input
+                        accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml"
+                        id="logo"
+                        name="logo"
+                        required
+                        type="file"
+                      />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Recomendado: fondo transparente o cuadrado. Lo optimizamos a WEBP automaticamente.
+                      </p>
+                    </div>
+                    <Button type="submit" variant="secondary">
+                      Guardar logo
+                    </Button>
+                  </form>
+                </div>
+              </Card>
+
+              <Card>
+                <CardTitle>Foto publica de la liga</CardTitle>
+                <CardDescription className="mt-2">
+                  Es opcional. Si la cargas, se muestra en la ficha publica de la liga; si no, esa zona queda igual que ahora.
+                </CardDescription>
+                <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+                  <LeaguePhoto
+                    alt={`Foto de ${details.league.name}`}
+                    className="aspect-[16/9] min-h-[220px]"
+                    src={details.league.photoUrl}
+                  />
+                  <form
+                    action={uploadLeaguePhotoAction.bind(null, id)}
+                    className="space-y-3"
+                    encType="multipart/form-data"
+                  >
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="photo">
+                        Archivo
+                      </label>
+                      <Input
+                        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                        id="photo"
+                        name="photo"
+                        type="file"
+                      />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Ideal para una foto general de la liga o una imagen ambientada del torneo.
+                      </p>
+                    </div>
+                    <Button type="submit" variant="secondary">
+                      Guardar foto
+                    </Button>
+                  </form>
+                </div>
+              </Card>
+            </div>
           </section>
         </>
       ) : null}
@@ -224,7 +265,7 @@ export default async function AdminLeagueDetailPage({
             <CardDescription className="mt-2">
               Aqui cargas el catalogo base de equipos de la liga. Luego eliges cuales se inscriben en cada competencia.
             </CardDescription>
-            <form action={addLeagueTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
+            <form action={addLeagueTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2" encType="multipart/form-data">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
                 <Input name="name" required />
@@ -232,6 +273,13 @@ export default async function AdminLeagueDetailPage({
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre corto</label>
                 <Input maxLength={20} name="shortName" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-semibold text-slate-200">Logo del equipo</label>
+                <Input accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml" name="logo" type="file" />
+                <p className="mt-2 text-xs text-slate-500">
+                  Opcional. Solo el admin de la liga puede cargar o cambiar el logo del equipo.
+                </p>
               </div>
               <div className="md:col-span-2">
                 <label className="mb-1 block text-sm font-semibold text-slate-200">Notas</label>
@@ -248,11 +296,14 @@ export default async function AdminLeagueDetailPage({
               details.leagueTeams.map((team) => (
                 <Card key={team.id}>
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <CardTitle>{team.name}</CardTitle>
-                      <CardDescription className="mt-1">
+                    <div className="flex items-start gap-3">
+                      <LeagueLogo alt={`Logo de ${team.name}`} size={56} src={team.logoUrl} />
+                      <div>
+                        <CardTitle>{team.name}</CardTitle>
+                        <CardDescription className="mt-1">
                         {team.shortName ? `${team.shortName} · ` : ""}catalogo base de la liga
                       </CardDescription>
+                      </div>
                     </div>
                     <form action={deleteLeagueTeamAction.bind(null, id)}>
                       <input name="teamId" type="hidden" value={team.id} />
@@ -265,7 +316,7 @@ export default async function AdminLeagueDetailPage({
                     </form>
                   </div>
 
-                  <form action={updateLeagueTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
+                  <form action={updateLeagueTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2" encType="multipart/form-data">
                     <input name="teamId" type="hidden" value={team.id} />
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
@@ -274,6 +325,13 @@ export default async function AdminLeagueDetailPage({
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre corto</label>
                       <Input defaultValue={team.shortName ?? ""} name="shortName" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="mb-1 block text-sm font-semibold text-slate-200">Logo del equipo</label>
+                      <Input accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml" name="logo" type="file" />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Si subes uno nuevo, reemplaza el actual.
+                      </p>
                     </div>
                     <div className="md:col-span-2">
                       <label className="mb-1 block text-sm font-semibold text-slate-200">Notas</label>

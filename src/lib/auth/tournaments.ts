@@ -9,6 +9,7 @@ export type AdminLeague = {
   name: string;
   slug: string;
   logo_path: string | null;
+  photo_path: string | null;
   venue_name: string | null;
   location_notes: string | null;
   status: LeagueStatus;
@@ -35,7 +36,7 @@ async function loadLeagueById(leagueId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("leagues")
-    .select("id, name, slug, logo_path, venue_name, location_notes, status, is_public, created_at")
+    .select("id, name, slug, logo_path, photo_path, venue_name, location_notes, status, is_public, created_at")
     .eq("id", leagueId)
     .maybeSingle();
 
@@ -52,7 +53,7 @@ export async function getAdminLeagues(admin: AdminSession): Promise<AdminLeague[
   if (admin.isSuperAdmin) {
     const { data, error } = await supabase
       .from("leagues")
-      .select("id, name, slug, logo_path, venue_name, location_notes, status, is_public, created_at")
+      .select("id, name, slug, logo_path, photo_path, venue_name, location_notes, status, is_public, created_at")
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
@@ -79,7 +80,7 @@ export async function getAdminLeagues(admin: AdminSession): Promise<AdminLeague[
 
   const { data, error } = await supabase
     .from("leagues")
-    .select("id, name, slug, logo_path, venue_name, location_notes, status, is_public, created_at")
+    .select("id, name, slug, logo_path, photo_path, venue_name, location_notes, status, is_public, created_at")
     .in("id", leagueIds)
     .order("created_at", { ascending: false });
 

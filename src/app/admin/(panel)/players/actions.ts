@@ -10,6 +10,10 @@ import { toUserMessage } from "@/lib/errors";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
 import {
+  assertPlayerPhotoUploadAllowed,
+  registerPlayerPhotoUploadEvent
+} from "@/lib/player-photo-upload-limits";
+import {
   getOrganizationPlayerPhotoObjectPath,
   inferPlayerPhotoExtension,
   MAX_PLAYER_PHOTO_SIZE_MB,
@@ -439,7 +443,7 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
       );
     }
 
-    await assertOrganizationAdminAction(parsed.data.organizationId);
+    const admin = await assertOrganizationAdminAction(parsed.data.organizationId);
     const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
 
     const file = formData.get("photo");
@@ -469,6 +473,14 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
       redirect(withMessage(organizationQueryKey, "No se encontro el jugador en el grupo seleccionado."));
     }
 
+    await assertPlayerPhotoUploadAllowed({
+      supabase: supabase as never,
+      uploaderId: admin.userId,
+      uploaderRole: "organization_admin",
+      targetPlayerId: parsed.data.playerId,
+      targetType: "organization_player"
+    });
+
     const optimizedBuffer = await optimizePlayerAvatarImage(file);
     const objectPath = getOrganizationPlayerPhotoObjectPath(
       getSupabaseDbSchema(),
@@ -492,6 +504,14 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
       });
       redirect(withMessage(organizationQueryKey, "No se pudo guardar la foto en Storage. Intenta nuevamente."));
     }
+
+    await registerPlayerPhotoUploadEvent({
+      supabase: supabase as never,
+      uploaderId: admin.userId,
+      uploaderRole: "organization_admin",
+      targetPlayerId: parsed.data.playerId,
+      targetType: "organization_player"
+    });
 
     revalidatePath("/admin/players");
     revalidatePath("/players");

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { LeaguePhoto } from "@/components/tournaments/league-photo";
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -38,9 +39,18 @@ export default async function LeagueDetailPage({
               </div>
             </div>
           </div>
-          <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/tournaments">
-            Volver al listado
-          </Link>
+          {data.league.photoUrl ? (
+            <div className="w-full max-w-sm space-y-3">
+              <LeaguePhoto alt={`Foto de ${data.league.name}`} className="aspect-[16/9]" priority src={data.league.photoUrl} />
+              <Link className="inline-block text-sm font-semibold text-slate-300 hover:underline" href="/tournaments">
+                Volver al listado
+              </Link>
+            </div>
+          ) : (
+            <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/tournaments">
+              Volver al listado
+            </Link>
+          )}
         </div>
       </Card>
 
