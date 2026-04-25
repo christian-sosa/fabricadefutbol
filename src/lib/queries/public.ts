@@ -279,10 +279,13 @@ async function getHomeSummaryLive(organizationId: string | null): Promise<Organi
 
   const { data: topPlayers, error: topPlayersError } = await supabase
     .from("players")
-    .select("id, full_name, current_rating, initial_rank")
+    .select("id, full_name, current_rating, initial_rank, skill_level, display_order")
     .eq("organization_id", organizationId)
     .eq("active", true)
     .order("current_rating", { ascending: false })
+    .order("skill_level", { ascending: true })
+    .order("display_order", { ascending: true })
+    .order("full_name", { ascending: true })
     .limit(5);
   if (topPlayersError) throw new Error(topPlayersError.message);
 
@@ -313,11 +316,13 @@ export async function getRankingPlayers(organizationId: string | null) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("players")
-    .select("id, full_name, current_rating, initial_rank")
+    .select("id, full_name, current_rating, initial_rank, skill_level, display_order")
     .eq("organization_id", organizationId)
     .eq("active", true)
     .order("current_rating", { ascending: false })
-    .order("initial_rank", { ascending: true });
+    .order("skill_level", { ascending: true })
+    .order("display_order", { ascending: true })
+    .order("full_name", { ascending: true });
   if (error) throw new Error(error.message);
   return data ?? [];
 }
@@ -332,7 +337,9 @@ async function getPlayersWithStatsLive(organizationId: string | null) {
     .eq("organization_id", organizationId)
     .eq("active", true)
     .order("current_rating", { ascending: false })
-    .order("initial_rank", { ascending: true });
+    .order("skill_level", { ascending: true })
+    .order("display_order", { ascending: true })
+    .order("full_name", { ascending: true });
   if (playersError) throw new Error(playersError.message);
 
   const { data: finishedMatches, error: matchesError } = await supabase

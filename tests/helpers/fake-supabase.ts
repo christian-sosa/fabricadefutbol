@@ -255,6 +255,8 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "players":
+      if (!("skill_level" in normalized)) normalized.skill_level = 3;
+      if (!("display_order" in normalized)) normalized.display_order = normalized.initial_rank ?? 1;
       if (!("current_rating" in normalized)) normalized.current_rating = 1000;
       if (!("active" in normalized)) normalized.active = true;
       if (!normalized.updated_at) normalized.updated_at = now;
@@ -674,7 +676,7 @@ class FakeSupabaseState {
 
 class FakeQuery {
   private filters: Filter[] = [];
-  private orderBy: { column: string; ascending: boolean } | null = null;
+  private orderBy: Array<{ column: string; ascending: boolean }> = [];
   private limitedTo: number | null = null;
   private slicedRange: [number, number] | null = null;
   private mode: QueryMode = "select";
@@ -766,10 +768,10 @@ class FakeQuery {
   }
 
   order(column: string, options?: { ascending?: boolean }) {
-    this.orderBy = {
+    this.orderBy.push({
       column,
       ascending: options?.ascending !== false
-    };
+    });
     return this;
   }
 
@@ -804,11 +806,13 @@ class FakeQuery {
       rows = rows.filter((row) => filter(row));
     }
 
-    if (this.orderBy) {
-      const { column, ascending } = this.orderBy;
+    if (this.orderBy.length) {
       rows.sort((left, right) => {
-        const result = compareValues(left[column], right[column]);
-        return ascending ? result : -result;
+        for (const { column, ascending } of this.orderBy) {
+          const result = compareValues(left[column], right[column]);
+          if (result !== 0) return ascending ? result : -result;
+        }
+        return 0;
       });
     }
 

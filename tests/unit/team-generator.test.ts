@@ -110,4 +110,53 @@ describe("generateBalancedTeamOptions", () => {
 
     expect(options.length).toBeLessThanOrEqual(6);
   });
+
+  it("soporta niveles repetidos como puntajes de balance", () => {
+    const players = [
+      500,
+      500,
+      400,
+      400,
+      300,
+      300,
+      200,
+      200,
+      100,
+      100
+    ].map((rating, index) => ({
+      id: `player-${index + 1}`,
+      fullName: `Jugador ${index + 1}`,
+      rating
+    }));
+
+    const options = generateBalancedTeamOptions({
+      modality: "5v5",
+      players,
+      seed: 20260425
+    });
+
+    expect(options).toHaveLength(3);
+    expect(options[0]?.ratingDiff).toBe(0);
+  });
+
+  it("evita concentrar demasiados jugadores fuertes en el mismo equipo", () => {
+    const players = [500, 500, 400, 400, 300, 300, 200, 200, 100, 100].map((rating, index) => ({
+      id: `player-${index + 1}`,
+      fullName: `Jugador ${index + 1}`,
+      rating
+    }));
+
+    const options = generateBalancedTeamOptions({
+      modality: "5v5",
+      players,
+      seed: 2222,
+      requestedOptions: 3
+    });
+
+    for (const option of options) {
+      const strongA = option.teamA.filter((player) => player.rating >= 400).length;
+      const strongB = option.teamB.filter((player) => player.rating >= 400).length;
+      expect(Math.abs(strongA - strongB)).toBe(0);
+    }
+  });
 });

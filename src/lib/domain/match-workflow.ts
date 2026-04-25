@@ -1,5 +1,6 @@
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { calculateMatchRatingAdjustments, deriveWinnerTeam } from "@/lib/domain/rating";
+import { calculateEffectiveSkillScore, mapInitialRankToSkillLevel } from "@/lib/domain/skill-level";
 import { generateBalancedTeamOptions } from "@/lib/domain/team-generator";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { MatchModality, MatchResultInput, ResultAssignmentTeam, TeamSide } from "@/types/domain";
@@ -16,6 +17,15 @@ type BalanceParticipant = {
   id: string;
   fullName: string;
   rating: number;
+};
+
+type SelectedPlayerForBalance = {
+  id: string;
+  full_name: string;
+  initial_rank: number;
+  skill_level: number | null;
+  current_rating: number;
+  active: boolean;
 };
 
 type ConfirmedParticipant = {
@@ -189,9 +199,10 @@ async function fetchSelectedPlayers(supabase: DbClient, organizationId: string, 
 
   const { data, error } = await supabase
     .from("players")
-    .select("id, full_name, initial_rank, active")
+    .select("id, full_name, initial_rank, skill_level, current_rating, display_order, active")
     .eq("organization_id", organizationId)
     .in("id", playerIds)
+    .order("display_order", { ascending: true })
     .order("initial_rank", { ascending: true });
 
   if (error) throw new Error(`No se pudieron leer jugadores: ${error.message}`);
@@ -208,26 +219,32 @@ async function fetchSelectedPlayers(supabase: DbClient, organizationId: string, 
 }
 
 function toBalancePlayers(
-  registeredPlayers: Array<{ id: string; full_name: string; initial_rank: number }>,
+  registeredPlayers: SelectedPlayerForBalance[],
   guests: Array<{ id: string; guest_name: string; guest_rating: number }>
 ) {
-  const rankValues = [
-    ...registeredPlayers.map((player) => Number(player.initial_rank)),
-    ...guests.map((guest) => Number(guest.guest_rating))
-  ];
-  const maxRank = rankValues.length ? Math.max(...rankValues) : 100;
-  const toBalanceScore = (rank: number) => Number((maxRank + 1 - rank).toFixed(2));
+  const totalRegisteredPlayers = registeredPlayers.length;
 
   const basePlayers: BalanceParticipant[] = registeredPlayers.map((player) => ({
     id: toPlayerParticipantId(player.id),
     fullName: player.full_name,
-    rating: toBalanceScore(Number(player.initial_rank))
+    rating: calculateEffectiveSkillScore({
+      skillLevel:
+        player.skill_level ??
+        mapInitialRankToSkillLevel({
+          initialRank: Number(player.initial_rank),
+          totalPlayers: totalRegisteredPlayers
+        }),
+      currentRating: Number(player.current_rating)
+    })
   }));
 
   const guestPlayers: BalanceParticipant[] = guests.map((guest) => ({
     id: toGuestParticipantId(guest.id),
     fullName: guest.guest_name,
-    rating: toBalanceScore(Number(guest.guest_rating))
+    rating: calculateEffectiveSkillScore({
+      skillLevel: Number(guest.guest_rating),
+      currentRating: 1000
+    })
   }));
 
   return [...basePlayers, ...guestPlayers];

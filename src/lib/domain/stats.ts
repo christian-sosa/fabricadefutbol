@@ -18,6 +18,8 @@ type InternalStats = {
   playerName: string;
   currentRating: number;
   initialRank: number;
+  skillLevel: number;
+  displayOrder: number;
   matchesPlayed: number;
   wins: number;
   draws: number;
@@ -65,6 +67,8 @@ export function calculatePlayerStats(params: {
         playerName: player.full_name,
         currentRating: Number(player.current_rating),
         initialRank: player.initial_rank,
+        skillLevel: player.skill_level,
+        displayOrder: player.display_order,
         matchesPlayed: 0,
         wins: 0,
         draws: 0,
@@ -113,8 +117,10 @@ export function calculatePlayerStats(params: {
         if (ratingDiff !== 0) return ratingDiff;
         const matchesDiff = b.matchesPlayed - a.matchesPlayed;
         if (matchesDiff !== 0) return matchesDiff;
-        const winsDiff = b.wins - a.wins;
-        if (winsDiff !== 0) return winsDiff;
+        const skillLevelDiff = a.skillLevel - b.skillLevel;
+        if (skillLevelDiff !== 0) return skillLevelDiff;
+        const displayOrderDiff = a.displayOrder - b.displayOrder;
+        if (displayOrderDiff !== 0) return displayOrderDiff;
         return a.playerName.localeCompare(b.playerName);
       })
       .map((player, index) => [player.playerId, index + 1])

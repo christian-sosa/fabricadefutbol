@@ -200,6 +200,7 @@ export async function getAdminPlayers(organizationId: string) {
     .from("players")
     .select("*")
     .eq("organization_id", organizationId)
+    .order("display_order", { ascending: true })
     .order("initial_rank", { ascending: true });
   if (error) throw new Error(error.message);
   return data ?? [];
@@ -209,9 +210,10 @@ export async function getSelectablePlayers(organizationId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("players")
-    .select("id, full_name, current_rating, initial_rank")
+    .select("id, full_name, current_rating, initial_rank, skill_level, display_order")
     .eq("organization_id", organizationId)
     .eq("active", true)
+    .order("display_order", { ascending: true })
     .order("initial_rank", { ascending: true });
   if (error) throw new Error(error.message);
   return data ?? [];

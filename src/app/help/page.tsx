@@ -57,12 +57,12 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "2. Carga tu plantel base",
         description:
-          "En la seccion Jugadores agrega a cada integrante del equipo. El nombre es obligatorio y el orden inicial te sirve para ordenar tu plantel desde el primer dia."
+          "En la seccion Jugadores agrega a cada integrante del equipo. El nombre es obligatorio y el nivel de habilidad te sirve como referencia manual desde el primer dia."
       },
       {
         title: "3. Crea tu primer partido",
         description:
-          "En Nuevo Partido eliges modalidad, fecha y convocatoria. Puedes trabajar solo con jugadores registrados o sumar invitados puntuales con un rating manual."
+          "En Nuevo Partido eliges modalidad, fecha y convocatoria. Puedes trabajar solo con jugadores registrados o sumar invitados puntuales con un nivel equivalente."
       },
       {
         title: "4. Confirma equipos y carga el resultado",
@@ -80,7 +80,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "Equipos balanceados",
         description:
-          "Las opciones automaticas buscan reducir la diferencia entre ambos lados usando como referencia el orden inicial del plantel y el puntaje manual de los invitados."
+          "Las opciones automaticas buscan reducir la diferencia entre ambos lados usando como referencia el nivel manual, el rating competitivo y el nivel equivalente de los invitados."
       },
       {
         title: "Flexibilidad para la cancha real",
@@ -91,9 +91,9 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
     detailLabel: "Ranking de jugadores",
     detail: [
       {
-        title: "Orden inicial del plantel",
+        title: "Nivel de habilidad",
         description:
-          "Es una referencia manual definida por el administrador para ordenar a los jugadores dentro del grupo y hoy tambien sirve como base para balancear equipos."
+          "Es una referencia manual definida por el administrador para estimar la fuerza base de cada jugador. No cambia automaticamente por ganar o perder partidos."
       },
       {
         title: "Punto de partida del rating",
@@ -115,7 +115,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "Como interpretar el ranking",
         description:
-          "Hay dos referencias distintas dentro de la plataforma: el orden inicial del plantel, que es manual, y el ranking competitivo, que se calcula con el rating actual de cada jugador."
+          "Hay dos referencias distintas dentro de la plataforma: el nivel de habilidad, que es manual, y el ranking competitivo, que se calcula con el rating actual de cada jugador."
       },
       {
         title: "Consejo practico",

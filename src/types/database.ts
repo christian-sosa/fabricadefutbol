@@ -59,30 +59,36 @@ export type Database = {
           active: boolean;
           created_at: string;
           current_rating: number;
+          display_order: number;
           full_name: string;
           id: string;
           initial_rank: number;
           notes: string | null;
+          skill_level: number;
           updated_at: string;
         };
         Insert: {
           active?: boolean;
           created_at?: string;
           current_rating?: number;
+          display_order?: number;
           full_name: string;
           id?: string;
           initial_rank: number;
           notes?: string | null;
+          skill_level?: number;
           updated_at?: string;
         };
         Update: {
           active?: boolean;
           created_at?: string;
           current_rating?: number;
+          display_order?: number;
           full_name?: string;
           id?: string;
           initial_rank?: number;
           notes?: string | null;
+          skill_level?: number;
           updated_at?: string;
         };
         Relationships: [];
