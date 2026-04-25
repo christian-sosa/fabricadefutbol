@@ -2,6 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
+  createTournamentAction,
+  deleteTournamentAction
+} from "@/app/admin/(panel)/tournaments/actions";
+import {
   addTournamentPlayerAction,
   addTournamentTeamAction,
   createManualTournamentMatchAction,
@@ -36,7 +40,8 @@ import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { requireAdminTournament } from "@/lib/auth/tournaments";
+import { getAdminTournaments, requireAdminTournament } from "@/lib/auth/tournaments";
+import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import { findBestDefenseRows, findTopFigureRows, findTopScorerRows, getAdminTournamentDetails, groupFixtureByRound } from "@/lib/queries/tournaments";
 import { formatDateTime } from "@/lib/utils";
 
@@ -74,7 +79,7 @@ export default async function AdminTournamentDetailPage({
 }) {
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   const { admin } = await requireAdminTournament(id);
-  const details = await getAdminTournamentDetails(id);
+  const [details, allTournaments] = await Promise.all([getAdminTournamentDetails(id), getAdminTournaments(admin)]);
 
   if (!details) notFound();
 
@@ -89,6 +94,14 @@ export default async function AdminTournamentDetailPage({
   const tournamentAdminInvitesEnabled = details.schemaSupport.tournamentAdminInvites;
   const captainManagementEnabled =
     details.schemaSupport.tournamentTeamCaptains && details.schemaSupport.tournamentCaptainInvites;
+  const currentTournament = allTournaments.find((item) => item.id === id) ?? null;
+  const familyRootId = currentTournament?.parent_tournament_id ?? currentTournament?.id ?? null;
+  const rootTournament = familyRootId ? allTournaments.find((item) => item.id === familyRootId) ?? null : null;
+  const subtournaments = familyRootId
+    ? allTournaments
+        .filter((item) => item.parent_tournament_id === familyRootId)
+        .sort((left, right) => left.name.localeCompare(right.name, "es"))
+    : [];
 
   return (
     <div className="space-y-4">
@@ -105,6 +118,14 @@ export default async function AdminTournamentDetailPage({
             <p className="mt-2 text-xs text-slate-400">
               {details.tournament.isPublic ? "Visible publicamente" : "Solo visible en admin"} - /{details.tournament.slug}
             </p>
+            {currentTournament?.parent_tournament_id && rootTournament ? (
+              <p className="mt-2 text-xs text-slate-400">
+                Torneo base:{" "}
+                <Link className="font-semibold text-emerald-300 hover:underline" href={`/admin/tournaments/${rootTournament.id}`}>
+                  {rootTournament.name}
+                </Link>
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -114,6 +135,18 @@ export default async function AdminTournamentDetailPage({
             <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={`/tournaments/${details.tournament.slug}`}>
               Ver publico
             </Link>
+            <form action={deleteTournamentAction}>
+              <input name="tournamentId" type="hidden" value={id} />
+              {rootTournament?.id && rootTournament.id !== id ? (
+                <input name="returnToTournamentId" type="hidden" value={rootTournament.id} />
+              ) : null}
+              <ConfirmSubmitButton
+                className="h-8 px-3 text-xs"
+                confirmMessage={`Estas seguro de borrar ${details.tournament.name}?`}
+                label="Borrar"
+                variant="ghost"
+              />
+            </form>
           </div>
         </div>
         {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
@@ -143,6 +176,9 @@ export default async function AdminTournamentDetailPage({
 
           <Card>
             <CardTitle>Configuracion general</CardTitle>
+            <CardDescription className="mt-2">
+              El torneo sale de borrador y pasa a activo automaticamente cuando generas el fixture o creas el primer partido manual.
+            </CardDescription>
             <form action={updateTournamentAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="name">
@@ -177,6 +213,84 @@ export default async function AdminTournamentDetailPage({
                 <Button type="submit">Guardar resumen</Button>
               </div>
             </form>
+          </Card>
+
+          <Card>
+            <CardTitle>{currentTournament?.parent_tournament_id ? "Competencia madre y subtorneos" : "Subtorneos"}</CardTitle>
+            <CardDescription className="mt-2">
+              Un torneo base puede tener varios subtorneos. Todos se administran por separado, pero quedan agrupados bajo la misma competencia.
+            </CardDescription>
+
+            {currentTournament?.parent_tournament_id && rootTournament ? (
+              <p className="mt-3 text-sm text-slate-300">
+                Torneo base:{" "}
+                <Link className="font-semibold text-emerald-300 hover:underline" href={`/admin/tournaments/${rootTournament.id}`}>
+                  {rootTournament.name}
+                </Link>
+              </p>
+            ) : null}
+
+            <form action={createTournamentAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+              <input name="parentTournamentId" type="hidden" value={familyRootId ?? id} />
+              <input name="returnToTournamentId" type="hidden" value={id} />
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="subtournament-name">
+                  Nombre del subtorneo
+                </label>
+                <Input id="subtournament-name" name="name" placeholder="Ej: Viernes A2" required />
+              </div>
+              <div className="md:self-end">
+                <Button type="submit" variant="secondary">
+                  Crear subtorneo
+                </Button>
+              </div>
+            </form>
+
+            <div className="mt-4 space-y-2">
+              {subtournaments.length ? (
+                subtournaments.map((subtournament) => {
+                  const isCurrent = subtournament.id === id;
+                  return (
+                    <div
+                      className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-3 md:flex-row md:items-center md:justify-between"
+                      key={subtournament.id}
+                    >
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-slate-100">{subtournament.name}</p>
+                          {isCurrent ? (
+                            <span className="rounded-full border border-emerald-400/35 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-200">
+                              Actual
+                            </span>
+                          ) : null}
+                          <TournamentStatusBadge status={subtournament.status} />
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">/{subtournament.slug}</p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        {!isCurrent ? (
+                          <Link
+                            className="text-sm font-semibold text-emerald-300 hover:underline"
+                            href={`/admin/tournaments/${subtournament.id}`}
+                          >
+                            Gestionar
+                          </Link>
+                        ) : null}
+                        <Link
+                          className="text-sm font-semibold text-sky-300 hover:underline"
+                          href={`/tournaments/${subtournament.slug}`}
+                        >
+                          Ver publico
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-slate-400">Todavia no hay subtorneos creados dentro de esta competencia.</p>
+              )}
+            </div>
           </Card>
 
           <Card>
@@ -332,15 +446,23 @@ export default async function AdminTournamentDetailPage({
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="displayOrder">
-                  Orden
+                  Orden visual
                 </label>
                 <Input defaultValue={details.teams.length + 1} id="displayOrder" min={1} name="displayOrder" required type="number" />
+                <p className="mt-1 text-xs text-slate-500">
+                  Solo define como se ordena este equipo dentro del panel y de algunas listas del torneo.
+                </p>
               </div>
               <div className="md:col-span-2">
                 <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="teamNotes">
-                  Notas
+                  Descripcion (opcional)
                 </label>
-                <Textarea id="teamNotes" name="notes" rows={2} />
+                <Textarea
+                  id="teamNotes"
+                  name="notes"
+                  placeholder="Ej: categoria, zona, sponsor o una nota corta para identificar al equipo."
+                  rows={2}
+                />
               </div>
               <div className="md:col-span-2">
                 <Button type="submit">Agregar equipo</Button>
@@ -362,8 +484,9 @@ export default async function AdminTournamentDetailPage({
                   <div>
                     <CardTitle>{team.name}</CardTitle>
                     <CardDescription className="mt-1">
-                      {team.short_name ? `Corto: ${team.short_name}` : "Sin nombre corto"} - Orden {team.display_order}
+                      {team.short_name ? `Corto: ${team.short_name}` : "Sin nombre corto"} - Orden visual {team.display_order}
                     </CardDescription>
+                    {team.notes ? <p className="mt-2 text-sm text-slate-400">{team.notes}</p> : null}
                     <p className="mt-1 text-xs text-slate-500">
                       {details.playersByTeam.get(team.id)?.length ?? 0} jugador(es) en plantilla
                     </p>
@@ -472,10 +595,31 @@ export default async function AdminTournamentDetailPage({
 
                 <form action={updateTournamentTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
                   <input name="teamId" type="hidden" value={team.id} />
-                  <Input defaultValue={team.name} name="name" required />
-                  <Input defaultValue={team.short_name ?? ""} name="shortName" placeholder="Nombre corto" />
-                  <Input defaultValue={team.display_order} min={1} name="displayOrder" required type="number" />
-                  <Textarea className="md:col-span-2" defaultValue={team.notes ?? ""} name="notes" rows={2} />
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
+                    <Input defaultValue={team.name} name="name" required />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre corto</label>
+                    <Input defaultValue={team.short_name ?? ""} name="shortName" placeholder="Ej: LPF" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-slate-200">Orden visual</label>
+                    <Input defaultValue={team.display_order} min={1} name="displayOrder" required type="number" />
+                    <p className="mt-1 text-xs text-slate-500">
+                      Solo cambia la posicion del equipo dentro del panel y de algunas listas del torneo.
+                    </p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-sm font-semibold text-slate-200">Descripcion (opcional)</label>
+                    <Textarea
+                      className="md:col-span-2"
+                      defaultValue={team.notes ?? ""}
+                      name="notes"
+                      placeholder="Ej: categoria, zona, sponsor o una nota corta para identificar al equipo."
+                      rows={2}
+                    />
+                  </div>
                   <div className="md:col-span-2">
                     <Button type="submit" variant="secondary">
                       Guardar equipo
@@ -524,6 +668,9 @@ export default async function AdminTournamentDetailPage({
 
           <Card>
             <CardTitle>Agregar jugador al torneo</CardTitle>
+            <CardDescription className="mt-2">
+              Cada equipo admite hasta {MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores.
+            </CardDescription>
             <form action={addTournamentPlayerAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="playerTeamId">
@@ -569,6 +716,9 @@ export default async function AdminTournamentDetailPage({
               return (
                 <Card key={team.id}>
                   <CardTitle>{team.name}</CardTitle>
+                  <CardDescription className="mt-2">
+                    {players.length}/{MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores cargados en este equipo.
+                  </CardDescription>
                   <div className="mt-4 overflow-x-auto">
                     <Table>
                       <THead>

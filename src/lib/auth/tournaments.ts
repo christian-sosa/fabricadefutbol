@@ -9,6 +9,7 @@ export type AdminTournament = {
   name: string;
   slug: string;
   season_label: string;
+  parent_tournament_id: string | null;
   status: TournamentStatus;
   is_public: boolean;
   created_at: string;
@@ -20,7 +21,7 @@ export async function getAdminTournaments(admin: AdminSession): Promise<AdminTou
   if (admin.isSuperAdmin) {
     const { data, error } = await supabase
       .from("tournaments")
-      .select("id, name, slug, season_label, status, is_public, created_at")
+      .select("id, name, slug, season_label, parent_tournament_id, status, is_public, created_at")
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
@@ -47,7 +48,7 @@ export async function getAdminTournaments(admin: AdminSession): Promise<AdminTou
 
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id, name, slug, season_label, status, is_public, created_at")
+    .select("id, name, slug, season_label, parent_tournament_id, status, is_public, created_at")
     .in("id", tournamentIds)
     .order("created_at", { ascending: false });
 

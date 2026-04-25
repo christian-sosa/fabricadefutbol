@@ -29,6 +29,7 @@ type TournamentRecord = {
   name: string;
   slug: string;
   season_label: string;
+  parent_tournament_id: string | null;
   description: string | null;
   is_public: boolean;
   status: TournamentListItem["status"];
@@ -120,6 +121,7 @@ function normalizeTournamentRecord(record: TournamentRecord): TournamentListItem
     description: record.description,
     isPublic: record.is_public,
     status: record.status,
+    parentTournamentId: record.parent_tournament_id,
     createdAt: record.created_at
   };
 }
@@ -128,7 +130,7 @@ async function loadTournamentBundle(tournamentId: string) {
   const supabase = await createSupabaseServerClient();
   const { data: tournament, error: tournamentError } = await supabase
     .from("tournaments")
-    .select("id, name, slug, season_label, description, is_public, status, created_at")
+    .select("id, name, slug, season_label, parent_tournament_id, description, is_public, status, created_at")
     .eq("id", tournamentId)
     .maybeSingle();
 
@@ -202,7 +204,7 @@ export async function getPublicTournaments(): Promise<TournamentListItem[]> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id, name, slug, season_label, description, is_public, status, created_at")
+    .select("id, name, slug, season_label, parent_tournament_id, description, is_public, status, created_at")
     .eq("is_public", true)
     .order("created_at", { ascending: false });
 
@@ -215,7 +217,7 @@ export async function getPublicTournamentBySlug(slug: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id, name, slug, season_label, description, is_public, status, created_at")
+    .select("id, name, slug, season_label, parent_tournament_id, description, is_public, status, created_at")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -298,6 +300,7 @@ export async function getAdminTournamentList() {
     description: null,
     isPublic: tournament.is_public,
     status: tournament.status,
+    parentTournamentId: tournament.parent_tournament_id,
     createdAt: tournament.created_at
   }));
 }

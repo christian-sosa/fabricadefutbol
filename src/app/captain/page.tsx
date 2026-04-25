@@ -16,8 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
-import { Select } from "@/components/ui/select";
 import { getCaptainContext } from "@/lib/auth/captains";
+import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import { getCaptainTournamentTeamPanelData } from "@/lib/queries/tournaments";
 import { formatDateTime } from "@/lib/utils";
 
@@ -39,8 +39,8 @@ function formatTeamMatchLabel(params: {
   const prefix = params.isHome ? "vs" : "@";
   const schedule = params.scheduledAt ? formatDateTime(params.scheduledAt) : "Sin horario";
   const score =
-    params.homeScore !== null && params.awayScore !== null ? ` · ${params.homeScore}-${params.awayScore}` : "";
-  return `${prefix} ${params.opponentName} · ${schedule}${score}`;
+    params.homeScore !== null && params.awayScore !== null ? ` - ${params.homeScore}-${params.awayScore}` : "";
+  return `${prefix} ${params.opponentName} - ${schedule}${score}`;
 }
 
 export default async function CaptainPage({
@@ -64,9 +64,9 @@ export default async function CaptainPage({
     return (
       <div className="space-y-4 py-6">
         <Card>
-          <CardTitle>Mi equipo</CardTitle>
+          <CardTitle>Tus equipos de torneo</CardTitle>
           <CardDescription className="mt-2">
-            Todavia no tienes un equipo asignado como capitan. Cuando un admin te invite a un torneo, lo veras aqui.
+            Todavia no tienes equipos asignados como capitan. Cuando un admin te invite a un torneo, los veras aqui.
           </CardDescription>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link className="text-sm font-semibold text-emerald-300 hover:underline" href="/admin">
@@ -82,9 +82,7 @@ export default async function CaptainPage({
   }
 
   const selectedAssignment = context.selectedAssignment ?? context.assignments[0] ?? null;
-  if (!selectedAssignment) {
-    return null;
-  }
+  if (!selectedAssignment) return null;
 
   const panelData = await getCaptainTournamentTeamPanelData({
     tournamentId: selectedAssignment.tournamentId,
@@ -114,11 +112,12 @@ export default async function CaptainPage({
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-400">Panel capitan</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <CardTitle>{panelData.team.name}</CardTitle>
+              <CardTitle>{panelData.tournament.name}</CardTitle>
               <TournamentStatusBadge status={panelData.tournament.status} />
             </div>
+            <p className="mt-2 text-sm font-semibold text-slate-200">Equipo asignado: {panelData.team.name}</p>
             <CardDescription className="mt-2">
-              Gestiona los datos de tu plantel y mantén al día las fotos del equipo dentro de {panelData.tournament.name}.
+              Gestiona los jugadores y las fotos de {panelData.team.name} dentro de {panelData.tournament.name}.
             </CardDescription>
           </div>
 
@@ -145,7 +144,7 @@ export default async function CaptainPage({
 
       <Card>
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Equipos que administras
+          Equipos donde eres capitan
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {context.assignments.map((assignment) => {
@@ -161,7 +160,7 @@ export default async function CaptainPage({
                 href={buildCaptainTabHref(assignment.tournamentId, assignment.teamId)}
                 key={`${assignment.tournamentId}:${assignment.teamId}`}
               >
-                {assignment.tournamentName} · {assignment.teamName}
+                {assignment.teamName} - {assignment.tournamentName}
               </Link>
             );
           })}
@@ -170,12 +169,14 @@ export default async function CaptainPage({
 
       <section className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardDescription>Plantel cargado</CardDescription>
+          <CardDescription>Jugadores cargados</CardDescription>
           <CardTitle className="mt-1 text-3xl">{panelData.roster.length}</CardTitle>
         </Card>
         <Card>
           <CardDescription>Posicion actual</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{panelData.standingRow ? panelData.standings.indexOf(panelData.standingRow) + 1 : "-"}</CardTitle>
+          <CardTitle className="mt-1 text-3xl">
+            {panelData.standingRow ? panelData.standings.indexOf(panelData.standingRow) + 1 : "-"}
+          </CardTitle>
         </Card>
         <Card>
           <CardDescription>Puntos</CardDescription>
@@ -187,73 +188,45 @@ export default async function CaptainPage({
         </Card>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card>
-          <CardTitle>Agregar jugador</CardTitle>
-          <CardDescription className="mt-2">
-            Carga a tus compañeros del plantel. Luego podrás completar su número, posición y foto.
-          </CardDescription>
-          <form action={addCaptainTournamentPlayerAction} className="mt-4 grid gap-3 md:grid-cols-2">
-            <input name="tournamentId" type="hidden" value={panelData.tournament.id} />
-            <input name="teamId" type="hidden" value={panelData.team.id} />
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="captain-full-name">
-                Nombre completo
-              </label>
-              <Input id="captain-full-name" name="fullName" required />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="captain-shirt-number">
-                Numero
-              </label>
-              <Input id="captain-shirt-number" max={99} min={1} name="shirtNumber" type="number" />
-            </div>
-            <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="captain-position">
-                Posicion
-              </label>
-              <Input id="captain-position" name="position" placeholder="Arquero / Defensor / ..." />
-            </div>
-            <div className="md:col-span-2">
-              <Button type="submit">Agregar al plantel</Button>
-            </div>
-          </form>
-        </Card>
-
-        <Card>
-          <CardTitle>Subir foto</CardTitle>
-          <CardDescription className="mt-2">
-            La foto se optimiza automáticamente y se refleja en el torneo.
-          </CardDescription>
-          <form action={uploadCaptainTournamentPlayerPhotoAction} className="mt-4 grid gap-3">
-            <input name="tournamentId" type="hidden" value={panelData.tournament.id} />
-            <input name="teamId" type="hidden" value={panelData.team.id} />
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="captain-player-photo">
-                Jugador
-              </label>
-              <Select defaultValue={panelData.roster[0]?.id ?? ""} id="captain-player-photo" name="playerId" required>
-                <option value="">Selecciona jugador</option>
-                {panelData.roster.map((player) => (
-                  <option key={player.id} value={player.id}>
-                    {player.full_name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <PhotoUploadInput />
-            <Button disabled={!panelData.roster.length} type="submit" variant="secondary">
-              Guardar foto
-            </Button>
-          </form>
-        </Card>
-      </div>
+      <Card>
+        <CardTitle>Agregar jugador</CardTitle>
+        <CardDescription className="mt-2">
+          Carga a tus companeros del equipo. La foto se puede subir directamente dentro de cada jugador. Limite:
+          {" "}{MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores por equipo.
+        </CardDescription>
+        <form action={addCaptainTournamentPlayerAction} className="mt-4 grid gap-3 md:grid-cols-2">
+          <input name="tournamentId" type="hidden" value={panelData.tournament.id} />
+          <input name="teamId" type="hidden" value={panelData.team.id} />
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="captain-full-name">
+              Nombre completo
+            </label>
+            <Input id="captain-full-name" name="fullName" required />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="captain-shirt-number">
+              Numero
+            </label>
+            <Input id="captain-shirt-number" max={99} min={1} name="shirtNumber" type="number" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="captain-position">
+              Posicion
+            </label>
+            <Input id="captain-position" name="position" placeholder="Arquero / Defensor / ..." />
+          </div>
+          <div className="md:col-span-2">
+            <Button type="submit">Agregar jugador</Button>
+          </div>
+        </form>
+      </Card>
 
       <section className="space-y-4">
         <Card>
-          <CardTitle>Plantel del equipo</CardTitle>
+          <CardTitle>Jugadores del equipo</CardTitle>
           <CardDescription className="mt-2">
             Solo puedes editar jugadores de {panelData.team.name}. Los cambios impactan en el torneo, no en grupos.
+            Actualmente llevas {panelData.roster.length}/{MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores.
           </CardDescription>
         </Card>
 
@@ -266,7 +239,7 @@ export default async function CaptainPage({
                   <div>
                     <CardTitle>{player.full_name}</CardTitle>
                     <CardDescription className="mt-1">
-                      {player.shirt_number ? `#${player.shirt_number}` : "Sin numero"} · {player.position ?? "Sin posicion"}
+                      {player.shirt_number ? `#${player.shirt_number}` : "Sin numero"} - {player.position ?? "Sin posicion"}
                     </CardDescription>
                   </div>
                 </div>
@@ -304,7 +277,7 @@ export default async function CaptainPage({
                     type="number"
                   />
                 </div>
-                <div>
+                <div className="md:col-span-2">
                   <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`player-position-${player.id}`}>
                     Posicion
                   </label>
@@ -315,20 +288,24 @@ export default async function CaptainPage({
                     placeholder="Arquero / Defensor / ..."
                   />
                 </div>
-                <div className="flex items-end">
-                  <label className="flex items-center gap-2 text-sm text-slate-200">
-                    <input
-                      className="h-4 w-4 accent-emerald-400"
-                      defaultChecked={player.active}
-                      name="active"
-                      type="checkbox"
-                    />
-                    Jugador activo
-                  </label>
-                </div>
                 <div className="md:col-span-2">
                   <Button type="submit" variant="secondary">
                     Guardar jugador
+                  </Button>
+                </div>
+              </form>
+
+              <form action={uploadCaptainTournamentPlayerPhotoAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+                <input name="tournamentId" type="hidden" value={panelData.tournament.id} />
+                <input name="teamId" type="hidden" value={panelData.team.id} />
+                <input name="playerId" type="hidden" value={player.id} />
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-200">Foto del jugador</label>
+                  <PhotoUploadInput compact hint="Sube una foto para este jugador. Se optimiza automaticamente a WEBP." />
+                </div>
+                <div className="md:self-end">
+                  <Button type="submit" variant="secondary">
+                    Guardar foto
                   </Button>
                 </div>
               </form>
@@ -356,9 +333,7 @@ export default async function CaptainPage({
                   <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3" key={match.id}>
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <p className="font-semibold text-slate-100">
-                          {match.roundName}
-                        </p>
+                        <p className="font-semibold text-slate-100">{match.roundName}</p>
                         <p className="text-sm text-slate-400">
                           {formatTeamMatchLabel({
                             isHome,
@@ -383,7 +358,7 @@ export default async function CaptainPage({
         <Card>
           <CardTitle>Partidos jugados</CardTitle>
           <CardDescription className="mt-2">
-            Referencia rápida de los resultados ya cargados en el torneo.
+            Referencia rapida de los resultados ya cargados en el torneo.
           </CardDescription>
           <div className="mt-4 space-y-3">
             {playedMatches.length ? (

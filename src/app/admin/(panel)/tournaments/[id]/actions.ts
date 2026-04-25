@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { assertTournamentMembershipAction, getTournamentSlugById } from "@/lib/auth/tournaments";
+import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import { generateTournamentFixture, validateTournamentMatchPair } from "@/lib/domain/tournament-workflow";
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
@@ -122,6 +123,51 @@ function parseNextSlug(baseSlug: string, existingSlugs: string[]) {
 function normalizeScheduledAt(value: string | undefined) {
   if (!value?.trim()) return null;
   return new Date(value).toISOString();
+}
+
+async function assertTournamentTeamPlayerCapacity(params: {
+  tournamentId: string;
+  teamId: string;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const { count, error } = await supabase
+    .from("tournament_players")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", params.tournamentId)
+    .eq("team_id", params.teamId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if ((count ?? 0) >= MAX_TOURNAMENT_PLAYERS_PER_TEAM) {
+    throw new Error(`Cada equipo admite hasta ${MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores.`);
+  }
+}
+
+async function activateTournamentIfStillDraft(tournamentId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: tournament, error: tournamentError } = await supabase
+    .from("tournaments")
+    .select("status")
+    .eq("id", tournamentId)
+    .maybeSingle();
+
+  if (tournamentError || !tournament) {
+    throw new Error(tournamentError?.message ?? "No se encontro el torneo.");
+  }
+
+  if (tournament.status !== "draft") return;
+
+  const { error: updateError } = await supabase
+    .from("tournaments")
+    .update({ status: "active" })
+    .eq("id", tournamentId)
+    .eq("status", "draft");
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
 }
 
 async function validateTournamentNameAvailability(params: {
@@ -1008,6 +1054,11 @@ export async function addTournamentPlayerAction(tournamentId: string, formData: 
       );
     }
 
+    await assertTournamentTeamPlayerCapacity({
+      tournamentId,
+      teamId: parsed.data.teamId
+    });
+
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.from("tournament_players").insert({
       tournament_id: tournamentId,
@@ -1201,6 +1252,7 @@ export async function generateTournamentFixtureAction(tournamentId: string) {
       adminId: admin.userId,
       tournamentId
     });
+    await activateTournamentIfStillDraft(tournamentId);
 
     await revalidateTournamentPaths(tournamentId);
     redirect(buildTournamentDetailPath({ tournamentId, tab: "fixture", success: "Fixture generado." }));
@@ -1271,6 +1323,7 @@ export async function createManualTournamentMatchAction(tournamentId: string, fo
       );
     }
 
+    await activateTournamentIfStillDraft(tournamentId);
     await revalidateTournamentPaths(tournamentId);
     redirect(buildTournamentDetailPath({ tournamentId, tab: "fixture", success: "Partido creado." }));
   } catch (error) {
