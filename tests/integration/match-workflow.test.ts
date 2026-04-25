@@ -6,6 +6,7 @@ import {
   saveConfirmedMatchLineup,
   saveMatchResult
 } from "@/lib/domain/match-workflow";
+import { calculateEffectiveSkillScore } from "@/lib/domain/skill-level";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 const ORG_ID = "org-1";
@@ -18,6 +19,8 @@ function buildPlayers(count: number, organizationId = ORG_ID) {
     organization_id: organizationId,
     full_name: `Jugador ${index + 1}`,
     initial_rank: index + 1,
+    skill_level: Math.min(5, Math.floor(index / 2) + 1),
+    display_order: index + 1,
     current_rating: 1000,
     active: true
   }));
@@ -145,6 +148,66 @@ describe("match workflow", () => {
       const secondGoalkeeper = optionPlayers.find((row) => row.player_id === "player-2");
       expect(firstGoalkeeper?.team).not.toBe(secondGoalkeeper?.team);
     }
+  });
+
+  it("balancea con skill_level repetible y current_rating sin cambiar ratings al crear draft", async () => {
+    const players = buildPlayers(8).map((player, index) => ({
+      ...player,
+      skill_level: [1, 1, 2, 2, 3, 3, 5, 5][index],
+      current_rating: [1080, 1000, 1060, 990, 1000, 1000, 930, 980][index]
+    }));
+    const guests = [
+      { key: "guest-1", name: "Invitado Nivel 1", rating: 1 },
+      { key: "guest-2", name: "Invitado Nivel 4", rating: 4 }
+    ];
+    const fake = createFakeSupabase({
+      organizations: [{ id: ORG_ID, name: "Liga A", slug: "liga-a" }],
+      players
+    });
+
+    const expectedTotalScore =
+      players.reduce(
+        (sum, player) =>
+          sum +
+          calculateEffectiveSkillScore({
+            skillLevel: player.skill_level,
+            currentRating: player.current_rating
+          }),
+        0
+      ) +
+      guests.reduce(
+        (sum, guest) =>
+          sum +
+          calculateEffectiveSkillScore({
+            skillLevel: guest.rating,
+            currentRating: 1000
+          }),
+        0
+      );
+
+    const matchId = await createDraftMatchWithOptions({
+      supabase: fake.client as never,
+      adminId: ADMIN_ID,
+      organizationId: ORG_ID,
+      scheduledAt: SCHEDULED_AT,
+      modality: "5v5",
+      selectedPlayerIds: players.map((player) => String(player.id)),
+      invitedGuests: guests
+    });
+
+    const options = fake.table("team_options").filter((row) => row.match_id === matchId);
+    expect(options).toHaveLength(3);
+    for (const option of options) {
+      expect(Number(option.rating_sum_a) + Number(option.rating_sum_b)).toBe(expectedTotalScore);
+    }
+    expect(fake.table("match_guests")).toEqual([
+      expect.objectContaining({ guest_name: "Invitado Nivel 1", guest_rating: 1 }),
+      expect.objectContaining({ guest_name: "Invitado Nivel 4", guest_rating: 4 })
+    ]);
+    expect(fake.find("players", (row) => row.id === "player-1")).toEqual(
+      expect.objectContaining({ current_rating: 1080 })
+    );
+    expect(fake.table("rating_history")).toHaveLength(0);
   });
 
   it("crea y confirma un partido manual valido", async () => {

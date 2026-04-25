@@ -13,6 +13,7 @@ import {
   assertPlayerPhotoUploadAllowed,
   registerPlayerPhotoUploadEvent
 } from "@/lib/player-photo-upload-limits";
+import { normalizeSkillLevel } from "@/lib/domain/skill-level";
 import {
   getOrganizationPlayerPhotoObjectPath,
   inferPlayerPhotoExtension,
@@ -26,7 +27,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 const createSchema = z.object({
   organizationId: z.string().uuid(),
   fullName: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
-  initialRank: z.coerce.number().int().positive().max(999)
+  skillLevel: z.coerce.number().int().min(1, "El nivel debe estar entre 1 y 5.").max(5, "El nivel debe estar entre 1 y 5.")
 });
 
 const deleteSchema = z.object({
@@ -42,7 +43,7 @@ const photoSchema = z.object({
 const rowSchema = z.object({
   id: z.string().uuid(),
   fullName: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
-  initialRank: z.number().int().positive("El rank inicial debe ser un numero entero positivo."),
+  skillLevel: z.number().int().min(1, "El nivel debe estar entre 1 y 5.").max(5, "El nivel debe estar entre 1 y 5."),
   currentRating: z.number().positive("El rating debe ser un numero positivo.")
 });
 
@@ -68,99 +69,12 @@ function withSuccess(organizationId: string, success: string | null) {
   return `${basePath}${separator}success=${encodeURIComponent(success)}&refresh=${Date.now()}`;
 }
 
-function buildRankAssignments(params: {
-  rows: Array<z.infer<typeof rowSchema>>;
-  originalRankById: Map<string, number>;
-}) {
-  const { rows, originalRankById } = params;
-  const rowById = new Map(rows.map((row) => [row.id, row]));
-
-  const orderedIds = [...rows]
-    .sort((a, b) => {
-      const aRank = originalRankById.get(a.id) ?? Number.MAX_SAFE_INTEGER;
-      const bRank = originalRankById.get(b.id) ?? Number.MAX_SAFE_INTEGER;
-      return aRank - bRank;
-    })
-    .map((row) => row.id);
-
-  const rankMoves = rows
-    .map((row) => ({
-      id: row.id,
-      originalRank: originalRankById.get(row.id),
-      targetRank: row.initialRank
-    }))
-    .filter((move) => typeof move.originalRank === "number" && move.originalRank !== move.targetRank)
-    .sort((a, b) => (a.originalRank ?? 0) - (b.originalRank ?? 0));
-
-  for (const move of rankMoves) {
-    const currentIndex = orderedIds.indexOf(move.id);
-    if (currentIndex < 0) continue;
-
-    const targetIndex = Math.min(Math.max(move.targetRank, 1), orderedIds.length) - 1;
-    if (targetIndex === currentIndex) continue;
-
-    orderedIds.splice(currentIndex, 1);
-    orderedIds.splice(targetIndex, 0, move.id);
-  }
-
-  return orderedIds.map((id, index) => {
-    const row = rowById.get(id);
-    if (!row) {
-      throw new Error("No se pudo reordenar el ranking por datos incompletos.");
-    }
-
-    return {
-      row,
-      finalRank: index + 1
-    };
-  });
-}
-
-async function persistRankAssignments(params: {
-  organizationId: string;
-  organizationQueryKey: string;
-  assignments: ReturnType<typeof buildRankAssignments>;
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
-}) {
-  const { assignments, organizationId, organizationQueryKey, supabase } = params;
-
-  for (let index = 0; index < assignments.length; index += 1) {
-    const row = assignments[index].row;
-    const { error: tempError } = await supabase
-      .from("players")
-      .update({ initial_rank: 10000 + index })
-      .eq("id", row.id)
-      .eq("organization_id", organizationId);
-
-    if (tempError) {
-      redirect(withMessage(organizationQueryKey, tempError.message));
-    }
-  }
-
-  for (const assignment of assignments) {
-    const row = assignment.row;
-    const { error: saveError } = await supabase
-      .from("players")
-      .update({
-        full_name: row.fullName,
-        initial_rank: assignment.finalRank,
-        current_rating: Number(row.currentRating.toFixed(2))
-      })
-      .eq("id", row.id)
-      .eq("organization_id", organizationId);
-
-    if (saveError) {
-      redirect(withMessage(organizationQueryKey, saveError.message));
-    }
-  }
-}
-
 export async function createPlayerAction(formData: FormData) {
   try {
     const parsed = createSchema.safeParse({
       organizationId: formData.get("organizationId"),
       fullName: formData.get("fullName"),
-      initialRank: formData.get("initialRank")
+      skillLevel: formData.get("skillLevel")
     });
 
     if (!parsed.success) {
@@ -178,7 +92,7 @@ export async function createPlayerAction(formData: FormData) {
 
     const { data: players, error: playersError } = await supabase
       .from("players")
-      .select("id, initial_rank")
+      .select("id, initial_rank, display_order")
       .eq("organization_id", parsed.data.organizationId)
       .order("initial_rank", { ascending: false });
 
@@ -186,26 +100,21 @@ export async function createPlayerAction(formData: FormData) {
       redirect(withMessage(organizationQueryKey, playersError.message));
     }
 
-    const totalPlayers = players?.length ?? 0;
-    const rankToUse = Math.min(Math.max(parsed.data.initialRank, 1), totalPlayers + 1);
-
-    const affectedPlayers = (players ?? []).filter((player) => player.initial_rank >= rankToUse);
-    for (const player of affectedPlayers) {
-      const { error: shiftError } = await supabase
-        .from("players")
-        .update({ initial_rank: player.initial_rank + 1 })
-        .eq("id", player.id)
-        .eq("organization_id", parsed.data.organizationId);
-
-      if (shiftError) {
-        redirect(withMessage(organizationQueryKey, shiftError.message));
-      }
-    }
+    const existingPlayers = players ?? [];
+    const nextInitialRank =
+      Math.max(0, ...existingPlayers.map((player) => Number(player.initial_rank) || 0)) + 1;
+    const nextDisplayOrder =
+      Math.max(
+        0,
+        ...existingPlayers.map((player) => Number(player.display_order ?? player.initial_rank) || 0)
+      ) + 1;
 
     const { error } = await supabase.from("players").insert({
       organization_id: parsed.data.organizationId,
       full_name: parsed.data.fullName,
-      initial_rank: rankToUse
+      initial_rank: nextInitialRank,
+      skill_level: normalizeSkillLevel(parsed.data.skillLevel),
+      display_order: nextDisplayOrder
     });
     if (error) {
       redirect(withMessage(organizationQueryKey, toUserMessage(error, "No se pudo crear al jugador.")));
@@ -236,13 +145,13 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
 
     const playerIds = formData.getAll("playerId").map((value) => String(value));
     const fullNames = formData.getAll("fullName").map((value) => String(value));
-    const initialRanks = formData.getAll("initialRank").map((value) => Number(value));
+    const skillLevels = formData.getAll("skillLevel").map((value) => Number(value));
     const currentRatings = formData.getAll("currentRating").map((value) => parseDecimalField(value));
 
     if (
       !playerIds.length ||
       playerIds.length !== fullNames.length ||
-      playerIds.length !== initialRanks.length ||
+      playerIds.length !== skillLevels.length ||
       playerIds.length !== currentRatings.length
     ) {
       redirect(withMessage(organizationQueryKey, "La planilla enviada es invalida o incompleta."));
@@ -252,7 +161,7 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
       const parsedRow = rowSchema.safeParse({
         id,
         fullName: fullNames[index],
-        initialRank: initialRanks[index],
+        skillLevel: skillLevels[index],
         currentRating: currentRatings[index]
       });
 
@@ -276,15 +185,15 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
     const supabase = await createSupabaseServerClient();
     const { data: currentPlayers, error: currentPlayersError } = await supabase
       .from("players")
-      .select("id, initial_rank")
+      .select("id")
       .eq("organization_id", organizationId);
 
     if (currentPlayersError) {
       redirect(withMessage(organizationQueryKey, currentPlayersError.message));
     }
 
-    const originalRankById = new Map((currentPlayers ?? []).map((player) => [player.id, player.initial_rank]));
-    if (originalRankById.size !== rows.length) {
+    const currentPlayerIds = new Set((currentPlayers ?? []).map((player) => player.id));
+    if (currentPlayerIds.size !== rows.length || rows.some((row) => !currentPlayerIds.has(row.id))) {
       redirect(
         withMessage(
           organizationQueryKey,
@@ -293,40 +202,20 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
       );
     }
 
-    const assignments = buildRankAssignments({ rows, originalRankById });
-    const hasRankChanges = assignments.some(
-      ({ row, finalRank }) => (originalRankById.get(row.id) ?? finalRank) !== finalRank
-    );
+    for (const row of rows) {
+      const { error: saveError } = await supabase
+        .from("players")
+        .update({
+          full_name: row.fullName,
+          skill_level: normalizeSkillLevel(row.skillLevel),
+          current_rating: Number(row.currentRating.toFixed(2))
+        })
+        .eq("id", row.id)
+        .eq("organization_id", organizationId);
 
-    await persistRankAssignments({
-      assignments,
-      organizationId,
-      organizationQueryKey,
-      supabase
-    });
-
-    // Safeguard: if any rank was persisted incorrectly, force the canonical order.
-    const { data: persistedRows, error: persistedRowsError } = await supabase
-      .from("players")
-      .select("id, initial_rank")
-      .eq("organization_id", organizationId);
-
-    if (persistedRowsError) {
-      redirect(withMessage(organizationQueryKey, persistedRowsError.message));
-    }
-
-    const persistedRankById = new Map((persistedRows ?? []).map((row) => [row.id, row.initial_rank]));
-    const mismatchDetected = assignments.some(
-      (assignment) => persistedRankById.get(assignment.row.id) !== assignment.finalRank
-    );
-
-    if (mismatchDetected) {
-      await persistRankAssignments({
-        assignments,
-        organizationId,
-        organizationQueryKey,
-        supabase
-      });
+      if (saveError) {
+        redirect(withMessage(organizationQueryKey, saveError.message));
+      }
     }
 
     await refreshOrganizationPublicSnapshotSafe(organizationId);
@@ -334,14 +223,7 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
     revalidatePath("/players");
     revalidatePath("/ranking");
     revalidatePath("/");
-    redirect(
-      withSuccess(
-        organizationQueryKey,
-        hasRankChanges
-          ? "Se guardaron los cambios y el ranking se reordeno automaticamente."
-          : "Se guardaron todos los cambios de la planilla."
-      )
-    );
+    redirect(withSuccess(organizationQueryKey, "Se guardaron todos los cambios de la planilla."));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(withMessage(organizationId, toUserMessage(error, "No se pudo guardar la planilla.")));
@@ -370,7 +252,7 @@ export async function deletePlayerAction(formData: FormData) {
 
     const { data: playerToDelete, error: playerError } = await supabase
       .from("players")
-      .select("id, initial_rank, full_name")
+      .select("id, full_name")
       .eq("id", parsed.data.deletePlayerId)
       .eq("organization_id", parsed.data.organizationId)
       .maybeSingle();
@@ -397,35 +279,12 @@ export async function deletePlayerAction(formData: FormData) {
       );
     }
 
-    const { data: playersToShift, error: shiftCandidatesError } = await supabase
-      .from("players")
-      .select("id, initial_rank")
-      .eq("organization_id", parsed.data.organizationId)
-      .gt("initial_rank", playerToDelete.initial_rank)
-      .order("initial_rank", { ascending: true });
-
-    if (shiftCandidatesError) {
-      redirect(withMessage(organizationQueryKey, toUserMessage(shiftCandidatesError, "No se pudo recalcular el ranking.")));
-    }
-
-    for (const player of playersToShift ?? []) {
-      const { error: shiftError } = await supabase
-        .from("players")
-        .update({ initial_rank: player.initial_rank - 1 })
-        .eq("id", player.id)
-        .eq("organization_id", parsed.data.organizationId);
-
-      if (shiftError) {
-        redirect(withMessage(organizationQueryKey, toUserMessage(shiftError, "No se pudo reordenar el ranking.")));
-      }
-    }
-
     await refreshOrganizationPublicSnapshotSafe(parsed.data.organizationId);
     revalidatePath("/admin/players");
     revalidatePath("/players");
     revalidatePath("/ranking");
     revalidatePath("/");
-    redirect(withSuccess(organizationQueryKey, `Jugador ${playerToDelete.full_name} eliminado y ranking reordenado.`));
+    redirect(withSuccess(organizationQueryKey, `Jugador ${playerToDelete.full_name} eliminado.`));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(withMessage(String(formData.get("organizationId") ?? ""), toUserMessage(error, "No se pudo eliminar el jugador.")));

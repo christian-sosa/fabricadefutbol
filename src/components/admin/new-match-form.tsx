@@ -17,6 +17,8 @@ type SelectablePlayer = {
   full_name: string;
   current_rating: number;
   initial_rank: number;
+  skill_level: number;
+  display_order?: number;
 };
 
 type GuestRow = {
@@ -38,10 +40,12 @@ const EXPECTED_PLAYERS: Record<MatchModality, number> = Object.fromEntries(
   Object.entries(TEAM_SIZE_BY_MODALITY).map(([modality, teamSize]) => [modality, teamSize * 2])
 ) as Record<MatchModality, number>;
 
-function parsePositiveNumber(rawValue: string) {
+const SKILL_LEVEL_OPTIONS = [1, 2, 3, 4, 5] as const;
+
+function parseGuestSkillLevel(rawValue: string) {
   const parsed = Number(rawValue);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return Number(parsed.toFixed(2));
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 5) return null;
+  return Math.trunc(parsed);
 }
 
 export function NewMatchForm({
@@ -75,12 +79,12 @@ export function NewMatchForm({
       guestRows
         .map((guest) => {
           const name = guest.name.trim();
-          const numericRating = parsePositiveNumber(guest.rating.trim());
-          if (!name || numericRating === null) return null;
+          const skillLevel = parseGuestSkillLevel(guest.rating.trim());
+          if (!name || skillLevel === null) return null;
           return {
             key: String(guest.key),
             name,
-            rating: numericRating
+            rating: skillLevel
           };
         })
         .filter((guest): guest is NonNullable<typeof guest> => guest !== null),
@@ -298,7 +302,7 @@ export function NewMatchForm({
               <span className="flex items-center gap-3">
                 <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
                 <span>
-                  {player.full_name} <span className="text-xs text-slate-500">(rank {player.initial_rank})</span>
+                  {player.full_name} <span className="text-xs text-slate-500">(Nivel {player.skill_level})</span>
                 </span>
               </span>
               <span className="flex items-center gap-2">
@@ -352,8 +356,8 @@ export function NewMatchForm({
           <div>
             <p className="text-sm font-semibold text-slate-100">Invitados (temporales)</p>
             <p className="text-xs text-slate-400">
-              No se guardan como jugadores del club, pero si quedan en el historial del partido. El rank equivalente
-              se interpreta como initial rank (1 = mejor).
+              No se guardan como jugadores del club, pero si quedan en el historial del partido. El nivel equivalente
+              usa 1 como mas fuerte y 5 como mas bajo.
             </p>
           </div>
           <Button onClick={addGuest} type="button" variant="ghost">
@@ -372,15 +376,18 @@ export function NewMatchForm({
                   placeholder={`Nombre invitado #${index + 1}`}
                   value={guest.name}
                 />
-                <Input
-                  min={1}
+                <Select
                   name="guestRatings"
                   onChange={(event) => updateGuest(guest.key, "rating", event.target.value)}
-                  placeholder="Rank equivalente (1 mejor)"
-                  step="0.01"
-                  type="number"
                   value={guest.rating}
-                />
+                >
+                  <option value="">Nivel equivalente</option>
+                  {SKILL_LEVEL_OPTIONS.map((level) => (
+                    <option key={level} value={level}>
+                      Nivel {level}
+                    </option>
+                  ))}
+                </Select>
                 <Button onClick={() => removeGuest(guest.key)} type="button" variant="danger">
                   Quitar
                 </Button>
@@ -418,7 +425,9 @@ export function NewMatchForm({
                     <div className="text-sm text-slate-100">
                       <span>{participant.fullName}</span>
                       <span className="ml-2 text-xs text-slate-400">
-                        {participant.source === "guest" ? "Invitado" : "Jugador"} | rating {participant.rating.toFixed(2)}
+                        {participant.source === "guest"
+                          ? `Invitado | Nivel ${participant.rating}`
+                          : `Jugador | rating ${participant.rating.toFixed(2)}`}
                       </span>
                     </div>
                     <Select

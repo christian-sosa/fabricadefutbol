@@ -62,12 +62,12 @@ function parseGuestsFromForm(formData: FormData): GuestDraftInput[] {
 
     if (!hasName && !hasRating) continue;
     if (!hasName || !hasRating) {
-      throw new Error(`Completa nombre y rank equivalente para el invitado ${index + 1}.`);
+      throw new Error(`Completa nombre y nivel equivalente para el invitado ${index + 1}.`);
     }
 
     const numericRating = Number(ratingRaw);
-    if (!Number.isFinite(numericRating) || numericRating <= 0) {
-      throw new Error(`El rank equivalente del invitado ${index + 1} debe ser un numero positivo.`);
+    if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
+      throw new Error(`El nivel equivalente del invitado ${index + 1} debe estar entre 1 y 5.`);
     }
 
     const key = keyRaw.length ? keyRaw : `guest-${index + 1}`;
@@ -79,7 +79,7 @@ function parseGuestsFromForm(formData: FormData): GuestDraftInput[] {
     guests.push({
       key,
       name,
-      rating: Number(numericRating.toFixed(2))
+      rating: Math.trunc(numericRating)
     });
   }
 

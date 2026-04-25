@@ -15,6 +15,8 @@ export type OrganizationPublicSummary = {
     full_name: string;
     current_rating: number;
     initial_rank: number;
+    skill_level?: number;
+    display_order?: number;
   }>;
 };
 

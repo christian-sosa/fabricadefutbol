@@ -13,7 +13,9 @@ function buildPlayers(count: number) {
     id: `player-${index + 1}`,
     full_name: `Jugador ${index + 1}`,
     current_rating: 1000 - index * 10,
-    initial_rank: index + 1
+    initial_rank: index + 1,
+    skill_level: Math.min(5, Math.floor(index / 2) + 1),
+    display_order: index + 1
   }));
 }
 

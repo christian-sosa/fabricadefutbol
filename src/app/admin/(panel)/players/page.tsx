@@ -13,9 +13,12 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import { Select } from "@/components/ui/select";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { getAdminPlayers } from "@/lib/queries/admin";
 import { withOrgQuery } from "@/lib/org";
+
+const SKILL_LEVEL_OPTIONS = [1, 2, 3, 4, 5] as const;
 
 export default async function AdminPlayersPage({
   searchParams
@@ -52,18 +55,20 @@ export default async function AdminPlayersPage({
 
       <Card>
         <CardTitle>Alta de jugador</CardTitle>
-        <CardDescription>Carga jugadores nuevos para el grupo seleccionado.</CardDescription>
+        <CardDescription>
+          Carga jugadores nuevos para el grupo seleccionado. El nivel sirve como base manual; el rating aprende con los
+          partidos y ayuda a armar equipos mas parejos.
+        </CardDescription>
         <form action={createPlayerAction} className="mt-4 grid gap-3 md:grid-cols-4">
           <input name="organizationId" type="hidden" value={selectedOrganization.id} />
           <Input name="fullName" placeholder="Nombre completo" required />
-          <Input
-            max={Math.max(players.length + 1, 1)}
-            min={1}
-            name="initialRank"
-            placeholder="Ranking inicial"
-            required
-            type="number"
-          />
+          <Select aria-label="Nivel de habilidad" defaultValue="3" name="skillLevel" required>
+            {SKILL_LEVEL_OPTIONS.map((level) => (
+              <option key={level} value={level}>
+                Nivel {level}
+              </option>
+            ))}
+          </Select>
           <Input disabled value="1000 (automatico)" />
           <Button type="submit">Crear jugador</Button>
         </form>
@@ -85,7 +90,7 @@ export default async function AdminPlayersPage({
         <div className="mt-4 space-y-3">
           <div className="hidden grid-cols-[2.3fr_0.75fr_0.95fr_1.8fr_auto] gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 md:grid">
             <span>Jugador</span>
-            <span>Rank</span>
+            <span>Nivel</span>
             <span>Rating</span>
             <span>Foto</span>
             <span>Acciones</span>
@@ -106,7 +111,19 @@ export default async function AdminPlayersPage({
                   Creado {new Date(player.created_at).toLocaleDateString("es-AR")}
                 </p>
               </div>
-              <Input defaultValue={player.initial_rank} form={bulkFormId} min={1} name="initialRank" required type="number" />
+              <Select
+                aria-label={`Nivel de habilidad de ${player.full_name}`}
+                defaultValue={String(player.skill_level)}
+                form={bulkFormId}
+                name="skillLevel"
+                required
+              >
+                {SKILL_LEVEL_OPTIONS.map((level) => (
+                  <option key={level} value={level}>
+                    Nivel {level}
+                  </option>
+                ))}
+              </Select>
               <Input
                 defaultValue={String(Number(player.current_rating))}
                 form={bulkFormId}
@@ -129,7 +146,7 @@ export default async function AdminPlayersPage({
                 <input name="deletePlayerId" type="hidden" value={player.id} />
                 <ConfirmSubmitButton
                   className="h-8 px-3 text-xs"
-                  confirmMessage={`Estas seguro de eliminar a ${player.full_name}? El ranking se reordenara automaticamente.`}
+                  confirmMessage={`Estas seguro de eliminar a ${player.full_name}?`}
                   label="Eliminar"
                   variant="danger"
                 />

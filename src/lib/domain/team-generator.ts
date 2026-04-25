@@ -17,6 +17,10 @@ type ScoredCombination = TeamOptionCandidate & {
 const DEFAULT_OPTION_COUNT = 3;
 const MAX_OPTION_COUNT = 6;
 const TOP_TWO_SAME_TEAM_PENALTY = 35;
+const STRONG_PLAYER_SCORE_THRESHOLD = 400;
+const ELITE_PLAYER_SCORE_THRESHOLD = 500;
+const STRONG_COUNT_DIFF_PENALTY = 30;
+const ELITE_COUNT_DIFF_PENALTY = 20;
 // Por encima de este numero de combinaciones totales evitamos enumerar todo
 // y usamos muestreo aleatorio. Cubre hasta 9v9 (C(17,8)=24310) sin cambios;
 // 11v11 (C(21,10)=352716) pasa al camino de muestreo.
@@ -57,6 +61,21 @@ function sameTeam(topPlayerAId: string, topPlayerBId: string, teamA: PlayerRatin
   const topInTeamA = ids.has(topPlayerAId) && ids.has(topPlayerBId);
   const topInTeamB = !ids.has(topPlayerAId) && !ids.has(topPlayerBId);
   return topInTeamA || topInTeamB;
+}
+
+function countPlayersAtOrAbove(players: PlayerRatingInput[], threshold: number) {
+  return players.filter((player) => player.rating >= threshold).length;
+}
+
+function distributionPenalty(params: {
+  teamA: PlayerRatingInput[];
+  teamB: PlayerRatingInput[];
+  threshold: number;
+  penaltyPerPlayerDiff: number;
+}) {
+  const strongA = countPlayersAtOrAbove(params.teamA, params.threshold);
+  const strongB = countPlayersAtOrAbove(params.teamB, params.threshold);
+  return Math.abs(strongA - strongB) * params.penaltyPerPlayerDiff;
 }
 
 function areParticipantsSeparated(
@@ -162,7 +181,7 @@ export function generateBalancedTeamOptions(input: GenerateTeamOptionsInput): Te
    * Strategy:
    * 1) Build unique partitions A/B fixing one player to avoid mirrored duplicates.
    * 2) Score each partition by rating difference.
-   * 3) Penalize combinations where top two ratings end up together.
+   * 3) Penalize combinations that concentrate too much top-end strength.
    * 4) Add small seeded jitter to vary regeneration while preserving quality.
    */
   const { players, modality } = input;
@@ -213,8 +232,21 @@ export function generateBalancedTeamOptions(input: GenerateTeamOptionsInput): Te
 
     const topTwoPenalty =
       topA && topB && sameTeam(topA, topB, teamA) ? TOP_TWO_SAME_TEAM_PENALTY : 0;
+    const strongDistributionPenalty = distributionPenalty({
+      teamA,
+      teamB,
+      threshold: STRONG_PLAYER_SCORE_THRESHOLD,
+      penaltyPerPlayerDiff: STRONG_COUNT_DIFF_PENALTY
+    });
+    const eliteDistributionPenalty = distributionPenalty({
+      teamA,
+      teamB,
+      threshold: ELITE_PLAYER_SCORE_THRESHOLD,
+      penaltyPerPlayerDiff: ELITE_COUNT_DIFF_PENALTY
+    });
 
-    const score = ratingDiff + topTwoPenalty + random() * 1.25;
+    const score =
+      ratingDiff + topTwoPenalty + strongDistributionPenalty + eliteDistributionPenalty + random() * 1.25;
 
     return {
       teamA,
@@ -234,7 +266,6 @@ export function generateBalancedTeamOptions(input: GenerateTeamOptionsInput): Te
   scored.sort((a, b) => a.score - b.score);
 
   const qualityPool = scored.slice(0, Math.min(80, scored.length));
-  shuffleInPlace(qualityPool, random);
 
   const selected: TeamOptionCandidate[] = [];
   const usedKeys = new Set<string>();
