@@ -34,6 +34,7 @@ import {
 } from "@/app/admin/(panel)/tournaments/[id]/competitions/[competitionId]/actions";
 import { requireAdminCompetition } from "@/lib/auth/tournaments";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
+import { formatMatchDateTime, matchIsoToDatetimeLocal } from "@/lib/match-datetime";
 import {
   findTopFigureRows,
   findTopScorerRows,
@@ -47,17 +48,13 @@ import type {
   TournamentMatchStatus,
   TournamentStandingRow
 } from "@/types/domain";
-import { formatDateTime } from "@/lib/utils";
 
 function toInputDateTime(isoDate: string | null) {
-  if (!isoDate) return "";
-  const date = new Date(isoDate);
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  return matchIsoToDatetimeLocal(isoDate);
 }
 
 function formatMatchSchedule(value: string | null) {
-  return value ? formatDateTime(value) : "Sin horario";
+  return value ? formatMatchDateTime(value) : "Sin horario";
 }
 
 function buildCaptainInviteUrl(inviteToken: string) {

@@ -17,6 +17,7 @@ import {
 } from "@/lib/domain/tournament-workflow";
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
+import { datetimeLocalToMatchIso } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import {
   assertPlayerPhotoUploadAllowed,
@@ -203,7 +204,7 @@ function buildMatchSheetPath(params: {
 
 function normalizeScheduledAt(value: string | undefined) {
   if (!value?.trim()) return null;
-  return new Date(value).toISOString();
+  return datetimeLocalToMatchIso(value);
 }
 
 function buildInviteExpiresAt() {

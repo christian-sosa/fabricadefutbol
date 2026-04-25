@@ -7,6 +7,7 @@ import { z } from "zod";
 import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/lib/auth/admin";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { createDraftMatchWithOptions } from "@/lib/domain/match-workflow";
+import { datetimeLocalToMatchIso } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
 import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
@@ -222,7 +223,7 @@ export async function createMatchAction(formData: FormData) {
       supabase,
       adminId: admin.userId,
       organizationId: parsed.data.organizationId,
-      scheduledAt: new Date(parsed.data.scheduledAt).toISOString(),
+      scheduledAt: datetimeLocalToMatchIso(parsed.data.scheduledAt),
       modality: parsed.data.modality,
       location: parsed.data.location ?? "",
       selectedPlayerIds: parsed.data.playerIds,

@@ -18,8 +18,8 @@ import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { getCaptainContext } from "@/lib/auth/captains";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
+import { formatMatchDateTime } from "@/lib/match-datetime";
 import { getCaptainCompetitionTeamPanelData } from "@/lib/queries/tournaments";
-import { formatDateTime } from "@/lib/utils";
 import type { TournamentMatchStatus } from "@/types/domain";
 
 function buildCaptainTabHref(competitionId?: string | null, teamId?: string | null) {
@@ -38,7 +38,7 @@ function formatTeamMatchLabel(params: {
   awayScore: number | null;
 }) {
   const prefix = params.isHome ? "vs" : "@";
-  const schedule = params.scheduledAt ? formatDateTime(params.scheduledAt) : "Sin horario";
+  const schedule = params.scheduledAt ? formatMatchDateTime(params.scheduledAt) : "Sin horario";
   const score =
     params.homeScore !== null && params.awayScore !== null ? ` · ${params.homeScore}-${params.awayScore}` : "";
   return `${prefix} ${params.opponentName} · ${schedule}${score}`;

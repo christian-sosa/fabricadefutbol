@@ -4,9 +4,9 @@ import { OrganizationSwitcher } from "@/components/layout/organization-switcher"
 import { MatchStatusBadge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
+import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminMatches } from "@/lib/queries/admin";
-import { formatDateTime } from "@/lib/utils";
 
 export default async function AdminMatchesPage({
   searchParams
@@ -47,7 +47,7 @@ export default async function AdminMatchesPage({
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-100">
-                    {formatDateTime(match.scheduled_at)} - {match.modality}
+                    {formatMatchDateTime(match.scheduled_at)} - {match.modality}
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
                     {match.location?.trim() ? match.location : "Sin ubicacion cargada"}

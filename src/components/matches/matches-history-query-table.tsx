@@ -7,10 +7,10 @@ import { MatchStatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
+import { formatMatchDateTime } from "@/lib/match-datetime";
 import { useOrganizationMatchesQuery } from "@/lib/query/hooks";
 import type { OrganizationMatchesResponse } from "@/lib/query/types";
 import { withOrgQuery } from "@/lib/org";
-import { formatDateTime } from "@/lib/utils";
 
 type MatchesHistoryQueryTableProps = {
   organizationId: string | null;
@@ -42,14 +42,14 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
 
   return (
     <Card>
-      <div className="mb-2 text-xs text-slate-400">{isFetching ? "Actualizando historial..." : "Historial estable"}</div>
+      {isFetching ? <div className="mb-2 text-xs text-slate-400">Actualizando historial...</div> : null}
 
       <div className="grid gap-3 md:hidden">
         {matches.map((match) => (
           <article className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4" key={match.id}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-slate-100">{formatDateTime(match.scheduledAt)}</p>
+                <p className="text-sm font-semibold text-slate-100">{formatMatchDateTime(match.scheduledAt)}</p>
                 <p className="mt-1 text-sm text-slate-400">{match.modality}</p>
               </div>
               <MatchStatusBadge status={match.status} />
@@ -90,7 +90,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
           <TBody>
             {matches.map((match) => (
               <tr className="transition-colors hover:bg-slate-800/70" key={match.id}>
-                <TD>{formatDateTime(match.scheduledAt)}</TD>
+                <TD>{formatMatchDateTime(match.scheduledAt)}</TD>
                 <TD>{match.modality}</TD>
                 <TD>{match.scoreA !== null && match.scoreB !== null ? `${match.scoreA} - ${match.scoreB}` : "Pendiente"}</TD>
                 <TD>

@@ -11,6 +11,7 @@ import {
   saveConfirmedMatchLineup,
   saveMatchResult
 } from "@/lib/domain/match-workflow";
+import { datetimeLocalToMatchIso } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
 import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
@@ -288,7 +289,7 @@ export async function updateMatchAction(matchId: string, organizationId: string,
       status: "draft" | "confirmed" | "finished" | "cancelled";
       finished_at?: string | null;
     } = {
-      scheduled_at: new Date(parsed.data.scheduledAt).toISOString(),
+      scheduled_at: datetimeLocalToMatchIso(parsed.data.scheduledAt),
       location: parsed.data.location || null,
       status: parsed.data.status
     };

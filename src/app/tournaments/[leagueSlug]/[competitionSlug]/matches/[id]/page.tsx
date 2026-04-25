@@ -4,12 +4,12 @@ import { notFound } from "next/navigation";
 import { TournamentMatchStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
+import { formatMatchDateTime } from "@/lib/match-datetime";
 import { getPublicCompetitionMatchDetails } from "@/lib/queries/tournaments";
-import { formatDateTime } from "@/lib/utils";
 import type { TournamentMatchStatus } from "@/types/domain";
 
 function formatScheduledAt(value: string | null) {
-  return value ? formatDateTime(value) : "Sin horario";
+  return value ? formatMatchDateTime(value) : "Sin horario";
 }
 
 export default async function CompetitionMatchDetailPage({
