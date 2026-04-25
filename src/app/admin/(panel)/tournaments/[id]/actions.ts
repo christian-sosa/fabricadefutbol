@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { assertLeagueMembershipAction, getLeagueSlugById } from "@/lib/auth/tournaments";
+import { assertLeagueWriteAction, getLeagueSlugById } from "@/lib/auth/tournaments";
 import {
   getLeagueLogosBucket,
   getLeaguePhotosBucket,
@@ -26,6 +26,7 @@ import {
 } from "@/lib/league-logos";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { normalizeEmail, slugifyTournamentName } from "@/lib/org";
+import { REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL } from "@/lib/storage-image-responses";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -72,6 +73,7 @@ const createCompetitionSchema = z.object({
   description: z.string().max(500).optional(),
   venueOverride: z.string().max(120).optional(),
   type: z.enum(["league", "cup", "league_and_cup"]).default("league"),
+  coverageMode: z.enum(["full_stats", "results_only"]).default("full_stats"),
   playoffSize: z.preprocess(
     (value) => (typeof value === "string" && value.trim() ? Number(value) : null),
     z.union([z.literal(4), z.literal(8), z.null()])
@@ -252,7 +254,7 @@ async function uploadLeagueTeamLogoIfPresent(params: {
     .upload(objectPath, optimizedBuffer, {
       upsert: true,
       contentType: "image/webp",
-      cacheControl: "31536000"
+      cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
     });
 
   if (uploadError) {
@@ -309,7 +311,7 @@ async function resolveUniqueCompetitionSlug(params: {
 
 export async function updateLeagueAction(leagueId: string, formData: FormData) {
   try {
-    await assertLeagueMembershipAction(leagueId);
+    await assertLeagueWriteAction(leagueId);
     const parsed = updateLeagueSchema.safeParse({
       name: formData.get("name"),
       description: formData.get("description"),
@@ -365,7 +367,7 @@ export async function updateLeagueAction(leagueId: string, formData: FormData) {
 
 export async function uploadLeagueLogoAction(leagueId: string, formData: FormData) {
   try {
-    await assertLeagueMembershipAction(leagueId);
+    await assertLeagueWriteAction(leagueId);
     const file = formData.get("logo");
 
     if (!(file instanceof File) || file.size <= 0) {
@@ -401,7 +403,7 @@ export async function uploadLeagueLogoAction(leagueId: string, formData: FormDat
       .upload(objectPath, optimizedBuffer, {
         upsert: true,
         contentType: "image/webp",
-        cacheControl: "31536000"
+        cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
       });
 
     if (uploadError) {
@@ -441,7 +443,7 @@ export async function uploadLeagueLogoAction(leagueId: string, formData: FormDat
 
 export async function uploadLeaguePhotoAction(leagueId: string, formData: FormData) {
   try {
-    await assertLeagueMembershipAction(leagueId);
+    await assertLeagueWriteAction(leagueId);
     const file = formData.get("photo");
 
     if (!(file instanceof File) || file.size <= 0) {
@@ -477,7 +479,7 @@ export async function uploadLeaguePhotoAction(leagueId: string, formData: FormDa
       .upload(objectPath, optimizedBuffer, {
         upsert: true,
         contentType: "image/webp",
-        cacheControl: "31536000"
+        cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
       });
 
     if (uploadError) {
@@ -517,7 +519,7 @@ export async function uploadLeaguePhotoAction(leagueId: string, formData: FormDa
 
 export async function inviteLeagueAdminAction(leagueId: string, formData: FormData) {
   try {
-    const admin = await assertLeagueMembershipAction(leagueId);
+    const admin = await assertLeagueWriteAction(leagueId);
     const parsed = leagueAdminInviteSchema.safeParse({
       email: formData.get("email")
     });
@@ -604,7 +606,7 @@ export async function inviteLeagueAdminAction(leagueId: string, formData: FormDa
 
 export async function revokeLeagueAdminInviteAction(leagueId: string, formData: FormData) {
   try {
-    await assertLeagueMembershipAction(leagueId);
+    await assertLeagueWriteAction(leagueId);
     const parsed = leagueAdminInviteDeleteSchema.safeParse({
       inviteId: formData.get("inviteId")
     });
@@ -634,7 +636,7 @@ export async function revokeLeagueAdminInviteAction(leagueId: string, formData: 
 
 export async function removeLeagueAdminAction(leagueId: string, formData: FormData) {
   try {
-    const actingAdmin = await assertLeagueMembershipAction(leagueId);
+    const actingAdmin = await assertLeagueWriteAction(leagueId);
     const parsed = removeLeagueAdminSchema.safeParse({
       adminId: formData.get("adminId")
     });
@@ -681,7 +683,7 @@ export async function removeLeagueAdminAction(leagueId: string, formData: FormDa
 
 export async function addLeagueTeamAction(leagueId: string, formData: FormData) {
   try {
-    await assertLeagueMembershipAction(leagueId);
+    await assertLeagueWriteAction(leagueId);
     const parsed = leagueTeamSchema.safeParse({
       name: formData.get("name"),
       shortName: formData.get("shortName"),
@@ -747,7 +749,7 @@ export async function addLeagueTeamAction(leagueId: string, formData: FormData) 
 
 export async function updateLeagueTeamAction(leagueId: string, formData: FormData) {
   try {
-    await assertLeagueMembershipAction(leagueId);
+    await assertLeagueWriteAction(leagueId);
     const parsed = leagueTeamUpdateSchema.safeParse({
       teamId: formData.get("teamId"),
       name: formData.get("name"),
@@ -809,7 +811,7 @@ export async function updateLeagueTeamAction(leagueId: string, formData: FormDat
 
 export async function deleteLeagueTeamAction(leagueId: string, formData: FormData) {
   try {
-    await assertLeagueMembershipAction(leagueId);
+    await assertLeagueWriteAction(leagueId);
     const teamId = String(formData.get("teamId") ?? "");
     if (!teamId) {
       redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: "Falta el equipo a borrar." }));
@@ -840,13 +842,14 @@ export async function deleteLeagueTeamAction(leagueId: string, formData: FormDat
 
 export async function createCompetitionAction(leagueId: string, formData: FormData) {
   try {
-    await assertLeagueMembershipAction(leagueId);
+    await assertLeagueWriteAction(leagueId);
     const parsed = createCompetitionSchema.safeParse({
       name: formData.get("name"),
       seasonLabel: formData.get("seasonLabel"),
       description: formData.get("description"),
       venueOverride: formData.get("venueOverride"),
       type: formData.get("type"),
+      coverageMode: formData.get("coverageMode"),
       playoffSize: formData.get("playoffSize"),
       isPublic: formData.get("isPublic") === "on"
     });
@@ -877,9 +880,10 @@ export async function createCompetitionAction(leagueId: string, formData: FormDa
         description: parsed.data.description?.trim() || null,
         venue_override: parsed.data.venueOverride?.trim() || null,
         type: parsed.data.type,
+        coverage_mode: parsed.data.coverageMode,
         playoff_size: parsed.data.type === "league_and_cup" ? parsed.data.playoffSize : null,
         is_public: parsed.data.isPublic,
-        status: "draft"
+        status: "active"
       })
       .select("id")
       .single();

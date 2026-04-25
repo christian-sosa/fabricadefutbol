@@ -33,4 +33,12 @@ describe("organization image helpers", () => {
     expect(svg).toMatch(/>\s*LC\s*</);
     expect(svg).toContain("<svg");
   });
+
+  it("escapa el nombre del grupo antes de interpolarlo en el svg", () => {
+    const svg = buildOrganizationImagePlaceholderSvg(`La <Cantera> & "LQ"`);
+
+    expect(svg).toContain("aria-label=\"La &lt;Cantera&gt; &amp; &quot;LQ&quot;\"");
+    expect(svg).toContain("La &lt;Cantera&gt; &amp; \"LQ\"");
+    expect(svg).not.toContain(`La <Cantera> & "LQ"`);
+  });
 });

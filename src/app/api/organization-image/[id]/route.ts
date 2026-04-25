@@ -6,6 +6,10 @@ import {
   ORGANIZATION_IMAGE_CACHE_CONTROL,
   ORGANIZATION_IMAGE_PLACEHOLDER_CACHE_CONTROL
 } from "@/lib/organization-images";
+import {
+  createSignedStorageRedirect,
+  createStorageObjectStreamResponse
+} from "@/lib/storage-image-responses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function buildPlaceholderResponse(organizationName: string) {
@@ -39,19 +43,27 @@ export async function GET(
     return buildPlaceholderResponse(String(organization.name ?? "Grupo"));
   }
 
-  const { data: file, error: downloadError } = await supabase.storage
-    .from(getOrganizationImagesBucket())
-    .download(String(organization.image_path));
+  const bucketName = getOrganizationImagesBucket();
+  const objectPath = String(organization.image_path);
+  const signedRedirect = await createSignedStorageRedirect({
+    supabase,
+    bucketName,
+    objectPath
+  });
 
-  if (downloadError || !file) {
+  if (signedRedirect) return signedRedirect;
+
+  const streamedResponse = await createStorageObjectStreamResponse({
+    supabase,
+    bucketName,
+    objectPath,
+    contentType: "image/webp",
+    cacheControl: ORGANIZATION_IMAGE_CACHE_CONTROL
+  });
+
+  if (!streamedResponse) {
     return buildPlaceholderResponse(String(organization.name ?? "Grupo"));
   }
 
-  const fileBuffer = Buffer.from(await file.arrayBuffer());
-  return new NextResponse(fileBuffer, {
-    headers: {
-      "content-type": "image/webp",
-      "cache-control": ORGANIZATION_IMAGE_CACHE_CONTROL
-    }
-  });
+  return streamedResponse;
 }

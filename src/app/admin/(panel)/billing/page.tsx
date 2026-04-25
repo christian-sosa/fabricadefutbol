@@ -89,8 +89,7 @@ export default async function AdminBillingPage({
   const billingData = await getOrganizationBillingData(selectedOrganization.id);
   const subscription = billingData.subscription;
   const isSubscriptionActive = writeAccess.subscriptionActive;
-  const periodEndsAt = subscription?.current_period_end ?? null;
-  const accessValidUntil = periodEndsAt ?? writeAccess.organizationTrialEndsAt ?? null;
+  const accessValidUntil = writeAccess.accessValidUntil;
   const subscriptionStatusLabel = subscription?.status
     ? normalizePaymentStatusLabel(subscription.status)
     : writeAccess.organizationTrialExpired
@@ -185,6 +184,20 @@ export default async function AdminBillingPage({
         {!writeAccess.canWrite ? (
           <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
             <p className="text-sm font-semibold text-amber-100">{writeAccess.reason}</p>
+            {writeAccess.playerPhotosPurgedAt ? (
+              <p className="mt-2 text-sm text-amber-50/90">
+                Las fotos de jugadores ya se eliminaron el{" "}
+                {new Date(writeAccess.playerPhotosPurgedAt).toLocaleDateString("es-AR")} por falta
+                de pago. La imagen del grupo se conserva.
+              </p>
+            ) : writeAccess.playerPhotosPurgeAt ? (
+              <p className="mt-2 text-sm text-amber-50/90">
+                El grupo queda en modo lectura apenas vence el acceso. Las fotos de jugadores se
+                conservan hasta el{" "}
+                {new Date(writeAccess.playerPhotosPurgeAt).toLocaleDateString("es-AR")} y luego se
+                eliminan automaticamente si no se reactiva el plan. La imagen del grupo se mantiene.
+              </p>
+            ) : null}
             <form action={startOrganizationCheckoutProAction} className="mt-3">
               <input name="organizationId" type="hidden" value={selectedOrganization.id} />
               <Button type="submit">
@@ -196,6 +209,10 @@ export default async function AdminBillingPage({
           <div className="mt-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3">
             <p className="text-sm font-semibold text-emerald-100">
               Escritura habilitada ({isSubscriptionActive ? "suscripcion activa" : "trial vigente"}).
+            </p>
+            <p className="mt-2 text-sm text-emerald-50/90">
+              Si el grupo deja de pagar, pasa a modo lectura y las fotos de jugadores se conservan
+              por 90 dias antes de borrarse. La imagen del grupo no se elimina.
             </p>
             <form action={startOrganizationCheckoutProAction} className="mt-3">
               <input name="organizationId" type="hidden" value={selectedOrganization.id} />

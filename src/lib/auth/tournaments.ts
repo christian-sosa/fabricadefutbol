@@ -1,8 +1,18 @@
 import { redirect } from "next/navigation";
 
 import { assertAdminAction, requireAdminSession, type AdminSession } from "@/lib/auth/admin";
+import {
+  resolveLeagueWriteWindow,
+  toShortDate,
+  type LeagueSubscriptionSnapshot
+} from "@/lib/domain/billing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { CompetitionStatus, CompetitionType, LeagueStatus } from "@/types/domain";
+import type {
+  CompetitionCoverageMode,
+  CompetitionStatus,
+  CompetitionType,
+  LeagueStatus
+} from "@/types/domain";
 
 export type AdminLeague = {
   id: string;
@@ -26,11 +36,28 @@ export type AdminCompetition = {
   description: string | null;
   venue_override: string | null;
   type: CompetitionType;
+  coverage_mode: CompetitionCoverageMode;
   playoff_size: number | null;
   status: CompetitionStatus;
   is_public: boolean;
   created_at: string;
 };
+
+export type LeagueWriteAccess = {
+  canWrite: boolean;
+  reason: string | null;
+  accessValidUntil: string | null;
+  writeLockedAt: string | null;
+  subscriptionStatus: string | null;
+  subscriptionCurrentPeriodEnd: string | null;
+  subscriptionActive: boolean;
+};
+
+function isLeagueBillingSchemaMissing(message: string) {
+  return /league_billing_subscriptions|league_billing_payments|purpose|period_start|period_end|subscription_applied_at/i.test(
+    message
+  );
+}
 
 async function loadLeagueById(leagueId: string) {
   const supabase = await createSupabaseServerClient();
@@ -92,7 +119,7 @@ export async function getAdminCompetitionsForLeague(leagueId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("competitions")
-    .select("id, league_id, name, slug, season_label, description, venue_override, type, playoff_size, status, is_public, created_at")
+    .select("id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, status, is_public, created_at")
     .eq("league_id", leagueId)
     .order("created_at", { ascending: false });
 
@@ -174,6 +201,87 @@ export async function assertLeagueMembershipAction(leagueId: string) {
   return assertLeagueMembership(leagueId);
 }
 
+export async function getLeagueWriteAccess(
+  admin: AdminSession,
+  leagueId: string
+): Promise<LeagueWriteAccess> {
+  if (admin.isSuperAdmin) {
+    return {
+      canWrite: true,
+      reason: null,
+      accessValidUntil: null,
+      writeLockedAt: null,
+      subscriptionStatus: null,
+      subscriptionCurrentPeriodEnd: null,
+      subscriptionActive: false
+    };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: subscription, error } = await supabase
+    .from("league_billing_subscriptions")
+    .select("status, current_period_end")
+    .eq("league_id", leagueId)
+    .maybeSingle();
+
+  if (error && !isLeagueBillingSchemaMissing(error.message)) {
+    throw new Error(error.message);
+  }
+
+  if (error && isLeagueBillingSchemaMissing(error.message)) {
+    return {
+      canWrite: true,
+      reason: null,
+      accessValidUntil: null,
+      writeLockedAt: null,
+      subscriptionStatus: null,
+      subscriptionCurrentPeriodEnd: null,
+      subscriptionActive: false
+    };
+  }
+
+  const safeSubscription = (subscription ?? null) as LeagueSubscriptionSnapshot | null;
+  const writeWindow = resolveLeagueWriteWindow({
+    subscription: safeSubscription
+  });
+  const accessValidUntil = writeWindow.accessValidUntil;
+
+  if (!writeWindow.canWrite) {
+    const reason = accessValidUntil
+      ? `El acceso de esta liga vencio el ${toShortDate(accessValidUntil)}. Necesitas pagar otro mes para volver a editar.`
+      : "Esta liga no tiene un periodo pago activo. Necesitas pagar el mes para poder editar.";
+
+    return {
+      canWrite: false,
+      reason,
+      accessValidUntil,
+      writeLockedAt: writeWindow.writeLockedAt,
+      subscriptionStatus: safeSubscription?.status ?? null,
+      subscriptionCurrentPeriodEnd: safeSubscription?.current_period_end ?? null,
+      subscriptionActive: writeWindow.subscriptionActive
+    };
+  }
+
+  return {
+    canWrite: true,
+    reason: null,
+    accessValidUntil,
+    writeLockedAt: writeWindow.writeLockedAt,
+    subscriptionStatus: safeSubscription?.status ?? null,
+    subscriptionCurrentPeriodEnd: safeSubscription?.current_period_end ?? null,
+    subscriptionActive: writeWindow.subscriptionActive
+  };
+}
+
+export async function assertLeagueWriteAction(leagueId: string) {
+  const admin = await assertLeagueMembership(leagueId);
+  const writeAccess = await getLeagueWriteAccess(admin, leagueId);
+  if (!writeAccess.canWrite) {
+    throw new Error(writeAccess.reason ?? "No tienes acceso de escritura para esta liga.");
+  }
+  return admin;
+}
+
 export async function assertCompetitionMembershipAction(competitionId: string) {
   const supabase = await createSupabaseServerClient();
   const { data: competition, error } = await supabase
@@ -190,6 +298,19 @@ export async function assertCompetitionMembershipAction(competitionId: string) {
   return {
     admin,
     leagueId: String(competition.league_id)
+  };
+}
+
+export async function assertCompetitionWriteAction(competitionId: string) {
+  const { admin, leagueId } = await assertCompetitionMembershipAction(competitionId);
+  const writeAccess = await getLeagueWriteAccess(admin, leagueId);
+  if (!writeAccess.canWrite) {
+    throw new Error(writeAccess.reason ?? "No tienes acceso de escritura para esta liga.");
+  }
+
+  return {
+    admin,
+    leagueId
   };
 }
 
@@ -223,7 +344,7 @@ export async function requireAdminCompetition(params: {
       const supabase = await createSupabaseServerClient();
       const { data, error } = await supabase
         .from("competitions")
-        .select("id, league_id, name, slug, season_label, description, venue_override, type, playoff_size, status, is_public, created_at")
+        .select("id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, status, is_public, created_at")
         .eq("id", competitionId)
         .eq("league_id", leagueId)
         .maybeSingle();

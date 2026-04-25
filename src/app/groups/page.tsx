@@ -55,20 +55,12 @@ export default async function GroupsPage({
                   src={getOrganizationImageUrl(selectedOrganization.id)}
                 />
                 <div className="absolute inset-x-0 bottom-0 p-5 md:p-6">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200/90">
-                    Grupo seleccionado
-                  </p>
-                  <h2 className="mt-2 text-2xl font-black text-white md:text-4xl">
-                    {selectedOrganization.name}
-                  </h2>
-                  <p className="mt-2 max-w-2xl text-sm text-slate-200 md:text-base">
-                    Un vistazo rapido para entrar al grupo, ver quienes vienen arriba y seguir las fechas que ya quedaron confirmadas.
-                  </p>
+                  <h2 className="text-2xl font-black text-white md:text-4xl">{selectedOrganization.name}</h2>
                 </div>
               </div>
             </Card>
 
-            <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
               <Card>
                 <CardDescription>Jugadores activos</CardDescription>
                 <CardTitle className="mt-1 text-3xl">{summary.totalPlayers}</CardTitle>
@@ -77,12 +69,12 @@ export default async function GroupsPage({
                 <CardDescription>Partidos finalizados</CardDescription>
                 <CardTitle className="mt-1 text-3xl">{summary.totalFinishedMatches}</CardTitle>
               </Card>
-              <Card>
-                <CardDescription>Agenda confirmada</CardDescription>
-                <CardTitle className="mt-1 text-3xl">{summary.upcomingMatches.length}</CardTitle>
-              </Card>
             </div>
           </section>
+
+          <p className="max-w-3xl text-sm text-slate-300 md:text-base">
+            Un vistazo rapido para entrar al grupo, ver quienes vienen arriba y seguir las fechas que ya quedaron confirmadas.
+          </p>
 
           <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
             <Card>

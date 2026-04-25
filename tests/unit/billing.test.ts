@@ -5,6 +5,7 @@ import {
   addMonthsToIsoDate,
   getOrganizationTrialEndsAt,
   hasActiveOrganizationSubscription,
+  resolveOrganizationWriteWindow,
   resolveNextOrganizationBillingPeriod
 } from "@/lib/domain/billing";
 
@@ -82,5 +83,33 @@ describe("billing helpers", () => {
 
     expect(period.periodStart).toBe("2026-06-10T00:00:00.000Z");
     expect(period.periodEnd).toBe("2026-07-10T00:00:00.000Z");
+  });
+
+  it("si el trial vencio y no hay plan inicia la retencion de fotos desde ese vencimiento", () => {
+    const window = resolveOrganizationWriteWindow({
+      organizationCreatedAt: "2026-02-01T00:00:00.000Z",
+      subscription: null
+    });
+
+    expect(window.canWrite).toBe(false);
+    expect(window.writeLockedAt).toBe("2026-03-03T00:00:00.000Z");
+    expect(window.playerPhotosPurgeAt).toBe("2026-06-01T00:00:00.000Z");
+    expect(window.playerPhotosRetentionExpired).toBe(false);
+  });
+
+  it("si hubo suscripcion, la retencion corre desde el fin del ultimo periodo pago", () => {
+    const window = resolveOrganizationWriteWindow({
+      organizationCreatedAt: "2026-02-01T00:00:00.000Z",
+      subscription: {
+        status: "active",
+        current_period_end: "2026-04-10T00:00:00.000Z"
+      }
+    });
+
+    expect(window.canWrite).toBe(false);
+    expect(window.accessValidUntil).toBe("2026-04-10T00:00:00.000Z");
+    expect(window.writeLockedAt).toBe("2026-04-10T00:00:00.000Z");
+    expect(window.playerPhotosPurgeAt).toBe("2026-07-09T00:00:00.000Z");
+    expect(window.playerPhotosRetentionExpired).toBe(false);
   });
 });

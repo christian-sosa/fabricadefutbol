@@ -13,6 +13,7 @@ import {
 } from "@/lib/domain/match-workflow";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
+import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const confirmSchema = z.object({
@@ -200,6 +201,7 @@ export async function saveResultAction(matchId: string, organizationId: string, 
       }
     });
 
+    await refreshOrganizationPublicSnapshotSafe(organizationId);
     revalidateMatchPaths(matchId);
     redirect(buildPath(matchId, organizationQueryKey));
   } catch (error) {
@@ -308,6 +310,7 @@ export async function updateMatchAction(matchId: string, organizationId: string,
       redirect(buildPath(matchId, organizationQueryKey, error.message));
     }
 
+    await refreshOrganizationPublicSnapshotSafe(organizationId);
     revalidateMatchPaths(matchId);
     redirect(buildPath(matchId, organizationQueryKey));
   } catch (error) {
@@ -369,6 +372,7 @@ export async function deleteMatchAction(matchId: string, organizationId: string)
       redirect(buildPath(matchId, organizationQueryKey, deleteError.message));
     }
 
+    await refreshOrganizationPublicSnapshotSafe(organizationId);
     revalidatePath("/admin");
     revalidatePath("/matches");
     revalidatePath("/upcoming");

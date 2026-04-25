@@ -6,6 +6,10 @@ import {
   LEAGUE_LOGO_CACHE_CONTROL,
   LEAGUE_LOGO_PLACEHOLDER_CACHE_CONTROL
 } from "@/lib/league-logos";
+import {
+  createSignedStorageRedirect,
+  createStorageObjectStreamResponse
+} from "@/lib/storage-image-responses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function buildPlaceholderResponse(leagueName: string) {
@@ -39,19 +43,27 @@ export async function GET(
     return buildPlaceholderResponse(String(league.name ?? "Liga"));
   }
 
-  const { data: file, error: downloadError } = await supabase.storage
-    .from(getLeagueLogosBucket())
-    .download(String(league.logo_path));
+  const bucketName = getLeagueLogosBucket();
+  const objectPath = String(league.logo_path);
+  const signedRedirect = await createSignedStorageRedirect({
+    supabase,
+    bucketName,
+    objectPath
+  });
 
-  if (downloadError || !file) {
+  if (signedRedirect) return signedRedirect;
+
+  const streamedResponse = await createStorageObjectStreamResponse({
+    supabase,
+    bucketName,
+    objectPath,
+    contentType: "image/webp",
+    cacheControl: LEAGUE_LOGO_CACHE_CONTROL
+  });
+
+  if (!streamedResponse) {
     return buildPlaceholderResponse(String(league.name ?? "Liga"));
   }
 
-  const fileBuffer = Buffer.from(await file.arrayBuffer());
-  return new NextResponse(fileBuffer, {
-    headers: {
-      "content-type": "image/webp",
-      "cache-control": LEAGUE_LOGO_CACHE_CONTROL
-    }
-  });
+  return streamedResponse;
 }

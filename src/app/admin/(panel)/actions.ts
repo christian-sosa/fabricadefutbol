@@ -41,6 +41,7 @@ import {
 } from "@/lib/organization-images";
 import { toUserMessage } from "@/lib/errors";
 import { createCheckoutProPreference } from "@/lib/payments/mercadopago";
+import { REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL } from "@/lib/storage-image-responses";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -843,7 +844,7 @@ export async function uploadOrganizationImageAction(formData: FormData) {
       .upload(objectPath, optimizedBuffer, {
         upsert: true,
         contentType: "image/webp",
-        cacheControl: "31536000"
+        cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
       });
 
     if (uploadError) {

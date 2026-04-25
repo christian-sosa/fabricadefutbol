@@ -6,7 +6,7 @@ import type { TournamentMatchStatus, TournamentStatus } from "@/types/domain";
 export const TOURNAMENT_STATUS_OPTIONS: TournamentStatus[] = ["draft", "active", "finished", "archived"];
 
 export const TOURNAMENT_STATUS_LABELS: Record<TournamentStatus, string> = {
-  draft: "Borrador",
+  draft: "En preparacion",
   active: "Activo",
   finished: "Finalizado",
   archived: "Archivado"
@@ -27,7 +27,7 @@ export const TOURNAMENT_MATCH_STATUS_OPTIONS: TournamentMatchStatus[] = [
 ];
 
 export const TOURNAMENT_MATCH_STATUS_LABELS: Record<TournamentMatchStatus, string> = {
-  draft: "Borrador",
+  draft: "Sin programar",
   scheduled: "Programado",
   played: "Jugado",
   cancelled: "Cancelado"

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import {
-  assertCompetitionMembershipAction,
+  assertCompetitionWriteAction,
   getCompetitionPublicPathById
 } from "@/lib/auth/tournaments";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
@@ -28,6 +28,7 @@ import {
   MAX_PLAYER_PHOTO_SIZE_MB,
   optimizePlayerAvatarImage
 } from "@/lib/player-photos";
+import { REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL } from "@/lib/storage-image-responses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { CompetitionPhase, TournamentMatchSheetInput } from "@/types/domain";
 
@@ -37,6 +38,7 @@ const updateCompetitionSchema = z.object({
   description: z.string().max(500).optional(),
   venueOverride: z.string().max(120).optional(),
   type: z.enum(["league", "cup", "league_and_cup"]).default("league"),
+  coverageMode: z.enum(["full_stats", "results_only"]).default("full_stats"),
   playoffSize: z.preprocess(
     (value) => (typeof value === "string" && value.trim() ? Number(value) : null),
     z.union([z.literal(4), z.literal(8), z.null()])
@@ -137,7 +139,7 @@ async function loadCompetitionSummary(competitionId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("competitions")
-    .select("id, type, playoff_size")
+    .select("id, type, coverage_mode, playoff_size")
     .eq("id", competitionId)
     .maybeSingle();
 
@@ -148,6 +150,7 @@ async function loadCompetitionSummary(competitionId: string) {
   return {
     id: String(data.id),
     type: String(data.type) as "league" | "cup" | "league_and_cup",
+    coverageMode: String(data.coverage_mode ?? "full_stats") as "full_stats" | "results_only",
     playoffSize: data.playoff_size === 4 || data.playoff_size === 8 ? data.playoff_size : null
   };
 }
@@ -336,13 +339,14 @@ export async function updateCompetitionAction(
   formData: FormData
 ) {
   try {
-    await assertCompetitionMembershipAction(competitionId);
+    await assertCompetitionWriteAction(competitionId);
     const parsed = updateCompetitionSchema.safeParse({
       name: formData.get("name"),
       seasonLabel: formData.get("seasonLabel"),
       description: formData.get("description"),
       venueOverride: formData.get("venueOverride"),
       type: formData.get("type"),
+      coverageMode: formData.get("coverageMode"),
       playoffSize: formData.get("playoffSize"),
       isPublic: formData.get("isPublic") === "on",
       status: formData.get("status")
@@ -413,6 +417,7 @@ export async function updateCompetitionAction(
         description: parsed.data.description?.trim() || null,
         venue_override: parsed.data.venueOverride?.trim() || null,
         type: parsed.data.type,
+        coverage_mode: parsed.data.coverageMode,
         playoff_size: parsed.data.type === "league_and_cup" ? parsed.data.playoffSize : null,
         is_public: parsed.data.isPublic,
         status: parsed.data.status
@@ -438,7 +443,7 @@ export async function syncCompetitionTeamsAction(
   formData: FormData
 ) {
   try {
-    await assertCompetitionMembershipAction(competitionId);
+    await assertCompetitionWriteAction(competitionId);
     const selectedLeagueTeamIds = new Set(
       formData
         .getAll("leagueTeamIds")
@@ -527,7 +532,7 @@ export async function inviteCompetitionCaptainAction(
   formData: FormData
 ) {
   try {
-    await assertCompetitionMembershipAction(competitionId);
+    await assertCompetitionWriteAction(competitionId);
     const parsed = captainInviteSchema.safeParse({
       competitionTeamId: formData.get("competitionTeamId"),
       email: formData.get("email")
@@ -598,7 +603,7 @@ export async function deleteCompetitionCaptainInviteAction(
   formData: FormData
 ) {
   try {
-    await assertCompetitionMembershipAction(competitionId);
+    await assertCompetitionWriteAction(competitionId);
     const parsed = captainInviteDeleteSchema.safeParse({
       inviteId: formData.get("inviteId")
     });
@@ -632,7 +637,7 @@ export async function removeCompetitionCaptainAction(
   formData: FormData
 ) {
   try {
-    await assertCompetitionMembershipAction(competitionId);
+    await assertCompetitionWriteAction(competitionId);
     const parsed = competitionTeamSchema.safeParse({
       competitionTeamId: formData.get("competitionTeamId")
     });
@@ -667,7 +672,7 @@ export async function addCompetitionPlayerAction(
   formData: FormData
 ) {
   try {
-    await assertCompetitionMembershipAction(competitionId);
+    await assertCompetitionWriteAction(competitionId);
     const parsed = playerSchema.safeParse({
       competitionTeamId: formData.get("competitionTeamId"),
       fullName: formData.get("fullName"),
@@ -707,7 +712,7 @@ export async function updateCompetitionPlayerAction(
   formData: FormData
 ) {
   try {
-    await assertCompetitionMembershipAction(competitionId);
+    await assertCompetitionWriteAction(competitionId);
     const parsed = playerUpdateSchema.safeParse({
       competitionTeamId: formData.get("competitionTeamId"),
       playerId: formData.get("playerId"),
@@ -749,7 +754,7 @@ export async function deleteCompetitionPlayerAction(
   formData: FormData
 ) {
   try {
-    await assertCompetitionMembershipAction(competitionId);
+    await assertCompetitionWriteAction(competitionId);
     const parsed = playerDeleteSchema.safeParse({
       competitionTeamId: formData.get("competitionTeamId"),
       playerId: formData.get("playerId")
@@ -784,7 +789,7 @@ export async function uploadCompetitionPlayerPhotoAction(
   formData: FormData
 ) {
   try {
-    const { admin } = await assertCompetitionMembershipAction(competitionId);
+    const { admin } = await assertCompetitionWriteAction(competitionId);
     const parsed = playerPhotoSchema.safeParse({
       competitionTeamId: formData.get("competitionTeamId"),
       playerId: formData.get("playerId")
@@ -839,7 +844,7 @@ export async function uploadCompetitionPlayerPhotoAction(
     const { error: uploadError } = await supabase.storage.from(bucketName).upload(objectPath, optimizedBuffer, {
       upsert: true,
       contentType: "image/webp",
-      cacheControl: "31536000"
+      cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
     });
 
     if (uploadError) {
@@ -865,7 +870,7 @@ export async function uploadCompetitionPlayerPhotoAction(
 
 export async function generateCompetitionFixtureAction(leagueId: string, competitionId: string) {
   try {
-    const { admin } = await assertCompetitionMembershipAction(competitionId);
+    const { admin } = await assertCompetitionWriteAction(competitionId);
     const supabase = await createSupabaseServerClient();
     await generateCompetitionFixture({
       supabase: supabase as never,
@@ -884,7 +889,7 @@ export async function generateCompetitionFixtureAction(leagueId: string, competi
 
 export async function generateCompetitionPlayoffAction(leagueId: string, competitionId: string) {
   try {
-    const { admin } = await assertCompetitionMembershipAction(competitionId);
+    const { admin } = await assertCompetitionWriteAction(competitionId);
     const supabase = await createSupabaseServerClient();
     await generateCompetitionCupPlayoff({
       supabase: supabase as never,
@@ -906,7 +911,7 @@ export async function createManualCompetitionMatchAction(
   formData: FormData
 ) {
   try {
-    const { admin } = await assertCompetitionMembershipAction(competitionId);
+    const { admin } = await assertCompetitionWriteAction(competitionId);
     const competition = await loadCompetitionSummary(competitionId);
     const parsed = manualMatchSchema.safeParse({
       roundName: formData.get("roundName"),
@@ -973,7 +978,7 @@ export async function updateCompetitionMatchAction(
   formData: FormData
 ) {
   try {
-    await assertCompetitionMembershipAction(competitionId);
+    await assertCompetitionWriteAction(competitionId);
     const parsed = updateMatchSchema.safeParse({
       matchId: formData.get("matchId"),
       roundId: formData.get("roundId") ? String(formData.get("roundId")) : null,
@@ -1057,7 +1062,7 @@ export async function saveCompetitionMatchSheetAction(
   formData: FormData
 ) {
   try {
-    const { admin } = await assertCompetitionMembershipAction(competitionId);
+    const { admin } = await assertCompetitionWriteAction(competitionId);
     const payloadRaw = String(formData.get("sheetPayload") ?? "");
     if (!payloadRaw) {
       redirect(buildMatchSheetPath({ leagueId, competitionId, matchId, error: "Falta el payload del acta." }));

@@ -502,3 +502,21 @@ export function shouldUseMercadoPagoSandboxCheckout() {
 
   return parseBooleanEnv(selected ?? fallback, targetEnv === "development");
 }
+
+export function getInternalCronSecret() {
+  const targetEnv = getSupabaseTargetEnv();
+  const selected =
+    targetEnv === "development"
+      ? firstServerDefined(["INTERNAL_CRON_SECRET_DEV", "CRON_SECRET_DEV", "INTERNAL_CRON_SECRET", "CRON_SECRET"])
+      : firstServerDefined(["INTERNAL_CRON_SECRET", "CRON_SECRET", "INTERNAL_CRON_SECRET_PROD", "CRON_SECRET_PROD"]);
+  const fallback = firstServerDefined([
+    "INTERNAL_CRON_SECRET",
+    "CRON_SECRET",
+    "INTERNAL_CRON_SECRET_DEV",
+    "CRON_SECRET_DEV",
+    "INTERNAL_CRON_SECRET_PROD",
+    "CRON_SECRET_PROD"
+  ]);
+
+  return selected ?? fallback;
+}

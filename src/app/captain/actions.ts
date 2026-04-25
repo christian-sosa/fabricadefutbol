@@ -20,6 +20,7 @@ import {
   MAX_PLAYER_PHOTO_SIZE_MB,
   optimizePlayerAvatarImage
 } from "@/lib/player-photos";
+import { REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL } from "@/lib/storage-image-responses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const captainPlayerSchema = z.object({
@@ -281,7 +282,7 @@ export async function uploadCaptainTournamentPlayerPhotoAction(formData: FormDat
     const { error: uploadError } = await supabase.storage.from(bucketName).upload(objectPath, optimizedBuffer, {
       upsert: true,
       contentType: "image/webp",
-      cacheControl: "31536000"
+      cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
     });
 
     if (uploadError) {

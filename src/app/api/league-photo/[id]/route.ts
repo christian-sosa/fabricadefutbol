@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 
 import { getLeaguePhotosBucket } from "@/lib/env";
 import { LEAGUE_PHOTO_CACHE_CONTROL } from "@/lib/league-photos";
+import {
+  createSignedStorageRedirect,
+  createStorageObjectStreamResponse
+} from "@/lib/storage-image-responses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(
@@ -22,19 +26,27 @@ export async function GET(
     return new NextResponse(null, { status: 404 });
   }
 
-  const { data: file, error: downloadError } = await supabase.storage
-    .from(getLeaguePhotosBucket())
-    .download(String(league.photo_path));
+  const bucketName = getLeaguePhotosBucket();
+  const objectPath = String(league.photo_path);
+  const signedRedirect = await createSignedStorageRedirect({
+    supabase,
+    bucketName,
+    objectPath
+  });
 
-  if (downloadError || !file) {
+  if (signedRedirect) return signedRedirect;
+
+  const streamedResponse = await createStorageObjectStreamResponse({
+    supabase,
+    bucketName,
+    objectPath,
+    contentType: "image/webp",
+    cacheControl: LEAGUE_PHOTO_CACHE_CONTROL
+  });
+
+  if (!streamedResponse) {
     return new NextResponse(null, { status: 404 });
   }
 
-  const fileBuffer = Buffer.from(await file.arrayBuffer());
-  return new NextResponse(fileBuffer, {
-    headers: {
-      "content-type": "image/webp",
-      "cache-control": LEAGUE_PHOTO_CACHE_CONTROL
-    }
-  });
+  return streamedResponse;
 }

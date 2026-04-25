@@ -26,6 +26,8 @@ export default async function CompetitionMatchDetailPage({
 
   if (!data) notFound();
 
+  const showDetailedStats = data.competition.coverageMode !== "results_only";
+
   return (
     <div className="space-y-4">
       <Card>
@@ -38,7 +40,8 @@ export default async function CompetitionMatchDetailPage({
               {data.competition.name} · {data.league.name}
             </CardDescription>
             <p className="mt-2 text-sm text-slate-400">
-              {formatScheduledAt(data.match.scheduledAt)} · {data.match.venue || data.competition.venueOverride || data.league.venueName || "Sin sede"}
+              {formatScheduledAt(data.match.scheduledAt)} ·{" "}
+              {data.match.venue || data.competition.venueOverride || data.league.venueName || "Sin sede"}
             </p>
           </div>
           <TournamentMatchStatusBadge status={data.match.status as TournamentMatchStatus} />
@@ -56,84 +59,90 @@ export default async function CompetitionMatchDetailPage({
               Penales: {data.result.penalty_home_score} - {data.result.penalty_away_score}
             </p>
           ) : null}
-          <p className="text-sm text-slate-400">
-            Figura: {data.result?.mvp_player_name ?? "Sin figura cargada"}
-          </p>
+          {showDetailedStats ? (
+            <p className="text-sm text-slate-400">
+              Figura: {data.result?.mvp_player_name ?? "Sin figura cargada"}
+            </p>
+          ) : (
+            <p className="text-sm text-slate-400">Competencia publicada solo con resultados.</p>
+          )}
         </div>
         {data.result?.notes ? <p className="mt-3 text-sm text-slate-300">{data.result.notes}</p> : null}
       </Card>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardTitle>{data.match.homeTeamName}</CardTitle>
-          <div className="mt-4 overflow-x-auto">
-            <Table>
-              <THead>
-                <tr>
-                  <TH>Jugador</TH>
-                  <TH>G</TH>
-                  <TH>A</TH>
-                  <TH>R</TH>
-                  <TH>Figura</TH>
-                </tr>
-              </THead>
-              <TBody>
-                {data.homeStats.map((row) => (
-                  <tr className="transition-colors hover:bg-slate-800/70" key={`${row.player_id ?? row.player_name}:${row.team_id}`}>
-                    <TD className="font-semibold text-slate-100">{row.player_name}</TD>
-                    <TD>{row.goals}</TD>
-                    <TD>{row.yellow_cards}</TD>
-                    <TD>{row.red_cards}</TD>
-                    <TD>{row.is_mvp ? "Si" : "-"}</TD>
-                  </tr>
-                ))}
-                {!data.homeStats.length ? (
+      {showDetailedStats ? (
+        <section className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardTitle>{data.match.homeTeamName}</CardTitle>
+            <div className="mt-4 overflow-x-auto">
+              <Table>
+                <THead>
                   <tr>
-                    <TD className="py-6 text-sm text-slate-400" colSpan={5}>
-                      Sin acta cargada para este equipo.
-                    </TD>
+                    <TH>Jugador</TH>
+                    <TH>G</TH>
+                    <TH>A</TH>
+                    <TH>R</TH>
+                    <TH>Figura</TH>
                   </tr>
-                ) : null}
-              </TBody>
-            </Table>
-          </div>
-        </Card>
+                </THead>
+                <TBody>
+                  {data.homeStats.map((row) => (
+                    <tr className="transition-colors hover:bg-slate-800/70" key={`${row.player_id ?? row.player_name}:${row.team_id}`}>
+                      <TD className="font-semibold text-slate-100">{row.player_name}</TD>
+                      <TD>{row.goals}</TD>
+                      <TD>{row.yellow_cards}</TD>
+                      <TD>{row.red_cards}</TD>
+                      <TD>{row.is_mvp ? "Si" : "-"}</TD>
+                    </tr>
+                  ))}
+                  {!data.homeStats.length ? (
+                    <tr>
+                      <TD className="py-6 text-sm text-slate-400" colSpan={5}>
+                        Sin acta cargada para este equipo.
+                      </TD>
+                    </tr>
+                  ) : null}
+                </TBody>
+              </Table>
+            </div>
+          </Card>
 
-        <Card>
-          <CardTitle>{data.match.awayTeamName}</CardTitle>
-          <div className="mt-4 overflow-x-auto">
-            <Table>
-              <THead>
-                <tr>
-                  <TH>Jugador</TH>
-                  <TH>G</TH>
-                  <TH>A</TH>
-                  <TH>R</TH>
-                  <TH>Figura</TH>
-                </tr>
-              </THead>
-              <TBody>
-                {data.awayStats.map((row) => (
-                  <tr className="transition-colors hover:bg-slate-800/70" key={`${row.player_id ?? row.player_name}:${row.team_id}`}>
-                    <TD className="font-semibold text-slate-100">{row.player_name}</TD>
-                    <TD>{row.goals}</TD>
-                    <TD>{row.yellow_cards}</TD>
-                    <TD>{row.red_cards}</TD>
-                    <TD>{row.is_mvp ? "Si" : "-"}</TD>
-                  </tr>
-                ))}
-                {!data.awayStats.length ? (
+          <Card>
+            <CardTitle>{data.match.awayTeamName}</CardTitle>
+            <div className="mt-4 overflow-x-auto">
+              <Table>
+                <THead>
                   <tr>
-                    <TD className="py-6 text-sm text-slate-400" colSpan={5}>
-                      Sin acta cargada para este equipo.
-                    </TD>
+                    <TH>Jugador</TH>
+                    <TH>G</TH>
+                    <TH>A</TH>
+                    <TH>R</TH>
+                    <TH>Figura</TH>
                   </tr>
-                ) : null}
-              </TBody>
-            </Table>
-          </div>
-        </Card>
-      </section>
+                </THead>
+                <TBody>
+                  {data.awayStats.map((row) => (
+                    <tr className="transition-colors hover:bg-slate-800/70" key={`${row.player_id ?? row.player_name}:${row.team_id}`}>
+                      <TD className="font-semibold text-slate-100">{row.player_name}</TD>
+                      <TD>{row.goals}</TD>
+                      <TD>{row.yellow_cards}</TD>
+                      <TD>{row.red_cards}</TD>
+                      <TD>{row.is_mvp ? "Si" : "-"}</TD>
+                    </tr>
+                  ))}
+                  {!data.awayStats.length ? (
+                    <tr>
+                      <TD className="py-6 text-sm text-slate-400" colSpan={5}>
+                        Sin acta cargada para este equipo.
+                      </TD>
+                    </tr>
+                  ) : null}
+                </TBody>
+              </Table>
+            </div>
+          </Card>
+        </section>
+      ) : null}
 
       <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={`/tournaments/${leagueSlug}/${competitionSlug}?tab=fixture`}>
         Volver al fixture de la competencia
