@@ -62,6 +62,7 @@ export type TournamentListItem = {
   description: string | null;
   isPublic: boolean;
   status: TournamentStatus;
+  parentTournamentId: string | null;
   createdAt: string;
 };
 

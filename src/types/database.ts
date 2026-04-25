@@ -329,6 +329,7 @@ export type Database = {
           id: string;
           is_public: boolean;
           name: string;
+          parent_tournament_id: string | null;
           season_label: string;
           slug: string;
           status: "draft" | "active" | "finished" | "archived";
@@ -341,6 +342,7 @@ export type Database = {
           id?: string;
           is_public?: boolean;
           name: string;
+          parent_tournament_id?: string | null;
           season_label: string;
           slug: string;
           status?: "draft" | "active" | "finished" | "archived";
@@ -353,6 +355,7 @@ export type Database = {
           id?: string;
           is_public?: boolean;
           name?: string;
+          parent_tournament_id?: string | null;
           season_label?: string;
           slug?: string;
           status?: "draft" | "active" | "finished" | "archived";

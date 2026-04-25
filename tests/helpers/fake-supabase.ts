@@ -125,6 +125,7 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       break;
     case "tournaments":
       if (!("is_public" in normalized)) normalized.is_public = true;
+      if (!("parent_tournament_id" in normalized)) normalized.parent_tournament_id = null;
       if (!normalized.status) normalized.status = "draft";
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
@@ -341,6 +342,52 @@ class FakeSupabaseState {
 
   cascadeDelete(table: TableName, deletedRows: Row[]) {
     if (!deletedRows.length) return;
+
+    if (table === "tournaments") {
+      const deletedTournamentIds = new Set(deletedRows.map((row) => String(row.id)));
+      this.db.tournament_admins = this.db.tournament_admins.filter(
+        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      );
+      this.db.tournament_admin_invites = this.db.tournament_admin_invites.filter(
+        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      );
+      this.db.tournament_team_captains = this.db.tournament_team_captains.filter(
+        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      );
+      this.db.tournament_captain_invites = this.db.tournament_captain_invites.filter(
+        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      );
+      this.db.tournament_players = this.db.tournament_players.filter(
+        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      );
+      this.db.tournament_rounds = this.db.tournament_rounds.filter(
+        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      );
+      this.db.tournament_match_results = this.db.tournament_match_results.filter((row) => {
+        const match = this.db.tournament_matches.find((candidate) => String(candidate.id) === String(row.match_id));
+        return !match || !deletedTournamentIds.has(String(match.tournament_id));
+      });
+      this.db.tournament_match_player_stats = this.db.tournament_match_player_stats.filter((row) => {
+        const match = this.db.tournament_matches.find((candidate) => String(candidate.id) === String(row.match_id));
+        return !match || !deletedTournamentIds.has(String(match.tournament_id));
+      });
+      this.db.tournament_matches = this.db.tournament_matches.filter(
+        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      );
+      this.db.tournament_teams = this.db.tournament_teams.filter(
+        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      );
+      this.db.tournament_billing_payments = this.db.tournament_billing_payments.map((row) =>
+        deletedTournamentIds.has(String(row.created_tournament_id))
+          ? { ...row, created_tournament_id: null, updated_at: new Date().toISOString() }
+          : row
+      );
+      this.db.tournaments = this.db.tournaments.map((row) =>
+        deletedTournamentIds.has(String(row.parent_tournament_id))
+          ? { ...row, parent_tournament_id: null, updated_at: new Date().toISOString() }
+          : row
+      );
+    }
 
     if (table === "team_options") {
       const deletedOptionIds = new Set(deletedRows.map((row) => String(row.id)));

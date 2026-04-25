@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { assertCaptainTeamAction } from "@/lib/auth/captains";
 import { getTournamentSlugById } from "@/lib/auth/tournaments";
+import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
 import { isNextRedirectError } from "@/lib/next-redirect";
@@ -29,8 +30,7 @@ const captainPlayerSchema = z.object({
 });
 
 const captainPlayerUpdateSchema = captainPlayerSchema.extend({
-  playerId: z.string().uuid(),
-  active: z.boolean().default(true)
+  playerId: z.string().uuid()
 });
 
 const captainPlayerDeleteSchema = z.object({
@@ -67,6 +67,26 @@ async function revalidateCaptainPaths(tournamentId: string) {
   revalidatePath(`/tournaments/${tournamentSlug}`);
 }
 
+async function assertCaptainTeamPlayerCapacity(params: {
+  tournamentId: string;
+  teamId: string;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const { count, error } = await supabase
+    .from("tournament_players")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", params.tournamentId)
+    .eq("team_id", params.teamId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if ((count ?? 0) >= MAX_TOURNAMENT_PLAYERS_PER_TEAM) {
+    throw new Error(`Cada equipo admite hasta ${MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores.`);
+  }
+}
+
 export async function addCaptainTournamentPlayerAction(formData: FormData) {
   const rawTournamentId = String(formData.get("tournamentId") ?? "");
   const rawTeamId = String(formData.get("teamId") ?? "");
@@ -91,6 +111,10 @@ export async function addCaptainTournamentPlayerAction(formData: FormData) {
     }
 
     await assertCaptainTeamAction({
+      tournamentId: parsed.data.tournamentId,
+      teamId: parsed.data.teamId
+    });
+    await assertCaptainTeamPlayerCapacity({
       tournamentId: parsed.data.tournamentId,
       teamId: parsed.data.teamId
     });
@@ -146,8 +170,7 @@ export async function updateCaptainTournamentPlayerAction(formData: FormData) {
       playerId: formData.get("playerId"),
       fullName: formData.get("fullName"),
       shirtNumber: formData.get("shirtNumber"),
-      position: formData.get("position"),
-      active: formData.get("active") === "on"
+      position: formData.get("position")
     });
 
     if (!parsed.success) {
@@ -171,8 +194,7 @@ export async function updateCaptainTournamentPlayerAction(formData: FormData) {
       .update({
         full_name: parsed.data.fullName.trim(),
         shirt_number: parsed.data.shirtNumber,
-        position: parsed.data.position?.trim() || null,
-        active: parsed.data.active
+        position: parsed.data.position?.trim() || null
       })
       .eq("id", parsed.data.playerId)
       .eq("tournament_id", parsed.data.tournamentId)

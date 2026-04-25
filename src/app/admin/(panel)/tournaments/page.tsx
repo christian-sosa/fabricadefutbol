@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { archiveTournamentAction, createTournamentAction } from "@/app/admin/(panel)/tournaments/actions";
+import {
+  archiveTournamentAction,
+  createTournamentAction,
+  deleteTournamentAction
+} from "@/app/admin/(panel)/tournaments/actions";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
 import { requireAdminSession } from "@/lib/auth/admin";
 import { getAdminTournaments } from "@/lib/auth/tournaments";
@@ -87,6 +92,15 @@ export default async function AdminTournamentsPage({
   }
 
   const tournaments = await getAdminTournaments(admin);
+  const tournamentById = new Map(tournaments.map((tournament) => [tournament.id, tournament]));
+  const rootTournaments = tournaments.filter((tournament) => !tournament.parent_tournament_id);
+  const subtournamentsByParent = new Map<string, typeof tournaments>();
+  for (const tournament of tournaments) {
+    if (!tournament.parent_tournament_id) continue;
+    const current = subtournamentsByParent.get(tournament.parent_tournament_id) ?? [];
+    current.push(tournament);
+    subtournamentsByParent.set(tournament.parent_tournament_id, current);
+  }
   const feedbackMessage = resolvedSearchParams.error
     ? { tone: "danger" as const, text: resolvedSearchParams.error }
     : resolvedSearchParams.success
@@ -116,11 +130,11 @@ export default async function AdminTournamentsPage({
       </Card>
 
       <Card>
-        <CardTitle>Nuevo torneo o subtorneo</CardTitle>
+        <CardTitle>Nuevo torneo base</CardTitle>
         <CardDescription className="mt-2">
           {TEMP_SKIP_TOURNAMENT_CHECKOUT
-            ? "Ingresa un nombre unico y lo creamos directo. El cobro de torneos esta temporalmente simulado para debug."
-            : "Ingresa un nombre unico y te llevamos a Mercado Pago para confirmar el alta antes de habilitar el torneo."}
+            ? "Ingresa un nombre unico y lo creamos directo. Ese torneo base despues puede tener varios subtorneos."
+            : "Ingresa un nombre unico y te llevamos a Mercado Pago para confirmar el alta del torneo base antes de habilitar sus subtorneos."}
         </CardDescription>
         <form action={createTournamentAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
           <div>
@@ -137,24 +151,79 @@ export default async function AdminTournamentsPage({
 
       <Card>
         <CardTitle>Mis torneos</CardTitle>
-        <CardDescription>Entra a cada torneo o subtorneo para cargar equipos, planteles, fixture y resultados.</CardDescription>
+        <CardDescription>
+          Cada torneo base puede agrupar varios subtorneos. Entra a cada uno para cargar equipos, planteles, fixture y resultados.
+        </CardDescription>
 
         <div className="mt-4 space-y-3">
-          {tournaments.length ? (
-            tournaments.map((tournament) => (
+          {rootTournaments.length ? (
+            rootTournaments.map((tournament) => {
+              const subtournaments = (subtournamentsByParent.get(tournament.id) ?? []).sort((left, right) =>
+                left.name.localeCompare(right.name, "es")
+              );
+              return (
               <div
                 className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 md:flex-row md:items-center md:justify-between"
                 key={tournament.id}
               >
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-base font-semibold text-slate-100">{tournament.name}</p>
+                    <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-200">
+                      Torneo base
+                    </span>
                     <TournamentStatusBadge status={tournament.status} />
                   </div>
                   <p className="mt-1 text-sm text-slate-400">/{tournament.slug}</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {tournament.is_public ? "Visible publicamente" : "Solo admin"}
+                    {tournament.is_public ? "Visible publicamente" : "Solo admin"} - {subtournaments.length} subtorneo(s)
                   </p>
+
+                  {subtournaments.length ? (
+                    <div className="mt-4 space-y-2 border-t border-slate-800/80 pt-4">
+                      {subtournaments.map((subtournament) => (
+                        <div
+                          className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-3 md:flex-row md:items-center md:justify-between"
+                          key={subtournament.id}
+                        >
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-semibold text-slate-100">{subtournament.name}</p>
+                              <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-200">
+                                Subtorneo
+                              </span>
+                              <TournamentStatusBadge status={subtournament.status} />
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">/{subtournament.slug}</p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-3">
+                            <Link
+                              className="text-sm font-semibold text-emerald-300 hover:underline"
+                              href={`/admin/tournaments/${subtournament.id}`}
+                            >
+                              Gestionar
+                            </Link>
+                            <Link
+                              className="text-sm font-semibold text-sky-300 hover:underline"
+                              href={`/tournaments/${subtournament.slug}`}
+                            >
+                              Ver publico
+                            </Link>
+                            <form action={deleteTournamentAction}>
+                              <input name="tournamentId" type="hidden" value={subtournament.id} />
+                              <ConfirmSubmitButton
+                                className="h-8 px-3 text-xs"
+                                confirmMessage={`Estas seguro de borrar el subtorneo ${subtournament.name}?`}
+                                label="Borrar"
+                                variant="ghost"
+                              />
+                            </form>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -178,11 +247,25 @@ export default async function AdminTournamentsPage({
                       </Button>
                     </form>
                   ) : null}
+                  <form action={deleteTournamentAction}>
+                    <input name="tournamentId" type="hidden" value={tournament.id} />
+                    <ConfirmSubmitButton
+                      className="h-8 px-3 text-xs"
+                      confirmMessage={`Estas seguro de borrar el torneo ${tournament.name}? Si tiene subtorneos primero deberas borrarlos.`}
+                      label="Borrar"
+                      variant="ghost"
+                    />
+                  </form>
                 </div>
               </div>
-            ))
+            );
+            })
           ) : (
-            <p className="text-sm text-slate-400">Todavia no administras ningun torneo.</p>
+            <p className="text-sm text-slate-400">
+              {tournaments.length
+                ? `Tus torneos actuales dependen de ${tournamentById.get(tournaments[0]?.parent_tournament_id ?? "")?.name ?? "otro torneo base"}.`
+                : "Todavia no administras ningun torneo."}
+            </p>
           )}
         </div>
       </Card>
