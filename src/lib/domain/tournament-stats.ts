@@ -1,5 +1,7 @@
 import type {
+  CompetitionPhase,
   TournamentBestDefenseRow,
+  TournamentByeKind,
   TournamentFixtureRow,
   TournamentStandingRow,
   TournamentTopFigureRow,
@@ -18,6 +20,8 @@ export type TournamentRoundReference = {
   id: string;
   round_number: number;
   name: string;
+  phase: CompetitionPhase;
+  stage_label: string | null;
   starts_at: string | null;
   ends_at: string | null;
 };
@@ -27,15 +31,29 @@ export type TournamentMatchReference = {
   round_id: string | null;
   home_team_id: string;
   away_team_id: string;
+  phase: CompetitionPhase;
+  stage_label: string | null;
   scheduled_at: string | null;
   venue: string | null;
   status: string;
+};
+
+export type TournamentByeReference = {
+  id: string;
+  round_id: string;
+  competition_team_id: string;
+  phase: CompetitionPhase;
+  kind: TournamentByeKind;
+  note: string | null;
 };
 
 export type TournamentMatchResultReference = {
   match_id: string;
   home_score: number;
   away_score: number;
+  penalty_home_score: number | null;
+  penalty_away_score: number | null;
+  winner_team_id: string | null;
   mvp_player_id: string | null;
   mvp_player_name: string | null;
   notes: string | null;
@@ -99,7 +117,7 @@ export function buildTournamentStandings(params: {
   }
 
   for (const match of matches) {
-    if (match.status !== "played") continue;
+    if (match.phase !== "league" || match.status !== "played") continue;
 
     const result = resultByMatchId.get(match.id);
     if (!result) continue;
@@ -136,6 +154,7 @@ export function buildTournamentStandings(params: {
       ...row,
       goalDifference: row.goalsFor - row.goalsAgainst
     }))
+    .filter((row) => row.played > 0)
     .sort((left, right) => {
       if (right.points !== left.points) return right.points - left.points;
       if (right.goalDifference !== left.goalDifference) return right.goalDifference - left.goalDifference;
@@ -148,14 +167,15 @@ export function buildTournamentFixture(params: {
   teams: TournamentTeamReference[];
   rounds: TournamentRoundReference[];
   matches: TournamentMatchReference[];
+  byes?: TournamentByeReference[];
   results: TournamentMatchResultReference[];
 }) {
-  const { teams, rounds, matches, results } = params;
+  const { teams, rounds, matches, byes = [], results } = params;
   const teamById = buildTeamIndex(teams);
   const roundById = new Map(rounds.map((round) => [round.id, round]));
   const resultByMatchId = new Map(results.map((result) => [result.match_id, result]));
 
-  return [...matches]
+  const matchRows = matches
     .map<TournamentFixtureRow | null>((match) => {
       const homeTeam = teamById.get(match.home_team_id);
       const awayTeam = teamById.get(match.away_team_id);
@@ -163,12 +183,17 @@ export function buildTournamentFixture(params: {
 
       const round = match.round_id ? roundById.get(match.round_id) ?? null : null;
       const result = resultByMatchId.get(match.id) ?? null;
+      const phase = match.phase ?? round?.phase ?? "league";
+      const stageLabel = match.stage_label ?? round?.stage_label ?? round?.name ?? "Partido";
 
       return {
         id: match.id,
+        kind: "match",
         roundId: round?.id ?? null,
         roundNumber: round?.round_number ?? 9999,
         roundName: round?.name ?? "Partido suelto",
+        phase,
+        stageLabel,
         scheduledAt: match.scheduled_at,
         venue: match.venue,
         status: match.status as TournamentFixtureRow["status"],
@@ -179,16 +204,68 @@ export function buildTournamentFixture(params: {
         awayTeamName: awayTeam.name,
         awayTeamShortName: awayTeam.short_name,
         homeScore: result?.home_score ?? null,
-        awayScore: result?.away_score ?? null
+        awayScore: result?.away_score ?? null,
+        penaltyHomeScore: result?.penalty_home_score ?? null,
+        penaltyAwayScore: result?.penalty_away_score ?? null,
+        winnerTeamId: result?.winner_team_id ?? null,
+        byeKind: null,
+        byeTeamId: null,
+        byeTeamName: null,
+        byeTeamShortName: null
       };
     })
-    .filter((row): row is TournamentFixtureRow => row !== null)
-    .sort((left, right) => {
-      if (left.roundNumber !== right.roundNumber) return left.roundNumber - right.roundNumber;
-      const scheduleDiff = compareMaybeDates(left.scheduledAt, right.scheduledAt);
-      if (scheduleDiff !== 0) return scheduleDiff;
-      return left.homeTeamName.localeCompare(right.homeTeamName, "es");
-    });
+    .filter((row): row is TournamentFixtureRow => row !== null);
+
+  const byeRows = byes
+    .map<TournamentFixtureRow | null>((bye) => {
+      const team = teamById.get(bye.competition_team_id);
+      const round = roundById.get(bye.round_id) ?? null;
+      if (!team || !round) return null;
+
+      return {
+        id: bye.id,
+        kind: "bye",
+        roundId: round.id,
+        roundNumber: round.round_number,
+        roundName: round.name,
+        phase: bye.phase ?? round.phase,
+        stageLabel: round.stage_label ?? round.name,
+        scheduledAt: null,
+        venue: null,
+        status: "bye",
+        homeTeamId: null,
+        homeTeamName: null,
+        homeTeamShortName: null,
+        awayTeamId: null,
+        awayTeamName: null,
+        awayTeamShortName: null,
+        homeScore: null,
+        awayScore: null,
+        penaltyHomeScore: null,
+        penaltyAwayScore: null,
+        winnerTeamId: team.id,
+        byeKind: bye.kind,
+        byeTeamId: team.id,
+        byeTeamName: team.name,
+        byeTeamShortName: team.short_name
+      };
+    })
+    .filter((row): row is TournamentFixtureRow => row !== null);
+
+  return [...matchRows, ...byeRows].sort((left, right) => {
+    if (left.roundNumber !== right.roundNumber) return left.roundNumber - right.roundNumber;
+    if (left.phase !== right.phase) return left.phase.localeCompare(right.phase);
+    if (left.kind !== right.kind) {
+      return left.kind === "match" ? -1 : 1;
+    }
+
+    const scheduleDiff = compareMaybeDates(left.scheduledAt, right.scheduledAt);
+    if (scheduleDiff !== 0) return scheduleDiff;
+
+    const leftLabel = left.kind === "bye" ? left.byeTeamName ?? "" : left.homeTeamName ?? "";
+    const rightLabel = right.kind === "bye" ? right.byeTeamName ?? "" : right.homeTeamName ?? "";
+    return leftLabel.localeCompare(rightLabel, "es");
+  });
 }
 
 export function buildTournamentTopScorers(params: {
@@ -284,17 +361,52 @@ export function buildTournamentBestDefense(params: {
   results: TournamentMatchResultReference[];
 }) {
   const { teams, matches, results } = params;
-  const standings = buildTournamentStandings({ teams, matches, results });
+  const teamById = buildTeamIndex(teams);
+  const resultByMatchId = new Map(results.map((result) => [result.match_id, result]));
+  const accumulators = new Map<
+    string,
+    {
+      goalsAgainst: number;
+      matchesPlayed: number;
+    }
+  >();
 
-  return standings
-    .filter((row) => row.played > 0)
-    .map<TournamentBestDefenseRow>((row) => ({
-      teamId: row.teamId,
-      teamName: row.teamName,
-      teamShortName: row.shortName,
-      goalsAgainst: row.goalsAgainst,
-      matchesPlayed: row.played
-    }))
+  for (const team of teams) {
+    accumulators.set(team.id, {
+      goalsAgainst: 0,
+      matchesPlayed: 0
+    });
+  }
+
+  for (const match of matches) {
+    if (match.status !== "played") continue;
+
+    const result = resultByMatchId.get(match.id);
+    if (!result) continue;
+
+    const homeAccumulator = accumulators.get(match.home_team_id);
+    const awayAccumulator = accumulators.get(match.away_team_id);
+    if (!homeAccumulator || !awayAccumulator) continue;
+
+    homeAccumulator.matchesPlayed += 1;
+    awayAccumulator.matchesPlayed += 1;
+    homeAccumulator.goalsAgainst += result.away_score;
+    awayAccumulator.goalsAgainst += result.home_score;
+  }
+
+  return [...accumulators.entries()]
+    .map<TournamentBestDefenseRow | null>(([teamId, value]) => {
+      if (value.matchesPlayed <= 0) return null;
+      const teamMeta = resolveTeamMeta(teamById, teamId);
+      return {
+        teamId,
+        teamName: teamMeta.teamName,
+        teamShortName: teamMeta.teamShortName,
+        goalsAgainst: value.goalsAgainst,
+        matchesPlayed: value.matchesPlayed
+      };
+    })
+    .filter((row): row is TournamentBestDefenseRow => row !== null)
     .sort((left, right) => {
       if (left.goalsAgainst !== right.goalsAgainst) return left.goalsAgainst - right.goalsAgainst;
       if (right.matchesPlayed !== left.matchesPlayed) return right.matchesPlayed - left.matchesPlayed;

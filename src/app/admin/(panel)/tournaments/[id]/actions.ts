@@ -5,7 +5,14 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { assertLeagueMembershipAction, getLeagueSlugById } from "@/lib/auth/tournaments";
+import { getLeagueLogosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
+import {
+  getLeagueLogoObjectPath,
+  isSupportedLeagueLogoFile,
+  MAX_LEAGUE_LOGO_SIZE_MB,
+  optimizeLeagueLogoImage
+} from "@/lib/league-logos";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { normalizeEmail, slugifyTournamentName } from "@/lib/org";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -47,7 +54,28 @@ const createCompetitionSchema = z.object({
   seasonLabel: z.string().max(40).optional(),
   description: z.string().max(500).optional(),
   venueOverride: z.string().max(120).optional(),
+  type: z.enum(["league", "cup", "league_and_cup"]).default("league"),
+  playoffSize: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() ? Number(value) : null),
+    z.union([z.literal(4), z.literal(8), z.null()])
+  ),
   isPublic: z.boolean().default(false)
+}).superRefine((value, ctx) => {
+  if (value.type === "league_and_cup" && value.playoffSize === null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["playoffSize"],
+      message: "Liga + copa necesita definir un playoff de 4 u 8 equipos."
+    });
+  }
+
+  if (value.type !== "league_and_cup" && value.playoffSize !== null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["playoffSize"],
+      message: "El playoff solo aplica al formato Liga + copa."
+    });
+  }
 });
 
 function buildLeagueDetailPath(params: {
@@ -163,6 +191,7 @@ async function revalidateLeaguePaths(leagueId: string) {
   revalidatePath(`/admin/tournaments/${leagueId}`);
   revalidatePath("/tournaments");
   revalidatePath(`/tournaments/${slug}`);
+  revalidatePath(`/api/league-logo/${leagueId}`);
   return slug;
 }
 
@@ -241,6 +270,82 @@ export async function updateLeagueAction(leagueId: string, formData: FormData) {
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildLeagueDetailPath({ leagueId, tab: "summary", error: toUserMessage(error, "No se pudo actualizar la liga.") }));
+  }
+}
+
+export async function uploadLeagueLogoAction(leagueId: string, formData: FormData) {
+  try {
+    await assertLeagueMembershipAction(leagueId);
+    const file = formData.get("logo");
+
+    if (!(file instanceof File) || file.size <= 0) {
+      redirect(buildLeagueDetailPath({ leagueId, tab: "summary", error: "Selecciona una imagen para subir." }));
+    }
+
+    const sizeLimitBytes = MAX_LEAGUE_LOGO_SIZE_MB * 1024 * 1024;
+    if (file.size > sizeLimitBytes) {
+      redirect(
+        buildLeagueDetailPath({
+          leagueId,
+          tab: "summary",
+          error: `La imagen no puede superar ${MAX_LEAGUE_LOGO_SIZE_MB} MB.`
+        })
+      );
+    }
+
+    if (!isSupportedLeagueLogoFile(file)) {
+      redirect(
+        buildLeagueDetailPath({
+          leagueId,
+          tab: "summary",
+          error: "Formato no soportado. Usa JPG, PNG, WEBP o SVG."
+        })
+      );
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const optimizedBuffer = await optimizeLeagueLogoImage(file);
+    const objectPath = getLeagueLogoObjectPath(getSupabaseDbSchema(), leagueId);
+    const { error: uploadError } = await supabase.storage
+      .from(getLeagueLogosBucket())
+      .upload(objectPath, optimizedBuffer, {
+        upsert: true,
+        contentType: "image/webp",
+        cacheControl: "31536000"
+      });
+
+    if (uploadError) {
+      redirect(
+        buildLeagueDetailPath({
+          leagueId,
+          tab: "summary",
+          error: toUserMessage(uploadError, "No se pudo guardar el logo.")
+        })
+      );
+    }
+
+    const { error: updateError } = await supabase
+      .from("leagues")
+      .update({
+        logo_path: objectPath
+      })
+      .eq("id", leagueId);
+
+    if (updateError) {
+      redirect(
+        buildLeagueDetailPath({
+          leagueId,
+          tab: "summary",
+          error: toUserMessage(updateError, "No se pudo vincular el logo a la liga.")
+        })
+      );
+    }
+
+    await revalidateLeaguePaths(leagueId);
+    redirect(buildLeagueDetailPath({ leagueId, tab: "summary", success: "Logo actualizado." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildLeagueDetailPath({ leagueId, tab: "summary", error: toUserMessage(error, "No se pudo subir el logo.") }));
   }
 }
 
@@ -557,6 +662,8 @@ export async function createCompetitionAction(leagueId: string, formData: FormDa
       seasonLabel: formData.get("seasonLabel"),
       description: formData.get("description"),
       venueOverride: formData.get("venueOverride"),
+      type: formData.get("type"),
+      playoffSize: formData.get("playoffSize"),
       isPublic: formData.get("isPublic") === "on"
     });
 
@@ -585,6 +692,8 @@ export async function createCompetitionAction(leagueId: string, formData: FormDa
         season_label: parsed.data.seasonLabel?.trim() || String(new Date().getFullYear()),
         description: parsed.data.description?.trim() || null,
         venue_override: parsed.data.venueOverride?.trim() || null,
+        type: parsed.data.type,
+        playoff_size: parsed.data.type === "league_and_cup" ? parsed.data.playoffSize : null,
         is_public: parsed.data.isPublic,
         status: "draft"
       })

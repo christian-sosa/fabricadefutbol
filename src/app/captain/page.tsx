@@ -20,6 +20,7 @@ import { getCaptainContext } from "@/lib/auth/captains";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import { getCaptainCompetitionTeamPanelData } from "@/lib/queries/tournaments";
 import { formatDateTime } from "@/lib/utils";
+import type { TournamentMatchStatus } from "@/types/domain";
 
 function buildCaptainTabHref(competitionId?: string | null, teamId?: string | null) {
   const searchParams = new URLSearchParams();
@@ -284,7 +285,7 @@ export default async function CaptainPage({
             {upcomingMatches.length ? (
               upcomingMatches.map((match) => {
                 const isHome = match.homeTeamId === panelData.team.id;
-                const opponentName = isHome ? match.awayTeamName : match.homeTeamName;
+                const opponentName = isHome ? (match.awayTeamName ?? "Rival por definir") : (match.homeTeamName ?? "Rival por definir");
                 return (
                   <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3" key={match.id}>
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -300,7 +301,7 @@ export default async function CaptainPage({
                           })}
                         </p>
                       </div>
-                      <TournamentMatchStatusBadge status={match.status} />
+                      <TournamentMatchStatusBadge status={match.status as TournamentMatchStatus} />
                     </div>
                   </div>
                 );
@@ -317,7 +318,7 @@ export default async function CaptainPage({
             {playedMatches.length ? (
               playedMatches.map((match) => {
                 const isHome = match.homeTeamId === panelData.team.id;
-                const opponentName = isHome ? match.awayTeamName : match.homeTeamName;
+                const opponentName = isHome ? (match.awayTeamName ?? "Rival por definir") : (match.homeTeamName ?? "Rival por definir");
                 return (
                   <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3" key={match.id}>
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -334,7 +335,7 @@ export default async function CaptainPage({
                         </p>
                       </div>
                       <span className="rounded-full border border-slate-700 px-3 py-1 text-xs font-semibold text-slate-200">
-                        {TOURNAMENT_MATCH_STATUS_LABELS[match.status]}
+                        {TOURNAMENT_MATCH_STATUS_LABELS[match.status as TournamentMatchStatus]}
                       </span>
                     </div>
                   </div>

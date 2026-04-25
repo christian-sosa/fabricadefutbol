@@ -9,6 +9,22 @@ function formatScheduledAt(value: string | null) {
   return value ? formatDateTime(value) : "Por definir";
 }
 
+function formatFixtureScore(row: TournamentFixtureRow) {
+  if (row.kind === "bye") {
+    return row.byeKind === "advance" ? "Pasa de ronda" : "Fecha libre";
+  }
+
+  if (row.homeScore === null || row.awayScore === null) {
+    return "Pendiente";
+  }
+
+  if (row.penaltyHomeScore !== null && row.penaltyAwayScore !== null) {
+    return `${row.homeScore} - ${row.awayScore} (pen ${row.penaltyHomeScore}-${row.penaltyAwayScore})`;
+  }
+
+  return `${row.homeScore} - ${row.awayScore}`;
+}
+
 export function TournamentFixtureTable({
   rows,
   buildMatchHref,
@@ -36,19 +52,30 @@ export function TournamentFixtureTable({
             const href = buildMatchHref ? buildMatchHref(row) : null;
             return (
               <tr className="transition-colors hover:bg-slate-800/70" key={row.id}>
-                <TD>{row.roundName}</TD>
-                <TD>{formatScheduledAt(row.scheduledAt)}</TD>
+                <TD>
+                  <div className="space-y-1">
+                    <p>{row.roundName}</p>
+                    <p className="text-xs text-slate-500">{row.phase === "cup" ? row.stageLabel : "Fase liga"}</p>
+                  </div>
+                </TD>
+                <TD>{row.kind === "bye" ? "-" : formatScheduledAt(row.scheduledAt)}</TD>
                 <TD className="font-semibold text-slate-100">
-                  {row.homeTeamName} vs {row.awayTeamName}
+                  {row.kind === "bye"
+                    ? `${row.byeTeamName ?? "Equipo"} - ${row.byeKind === "advance" ? "Pasa de ronda" : "Fecha libre"}`
+                    : `${row.homeTeamName} vs ${row.awayTeamName}`}
+                </TD>
+                <TD>{formatFixtureScore(row)}</TD>
+                <TD>
+                  {row.status === "bye" ? (
+                    <span className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-200">
+                      Bye
+                    </span>
+                  ) : (
+                    <TournamentMatchStatusBadge status={row.status} />
+                  )}
                 </TD>
                 <TD>
-                  {row.homeScore !== null && row.awayScore !== null ? `${row.homeScore} - ${row.awayScore}` : "Pendiente"}
-                </TD>
-                <TD>
-                  <TournamentMatchStatusBadge status={row.status} />
-                </TD>
-                <TD>
-                  {href ? (
+                  {href && row.kind === "match" ? (
                     <Link className="font-semibold text-emerald-300 hover:underline" href={href}>
                       {linkLabel}
                     </Link>

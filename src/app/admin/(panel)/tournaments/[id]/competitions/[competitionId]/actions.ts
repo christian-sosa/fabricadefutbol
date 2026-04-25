@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/tournaments";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import {
+  generateCompetitionCupPlayoff,
   generateCompetitionFixture,
   saveCompetitionMatchSheet,
   validateCompetitionMatchPair
@@ -24,15 +25,36 @@ import {
   optimizePlayerAvatarImage
 } from "@/lib/player-photos";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { TournamentMatchSheetInput } from "@/types/domain";
+import type { CompetitionPhase, TournamentMatchSheetInput } from "@/types/domain";
 
 const updateCompetitionSchema = z.object({
   name: z.string().min(3, "La competencia debe tener al menos 3 caracteres.").max(100),
   seasonLabel: z.string().max(40).optional(),
   description: z.string().max(500).optional(),
   venueOverride: z.string().max(120).optional(),
+  type: z.enum(["league", "cup", "league_and_cup"]).default("league"),
+  playoffSize: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() ? Number(value) : null),
+    z.union([z.literal(4), z.literal(8), z.null()])
+  ),
   isPublic: z.boolean().default(false),
   status: z.enum(["draft", "active", "finished", "archived"])
+}).superRefine((value, ctx) => {
+  if (value.type === "league_and_cup" && value.playoffSize === null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["playoffSize"],
+      message: "Liga + copa necesita definir un playoff de 4 u 8 equipos."
+    });
+  }
+
+  if (value.type !== "league_and_cup" && value.playoffSize !== null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["playoffSize"],
+      message: "El playoff solo aplica al formato Liga + copa."
+    });
+  }
 });
 
 const captainInviteSchema = z.object({
@@ -74,6 +96,7 @@ const playerPhotoSchema = z.object({
 
 const manualMatchSchema = z.object({
   roundName: z.string().min(2, "La fecha debe tener al menos 2 caracteres.").max(80),
+  phase: z.enum(["league", "cup"]).optional(),
   homeTeamId: z.string().uuid(),
   awayTeamId: z.string().uuid(),
   scheduledAt: z.string().optional(),
@@ -105,6 +128,40 @@ const matchSheetSchema = z.object({
     })
   )
 });
+
+async function loadCompetitionSummary(competitionId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("competitions")
+    .select("id, type, playoff_size")
+    .eq("id", competitionId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "No se encontro la competencia.");
+  }
+
+  return {
+    id: String(data.id),
+    type: String(data.type) as "league" | "cup" | "league_and_cup",
+    playoffSize: data.playoff_size === 4 || data.playoff_size === 8 ? data.playoff_size : null
+  };
+}
+
+function resolveManualMatchPhase(params: {
+  competitionType: "league" | "cup" | "league_and_cup";
+  requestedPhase?: CompetitionPhase | undefined;
+}): CompetitionPhase {
+  if (params.competitionType === "cup") {
+    return "cup";
+  }
+
+  if (params.competitionType === "league_and_cup") {
+    return params.requestedPhase === "cup" ? "cup" : "league";
+  }
+
+  return "league";
+}
 
 function buildCompetitionDetailPath(params: {
   leagueId: string;
@@ -228,13 +285,15 @@ async function validateCompetitionNameAvailability(params: {
 async function resolveRoundIdByName(params: {
   competitionId: string;
   roundName: string;
+  phase: CompetitionPhase;
+  stageLabel?: string;
 }) {
-  const { competitionId, roundName } = params;
+  const { competitionId, roundName, phase } = params;
   const supabase = await createSupabaseServerClient();
   const normalizedRoundName = roundName.trim().toLowerCase();
   const { data: existingRounds, error: roundsError } = await supabase
     .from("competition_rounds")
-    .select("id, round_number, name")
+    .select("id, round_number, name, phase")
     .eq("competition_id", competitionId)
     .order("round_number", { ascending: true });
 
@@ -242,7 +301,9 @@ async function resolveRoundIdByName(params: {
     throw new Error(`No se pudieron leer las fechas de la competencia: ${roundsError.message}`);
   }
 
-  const existingRound = (existingRounds ?? []).find((row) => row.name.trim().toLowerCase() === normalizedRoundName);
+  const existingRound = (existingRounds ?? []).find(
+    (row) => row.name.trim().toLowerCase() === normalizedRoundName && row.phase === phase
+  );
   if (existingRound) return existingRound.id;
 
   const nextRoundNumber = Math.max(0, ...(existingRounds ?? []).map((row) => Number(row.round_number))) + 1;
@@ -251,7 +312,9 @@ async function resolveRoundIdByName(params: {
     .insert({
       competition_id: competitionId,
       round_number: nextRoundNumber,
-      name: roundName.trim()
+      name: roundName.trim(),
+      phase,
+      stage_label: params.stageLabel?.trim() || roundName.trim()
     })
     .select("id")
     .single();
@@ -275,6 +338,8 @@ export async function updateCompetitionAction(
       seasonLabel: formData.get("seasonLabel"),
       description: formData.get("description"),
       venueOverride: formData.get("venueOverride"),
+      type: formData.get("type"),
+      playoffSize: formData.get("playoffSize"),
       isPublic: formData.get("isPublic") === "on",
       status: formData.get("status")
     });
@@ -294,6 +359,48 @@ export async function updateCompetitionAction(
     }
 
     const supabase = await createSupabaseServerClient();
+    const currentCompetition = await loadCompetitionSummary(competitionId);
+    const [{ count: existingMatchCount, error: matchCountError }, { count: existingByeCount, error: byeCountError }] =
+      await Promise.all([
+        supabase
+          .from("competition_matches")
+          .select("id", { count: "exact", head: true })
+          .eq("competition_id", competitionId),
+        supabase
+          .from("competition_byes")
+          .select("id", { count: "exact", head: true })
+          .eq("competition_id", competitionId)
+      ]);
+
+    if (matchCountError || byeCountError) {
+      redirect(
+        buildCompetitionDetailPath({
+          leagueId,
+          competitionId,
+          tab: "summary",
+          error: "No se pudo validar el fixture actual."
+        })
+      );
+    }
+
+    const hasFixture = (existingMatchCount ?? 0) > 0 || (existingByeCount ?? 0) > 0;
+    if (
+      hasFixture &&
+      (parsed.data.type !== currentCompetition.type ||
+        (parsed.data.type === "league_and_cup"
+          ? parsed.data.playoffSize !== currentCompetition.playoffSize
+          : currentCompetition.playoffSize !== null))
+    ) {
+      redirect(
+        buildCompetitionDetailPath({
+          leagueId,
+          competitionId,
+          tab: "summary",
+          error: "No puedes cambiar el formato despues de generar el fixture."
+        })
+      );
+    }
+
     const { error } = await supabase
       .from("competitions")
       .update({
@@ -301,6 +408,8 @@ export async function updateCompetitionAction(
         season_label: parsed.data.seasonLabel?.trim() || String(new Date().getFullYear()),
         description: parsed.data.description?.trim() || null,
         venue_override: parsed.data.venueOverride?.trim() || null,
+        type: parsed.data.type,
+        playoff_size: parsed.data.type === "league_and_cup" ? parsed.data.playoffSize : null,
         is_public: parsed.data.isPublic,
         status: parsed.data.status
       })
@@ -752,6 +861,24 @@ export async function generateCompetitionFixtureAction(leagueId: string, competi
   }
 }
 
+export async function generateCompetitionPlayoffAction(leagueId: string, competitionId: string) {
+  try {
+    const { admin } = await assertCompetitionMembershipAction(competitionId);
+    const supabase = await createSupabaseServerClient();
+    await generateCompetitionCupPlayoff({
+      supabase: supabase as never,
+      adminId: admin.userId,
+      competitionId
+    });
+
+    await revalidateCompetitionPaths(leagueId, competitionId);
+    redirect(buildCompetitionDetailPath({ leagueId, competitionId, tab: "fixture", success: "Copa generada." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildCompetitionDetailPath({ leagueId, competitionId, tab: "fixture", error: toUserMessage(error, "No se pudo generar la copa.") }));
+  }
+}
+
 export async function createManualCompetitionMatchAction(
   leagueId: string,
   competitionId: string,
@@ -759,8 +886,10 @@ export async function createManualCompetitionMatchAction(
 ) {
   try {
     const { admin } = await assertCompetitionMembershipAction(competitionId);
+    const competition = await loadCompetitionSummary(competitionId);
     const parsed = manualMatchSchema.safeParse({
       roundName: formData.get("roundName"),
+      phase: formData.get("phase") || undefined,
       homeTeamId: formData.get("homeTeamId"),
       awayTeamId: formData.get("awayTeamId"),
       scheduledAt: formData.get("scheduledAt"),
@@ -773,15 +902,22 @@ export async function createManualCompetitionMatchAction(
     }
 
     const supabase = await createSupabaseServerClient();
+    const phase = resolveManualMatchPhase({
+      competitionType: competition.type,
+      requestedPhase: parsed.data.phase
+    });
     await validateCompetitionMatchPair({
       supabase: supabase as never,
       competitionId,
       homeTeamId: parsed.data.homeTeamId,
-      awayTeamId: parsed.data.awayTeamId
+      awayTeamId: parsed.data.awayTeamId,
+      phase
     });
     const roundId = await resolveRoundIdByName({
       competitionId,
-      roundName: parsed.data.roundName
+      roundName: parsed.data.roundName,
+      phase,
+      stageLabel: parsed.data.roundName
     });
 
     const { error } = await supabase.from("competition_matches").insert({
@@ -789,6 +925,8 @@ export async function createManualCompetitionMatchAction(
       round_id: roundId,
       home_team_id: parsed.data.homeTeamId,
       away_team_id: parsed.data.awayTeamId,
+      phase,
+      stage_label: parsed.data.roundName.trim(),
       scheduled_at: normalizeScheduledAt(parsed.data.scheduledAt),
       venue: parsed.data.venue?.trim() || null,
       status: parsed.data.status,
@@ -832,7 +970,7 @@ export async function updateCompetitionMatchAction(
     const supabase = await createSupabaseServerClient();
     const { data: currentMatch, error: matchError } = await supabase
       .from("competition_matches")
-      .select("id, home_team_id, away_team_id, round_id, status")
+      .select("id, home_team_id, away_team_id, round_id, phase, status")
       .eq("id", parsed.data.matchId)
       .eq("competition_id", competitionId)
       .maybeSingle();
@@ -849,6 +987,7 @@ export async function updateCompetitionMatchAction(
       competitionId,
       homeTeamId: parsed.data.homeTeamId,
       awayTeamId: parsed.data.awayTeamId,
+      phase: (currentMatch.phase as CompetitionPhase) ?? "league",
       ignoreMatchId: parsed.data.matchId
     });
 
@@ -922,14 +1061,33 @@ export async function saveCompetitionMatchSheetAction(
 
     const homeScore = Number(formData.get("homeScore"));
     const awayScore = Number(formData.get("awayScore"));
+    const penaltyHomeScoreRaw = formData.get("penaltyHomeScore");
+    const penaltyAwayScoreRaw = formData.get("penaltyAwayScore");
     const notesValue = String(formData.get("notes") ?? "");
+    const penaltyHomeScore =
+      typeof penaltyHomeScoreRaw === "string" && penaltyHomeScoreRaw.trim()
+        ? Number(penaltyHomeScoreRaw)
+        : null;
+    const penaltyAwayScore =
+      typeof penaltyAwayScoreRaw === "string" && penaltyAwayScoreRaw.trim()
+        ? Number(penaltyAwayScoreRaw)
+        : null;
     if (!Number.isFinite(homeScore) || !Number.isFinite(awayScore)) {
       redirect(buildMatchSheetPath({ leagueId, competitionId, matchId, error: "El marcador enviado es inválido." }));
+    }
+
+    if (
+      (penaltyHomeScore !== null && !Number.isFinite(penaltyHomeScore)) ||
+      (penaltyAwayScore !== null && !Number.isFinite(penaltyAwayScore))
+    ) {
+      redirect(buildMatchSheetPath({ leagueId, competitionId, matchId, error: "La tanda de penales enviada es invÃ¡lida." }));
     }
 
     const input: TournamentMatchSheetInput = {
       homeScore,
       awayScore,
+      penaltyHomeScore,
+      penaltyAwayScore,
       notes: notesValue,
       mvpEntryKey: normalizedPayload.data.mvpEntryKey ?? null,
       stats: normalizedPayload.data.stats

@@ -26,7 +26,13 @@ const NEXT_PUBLIC_ENV = {
   NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET_DEV:
     process.env.NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET_DEV,
   NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET_PROD:
-    process.env.NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET_PROD
+    process.env.NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET_PROD,
+  NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET:
+    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET,
+  NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_DEV:
+    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_DEV,
+  NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_PROD:
+    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_PROD
 } as const;
 
 function getEnv(name: string) {
@@ -238,6 +244,35 @@ export function getPlayerPhotosBucket() {
   const value = selected ?? fallback;
 
   return value ?? "player-photos";
+}
+
+export function getLeagueLogosBucket() {
+  const targetEnv = getSupabaseTargetEnv();
+  const selected =
+    targetEnv === "development"
+      ? firstDefined([
+          "SUPABASE_LEAGUE_LOGOS_BUCKET_DEV",
+          "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_DEV",
+          "SUPABASE_LEAGUE_LOGOS_BUCKET",
+          "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET"
+        ])
+      : firstDefined([
+          "SUPABASE_LEAGUE_LOGOS_BUCKET",
+          "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET",
+          "SUPABASE_LEAGUE_LOGOS_BUCKET_PROD",
+          "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_PROD"
+        ]);
+  const fallback = firstDefined([
+    "SUPABASE_LEAGUE_LOGOS_BUCKET",
+    "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET",
+    "SUPABASE_LEAGUE_LOGOS_BUCKET_DEV",
+    "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_DEV",
+    "SUPABASE_LEAGUE_LOGOS_BUCKET_PROD",
+    "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_PROD"
+  ]);
+  const value = selected ?? fallback;
+
+  return value ?? "league-logos";
 }
 
 export function getMercadoPagoAccessToken() {

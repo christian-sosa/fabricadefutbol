@@ -88,6 +88,7 @@ describe("league and competition public queries", () => {
       expect.objectContaining({
         id: "league-1",
         slug: "lafab",
+        logoUrl: "/api/league-logo/league-1",
         venueName: "Parque Norte",
         teamCount: 2,
         competitionCount: 1,
@@ -166,17 +167,13 @@ describe("league and competition public queries", () => {
       expect.objectContaining({
         league: expect.objectContaining({
           slug: "lafab",
+          logoUrl: "/api/league-logo/league-1",
           venueName: "Parque Norte",
           locationNotes: "Canchas 1 y 2",
           teamCount: 2,
-          competitionCount: 2
+          competitionCount: 1
         }),
         competitions: [
-          expect.objectContaining({
-            slug: "viernes-b",
-            seasonLabel: "2026",
-            teamCount: 0
-          }),
           expect.objectContaining({
             slug: "viernes-a",
             teamCount: 2
@@ -184,6 +181,40 @@ describe("league and competition public queries", () => {
         ]
       })
     );
+  });
+
+  it("oculta competencias en borrador aun si estan marcadas como publicas", async () => {
+    const fake = createFakeSupabase({
+      leagues: [
+        {
+          id: "league-1",
+          name: "LAFAB",
+          slug: "lafab",
+          is_public: true,
+          status: "active"
+        }
+      ],
+      competitions: [
+        {
+          id: "competition-1",
+          league_id: "league-1",
+          name: "Viernes B",
+          slug: "viernes-b",
+          season_label: "2026",
+          is_public: true,
+          status: "draft"
+        }
+      ]
+    });
+
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+
+    await expect(
+      getPublicCompetitionBySlugs({
+        leagueSlug: "lafab",
+        competitionSlug: "viernes-b"
+      })
+    ).resolves.toBeNull();
   });
 
   it("arma el detalle publico de una competencia con tabla, fixture y leaderboards", async () => {
@@ -209,6 +240,7 @@ describe("league and competition public queries", () => {
           slug: "viernes-a",
           season_label: "2026",
           description: "Zona principal",
+          type: "league",
           is_public: true,
           status: "active"
         }
@@ -236,7 +268,7 @@ describe("league and competition public queries", () => {
         { id: "player-b", competition_team_id: "competition-team-b", full_name: "Pedro Beta", shirt_number: 10 }
       ],
       competition_rounds: [
-        { id: "round-1", competition_id: "competition-1", round_number: 1, name: "Fecha 1" }
+        { id: "round-1", competition_id: "competition-1", round_number: 1, name: "Fecha 1", phase: "league", stage_label: "Fecha 1" }
       ],
       competition_matches: [
         {
@@ -245,6 +277,8 @@ describe("league and competition public queries", () => {
           round_id: "round-1",
           home_team_id: "competition-team-a",
           away_team_id: "competition-team-b",
+          phase: "league",
+          stage_label: "Fecha 1",
           scheduled_at: "2026-04-25T20:00:00.000Z",
           venue: "Cancha Central",
           status: "played",
@@ -315,6 +349,7 @@ describe("league and competition public queries", () => {
         fixture: [
           expect.objectContaining({
             id: "match-1",
+            kind: "match",
             roundName: "Fecha 1",
             homeScore: 3,
             awayScore: 1
@@ -372,6 +407,7 @@ describe("league and competition public queries", () => {
           name: "Viernes A",
           slug: "viernes-a",
           season_label: "2026",
+          type: "league",
           is_public: true,
           status: "active"
         }
@@ -395,7 +431,7 @@ describe("league and competition public queries", () => {
         }
       ],
       competition_rounds: [
-        { id: "round-1", competition_id: "competition-1", round_number: 1, name: "Fecha 1" }
+        { id: "round-1", competition_id: "competition-1", round_number: 1, name: "Fecha 1", phase: "league", stage_label: "Fecha 1" }
       ],
       competition_matches: [
         {
@@ -404,6 +440,8 @@ describe("league and competition public queries", () => {
           round_id: "round-1",
           home_team_id: "competition-team-a",
           away_team_id: "competition-team-b",
+          phase: "league",
+          stage_label: "Fecha 1",
           scheduled_at: null,
           venue: null,
           status: "played",
