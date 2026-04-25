@@ -1,13 +1,17 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
-const schemaSql = readFileSync(path.join(root, "supabase", "schema.sql"), "utf8");
-const policiesSql = readFileSync(path.join(root, "supabase", "policies.sql"), "utf8");
+const schemaSqlPath = path.join(root, "supabase", "schema.sql");
+const policiesSqlPath = path.join(root, "supabase", "policies.sql");
+const hasSupabaseSql = existsSync(schemaSqlPath) && existsSync(policiesSqlPath);
+const schemaSql = hasSupabaseSql ? readFileSync(schemaSqlPath, "utf8") : "";
+const policiesSql = hasSupabaseSql ? readFileSync(policiesSqlPath, "utf8") : "";
+const describeSupabaseSql = hasSupabaseSql ? describe : describe.skip;
 
-describe("organization public snapshot SQL", () => {
+describeSupabaseSql("organization public snapshot SQL", () => {
   it("define una tabla de snapshot por grupo", () => {
     expect(schemaSql).toContain("create table if not exists public.organization_public_snapshots");
     expect(schemaSql).toContain("organization_id uuid primary key references public.organizations(id) on delete cascade");

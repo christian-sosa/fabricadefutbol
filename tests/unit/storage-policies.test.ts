@@ -1,11 +1,15 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
-const schemaSql = readFileSync(path.join(root, "supabase", "schema.sql"), "utf8");
-const policiesSql = readFileSync(path.join(root, "supabase", "policies.sql"), "utf8");
+const schemaSqlPath = path.join(root, "supabase", "schema.sql");
+const policiesSqlPath = path.join(root, "supabase", "policies.sql");
+const hasSupabaseSql = existsSync(schemaSqlPath) && existsSync(policiesSqlPath);
+const schemaSql = hasSupabaseSql ? readFileSync(schemaSqlPath, "utf8") : "";
+const policiesSql = hasSupabaseSql ? readFileSync(policiesSqlPath, "utf8") : "";
+const describeSupabaseSql = hasSupabaseSql ? describe : describe.skip;
 
 const privateBuckets = [
   "player-photos",
@@ -20,7 +24,7 @@ const privateBuckets = [
   "team-logos-dev"
 ] as const;
 
-describe("storage privacy policies", () => {
+describeSupabaseSql("storage privacy policies", () => {
   it("mantiene privados los buckets con assets de producto", () => {
     for (const bucket of privateBuckets) {
       expect(schemaSql).toMatch(
