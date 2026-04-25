@@ -19,6 +19,10 @@ import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import {
+  assertPlayerPhotoUploadAllowed,
+  registerPlayerPhotoUploadEvent
+} from "@/lib/player-photo-upload-limits";
+import {
   getCompetitionPlayerPhotoObjectPath,
   inferPlayerPhotoExtension,
   MAX_PLAYER_PHOTO_SIZE_MB,
@@ -447,7 +451,7 @@ export async function syncCompetitionTeamsAction(
       await Promise.all([
         supabase
           .from("league_teams")
-          .select("id, name, short_name, notes")
+          .select("id, name, short_name, logo_path, notes")
           .eq("league_id", leagueId),
         supabase
           .from("competition_teams")
@@ -478,6 +482,7 @@ export async function syncCompetitionTeamsAction(
           league_team_id: team.id,
           display_name: team.name,
           short_name: team.short_name ?? null,
+          logo_path: team.logo_path ?? null,
           display_order: nextDisplayOrder + index,
           notes: team.notes ?? null
         }))
@@ -779,7 +784,7 @@ export async function uploadCompetitionPlayerPhotoAction(
   formData: FormData
 ) {
   try {
-    await assertCompetitionMembershipAction(competitionId);
+    const { admin } = await assertCompetitionMembershipAction(competitionId);
     const parsed = playerPhotoSchema.safeParse({
       competitionTeamId: formData.get("competitionTeamId"),
       playerId: formData.get("playerId")
@@ -816,6 +821,14 @@ export async function uploadCompetitionPlayerPhotoAction(
       redirect(buildCompetitionDetailPath({ leagueId, competitionId, tab: "rosters", error: "No se encontró el jugador en la competencia seleccionada." }));
     }
 
+    await assertPlayerPhotoUploadAllowed({
+      supabase: supabase as never,
+      uploaderId: admin.userId,
+      uploaderRole: "league_admin",
+      targetPlayerId: parsed.data.playerId,
+      targetType: "competition_player"
+    });
+
     const optimizedBuffer = await optimizePlayerAvatarImage(file);
     const objectPath = getCompetitionPlayerPhotoObjectPath(
       getSupabaseDbSchema(),
@@ -832,6 +845,14 @@ export async function uploadCompetitionPlayerPhotoAction(
     if (uploadError) {
       redirect(buildCompetitionDetailPath({ leagueId, competitionId, tab: "rosters", error: "No se pudo guardar la foto del jugador." }));
     }
+
+    await registerPlayerPhotoUploadEvent({
+      supabase: supabase as never,
+      uploaderId: admin.userId,
+      uploaderRole: "league_admin",
+      targetPlayerId: parsed.data.playerId,
+      targetType: "competition_player"
+    });
 
     await revalidateCompetitionPaths(leagueId, competitionId);
     revalidatePath(`/api/player-photo/${parsed.data.playerId}`);

@@ -5,8 +5,19 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { assertLeagueMembershipAction, getLeagueSlugById } from "@/lib/auth/tournaments";
-import { getLeagueLogosBucket, getSupabaseDbSchema } from "@/lib/env";
+import {
+  getLeagueLogosBucket,
+  getLeaguePhotosBucket,
+  getSupabaseDbSchema,
+  getTeamLogosBucket
+} from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
+import {
+  getLeaguePhotoObjectPath,
+  isSupportedLeaguePhotoFile,
+  MAX_LEAGUE_PHOTO_SIZE_MB,
+  optimizeLeaguePhotoImage
+} from "@/lib/league-photos";
 import {
   getLeagueLogoObjectPath,
   isSupportedLeagueLogoFile,
@@ -17,6 +28,12 @@ import { isNextRedirectError } from "@/lib/next-redirect";
 import { normalizeEmail, slugifyTournamentName } from "@/lib/org";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  getTeamLogoObjectPath,
+  isSupportedTeamLogoFile,
+  MAX_TEAM_LOGO_SIZE_MB,
+  optimizeTeamLogoImage
+} from "@/lib/team-logos";
 
 const updateLeagueSchema = z.object({
   name: z.string().min(3, "El nombre de la liga debe tener al menos 3 caracteres.").max(100),
@@ -192,7 +209,80 @@ async function revalidateLeaguePaths(leagueId: string) {
   revalidatePath("/tournaments");
   revalidatePath(`/tournaments/${slug}`);
   revalidatePath(`/api/league-logo/${leagueId}`);
+  revalidatePath(`/api/league-photo/${leagueId}`);
   return slug;
+}
+
+async function uploadLeagueTeamLogoIfPresent(params: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  leagueId: string;
+  leagueTeamId: string;
+  file: FormDataEntryValue | null;
+}) {
+  const { file, leagueId, leagueTeamId, supabase } = params;
+  if (!(file instanceof File) || file.size <= 0) {
+    return null;
+  }
+
+  const sizeLimitBytes = MAX_TEAM_LOGO_SIZE_MB * 1024 * 1024;
+  if (file.size > sizeLimitBytes) {
+    redirect(
+      buildLeagueDetailPath({
+        leagueId,
+        tab: "teams",
+        error: `El logo no puede superar ${MAX_TEAM_LOGO_SIZE_MB} MB.`
+      })
+    );
+  }
+
+  if (!isSupportedTeamLogoFile(file)) {
+    redirect(
+      buildLeagueDetailPath({
+        leagueId,
+        tab: "teams",
+        error: "Formato no soportado para el logo. Usa JPG, PNG, WEBP o SVG."
+      })
+    );
+  }
+
+  const optimizedBuffer = await optimizeTeamLogoImage(file);
+  const objectPath = getTeamLogoObjectPath(getSupabaseDbSchema(), leagueTeamId);
+  const { error: uploadError } = await supabase.storage
+    .from(getTeamLogosBucket())
+    .upload(objectPath, optimizedBuffer, {
+      upsert: true,
+      contentType: "image/webp",
+      cacheControl: "31536000"
+    });
+
+  if (uploadError) {
+    redirect(
+      buildLeagueDetailPath({
+        leagueId,
+        tab: "teams",
+        error: toUserMessage(uploadError, "No se pudo guardar el logo del equipo.")
+      })
+    );
+  }
+
+  const { error: updateError } = await supabase
+    .from("league_teams")
+    .update({ logo_path: objectPath })
+    .eq("id", leagueTeamId)
+    .eq("league_id", leagueId);
+
+  if (updateError) {
+    redirect(
+      buildLeagueDetailPath({
+        leagueId,
+        tab: "teams",
+        error: toUserMessage(updateError, "No se pudo vincular el logo al equipo.")
+      })
+    );
+  }
+
+  revalidatePath(`/api/league-team-logo/${leagueTeamId}`);
+  return objectPath;
 }
 
 async function resolveUniqueCompetitionSlug(params: {
@@ -346,6 +436,82 @@ export async function uploadLeagueLogoAction(leagueId: string, formData: FormDat
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildLeagueDetailPath({ leagueId, tab: "summary", error: toUserMessage(error, "No se pudo subir el logo.") }));
+  }
+}
+
+export async function uploadLeaguePhotoAction(leagueId: string, formData: FormData) {
+  try {
+    await assertLeagueMembershipAction(leagueId);
+    const file = formData.get("photo");
+
+    if (!(file instanceof File) || file.size <= 0) {
+      redirect(buildLeagueDetailPath({ leagueId, tab: "summary", error: "Selecciona una imagen para subir." }));
+    }
+
+    const sizeLimitBytes = MAX_LEAGUE_PHOTO_SIZE_MB * 1024 * 1024;
+    if (file.size > sizeLimitBytes) {
+      redirect(
+        buildLeagueDetailPath({
+          leagueId,
+          tab: "summary",
+          error: `La imagen no puede superar ${MAX_LEAGUE_PHOTO_SIZE_MB} MB.`
+        })
+      );
+    }
+
+    if (!isSupportedLeaguePhotoFile(file)) {
+      redirect(
+        buildLeagueDetailPath({
+          leagueId,
+          tab: "summary",
+          error: "Formato no soportado. Usa JPG, PNG o WEBP."
+        })
+      );
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const optimizedBuffer = await optimizeLeaguePhotoImage(file);
+    const objectPath = getLeaguePhotoObjectPath(getSupabaseDbSchema(), leagueId);
+    const { error: uploadError } = await supabase.storage
+      .from(getLeaguePhotosBucket())
+      .upload(objectPath, optimizedBuffer, {
+        upsert: true,
+        contentType: "image/webp",
+        cacheControl: "31536000"
+      });
+
+    if (uploadError) {
+      redirect(
+        buildLeagueDetailPath({
+          leagueId,
+          tab: "summary",
+          error: toUserMessage(uploadError, "No se pudo guardar la foto.")
+        })
+      );
+    }
+
+    const { error: updateError } = await supabase
+      .from("leagues")
+      .update({
+        photo_path: objectPath
+      })
+      .eq("id", leagueId);
+
+    if (updateError) {
+      redirect(
+        buildLeagueDetailPath({
+          leagueId,
+          tab: "summary",
+          error: toUserMessage(updateError, "No se pudo vincular la foto a la liga.")
+        })
+      );
+    }
+
+    await revalidateLeaguePaths(leagueId);
+    redirect(buildLeagueDetailPath({ leagueId, tab: "summary", success: "Foto actualizada." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildLeagueDetailPath({ leagueId, tab: "summary", error: toUserMessage(error, "No se pudo subir la foto.") }));
   }
 }
 
@@ -548,17 +714,28 @@ export async function addLeagueTeamAction(leagueId: string, formData: FormData) 
       (existingTeams ?? []).map((team) => String(team.slug).toLowerCase())
     );
 
-    const { error } = await supabase.from("league_teams").insert({
-      league_id: leagueId,
-      name: normalizedName,
-      short_name: parsed.data.shortName?.trim() || null,
-      slug: teamSlug,
-      notes: parsed.data.notes?.trim() || null
-    });
+    const { data: insertedTeam, error: insertError } = await supabase
+      .from("league_teams")
+      .insert({
+        league_id: leagueId,
+        name: normalizedName,
+        short_name: parsed.data.shortName?.trim() || null,
+        slug: teamSlug,
+        notes: parsed.data.notes?.trim() || null
+      })
+      .select("id")
+      .single();
 
-    if (error) {
-      redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: toUserMessage(error, "No se pudo agregar el equipo.") }));
+    if (insertError || !insertedTeam) {
+      redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: toUserMessage(insertError, "No se pudo agregar el equipo.") }));
     }
+
+    await uploadLeagueTeamLogoIfPresent({
+      supabase,
+      leagueId,
+      leagueTeamId: String(insertedTeam.id),
+      file: formData.get("logo")
+    });
 
     await revalidateLeaguePaths(leagueId);
     redirect(buildLeagueDetailPath({ leagueId, tab: "teams", success: "Equipo maestro agregado." }));
@@ -614,6 +791,13 @@ export async function updateLeagueTeamAction(leagueId: string, formData: FormDat
     if (error) {
       redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: toUserMessage(error, "No se pudo actualizar el equipo.") }));
     }
+
+    await uploadLeagueTeamLogoIfPresent({
+      supabase,
+      leagueId,
+      leagueTeamId: parsed.data.teamId,
+      file: formData.get("logo")
+    });
 
     await revalidateLeaguePaths(leagueId);
     redirect(buildLeagueDetailPath({ leagueId, tab: "teams", success: "Equipo maestro actualizado." }));
@@ -707,7 +891,7 @@ export async function createCompetitionAction(leagueId: string, formData: FormDa
     if (selectedLeagueTeamIds.length) {
       const { data: leagueTeams, error: leagueTeamsError } = await supabase
         .from("league_teams")
-        .select("id, name, short_name, notes")
+        .select("id, name, short_name, logo_path, notes")
         .eq("league_id", leagueId)
         .in("id", selectedLeagueTeamIds);
 
@@ -726,6 +910,7 @@ export async function createCompetitionAction(leagueId: string, formData: FormDa
             league_team_id: team.id,
             display_name: team.name,
             short_name: team.short_name ?? null,
+            logo_path: team.logo_path ?? null,
             display_order: index + 1,
             notes: team.notes ?? null
           }))

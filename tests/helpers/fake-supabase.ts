@@ -17,6 +17,7 @@ type TableName =
   | "competition_team_captains"
   | "competition_captain_invites"
   | "competition_team_players"
+  | "player_photo_upload_events"
   | "competition_rounds"
   | "competition_byes"
   | "competition_matches"
@@ -79,6 +80,7 @@ function createEmptyDatabase(): FakeDatabase {
     competition_team_captains: [],
     competition_captain_invites: [],
     competition_team_players: [],
+    player_photo_upload_events: [],
     competition_rounds: [],
     competition_byes: [],
     competition_matches: [],
@@ -116,6 +118,7 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
 
   switch (table) {
     case "organizations":
+      if (!("image_path" in normalized)) normalized.image_path = null;
       if (!("is_public" in normalized)) normalized.is_public = true;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
@@ -132,6 +135,7 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
     case "leagues":
       if (!("description" in normalized)) normalized.description = null;
       if (!("logo_path" in normalized)) normalized.logo_path = null;
+      if (!("photo_path" in normalized)) normalized.photo_path = null;
       if (!("venue_name" in normalized)) normalized.venue_name = null;
       if (!("location_notes" in normalized)) normalized.location_notes = null;
       if (!("is_public" in normalized)) normalized.is_public = true;
@@ -159,6 +163,7 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       break;
     case "league_teams":
       if (!("short_name" in normalized)) normalized.short_name = null;
+      if (!("logo_path" in normalized)) normalized.logo_path = null;
       if (!("notes" in normalized)) normalized.notes = null;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
@@ -173,6 +178,7 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       break;
     case "competition_teams":
       if (!("short_name" in normalized)) normalized.short_name = null;
+      if (!("logo_path" in normalized)) normalized.logo_path = null;
       if (!("notes" in normalized)) normalized.notes = null;
       break;
     case "competition_team_captains":
@@ -189,6 +195,8 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!("position" in normalized)) normalized.position = null;
       if (!("active" in normalized)) normalized.active = true;
       if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "player_photo_upload_events":
       break;
     case "competition_rounds":
       if (!("phase" in normalized)) normalized.phase = "league";
@@ -715,6 +723,16 @@ class FakeQuery {
 
   gt(column: string, value: unknown) {
     this.filters.push((row) => compareValues(row[column], value) > 0);
+    return this;
+  }
+
+  gte(column: string, value: unknown) {
+    this.filters.push((row) => compareValues(row[column], value) >= 0);
+    return this;
+  }
+
+  lte(column: string, value: unknown) {
+    this.filters.push((row) => compareValues(row[column], value) <= 0);
     return this;
   }
 

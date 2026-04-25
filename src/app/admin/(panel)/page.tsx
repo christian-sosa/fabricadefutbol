@@ -7,8 +7,10 @@ import {
   inviteOrganizationAdminAction,
   removeOrganizationAdminAction,
   revokeOrganizationInviteAction,
-  startOrganizationCreationCheckoutAction
+  startOrganizationCreationCheckoutAction,
+  uploadOrganizationImageAction
 } from "@/app/admin/(panel)/actions";
+import { OrganizationImage } from "@/components/groups/organization-image";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -22,6 +24,7 @@ import {
 } from "@/lib/auth/admin";
 import { ORGANIZATION_MONTHLY_PRICE_ARS } from "@/lib/constants";
 import { syncOrganizationBillingPaymentFromMercadoPago } from "@/lib/domain/billing-workflow";
+import { getOrganizationImageUrl } from "@/lib/organization-images";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminDashboardData, getOrganizationAdminData } from "@/lib/queries/admin";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -145,6 +148,32 @@ export default async function AdminDashboardPage({
               </div>
             </Card>
           ) : null}
+
+          <Card>
+            <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+              <OrganizationImage
+                alt={`Imagen de ${selectedOrganization.name}`}
+                className="aspect-[16/9] min-h-[220px]"
+                priority
+                src={getOrganizationImageUrl(selectedOrganization.id)}
+              />
+
+              <div>
+                <CardTitle>Imagen del grupo</CardTitle>
+                <CardDescription className="mt-2">
+                  Sube una foto que represente al grupo o una imagen post partido. Se mostrara en la vista publica de grupos.
+                </CardDescription>
+
+                <form action={uploadOrganizationImageAction} className="mt-4 space-y-3">
+                  <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+                  <Input accept="image/png,image/jpeg,image/webp" name="image" type="file" />
+                  <Button disabled={!canWriteSelectedOrganization} type="submit">
+                    Guardar imagen
+                  </Button>
+                </form>
+              </div>
+            </div>
+          </Card>
 
           <section className="grid gap-4 md:grid-cols-3">
             <Card>

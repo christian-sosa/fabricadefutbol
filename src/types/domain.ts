@@ -69,6 +69,7 @@ export type LeagueListItem = {
   venueName: string | null;
   locationNotes: string | null;
   logoUrl: string | null;
+  photoUrl: string | null;
   isPublic: boolean;
   status: LeagueStatus;
   createdAt: string;
