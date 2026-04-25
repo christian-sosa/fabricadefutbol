@@ -1,5 +1,7 @@
 import sharp from "sharp";
 
+import { escapeXmlAttribute, escapeXmlText } from "@/lib/xml";
+
 export const MAX_LEAGUE_LOGO_SIZE_MB = 10;
 export const LEAGUE_LOGO_SIZE_PX = 512;
 export const LEAGUE_LOGO_QUALITY = 88;
@@ -26,6 +28,7 @@ export function getLeagueLogoUrl(leagueId: string) {
 }
 
 export function buildLeagueLogoPlaceholderSvg(leagueName: string) {
+  const safeLeagueNameAttribute = escapeXmlAttribute(leagueName);
   const initials = leagueName
     .trim()
     .split(/\s+/)
@@ -33,9 +36,10 @@ export function buildLeagueLogoPlaceholderSvg(leagueName: string) {
     .map((segment) => segment[0] ?? "")
     .join("")
     .toUpperCase() || "LF";
+  const safeInitials = escapeXmlText(initials);
 
   return `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="${leagueName}">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="${safeLeagueNameAttribute}">
       <defs>
         <linearGradient id="league-logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stop-color="#0f172a" />
@@ -53,7 +57,7 @@ export function buildLeagueLogoPlaceholderSvg(leagueName: string) {
         font-weight="700"
         fill="#e2e8f0"
       >
-        ${initials}
+        ${safeInitials}
       </text>
     </svg>
   `.trim();

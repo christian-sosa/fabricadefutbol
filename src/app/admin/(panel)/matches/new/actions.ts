@@ -9,6 +9,7 @@ import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { createDraftMatchWithOptions } from "@/lib/domain/match-workflow";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
+import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const schema = z.object({
@@ -231,6 +232,7 @@ export async function createMatchAction(formData: FormData) {
       goalkeeperPlayerIds
     });
 
+    await refreshOrganizationPublicSnapshotSafe(parsed.data.organizationId);
     revalidatePath("/admin");
     revalidatePath("/admin/matches/new");
     revalidatePath(`/admin/matches/${matchId}`);

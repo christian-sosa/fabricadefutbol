@@ -178,6 +178,93 @@ describe("competition workflow", () => {
     expect(fake.table("competition_match_player_stats")).toEqual([]);
   });
 
+  it("ignora estadisticas detalladas cuando la competencia trabaja solo con resultados", async () => {
+    const fake = createFakeSupabase({
+      admins: [{ id: ADMIN_ID, display_name: "Admin Liga" }],
+      leagues: [{ id: LEAGUE_ID, name: "LAFAB", slug: "lafab", created_by: ADMIN_ID }],
+      competitions: [
+        {
+          id: COMPETITION_ID,
+          league_id: LEAGUE_ID,
+          name: "Viernes Express",
+          slug: "viernes-express",
+          season_label: "2026",
+          type: "league",
+          coverage_mode: "results_only",
+          created_by: ADMIN_ID
+        }
+      ],
+      competition_teams: [
+        {
+          id: "team-home",
+          competition_id: COMPETITION_ID,
+          league_team_id: "league-team-home",
+          display_name: "Locales",
+          short_name: "LOC",
+          display_order: 1
+        },
+        {
+          id: "team-away",
+          competition_id: COMPETITION_ID,
+          league_team_id: "league-team-away",
+          display_name: "Visitantes",
+          short_name: "VIS",
+          display_order: 2
+        }
+      ],
+      competition_matches: [
+        {
+          id: "match-1",
+          competition_id: COMPETITION_ID,
+          round_id: null,
+          home_team_id: "team-home",
+          away_team_id: "team-away",
+          phase: "league",
+          stage_label: "Fecha 1",
+          scheduled_at: "2026-04-25T20:00:00.000Z",
+          venue: "Cancha 1",
+          status: "scheduled",
+          created_by: ADMIN_ID
+        }
+      ]
+    });
+
+    await saveCompetitionMatchSheet({
+      supabase: fake.client as never,
+      adminId: ADMIN_ID,
+      competitionId: COMPETITION_ID,
+      matchId: "match-1",
+      input: {
+        homeScore: 2,
+        awayScore: 2,
+        notes: "Solo marcador final",
+        mvpEntryKey: "team-home:player-1",
+        stats: [
+          {
+            entryKey: "team-home:player-1",
+            teamId: "team-home",
+            playerId: "player-1",
+            playerName: "Jugador local",
+            goals: 2,
+            yellowCards: 1,
+            redCards: 0
+          }
+        ]
+      }
+    });
+
+    expect(fake.find("competition_match_results", (row) => row.match_id === "match-1")).toEqual(
+      expect.objectContaining({
+        home_score: 2,
+        away_score: 2,
+        mvp_player_id: null,
+        mvp_player_name: null,
+        notes: "Solo marcador final"
+      })
+    );
+    expect(fake.table("competition_match_player_stats")).toEqual([]);
+  });
+
   it("guarda acta con jugador registrado y nombre libre en la misma competencia", async () => {
     const fake = createFakeSupabase({
       admins: [{ id: ADMIN_ID, display_name: "Admin Liga" }],

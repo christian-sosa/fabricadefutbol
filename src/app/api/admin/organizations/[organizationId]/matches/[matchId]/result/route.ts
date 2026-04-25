@@ -4,6 +4,7 @@ import { z } from "zod";
 import { assertOrganizationAdminAction } from "@/lib/auth/admin";
 import { saveMatchResult } from "@/lib/domain/match-workflow";
 import { toUserMessage } from "@/lib/errors";
+import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const requestSchema = z.object({
@@ -69,6 +70,7 @@ export async function PATCH(
       resultInput: parsed.data
     });
 
+    await refreshOrganizationPublicSnapshotSafe(organizationId);
     return NextResponse.json({
       success: true,
       organizationId,

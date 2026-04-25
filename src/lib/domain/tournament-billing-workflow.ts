@@ -1,3 +1,4 @@
+import { resolveNextLeagueBillingPeriod } from "@/lib/domain/billing";
 import { getMercadoPagoPaymentById } from "@/lib/payments/mercadopago";
 import { slugifyTournamentName } from "@/lib/org";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -16,10 +17,20 @@ type LeagueBillingPaymentRow = {
   mp_external_reference: string | null;
   mp_payment_id: string | null;
   status: string;
+  created_at?: string | null;
+  approved_at?: string | null;
+  purpose: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  subscription_applied_at: string | null;
 };
 
 function normalizePaymentStatus(status: string | null | undefined) {
   return (status ?? "unknown").toLowerCase();
+}
+
+function normalizePaymentPurpose(purpose: string | null | undefined) {
+  return (purpose ?? "league_creation").toLowerCase();
 }
 
 function parseNextSlug(baseSlug: string, existingSlugs: string[]) {
@@ -161,6 +172,68 @@ async function createLeagueFromApprovedPayment(params: {
   return paymentRow.created_league_id;
 }
 
+async function applyApprovedLeaguePaymentPeriod(params: {
+  supabase: DbClient;
+  paymentRow: LeagueBillingPaymentRow;
+  approvedAt: string;
+  targetLeagueId?: string | null;
+}) {
+  const { supabase, paymentRow, approvedAt } = params;
+  if (paymentRow.subscription_applied_at) return;
+
+  const leagueId = params.targetLeagueId ?? paymentRow.created_league_id;
+  if (!leagueId) return;
+
+  const { data: subscription, error: subscriptionError } = await supabase
+    .from("league_billing_subscriptions")
+    .select("league_id, current_period_end")
+    .eq("league_id", leagueId)
+    .maybeSingle();
+
+  if (subscriptionError) throw new Error(subscriptionError.message);
+
+  const { periodStart, periodEnd } = resolveNextLeagueBillingPeriod(
+    subscription?.current_period_end ?? paymentRow.period_end ?? null
+  );
+
+  const { error: upsertSubscriptionError } = await supabase
+    .from("league_billing_subscriptions")
+    .upsert(
+      {
+        league_id: leagueId,
+        status: "active",
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
+        last_payment_at: approvedAt
+      },
+      { onConflict: "league_id" }
+    );
+
+  if (upsertSubscriptionError) throw new Error(upsertSubscriptionError.message);
+
+  const { data: markedRows, error: markAppliedError } = await supabase
+    .from("league_billing_payments")
+    .update({
+      created_league_id: leagueId,
+      period_start: periodStart,
+      period_end: periodEnd,
+      subscription_applied_at: new Date().toISOString()
+    })
+    .eq("id", paymentRow.id)
+    .is("subscription_applied_at", null)
+    .select("id");
+
+  if (markAppliedError) throw new Error(markAppliedError.message);
+  if (!markedRows || markedRows.length === 0) {
+    return;
+  }
+
+  paymentRow.created_league_id = leagueId;
+  paymentRow.period_start = periodStart;
+  paymentRow.period_end = periodEnd;
+  paymentRow.subscription_applied_at = new Date().toISOString();
+}
+
 export async function approveTournamentBillingPaymentForDebug(params: {
   supabase: DbClient;
   localPaymentId: string;
@@ -202,9 +275,20 @@ export async function approveTournamentBillingPaymentForDebug(params: {
 
   if (updatePaymentError) throw new Error(updatePaymentError.message);
 
-  const createdLeagueId = await createLeagueFromApprovedPayment({
+  const normalizedPurpose = normalizePaymentPurpose(paymentRow.purpose);
+  let createdLeagueId = paymentRow.created_league_id;
+  if (normalizedPurpose === "league_creation") {
+    createdLeagueId = await createLeagueFromApprovedPayment({
+      supabase,
+      paymentRow
+    });
+  }
+
+  await applyApprovedLeaguePaymentPeriod({
     supabase,
-    paymentRow
+    paymentRow,
+    approvedAt,
+    targetLeagueId: createdLeagueId
   });
 
   return {
@@ -220,8 +304,9 @@ export async function approveTournamentBillingPaymentForDebug(params: {
 export async function syncTournamentBillingPaymentFromMercadoPago(params: {
   supabase: DbClient;
   mercadopagoPaymentId: string | number;
+  expectedLeagueId?: string;
 }) {
-  const { supabase, mercadopagoPaymentId } = params;
+  const { supabase, mercadopagoPaymentId, expectedLeagueId } = params;
   let payment;
 
   try {
@@ -254,6 +339,13 @@ export async function syncTournamentBillingPaymentFromMercadoPago(params: {
     };
   }
 
+  if (expectedLeagueId && paymentRow.created_league_id !== expectedLeagueId) {
+    return {
+      updated: false,
+      reason: "El pago no pertenece a esta liga."
+    };
+  }
+
   const approvedAt = payment.date_approved ?? null;
   const { error: updatePaymentError } = await supabase
     .from("league_billing_payments")
@@ -269,9 +361,20 @@ export async function syncTournamentBillingPaymentFromMercadoPago(params: {
 
   let createdLeagueId: string | null = paymentRow.created_league_id;
   if (normalizedStatus === "approved") {
-    createdLeagueId = await createLeagueFromApprovedPayment({
+    const normalizedPurpose = normalizePaymentPurpose(paymentRow.purpose);
+
+    if (normalizedPurpose === "league_creation") {
+      createdLeagueId = await createLeagueFromApprovedPayment({
+        supabase,
+        paymentRow
+      });
+    }
+
+    await applyApprovedLeaguePaymentPeriod({
       supabase,
-      paymentRow
+      paymentRow,
+      approvedAt: approvedAt ?? new Date().toISOString(),
+      targetLeagueId: createdLeagueId
     });
   }
 

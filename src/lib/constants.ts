@@ -36,6 +36,7 @@ export function isSuperAdminConfigured() {
 }
 
 export const FREE_TRIAL_DAYS = 30;
+export const ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS = 90;
 export const ORGANIZATION_MONTHLY_PRICE_ARS = 5000;
 export const TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS = 100;
 export const MAX_TOURNAMENT_PLAYERS_PER_TEAM = 20;

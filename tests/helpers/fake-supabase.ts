@@ -10,6 +10,7 @@ type TableName =
   | "leagues"
   | "league_admins"
   | "league_admin_invites"
+  | "league_billing_subscriptions"
   | "league_billing_payments"
   | "league_teams"
   | "competitions"
@@ -32,7 +33,8 @@ type TableName =
   | "team_option_guests"
   | "match_result"
   | "rating_history"
-  | "match_player_stats";
+  | "match_player_stats"
+  | "organization_public_snapshots";
 
 type Row = Record<string, unknown>;
 type QueryError = { message: string };
@@ -73,6 +75,7 @@ function createEmptyDatabase(): FakeDatabase {
     leagues: [],
     league_admins: [],
     league_admin_invites: [],
+    league_billing_subscriptions: [],
     league_billing_payments: [],
     league_teams: [],
     competitions: [],
@@ -95,7 +98,8 @@ function createEmptyDatabase(): FakeDatabase {
     team_option_guests: [],
     match_result: [],
     rating_history: [],
-    match_player_stats: []
+    match_player_stats: [],
+    organization_public_snapshots: []
   };
 }
 
@@ -119,6 +123,8 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
   switch (table) {
     case "organizations":
       if (!("image_path" in normalized)) normalized.image_path = null;
+      if (!("player_photos_purge_at" in normalized)) normalized.player_photos_purge_at = null;
+      if (!("player_photos_purged_at" in normalized)) normalized.player_photos_purged_at = null;
       if (!("is_public" in normalized)) normalized.is_public = true;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
@@ -155,9 +161,20 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
         normalized.expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
       }
       break;
+    case "league_billing_subscriptions":
+      if (!normalized.status) normalized.status = "active";
+      if (!("current_period_start" in normalized)) normalized.current_period_start = null;
+      if (!("current_period_end" in normalized)) normalized.current_period_end = null;
+      if (!("last_payment_at" in normalized)) normalized.last_payment_at = null;
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
     case "league_billing_payments":
       if (!normalized.status) normalized.status = "pending";
+      if (!normalized.purpose) normalized.purpose = "league_creation";
       if (!("approved_at" in normalized)) normalized.approved_at = null;
+      if (!("period_start" in normalized)) normalized.period_start = null;
+      if (!("period_end" in normalized)) normalized.period_end = null;
+      if (!("subscription_applied_at" in normalized)) normalized.subscription_applied_at = null;
       if (!("created_league_id" in normalized)) normalized.created_league_id = null;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
@@ -171,6 +188,7 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!("description" in normalized)) normalized.description = null;
       if (!("venue_override" in normalized)) normalized.venue_override = null;
       if (!("type" in normalized)) normalized.type = "league";
+      if (!("coverage_mode" in normalized)) normalized.coverage_mode = "full_stats";
       if (!("playoff_size" in normalized)) normalized.playoff_size = null;
       if (!("is_public" in normalized)) normalized.is_public = true;
       if (!normalized.status) normalized.status = "draft";
@@ -251,6 +269,14 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!("is_confirmed" in normalized)) normalized.is_confirmed = false;
       break;
     case "match_result":
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "organization_public_snapshots":
+      if (!("summary" in normalized)) normalized.summary = {};
+      if (!("standings" in normalized)) normalized.standings = [];
+      if (!("match_history" in normalized)) normalized.match_history = [];
+      if (!("match_history_total_count" in normalized)) normalized.match_history_total_count = 0;
+      if (!normalized.refreshed_at) normalized.refreshed_at = now;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
     default:
@@ -427,6 +453,9 @@ class FakeSupabaseState {
         (row) => !deletedLeagueIds.has(String(row.league_id))
       );
       this.db.league_admin_invites = this.db.league_admin_invites.filter(
+        (row) => !deletedLeagueIds.has(String(row.league_id))
+      );
+      this.db.league_billing_subscriptions = this.db.league_billing_subscriptions.filter(
         (row) => !deletedLeagueIds.has(String(row.league_id))
       );
       this.db.league_teams = this.db.league_teams.filter(

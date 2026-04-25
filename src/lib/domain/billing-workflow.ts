@@ -162,6 +162,15 @@ async function applyApprovedPaymentPeriod(params: {
     );
   if (upsertSubscriptionError) throw new Error(upsertSubscriptionError.message);
 
+  const { error: resetRetentionError } = await supabase
+    .from("organizations")
+    .update({
+      player_photos_purge_at: null,
+      player_photos_purged_at: null
+    })
+    .eq("id", organizationId);
+  if (resetRetentionError) throw new Error(resetRetentionError.message);
+
   // Guard atomico: solo una ejecucion concurrente puede pasar el WHERE.
   // El WHERE adicional `subscription_applied_at IS NULL` evita doble aplicacion
   // si el webhook llega dos veces casi simultaneamente.

@@ -19,6 +19,8 @@ import {
   MAX_PLAYER_PHOTO_SIZE_MB,
   optimizePlayerAvatarImage
 } from "@/lib/player-photos";
+import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
+import { REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL } from "@/lib/storage-image-responses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const createSchema = z.object({
@@ -209,6 +211,7 @@ export async function createPlayerAction(formData: FormData) {
       redirect(withMessage(organizationQueryKey, toUserMessage(error, "No se pudo crear al jugador.")));
     }
 
+    await refreshOrganizationPublicSnapshotSafe(parsed.data.organizationId);
     revalidatePath("/admin/players");
     revalidatePath("/players");
     revalidatePath("/ranking");
@@ -326,6 +329,7 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
       });
     }
 
+    await refreshOrganizationPublicSnapshotSafe(organizationId);
     revalidatePath("/admin/players");
     revalidatePath("/players");
     revalidatePath("/ranking");
@@ -416,6 +420,7 @@ export async function deletePlayerAction(formData: FormData) {
       }
     }
 
+    await refreshOrganizationPublicSnapshotSafe(parsed.data.organizationId);
     revalidatePath("/admin/players");
     revalidatePath("/players");
     revalidatePath("/ranking");
@@ -493,7 +498,7 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
       .upload(objectPath, optimizedBuffer, {
         upsert: true,
         contentType: "image/webp",
-        cacheControl: "31536000"
+        cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
       });
 
     if (uploadError) {

@@ -8,6 +8,7 @@ export type TournamentMatchStatus = "draft" | "scheduled" | "played" | "cancelle
 export type LeagueStatus = TournamentStatus;
 export type CompetitionStatus = TournamentStatus;
 export type CompetitionType = "league" | "cup" | "league_and_cup";
+export type CompetitionCoverageMode = "full_stats" | "results_only";
 export type CompetitionPhase = "league" | "cup";
 export type CompetitionPlayoffSize = 4 | 8;
 export type TournamentFixtureItemKind = "match" | "bye";
@@ -86,6 +87,7 @@ export type CompetitionListItem = {
   description: string | null;
   venueOverride: string | null;
   type: CompetitionType;
+  coverageMode: CompetitionCoverageMode;
   playoffSize: CompetitionPlayoffSize | null;
   isPublic: boolean;
   status: CompetitionStatus;

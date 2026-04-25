@@ -104,11 +104,6 @@ export default async function AdminTournamentsPage({
         <CardDescription>
           Crea y administra ligas con sus equipos maestros, competencias y admins sin mezclar este flujo con Grupos.
         </CardDescription>
-        <div className="mt-3">
-          <Link className="text-sm font-semibold text-emerald-300 hover:underline" href="/admin/tournaments/billing">
-            Ir a facturacion de ligas
-          </Link>
-        </div>
         {feedbackMessage ? (
           <p
             className={

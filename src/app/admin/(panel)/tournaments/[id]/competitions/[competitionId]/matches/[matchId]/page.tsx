@@ -47,8 +47,13 @@ export default async function AdminCompetitionMatchSheetPage({
               {data.competition.name} · {data.league.name}
             </CardDescription>
             <div className="mt-2 space-y-1 text-sm text-slate-400">
-              <p>{formatScheduledAt(data.match.scheduledAt)} · {data.match.venue || data.competition.venueOverride || data.league.venueName || "Sin sede"}</p>
-              <p>{getPhaseLabel(data.match.phase)} · {data.match.stageLabel}</p>
+              <p>
+                {formatScheduledAt(data.match.scheduledAt)} ·{" "}
+                {data.match.venue || data.competition.venueOverride || data.league.venueName || "Sin sede"}
+              </p>
+              <p>
+                {getPhaseLabel(data.match.phase)} · {data.match.stageLabel}
+              </p>
             </div>
           </div>
           <TournamentMatchStatusBadge status={data.match.status as TournamentMatchStatus} />
@@ -60,11 +65,14 @@ export default async function AdminCompetitionMatchSheetPage({
       <Card>
         <CardTitle>Acta del partido</CardTitle>
         <CardDescription>
-          Carga marcador, notas y estadisticas si las tienes. La figura del partido es opcional y puedes agregar nombres libres si el jugador no estaba cargado.
+          {data.competition.coverageMode === "results_only"
+            ? "Carga marcador y notas. Esta competencia esta configurada para trabajar solo con resultados."
+            : "Carga marcador, notas y estadisticas si las tienes. La figura del partido es opcional y puedes agregar nombres libres si el jugador no estaba cargado."}
         </CardDescription>
         <div className="mt-4">
           <TournamentMatchSheetEditor
             action={saveCompetitionMatchSheetAction.bind(null, id, competitionId, matchId)}
+            allowDetailedStats={data.competition.coverageMode !== "results_only"}
             awayTeam={{ id: data.match.awayTeamId!, name: data.match.awayTeamName! }}
             defaultAwayScore={data.result?.away_score ?? data.match.awayScore ?? 0}
             defaultHomeScore={data.result?.home_score ?? data.match.homeScore ?? 0}

@@ -40,7 +40,13 @@ import {
   getAdminCompetitionDetails,
   groupFixtureByRound
 } from "@/lib/queries/tournaments";
-import type { CompetitionType, TournamentMatchStatus, TournamentStandingRow } from "@/types/domain";
+import type {
+  CompetitionCoverageMode,
+  CompetitionType,
+  TournamentFixtureRow,
+  TournamentMatchStatus,
+  TournamentStandingRow
+} from "@/types/domain";
 import { formatDateTime } from "@/lib/utils";
 
 function toInputDateTime(isoDate: string | null) {
@@ -72,6 +78,10 @@ function getCompetitionTypeLabel(type: CompetitionType) {
   }
 }
 
+function getCompetitionCoverageModeLabel(coverageMode: CompetitionCoverageMode) {
+  return coverageMode === "results_only" ? "Solo resultados" : "Toda la info";
+}
+
 function getFixtureModeDescription(type: CompetitionType) {
   switch (type) {
     case "cup":
@@ -99,12 +109,20 @@ function getSummaryLeaderText(params: {
   return `${params.standings[0].teamName} (${params.standings[0].points} pts)`;
 }
 
+function filterFixtureRowsByTeam(rows: TournamentFixtureRow[], teamId: string | null) {
+  if (!teamId) return rows;
+  return rows.filter(
+    (row) =>
+      row.homeTeamId === teamId || row.awayTeamId === teamId || row.byeTeamId === teamId
+  );
+}
+
 export default async function AdminCompetitionDetailPage({
   params,
   searchParams
 }: {
   params: Promise<{ id: string; competitionId: string }>;
-  searchParams: Promise<{ tab?: string; error?: string; success?: string }>;
+  searchParams: Promise<{ tab?: string; error?: string; success?: string; team?: string }>;
 }) {
   const [{ id, competitionId }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   await requireAdminCompetition({ leagueId: id, competitionId });
@@ -113,7 +131,11 @@ export default async function AdminCompetitionDetailPage({
   if (!details) notFound();
 
   const selectedTab = resolvedSearchParams.tab ?? "summary";
-  const groupedFixture = groupFixtureByRound(details.fixture);
+  const selectedTeamFilter = details.competitionTeams.some((team) => team.id === resolvedSearchParams.team)
+    ? resolvedSearchParams.team ?? null
+    : null;
+  const filteredFixture = filterFixtureRowsByTeam(details.fixture, selectedTeamFilter);
+  const groupedFixture = groupFixtureByRound(filteredFixture);
   const leagueGroups = groupedFixture.filter((group) => group.phase === "league");
   const cupGroups = groupedFixture.filter((group) => group.phase === "cup");
   const selectedLeagueTeamIds = new Set(details.competitionTeams.map((team) => team.leagueTeamId));
@@ -147,11 +169,12 @@ export default async function AdminCompetitionDetailPage({
               <TournamentStatusBadge status={details.competition.status} />
             </div>
             <CardDescription className="mt-2">
-              Competencia dentro de {details.league.name}. Aqui gestionas inscriptos, planteles, fixture y estadisticas.
+              Competencia dentro de {details.league.name}. Aqui gestionas inscriptos, planteles, fixture y la forma en que se publica la informacion.
             </CardDescription>
             <div className="mt-3 space-y-1 text-xs text-slate-400">
               <p>Temporada {details.competition.seasonLabel}</p>
               <p>Formato: {getCompetitionTypeLabel(details.competition.type)}</p>
+              <p>Carga: {getCompetitionCoverageModeLabel(details.competition.coverageMode)}</p>
               {details.competition.playoffSize ? <p>Playoff: top {details.competition.playoffSize}</p> : null}
               <p>
                 {details.competition.isPublic
@@ -233,6 +256,16 @@ export default async function AdminCompetitionDetailPage({
                 {!canEditFormat ? <input name="type" type="hidden" value={details.competition.type} /> : null}
               </div>
               <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200">Carga de datos</label>
+                <Select defaultValue={details.competition.coverageMode} name="coverageMode">
+                  <option value="full_stats">Toda la info</option>
+                  <option value="results_only">Solo resultados</option>
+                </Select>
+                <p className="mt-1 text-xs text-slate-500">
+                  En solo resultados se muestran tabla y fixture. El acta se reduce a marcador y notas.
+                </p>
+              </div>
+              <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-200">Playoff</label>
                 <Select
                   defaultValue={details.competition.playoffSize ? String(details.competition.playoffSize) : ""}
@@ -284,15 +317,23 @@ export default async function AdminCompetitionDetailPage({
               </CardDescription>
             </Card>
             <Card>
-              <CardTitle>Goleadores</CardTitle>
+              <CardTitle>{details.competition.coverageMode === "results_only" ? "Carga simplificada" : "Goleadores"}</CardTitle>
               <CardDescription className="mt-2">
-                {topScorers.length ? topScorers.map((row) => `${row.playerName} (${row.goals})`).join(" · ") : "Sin goles cargados"}
+                {details.competition.coverageMode === "results_only"
+                  ? "Esta competencia no publica goleadores ni figuras. Solo usa tabla, fixture y resultados."
+                  : topScorers.length
+                    ? topScorers.map((row) => `${row.playerName} (${row.goals})`).join(" · ")
+                    : "Sin goles cargados"}
               </CardDescription>
             </Card>
             <Card>
-              <CardTitle>Figuras</CardTitle>
+              <CardTitle>{details.competition.coverageMode === "results_only" ? "Acta reducida" : "Figuras"}</CardTitle>
               <CardDescription className="mt-2">
-                {topFigures.length ? topFigures.map((row) => `${row.playerName} (${row.mvpCount})`).join(" · ") : "Sin figuras cargadas"}
+                {details.competition.coverageMode === "results_only"
+                  ? "El acta guarda marcador, notas y penales si la fase lo necesita."
+                  : topFigures.length
+                    ? topFigures.map((row) => `${row.playerName} (${row.mvpCount})`).join(" · ")
+                    : "Sin figuras cargadas"}
               </CardDescription>
             </Card>
           </section>
@@ -630,6 +671,40 @@ export default async function AdminCompetitionDetailPage({
             </form>
           </Card>
 
+          <Card>
+            <CardTitle>Filtrar fixture</CardTitle>
+            <CardDescription className="mt-2">
+              Divide el calendario por fechas y, si quieres, sigue solamente el recorrido de un equipo.
+            </CardDescription>
+            <form className="mt-4 flex flex-col gap-3 md:flex-row md:items-end">
+              <input name="tab" type="hidden" value="fixture" />
+              <div className="w-full md:max-w-sm">
+                <label className="mb-1 block text-sm font-semibold text-slate-200">Equipo</label>
+                <Select defaultValue={selectedTeamFilter ?? ""} name="team">
+                  <option value="">Todos los equipos</option>
+                  {details.competitionTeams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.shortName ? `${team.displayName} (${team.shortName})` : team.displayName}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="flex gap-3">
+                <Button type="submit" variant="secondary">
+                  Filtrar
+                </Button>
+                {selectedTeamFilter ? (
+                  <Link
+                    className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-slate-500 hover:bg-slate-800"
+                    href={`/admin/tournaments/${id}/competitions/${competitionId}?tab=fixture`}
+                  >
+                    Limpiar
+                  </Link>
+                ) : null}
+              </div>
+            </form>
+          </Card>
+
           <div className="space-y-4">
             {groupedFixture.map((group) => {
               const byeRows = group.matches.filter((row) => row.kind === "bye");
@@ -743,7 +818,11 @@ export default async function AdminCompetitionDetailPage({
 
             {!groupedFixture.length ? (
               <Card>
-                <CardDescription>Todavia no hay partidos generados para esta competencia.</CardDescription>
+                <CardDescription>
+                  {selectedTeamFilter
+                    ? "Ese equipo todavia no tiene partidos ni fechas libres cargadas."
+                    : "Todavia no hay partidos generados para esta competencia."}
+                </CardDescription>
               </Card>
             ) : null}
           </div>
@@ -754,7 +833,9 @@ export default async function AdminCompetitionDetailPage({
         <Card>
           <CardTitle>Resultados y actas</CardTitle>
           <CardDescription>
-            Entra a cada partido para cargar o corregir su marcador, notas y estadisticas opcionales.
+            {details.competition.coverageMode === "results_only"
+              ? "Entra a cada partido para cargar o corregir marcador, notas y penales cuando corresponda."
+              : "Entra a cada partido para cargar o corregir su marcador, notas y estadisticas opcionales."}
           </CardDescription>
           <div className="mt-4">
             <TournamentFixtureTable
@@ -770,6 +851,15 @@ export default async function AdminCompetitionDetailPage({
 
       {selectedTab === "stats" ? (
         <div className="space-y-4">
+          {details.competition.coverageMode === "results_only" ? (
+            <Card>
+              <CardTitle>Competencia en modo solo resultados</CardTitle>
+              <CardDescription>
+                Esta competencia no calcula goleadores, figuras ni vallas. Usa Tabla y Fixture como vistas principales.
+              </CardDescription>
+            </Card>
+          ) : null}
+
           {details.competition.type !== "cup" ? (
             <Card>
               <CardTitle>{details.competition.type === "league_and_cup" ? "Tabla fase liga" : "Tabla de posiciones"}</CardTitle>
@@ -786,100 +876,102 @@ export default async function AdminCompetitionDetailPage({
             </Card>
           )}
 
-          <section className="grid gap-4 lg:grid-cols-3">
-            <Card>
-              <CardTitle>Goleadores</CardTitle>
-              <div className="mt-4 overflow-x-auto">
-                <Table>
-                  <THead>
-                    <tr>
-                      <TH>Jugador</TH>
-                      <TH>Equipo</TH>
-                      <TH>Goles</TH>
-                    </tr>
-                  </THead>
-                  <TBody>
-                    {details.topScorers.map((row) => (
-                      <tr className="transition-colors hover:bg-slate-800/70" key={`${row.teamId}:${row.playerId ?? row.playerName}`}>
-                        <TD className="font-semibold text-slate-100">{row.playerName}</TD>
-                        <TD>{row.teamName}</TD>
-                        <TD>{row.goals}</TD>
-                      </tr>
-                    ))}
-                    {!details.topScorers.length ? (
+          {details.competition.coverageMode !== "results_only" ? (
+            <section className="grid gap-4 lg:grid-cols-3">
+              <Card>
+                <CardTitle>Goleadores</CardTitle>
+                <div className="mt-4 overflow-x-auto">
+                  <Table>
+                    <THead>
                       <tr>
-                        <TD className="py-6 text-sm text-slate-400" colSpan={3}>
-                          Todavia no hay goles cargados.
-                        </TD>
+                        <TH>Jugador</TH>
+                        <TH>Equipo</TH>
+                        <TH>Goles</TH>
                       </tr>
-                    ) : null}
-                  </TBody>
-                </Table>
-              </div>
-            </Card>
+                    </THead>
+                    <TBody>
+                      {details.topScorers.map((row) => (
+                        <tr className="transition-colors hover:bg-slate-800/70" key={`${row.teamId}:${row.playerId ?? row.playerName}`}>
+                          <TD className="font-semibold text-slate-100">{row.playerName}</TD>
+                          <TD>{row.teamName}</TD>
+                          <TD>{row.goals}</TD>
+                        </tr>
+                      ))}
+                      {!details.topScorers.length ? (
+                        <tr>
+                          <TD className="py-6 text-sm text-slate-400" colSpan={3}>
+                            Todavia no hay goles cargados.
+                          </TD>
+                        </tr>
+                      ) : null}
+                    </TBody>
+                  </Table>
+                </div>
+              </Card>
 
-            <Card>
-              <CardTitle>Figuras</CardTitle>
-              <div className="mt-4 overflow-x-auto">
-                <Table>
-                  <THead>
-                    <tr>
-                      <TH>Jugador</TH>
-                      <TH>Equipo</TH>
-                      <TH>Figuras</TH>
-                    </tr>
-                  </THead>
-                  <TBody>
-                    {details.topFigures.map((row) => (
-                      <tr className="transition-colors hover:bg-slate-800/70" key={`${row.teamId}:${row.playerId ?? row.playerName}`}>
-                        <TD className="font-semibold text-slate-100">{row.playerName}</TD>
-                        <TD>{row.teamName}</TD>
-                        <TD>{row.mvpCount}</TD>
-                      </tr>
-                    ))}
-                    {!details.topFigures.length ? (
+              <Card>
+                <CardTitle>Figuras</CardTitle>
+                <div className="mt-4 overflow-x-auto">
+                  <Table>
+                    <THead>
                       <tr>
-                        <TD className="py-6 text-sm text-slate-400" colSpan={3}>
-                          Todavia no hay figuras cargadas.
-                        </TD>
+                        <TH>Jugador</TH>
+                        <TH>Equipo</TH>
+                        <TH>Figuras</TH>
                       </tr>
-                    ) : null}
-                  </TBody>
-                </Table>
-              </div>
-            </Card>
+                    </THead>
+                    <TBody>
+                      {details.topFigures.map((row) => (
+                        <tr className="transition-colors hover:bg-slate-800/70" key={`${row.teamId}:${row.playerId ?? row.playerName}`}>
+                          <TD className="font-semibold text-slate-100">{row.playerName}</TD>
+                          <TD>{row.teamName}</TD>
+                          <TD>{row.mvpCount}</TD>
+                        </tr>
+                      ))}
+                      {!details.topFigures.length ? (
+                        <tr>
+                          <TD className="py-6 text-sm text-slate-400" colSpan={3}>
+                            Todavia no hay figuras cargadas.
+                          </TD>
+                        </tr>
+                      ) : null}
+                    </TBody>
+                  </Table>
+                </div>
+              </Card>
 
-            <Card>
-              <CardTitle>Vallas menos vencidas</CardTitle>
-              <div className="mt-4 overflow-x-auto">
-                <Table>
-                  <THead>
-                    <tr>
-                      <TH>Equipo</TH>
-                      <TH>GC</TH>
-                      <TH>PJ</TH>
-                    </tr>
-                  </THead>
-                  <TBody>
-                    {details.bestDefense.map((row) => (
-                      <tr className="transition-colors hover:bg-slate-800/70" key={row.teamId}>
-                        <TD className="font-semibold text-slate-100">{row.teamName}</TD>
-                        <TD>{row.goalsAgainst}</TD>
-                        <TD>{row.matchesPlayed}</TD>
-                      </tr>
-                    ))}
-                    {!details.bestDefense.length ? (
+              <Card>
+                <CardTitle>Vallas menos vencidas</CardTitle>
+                <div className="mt-4 overflow-x-auto">
+                  <Table>
+                    <THead>
                       <tr>
-                        <TD className="py-6 text-sm text-slate-400" colSpan={3}>
-                          Todavia no hay partidos jugados.
-                        </TD>
+                        <TH>Equipo</TH>
+                        <TH>GC</TH>
+                        <TH>PJ</TH>
                       </tr>
-                    ) : null}
-                  </TBody>
-                </Table>
-              </div>
-            </Card>
-          </section>
+                    </THead>
+                    <TBody>
+                      {details.bestDefense.map((row) => (
+                        <tr className="transition-colors hover:bg-slate-800/70" key={row.teamId}>
+                          <TD className="font-semibold text-slate-100">{row.teamName}</TD>
+                          <TD>{row.goalsAgainst}</TD>
+                          <TD>{row.matchesPlayed}</TD>
+                        </tr>
+                      ))}
+                      {!details.bestDefense.length ? (
+                        <tr>
+                          <TD className="py-6 text-sm text-slate-400" colSpan={3}>
+                            Todavia no hay partidos jugados.
+                          </TD>
+                        </tr>
+                      ) : null}
+                    </TBody>
+                  </Table>
+                </div>
+              </Card>
+            </section>
+          ) : null}
         </div>
       ) : null}
     </div>

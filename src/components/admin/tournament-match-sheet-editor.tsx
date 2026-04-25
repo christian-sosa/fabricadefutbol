@@ -63,7 +63,8 @@ export function TournamentMatchSheetEditor({
   defaultPenaltyHomeScore,
   defaultPenaltyAwayScore,
   defaultNotes,
-  requiresShootout
+  requiresShootout,
+  allowDetailedStats = true
 }: {
   action: (formData: FormData) => void | Promise<void>;
   homeTeam: TeamSummary;
@@ -76,6 +77,7 @@ export function TournamentMatchSheetEditor({
   defaultPenaltyAwayScore?: number | null;
   defaultNotes?: string | null;
   requiresShootout?: boolean;
+  allowDetailedStats?: boolean;
 }) {
   const [registeredRows, setRegisteredRows] = useState<EditorRow[]>(() =>
     registeredPlayers.map((player) => ({
@@ -134,18 +136,20 @@ export function TournamentMatchSheetEditor({
   const payload = useMemo(
     () =>
       JSON.stringify({
-        mvpEntryKey: selectedMvpKey || null,
-        stats: allRows.map((row) => ({
-          entryKey: row.entryKey,
-          teamId: row.teamId,
-          playerId: row.playerId,
-          playerName: row.playerName.trim(),
-          goals: Number(row.goals || 0),
-          yellowCards: Number(row.yellowCards || 0),
-          redCards: Number(row.redCards || 0)
-        }))
+        mvpEntryKey: allowDetailedStats ? selectedMvpKey || null : null,
+        stats: allowDetailedStats
+          ? allRows.map((row) => ({
+              entryKey: row.entryKey,
+              teamId: row.teamId,
+              playerId: row.playerId,
+              playerName: row.playerName.trim(),
+              goals: Number(row.goals || 0),
+              yellowCards: Number(row.yellowCards || 0),
+              redCards: Number(row.redCards || 0)
+            }))
+          : []
       }),
-    [allRows, selectedMvpKey]
+    [allRows, allowDetailedStats, selectedMvpKey]
   );
 
   function updateRegisteredRow(entryKey: string, field: "goals" | "yellowCards" | "redCards", value: string) {
@@ -154,7 +158,11 @@ export function TournamentMatchSheetEditor({
     );
   }
 
-  function updateExtraRow(entryKey: string, field: keyof Omit<EditorRow, "entryKey" | "teamId" | "playerId">, value: string) {
+  function updateExtraRow(
+    entryKey: string,
+    field: keyof Omit<EditorRow, "entryKey" | "teamId" | "playerId">,
+    value: string
+  ) {
     setExtraRows((current) =>
       current.map((row) => (row.entryKey === entryKey ? { ...row, [field]: value } : row))
     );
@@ -203,7 +211,9 @@ export function TournamentMatchSheetEditor({
               <div
                 className={cn(
                   "grid gap-2 rounded-xl border border-slate-800 bg-slate-900/80 p-3",
-                  isRegistered ? "md:grid-cols-[1.4fr_90px_90px_90px_90px]" : "md:grid-cols-[1.4fr_90px_90px_90px_90px_auto]"
+                  isRegistered
+                    ? "md:grid-cols-[1.4fr_90px_90px_90px_90px]"
+                    : "md:grid-cols-[1.4fr_90px_90px_90px_90px_auto]"
                 )}
                 key={row.entryKey}
               >
@@ -348,26 +358,37 @@ export function TournamentMatchSheetEditor({
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {renderTeamRows(homeTeam, homeRows)}
-        {renderTeamRows(awayTeam, awayRows)}
-      </div>
+      {allowDetailedStats ? (
+        <>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {renderTeamRows(homeTeam, homeRows)}
+            {renderTeamRows(awayTeam, awayRows)}
+          </div>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-        <label className="flex items-center gap-3 text-sm font-semibold text-slate-200">
-          <input
-            checked={!selectedMvpKey}
-            className="h-4 w-4 accent-emerald-400"
-            name="mvpSelector"
-            onChange={() => setSelectedMvpKey("")}
-            type="radio"
-          />
-          Guardar el partido sin figura
-        </label>
-        <p className="mt-2 text-xs text-slate-400">
-          Puedes cerrar el acta solo con resultado y notas. Las figuras y estadísticas quedan abiertas para más tarde.
-        </p>
-      </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+            <label className="flex items-center gap-3 text-sm font-semibold text-slate-200">
+              <input
+                checked={!selectedMvpKey}
+                className="h-4 w-4 accent-emerald-400"
+                name="mvpSelector"
+                onChange={() => setSelectedMvpKey("")}
+                type="radio"
+              />
+              Guardar el partido sin figura
+            </label>
+            <p className="mt-2 text-xs text-slate-400">
+              Puedes cerrar el acta solo con resultado y notas. Las figuras y estadisticas quedan abiertas para mas tarde.
+            </p>
+          </div>
+        </>
+      ) : (
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+          <p className="text-sm font-semibold text-slate-100">Competencia configurada en solo resultados.</p>
+          <p className="mt-2 text-xs text-slate-400">
+            Aqui solo guardamos marcador, notas y penales si el cruce lo necesita. No se cargan goleadores, figuras ni tarjetas.
+          </p>
+        </div>
+      )}
 
       <Button type="submit">Guardar acta</Button>
     </form>

@@ -8,7 +8,11 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { assertAdminAction } from "@/lib/auth/admin";
-import { assertLeagueMembershipAction, getLeagueSlugById } from "@/lib/auth/tournaments";
+import {
+  assertLeagueMembershipAction,
+  assertLeagueWriteAction,
+  getLeagueSlugById
+} from "@/lib/auth/tournaments";
 import {
   ORGANIZATION_BILLING_CURRENCY,
   TEMP_SKIP_TOURNAMENT_CHECKOUT,
@@ -19,7 +23,10 @@ import {
   shouldUseMercadoPagoSandboxCheckout
 } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
-import { approveTournamentBillingPaymentForDebug } from "@/lib/domain/tournament-billing-workflow";
+import {
+  approveTournamentBillingPaymentForDebug,
+  syncTournamentBillingPaymentFromMercadoPago
+} from "@/lib/domain/tournament-billing-workflow";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { slugifyTournamentName } from "@/lib/org";
 import { createCheckoutProPreference } from "@/lib/payments/mercadopago";
@@ -28,6 +35,15 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const createLeagueSchema = z.object({
   name: z.string().min(3, "El nombre de la liga debe tener al menos 3 caracteres.").max(100)
+});
+
+const startLeagueBillingSchema = z.object({
+  leagueId: z.string().uuid()
+});
+
+const syncLeagueBillingSchema = z.object({
+  leagueId: z.string().uuid(),
+  paymentId: z.string().min(1, "paymentId invalido.")
 });
 
 const MERCADOPAGO_PREFERENCE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -61,6 +77,20 @@ function buildLeagueDetailPath(
   if (params?.success) url.searchParams.set("success", params.success);
   if (!params?.tab && !params?.error && !params?.success) return basePath;
   return `${basePath}?${url.searchParams.toString()}`;
+}
+
+function buildLeagueBillingPath(params?: {
+  checkout?: string;
+  error?: string;
+  league?: string;
+}) {
+  const basePath = "/admin/tournaments/billing";
+  const url = new URL(basePath, "http://localhost");
+  if (params?.checkout) url.searchParams.set("checkout", params.checkout);
+  if (params?.error) url.searchParams.set("error", params.error);
+  if (params?.league) url.searchParams.set("league", params.league);
+  const search = url.searchParams.toString();
+  return search ? `${basePath}?${search}` : basePath;
 }
 
 function stripTrailingSlashes(value: string) {
@@ -212,7 +242,8 @@ export async function createLeagueAction(formData: FormData) {
         amount: TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS,
         currency_id: ORGANIZATION_BILLING_CURRENCY,
         status: "pending",
-        mp_external_reference: externalReference
+        mp_external_reference: externalReference,
+        purpose: "league_creation"
       })
       .select("id")
       .single();
@@ -310,6 +341,177 @@ export async function createLeagueAction(formData: FormData) {
   }
 }
 
+export async function startLeagueCheckoutAction(formData: FormData) {
+  try {
+    const parsed = startLeagueBillingSchema.safeParse({
+      leagueId: formData.get("leagueId")
+    });
+
+    if (!parsed.success) {
+      redirect(buildLeagueBillingPath({ error: parsed.error.issues[0]?.message ?? "Datos invalidos." }));
+    }
+
+    const admin = await assertLeagueMembershipAction(parsed.data.leagueId);
+    const supabaseAdmin = createSupabaseAdminClient();
+    if (!supabaseAdmin) {
+      redirect(
+        buildLeagueBillingPath({
+          league: parsed.data.leagueId,
+          error: "Falta SUPABASE_SERVICE_ROLE_KEY para iniciar el checkout de Mercado Pago."
+        })
+      );
+    }
+
+    const { data: league, error: leagueError } = await supabaseAdmin
+      .from("leagues")
+      .select("id, name, slug")
+      .eq("id", parsed.data.leagueId)
+      .maybeSingle();
+
+    if (leagueError || !league) {
+      redirect(
+        buildLeagueBillingPath({
+          league: parsed.data.leagueId,
+          error: toUserMessage(leagueError, "No se pudo leer la liga para facturar.")
+        })
+      );
+    }
+
+    const externalReference = `league-subscription:${league.id}:${Date.now()}:${randomUUID().slice(0, 8)}`;
+    const publicBaseUrl = await resolveServerBaseUrl();
+    const successPath = buildLeagueBillingPath({ checkout: "success", league: String(league.id) });
+    const failurePath = buildLeagueBillingPath({ checkout: "failure", league: String(league.id) });
+    const pendingPath = buildLeagueBillingPath({ checkout: "pending", league: String(league.id) });
+    const notificationPath = "/api/payments/mercadopago/webhook";
+
+    const { data: insertedPayment, error: insertPaymentError } = await supabaseAdmin
+      .from("league_billing_payments")
+      .insert({
+        admin_id: admin.userId,
+        requested_league_name: String(league.name),
+        requested_league_slug: String(league.slug),
+        created_league_id: league.id,
+        amount: TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS,
+        currency_id: ORGANIZATION_BILLING_CURRENCY,
+        status: "pending",
+        mp_external_reference: externalReference,
+        purpose: "league_subscription"
+      })
+      .select("id")
+      .single();
+
+    if (insertPaymentError || !insertedPayment) {
+      redirect(
+        buildLeagueBillingPath({
+          league: String(league.id),
+          error: toUserMessage(insertPaymentError, "No se pudo registrar el intento de pago.")
+        })
+      );
+    }
+
+    const preference = await createCheckoutProPreference({
+      title: `Plan mensual ${league.name}`,
+      unitPrice: TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS,
+      currencyId: ORGANIZATION_BILLING_CURRENCY,
+      quantity: 1,
+      externalReference,
+      notificationUrl: `${publicBaseUrl}${notificationPath}`,
+      successUrl: buildMercadoPagoReturnUrl(publicBaseUrl, successPath),
+      failureUrl: buildMercadoPagoReturnUrl(publicBaseUrl, failurePath),
+      pendingUrl: buildMercadoPagoReturnUrl(publicBaseUrl, pendingPath),
+      expiresAt: buildMercadoPagoPreferenceExpirationDate(),
+      payerEmail: admin.email,
+      metadata: {
+        league_id: league.id,
+        league_billing_payment_id: insertedPayment.id,
+        purpose: "league_subscription"
+      }
+    });
+
+    const { error: updatePaymentError } = await supabaseAdmin
+      .from("league_billing_payments")
+      .update({
+        mp_preference_id: preference.id,
+        checkout_url: preference.init_point,
+        checkout_sandbox_url: preference.sandbox_init_point
+      })
+      .eq("id", insertedPayment.id);
+
+    if (updatePaymentError) {
+      redirect(
+        buildLeagueBillingPath({
+          league: String(league.id),
+          error: toUserMessage(updatePaymentError, "No se pudo guardar la preferencia de pago.")
+        })
+      );
+    }
+
+    const redirectUrl = shouldUseMercadoPagoSandboxCheckout()
+      ? preference.sandbox_init_point ?? preference.init_point
+      : preference.init_point ?? preference.sandbox_init_point;
+
+    if (!redirectUrl) {
+      redirect(
+        buildLeagueBillingPath({
+          league: String(league.id),
+          error: "Mercado Pago no devolvio una URL de checkout para continuar."
+        })
+      );
+    }
+
+    redirect(redirectUrl);
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildLeagueBillingPath({ error: toUserMessage(error, "No se pudo iniciar el pago de la liga.") }));
+  }
+}
+
+export async function syncLeagueBillingPaymentAction(formData: FormData) {
+  try {
+    const parsed = syncLeagueBillingSchema.safeParse({
+      leagueId: formData.get("leagueId"),
+      paymentId: formData.get("paymentId")
+    });
+
+    if (!parsed.success) {
+      redirect(buildLeagueBillingPath({ error: parsed.error.issues[0]?.message ?? "Datos invalidos." }));
+    }
+
+    await assertLeagueMembershipAction(parsed.data.leagueId);
+    const supabaseAdmin = createSupabaseAdminClient();
+    if (!supabaseAdmin) {
+      redirect(
+        buildLeagueBillingPath({
+          league: parsed.data.leagueId,
+          error: "Falta SUPABASE_SERVICE_ROLE_KEY para sincronizar pagos de Mercado Pago."
+        })
+      );
+    }
+
+    const syncResult = await syncTournamentBillingPaymentFromMercadoPago({
+      supabase: supabaseAdmin,
+      mercadopagoPaymentId: parsed.data.paymentId,
+      expectedLeagueId: parsed.data.leagueId
+    });
+
+    if (!syncResult.updated) {
+      redirect(
+        buildLeagueBillingPath({
+          league: parsed.data.leagueId,
+          error: syncResult.reason ?? "No se pudo sincronizar el pago."
+        })
+      );
+    }
+
+    revalidatePath("/admin/tournaments");
+    revalidatePath("/admin/tournaments/billing");
+    redirect(buildLeagueBillingPath({ checkout: "sync", league: parsed.data.leagueId }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildLeagueBillingPath({ error: toUserMessage(error, "No se pudo sincronizar el pago.") }));
+  }
+}
+
 export async function deleteLeagueAction(formData: FormData) {
   try {
     const admin = await assertAdminAction();
@@ -319,7 +521,7 @@ export async function deleteLeagueAction(formData: FormData) {
       redirect(buildLeagueIndexPath({ error: "Falta la liga a borrar." }));
     }
 
-    await assertLeagueMembershipAction(leagueId);
+    await assertLeagueWriteAction(leagueId);
 
     const supabase = await createSupabaseServerClient();
     const { data: league, error: leagueError } = await supabase
@@ -379,7 +581,7 @@ export async function archiveLeagueAction(formData: FormData) {
       redirect(buildLeagueIndexPath({ error: "Falta la liga a archivar." }));
     }
 
-    await assertLeagueMembershipAction(leagueId);
+    await assertLeagueWriteAction(leagueId);
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.from("leagues").update({ status: "archived" }).eq("id", leagueId);
 

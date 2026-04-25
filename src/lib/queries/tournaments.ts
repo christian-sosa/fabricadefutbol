@@ -3,6 +3,9 @@ import { unstable_noStore as noStore } from "next/cache";
 import { requireAdminSession } from "@/lib/auth/admin";
 import { getAdminLeagues } from "@/lib/auth/tournaments";
 import {
+  resolveLeagueWriteWindow
+} from "@/lib/domain/billing";
+import {
   buildTournamentBestDefense,
   buildTournamentFixture,
   buildTournamentStandings,
@@ -21,6 +24,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getTeamLogoUrl } from "@/lib/team-logos";
 import type {
+  CompetitionCoverageMode,
   CompetitionListItem,
   CompetitionPlayoffSize,
   LeagueListItem,
@@ -53,6 +57,7 @@ type CompetitionRecord = {
   description: string | null;
   venue_override: string | null;
   type: CompetitionListItem["type"];
+  coverage_mode: CompetitionCoverageMode;
   playoff_size: number | null;
   is_public: boolean;
   status: CompetitionListItem["status"];
@@ -153,6 +158,14 @@ type LeagueAdminInviteRow = {
   status: "pending" | "accepted" | "revoked";
 };
 
+type LeagueBillingSubscriptionRow = {
+  league_id: string;
+  status: string;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  last_payment_at: string | null;
+};
+
 type AdminProfileRow = {
   id: string;
   display_name: string;
@@ -240,6 +253,12 @@ function isPublicTournamentStatus(status: string) {
   return status === "active" || status === "finished";
 }
 
+function isLeagueBillingSchemaMissing(message: string) {
+  return /league_billing_subscriptions|league_billing_payments|purpose|period_start|period_end|subscription_applied_at/i.test(
+    message
+  );
+}
+
 function normalizeLeagueRecord(
   record: LeagueRecord,
   counts?: {
@@ -274,6 +293,7 @@ function normalizeCompetitionRecord(record: CompetitionRecord, teamCount = 0): C
     description: record.description,
     venueOverride: record.venue_override,
     type: record.type,
+    coverageMode: record.coverage_mode,
     playoffSize: normalizePlayoffSize(record.playoff_size),
     isPublic: record.is_public,
     status: record.status,
@@ -447,7 +467,7 @@ async function loadCompetitionById(params: {
   let query = supabase
     .from("competitions")
     .select(
-      "id, league_id, name, slug, season_label, description, venue_override, type, playoff_size, is_public, status, created_at"
+      "id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, is_public, status, created_at"
     )
     .eq("id", params.competitionId);
 
@@ -468,7 +488,7 @@ async function loadCompetitionBySlugs(params: {
   const { data, error } = await supabase
     .from("competitions")
     .select(
-      "id, league_id, name, slug, season_label, description, venue_override, type, playoff_size, is_public, status, created_at"
+      "id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, is_public, status, created_at"
     )
     .eq("league_id", params.leagueId)
     .eq("slug", params.competitionSlug)
@@ -829,7 +849,7 @@ export async function getPublicLeagueBySlug(leagueSlug: string) {
     supabase
       .from("competitions")
       .select(
-        "id, league_id, name, slug, season_label, description, venue_override, type, playoff_size, is_public, status, created_at"
+        "id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, is_public, status, created_at"
       )
       .eq("league_id", league.id)
       .eq("is_public", true)
@@ -948,7 +968,7 @@ export async function getAdminLeagueDetails(leagueId: string) {
     supabase
       .from("competitions")
       .select(
-        "id, league_id, name, slug, season_label, description, venue_override, type, playoff_size, is_public, status, created_at"
+        "id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, is_public, status, created_at"
       )
       .eq("league_id", leagueId)
       .order("created_at", { ascending: false }),
@@ -1095,14 +1115,16 @@ export async function getAdminLeagueBillingData() {
 
   const admin = await requireAdminSession();
   const supabase = await createSupabaseServerClient();
+  const adminLeagues = await getAdminLeagues(admin);
+  const leagueIds = adminLeagues.map((league) => league.id);
   const query = admin.isSuperAdmin
     ? supabase
         .from("league_billing_payments")
-        .select("id, admin_id, requested_league_name, requested_league_slug, created_league_id, amount, currency_id, status, mp_external_reference, mp_payment_id, mp_preference_id, checkout_url, checkout_sandbox_url, approved_at, created_at, updated_at")
+        .select("id, admin_id, requested_league_name, requested_league_slug, created_league_id, amount, currency_id, status, purpose, mp_external_reference, mp_payment_id, mp_preference_id, checkout_url, checkout_sandbox_url, approved_at, period_start, period_end, subscription_applied_at, created_at, updated_at")
         .order("created_at", { ascending: false })
     : supabase
         .from("league_billing_payments")
-        .select("id, admin_id, requested_league_name, requested_league_slug, created_league_id, amount, currency_id, status, mp_external_reference, mp_payment_id, mp_preference_id, checkout_url, checkout_sandbox_url, approved_at, created_at, updated_at")
+        .select("id, admin_id, requested_league_name, requested_league_slug, created_league_id, amount, currency_id, status, purpose, mp_external_reference, mp_payment_id, mp_preference_id, checkout_url, checkout_sandbox_url, approved_at, period_start, period_end, subscription_applied_at, created_at, updated_at")
         .eq("admin_id", admin.userId)
         .order("created_at", { ascending: false });
 
@@ -1112,7 +1134,7 @@ export async function getAdminLeagueBillingData() {
   const createdLeagueIds = Array.from(
     new Set((payments ?? []).map((row) => String(row.created_league_id ?? "")).filter(Boolean))
   );
-  const { data: leagues, error: leaguesError } = createdLeagueIds.length
+  const { data: createdLeagues, error: leaguesError } = createdLeagueIds.length
     ? await supabase
         .from("leagues")
         .select("id, name, slug, status")
@@ -1121,9 +1143,70 @@ export async function getAdminLeagueBillingData() {
 
   if (leaguesError) throw new Error(leaguesError.message);
 
-  const leagueById = new Map((leagues ?? []).map((league) => [String(league.id), league]));
+  const leagueById = new Map((createdLeagues ?? []).map((league) => [String(league.id), league]));
+
+  let subscriptionRows: LeagueBillingSubscriptionRow[] = [];
+  if (leagueIds.length) {
+    const { data, error: subscriptionsError } = await supabase
+      .from("league_billing_subscriptions")
+      .select("league_id, status, current_period_start, current_period_end, last_payment_at")
+      .in("league_id", leagueIds);
+
+    if (subscriptionsError && !isLeagueBillingSchemaMissing(subscriptionsError.message)) {
+      throw new Error(subscriptionsError.message);
+    }
+
+    if (!subscriptionsError) {
+      subscriptionRows = (data ?? []) as LeagueBillingSubscriptionRow[];
+    }
+  }
+
+  const subscriptionByLeagueId = new Map(
+    subscriptionRows.map((row) => [String(row.league_id), row])
+  );
 
   return {
+    leagues: adminLeagues.map((league) => {
+      const subscription = subscriptionByLeagueId.get(league.id) ?? null;
+      const writeWindow = resolveLeagueWriteWindow({
+        subscription: subscription
+          ? {
+              status: subscription.status,
+              current_period_end: subscription.current_period_end
+            }
+          : null
+      });
+      const accessLabel = writeWindow.subscriptionActive
+        ? "Edicion habilitada"
+        : writeWindow.accessValidUntil
+          ? "Solo lectura"
+          : "Pendiente de activacion";
+
+      return {
+        league: normalizeLeagueRecord(
+          {
+            ...league,
+            description: null,
+            photo_path: null
+          },
+          {
+            teamCount: 0,
+            competitionCount: 0
+          }
+        ),
+        access: {
+          canWrite: writeWindow.canWrite,
+          accessLabel,
+          accessValidUntil: writeWindow.accessValidUntil,
+          accessStartsAt: subscription?.current_period_start ?? null,
+          writeLockedAt: writeWindow.writeLockedAt,
+          subscriptionStatus: subscription?.status ?? null,
+          subscriptionCurrentPeriodEnd: subscription?.current_period_end ?? null,
+          subscriptionActive: writeWindow.subscriptionActive,
+          lastPaymentAt: subscription?.last_payment_at ?? null
+        }
+      };
+    }),
     payments: (payments ?? []).map((payment) => ({
       ...payment,
       createdLeague:
@@ -1187,7 +1270,7 @@ export async function getPublicTournamentBySlug(slug: string) {
   const { data: competition, error: competitionError } = await supabase
     .from("competitions")
     .select(
-      "id, league_id, name, slug, season_label, description, venue_override, type, playoff_size, is_public, status, created_at"
+      "id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, is_public, status, created_at"
     )
     .eq("slug", slug)
     .maybeSingle();

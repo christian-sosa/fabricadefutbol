@@ -1,5 +1,7 @@
 import sharp from "sharp";
 
+import { escapeXmlAttribute, escapeXmlText } from "@/lib/xml";
+
 export const MAX_ORGANIZATION_IMAGE_SIZE_MB = 20;
 export const ORGANIZATION_IMAGE_WIDTH_PX = 1600;
 export const ORGANIZATION_IMAGE_HEIGHT_PX = 900;
@@ -27,6 +29,8 @@ export function getOrganizationImageUrl(organizationId: string) {
 }
 
 export function buildOrganizationImagePlaceholderSvg(organizationName: string) {
+  const safeOrganizationName = escapeXmlText(organizationName);
+  const safeOrganizationNameAttribute = escapeXmlAttribute(organizationName);
   const initials =
     organizationName
       .trim()
@@ -35,9 +39,10 @@ export function buildOrganizationImagePlaceholderSvg(organizationName: string) {
       .map((segment) => segment[0] ?? "")
       .join("")
       .toUpperCase() || "GR";
+  const safeInitials = escapeXmlText(initials);
 
   return `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="${organizationName}">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="${safeOrganizationNameAttribute}">
       <defs>
         <linearGradient id="group-photo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stop-color="#0f172a" />
@@ -66,7 +71,7 @@ export function buildOrganizationImagePlaceholderSvg(organizationName: string) {
         font-weight="700"
         fill="#f8fafc"
       >
-        ${initials}
+        ${safeInitials}
       </text>
       <text
         x="112"
@@ -76,7 +81,7 @@ export function buildOrganizationImagePlaceholderSvg(organizationName: string) {
         font-weight="500"
         fill="rgba(226,232,240,0.9)"
       >
-        ${organizationName}
+        ${safeOrganizationName}
       </text>
     </svg>
   `.trim();

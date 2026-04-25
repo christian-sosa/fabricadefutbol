@@ -13,7 +13,12 @@ import {
   type TournamentTeamReference
 } from "@/lib/domain/tournament-stats";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { CompetitionPhase, CompetitionType, TournamentMatchSheetInput } from "@/types/domain";
+import type {
+  CompetitionCoverageMode,
+  CompetitionPhase,
+  CompetitionType,
+  TournamentMatchSheetInput
+} from "@/types/domain";
 
 type DbClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
@@ -21,6 +26,7 @@ type CompetitionRecord = {
   id: string;
   league_id: string;
   type: CompetitionType;
+  coverage_mode: CompetitionCoverageMode;
   playoff_size: number | null;
   status: string;
 };
@@ -95,7 +101,7 @@ function normalizePlayoffSize(value: number | null) {
 async function loadCompetitionRecord(supabase: DbClient, competitionId: string) {
   const { data, error } = await supabase
     .from("competitions")
-    .select("id, league_id, type, playoff_size, status")
+    .select("id, league_id, type, coverage_mode, playoff_size, status")
     .eq("id", competitionId)
     .maybeSingle();
 
@@ -180,7 +186,17 @@ async function assertMatchBelongsToCompetition(params: {
   return data as CompetitionMatchRow;
 }
 
-function normalizeCompetitionMatchStats(input: TournamentMatchSheetInput) {
+function normalizeCompetitionMatchStats(
+  input: TournamentMatchSheetInput,
+  allowDetailedStats: boolean
+) {
+  if (!allowDetailedStats) {
+    return {
+      stats: [] as NormalizedMatchStat[],
+      mvpRow: null as NormalizedMatchStat | null
+    };
+  }
+
   const mvpKey = input.mvpEntryKey?.trim() || null;
   const stats: NormalizedMatchStat[] = [];
   let mvpRow: NormalizedMatchStat | null = null;
@@ -683,13 +699,17 @@ export async function saveCompetitionMatchSheet(params: {
   if (!competitionId) {
     throw new Error("Falta la competencia a procesar.");
   }
+  const competition = await loadCompetitionRecord(supabase, competitionId);
   const match = await assertMatchBelongsToCompetition({ supabase, competitionId, matchId });
 
   if (input.homeScore < 0 || input.awayScore < 0) {
     throw new Error("El marcador no puede tener goles negativos.");
   }
 
-  const { stats, mvpRow } = normalizeCompetitionMatchStats(input);
+  const { stats, mvpRow } = normalizeCompetitionMatchStats(
+    input,
+    competition.coverage_mode !== "results_only"
+  );
   const allowedTeamIds = new Set([match.home_team_id, match.away_team_id]);
 
   for (const row of stats) {

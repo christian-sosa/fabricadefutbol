@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { getTeamLogosBucket } from "@/lib/env";
+import {
+  createSignedStorageRedirect,
+  createStorageObjectStreamResponse
+} from "@/lib/storage-image-responses";
 import { TEAM_LOGO_CACHE_CONTROL } from "@/lib/team-logos";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -22,19 +26,27 @@ export async function GET(
     return new NextResponse(null, { status: 404 });
   }
 
-  const { data: file, error: downloadError } = await supabase.storage
-    .from(getTeamLogosBucket())
-    .download(String(team.logo_path));
+  const bucketName = getTeamLogosBucket();
+  const objectPath = String(team.logo_path);
+  const signedRedirect = await createSignedStorageRedirect({
+    supabase,
+    bucketName,
+    objectPath
+  });
 
-  if (downloadError || !file) {
+  if (signedRedirect) return signedRedirect;
+
+  const streamedResponse = await createStorageObjectStreamResponse({
+    supabase,
+    bucketName,
+    objectPath,
+    contentType: "image/webp",
+    cacheControl: TEAM_LOGO_CACHE_CONTROL
+  });
+
+  if (!streamedResponse) {
     return new NextResponse(null, { status: 404 });
   }
 
-  const fileBuffer = Buffer.from(await file.arrayBuffer());
-  return new NextResponse(fileBuffer, {
-    headers: {
-      "content-type": "image/webp",
-      "cache-control": TEAM_LOGO_CACHE_CONTROL
-    }
-  });
+  return streamedResponse;
 }

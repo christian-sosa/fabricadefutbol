@@ -15,6 +15,7 @@ import {
   PLAYER_PHOTO_CACHE_CONTROL,
   PLAYER_PHOTO_PLACEHOLDER_CACHE_CONTROL
 } from "@/lib/player-photos";
+import { createStorageObjectStreamResponse } from "@/lib/storage-image-responses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 async function fileExists(filePath: string) {
@@ -81,19 +82,15 @@ export async function GET(
     ];
 
     for (const objectPath of objectPaths) {
-      const { data: photoFile, error: photoError } = await supabase.storage
-        .from(bucketName)
-        .download(objectPath);
+      const streamedResponse = await createStorageObjectStreamResponse({
+        supabase,
+        bucketName,
+        objectPath,
+        contentType: "image/webp",
+        cacheControl: PLAYER_PHOTO_CACHE_CONTROL
+      });
 
-      if (!photoError && photoFile) {
-        const fileBuffer = Buffer.from(await photoFile.arrayBuffer());
-        return new NextResponse(fileBuffer, {
-          headers: {
-            "content-type": "image/webp",
-            "cache-control": PLAYER_PHOTO_CACHE_CONTROL
-          }
-        });
-      }
+      if (streamedResponse) return streamedResponse;
     }
   }
 
@@ -116,17 +113,15 @@ export async function GET(
         competitionTeam.competition_id,
         playerId
       );
-      const { data: photoFile, error: photoError } = await supabase.storage.from(bucketName).download(objectPath);
+      const streamedResponse = await createStorageObjectStreamResponse({
+        supabase,
+        bucketName,
+        objectPath,
+        contentType: "image/webp",
+        cacheControl: PLAYER_PHOTO_CACHE_CONTROL
+      });
 
-      if (!photoError && photoFile) {
-        const fileBuffer = Buffer.from(await photoFile.arrayBuffer());
-        return new NextResponse(fileBuffer, {
-          headers: {
-            "content-type": "image/webp",
-            "cache-control": PLAYER_PHOTO_CACHE_CONTROL
-          }
-        });
-      }
+      if (streamedResponse) return streamedResponse;
     }
   }
 
@@ -138,17 +133,15 @@ export async function GET(
 
   if (!tournamentPlayerError && tournamentPlayer?.tournament_id) {
     const objectPath = getTournamentPlayerPhotoObjectPath(schemaName, tournamentPlayer.tournament_id, playerId);
-    const { data: photoFile, error: photoError } = await supabase.storage.from(bucketName).download(objectPath);
+    const streamedResponse = await createStorageObjectStreamResponse({
+      supabase,
+      bucketName,
+      objectPath,
+      contentType: "image/webp",
+      cacheControl: PLAYER_PHOTO_CACHE_CONTROL
+    });
 
-    if (!photoError && photoFile) {
-      const fileBuffer = Buffer.from(await photoFile.arrayBuffer());
-      return new NextResponse(fileBuffer, {
-        headers: {
-          "content-type": "image/webp",
-          "cache-control": PLAYER_PHOTO_CACHE_CONTROL
-        }
-      });
-    }
+    if (streamedResponse) return streamedResponse;
   }
 
   const legacyResponse = await readLegacyPhotoResponse(playerId);

@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 import { FREE_TRIAL_DAYS, SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import {
   addDaysToIsoDate,
-  getOrganizationTrialEndsAt,
-  hasActiveOrganizationSubscription,
+  resolveOrganizationWriteWindow,
   isIsoDateExpired,
   toShortDate
 } from "@/lib/domain/billing";
@@ -39,6 +38,8 @@ type FreeTrialStatus = {
 export type OrganizationWriteAccess = {
   canWrite: boolean;
   reason: string | null;
+  accessValidUntil: string | null;
+  writeLockedAt: string | null;
   organizationTrialEndsAt: string | null;
   organizationTrialExpired: boolean;
   adminTrialEndsAt: string | null;
@@ -46,6 +47,9 @@ export type OrganizationWriteAccess = {
   subscriptionStatus: string | null;
   subscriptionCurrentPeriodEnd: string | null;
   subscriptionActive: boolean;
+  playerPhotosPurgeAt: string | null;
+  playerPhotosRetentionExpired: boolean;
+  playerPhotosPurgedAt: string | null;
 };
 
 let cachedSuperAdminUserId: string | null | undefined;
@@ -260,20 +264,25 @@ export async function getOrganizationWriteAccess(
     return {
       canWrite: true,
       reason: null,
+      accessValidUntil: null,
+      writeLockedAt: null,
       organizationTrialEndsAt: null,
       organizationTrialExpired: false,
       adminTrialEndsAt: null,
       adminTrialExpired: false,
       subscriptionStatus: null,
       subscriptionCurrentPeriodEnd: null,
-      subscriptionActive: false
+      subscriptionActive: false,
+      playerPhotosPurgeAt: null,
+      playerPhotosRetentionExpired: false,
+      playerPhotosPurgedAt: null
     };
   }
 
   const supabase = await createSupabaseServerClient();
   const { data: organization, error: organizationError } = await supabase
     .from("organizations")
-    .select("id, created_at, created_by")
+    .select("id, created_at, created_by, player_photos_purge_at, player_photos_purged_at")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -293,18 +302,20 @@ export async function getOrganizationWriteAccess(
     return {
       canWrite: true,
       reason: null,
+      accessValidUntil: null,
+      writeLockedAt: null,
       organizationTrialEndsAt: null,
       organizationTrialExpired: false,
       adminTrialEndsAt: null,
       adminTrialExpired: false,
       subscriptionStatus: null,
       subscriptionCurrentPeriodEnd: null,
-      subscriptionActive: false
+      subscriptionActive: false,
+      playerPhotosPurgeAt: null,
+      playerPhotosRetentionExpired: false,
+      playerPhotosPurgedAt: null
     };
   }
-
-  const organizationTrialEndsAt = getOrganizationTrialEndsAt(organization.created_at);
-  const organizationTrialExpired = isIsoDateExpired(organizationTrialEndsAt);
 
   const { data: subscription, error: subscriptionError } = await supabase
     .from("organization_billing_subscriptions")
@@ -319,38 +330,57 @@ export async function getOrganizationWriteAccess(
   const safeSubscription = subscriptionError && isBillingSchemaMissing(subscriptionError.message) ? null : subscription;
   const subscriptionStatus = safeSubscription?.status ?? null;
   const subscriptionCurrentPeriodEnd = safeSubscription?.current_period_end ?? null;
-  const subscriptionActive = hasActiveOrganizationSubscription(safeSubscription);
+  const writeWindow = resolveOrganizationWriteWindow({
+    organizationCreatedAt: organization.created_at,
+    subscription: safeSubscription
+  });
 
   const userTrial = await getAdminFreeTrialStatus(admin.userId);
   const adminTrialEndsAt = userTrial.trialEndsAt;
   const adminTrialExpired = userTrial.trialExpired;
 
-  if (organizationTrialExpired && !subscriptionActive) {
+  if (!writeWindow.canWrite) {
+    const expiredReason = subscriptionCurrentPeriodEnd
+      ? `El ultimo periodo pago del grupo vencio el ${toShortDate(
+          writeWindow.accessValidUntil
+        )}. Necesita reactivar el plan mensual para volver a gestionar.`
+      : `El grupo supero sus 30 dias free (vencio el ${toShortDate(
+          writeWindow.accessValidUntil
+        )}). Necesita activar el plan mensual para volver a gestionar.`;
+
     return {
       canWrite: false,
-      reason: `El grupo supero su mes free (vencio el ${toShortDate(
-        organizationTrialEndsAt
-      )}). Necesita activar el plan mensual para volver a gestionar.`,
-      organizationTrialEndsAt,
-      organizationTrialExpired: true,
+      reason: expiredReason,
+      accessValidUntil: writeWindow.accessValidUntil,
+      writeLockedAt: writeWindow.writeLockedAt,
+      organizationTrialEndsAt: writeWindow.organizationTrialEndsAt,
+      organizationTrialExpired: writeWindow.organizationTrialExpired,
       adminTrialEndsAt,
       adminTrialExpired,
       subscriptionStatus,
       subscriptionCurrentPeriodEnd,
-      subscriptionActive
+      subscriptionActive: writeWindow.subscriptionActive,
+      playerPhotosPurgeAt: writeWindow.playerPhotosPurgeAt,
+      playerPhotosRetentionExpired: writeWindow.playerPhotosRetentionExpired,
+      playerPhotosPurgedAt: organization.player_photos_purged_at ?? null
     };
   }
 
   return {
     canWrite: true,
     reason: null,
-    organizationTrialEndsAt,
-    organizationTrialExpired,
+    accessValidUntil: writeWindow.accessValidUntil,
+    writeLockedAt: writeWindow.writeLockedAt,
+    organizationTrialEndsAt: writeWindow.organizationTrialEndsAt,
+    organizationTrialExpired: writeWindow.organizationTrialExpired,
     adminTrialEndsAt,
     adminTrialExpired,
     subscriptionStatus,
     subscriptionCurrentPeriodEnd,
-    subscriptionActive
+    subscriptionActive: writeWindow.subscriptionActive,
+    playerPhotosPurgeAt: writeWindow.playerPhotosPurgeAt,
+    playerPhotosRetentionExpired: writeWindow.playerPhotosRetentionExpired,
+    playerPhotosPurgedAt: organization.player_photos_purged_at ?? null
   };
 }
 

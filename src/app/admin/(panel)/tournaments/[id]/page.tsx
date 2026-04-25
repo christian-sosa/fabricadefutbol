@@ -44,6 +44,10 @@ function getCompetitionTypeLabel(type: "league" | "cup" | "league_and_cup") {
   }
 }
 
+function getCompetitionCoverageModeLabel(coverageMode: "full_stats" | "results_only") {
+  return coverageMode === "results_only" ? "Solo resultados" : "Toda la info";
+}
+
 export default async function AdminLeagueDetailPage({
   params,
   searchParams
@@ -380,6 +384,16 @@ export default async function AdminLeagueDetailPage({
                   </Select>
                 </div>
                 <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-200">Carga de datos</label>
+                  <Select defaultValue="full_stats" name="coverageMode">
+                    <option value="full_stats">Toda la info</option>
+                    <option value="results_only">Solo resultados</option>
+                  </Select>
+                  <p className="mt-1 text-xs text-slate-500">
+                    En solo resultados se muestran tabla y fixture, sin goleadores, figuras ni vallas.
+                  </p>
+                </div>
+                <div>
                   <label className="mb-1 block text-sm font-semibold text-slate-200">Playoff</label>
                   <Select defaultValue="" name="playoffSize">
                     <option value="">No aplica</option>
@@ -440,7 +454,7 @@ export default async function AdminLeagueDetailPage({
                         <TournamentStatusBadge status={competition.status} />
                       </div>
                       <CardDescription className="mt-1">
-                        {getCompetitionTypeLabel(competition.type)} · Temporada {competition.seasonLabel} · {competition.teamCount} inscriptos
+                        {getCompetitionTypeLabel(competition.type)} · {getCompetitionCoverageModeLabel(competition.coverageMode)} · Temporada {competition.seasonLabel} · {competition.teamCount} inscriptos
                       </CardDescription>
                       <div className="mt-1 space-y-1 text-xs text-slate-400">
                         <p>{competition.venueOverride ? `Sede: ${competition.venueOverride}` : "Usa la sede general de la liga"}</p>

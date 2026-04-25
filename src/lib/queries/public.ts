@@ -3,8 +3,18 @@ import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
 import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
+import {
+  buildOrganizationPublicSnapshotPayload,
+  buildSnapshotMatchHistoryPage,
+  readOrganizationPublicMatchHistorySnapshot,
+  readOrganizationPublicStandingsSnapshot,
+  readOrganizationPublicSummarySnapshot,
+  writeOrganizationPublicSnapshot,
+  type OrganizationPublicSummary
+} from "@/lib/domain/organization-public-snapshot";
 import { calculatePlayerStats, type MatchWithTeams } from "@/lib/domain/stats";
 import { normalizeEmail } from "@/lib/org";
+import type { MatchHistoryItem, OrganizationMatchesResponse } from "@/lib/query/types";
 import type { Database } from "@/types/database";
 
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
@@ -230,7 +240,7 @@ async function fetchMatchTeams(matchIds: string[]) {
     .filter((item): item is MatchWithTeams => item !== null);
 }
 
-export async function getHomeSummary(organizationId: string | null) {
+async function getHomeSummaryLive(organizationId: string | null): Promise<OrganizationPublicSummary> {
   if (!organizationId) {
     return {
       totalPlayers: 0,
@@ -279,9 +289,22 @@ export async function getHomeSummary(organizationId: string | null) {
   return {
     totalPlayers: playersRes.count ?? 0,
     totalFinishedMatches: finishedRes.count ?? 0,
-    upcomingMatches: upcomingRes.data ?? [],
+    upcomingMatches: (upcomingRes.data ?? []).filter(
+      (match): match is { id: string; scheduled_at: string; modality: string; status: string } =>
+        typeof match.scheduled_at === "string"
+    ),
     topPlayers: topPlayers ?? []
   };
+}
+
+export async function getHomeSummary(organizationId: string | null) {
+  if (!organizationId) return getHomeSummaryLive(null);
+
+  const supabase = await createSupabaseServerClient();
+  const summary = await readOrganizationPublicSummarySnapshot(supabase, organizationId);
+  if (summary) return summary;
+
+  return getHomeSummaryLive(organizationId);
 }
 
 export async function getRankingPlayers(organizationId: string | null) {
@@ -299,7 +322,7 @@ export async function getRankingPlayers(organizationId: string | null) {
   return data ?? [];
 }
 
-export async function getPlayersWithStats(organizationId: string | null) {
+async function getPlayersWithStatsLive(organizationId: string | null) {
   if (!organizationId) return [];
 
   const supabase = await createSupabaseServerClient();
@@ -334,6 +357,16 @@ export async function getPlayersWithStats(organizationId: string | null) {
     finishedMatches: finishedWithTeams,
     matchPlayerStats: matchPlayerStats ?? []
   });
+}
+
+export async function getPlayersWithStats(organizationId: string | null) {
+  if (!organizationId) return [];
+
+  const supabase = await createSupabaseServerClient();
+  const standings = await readOrganizationPublicStandingsSnapshot(supabase, organizationId);
+  if (standings) return standings;
+
+  return getPlayersWithStatsLive(organizationId);
 }
 
 export async function getPlayerDetails(playerId: string, organizationKey?: string | null) {
@@ -385,29 +418,55 @@ function normalizePositiveInteger(value: number | undefined, fallback: number) {
   return Math.max(1, Math.floor(value as number));
 }
 
-export async function getMatchHistoryCardsPage(
+async function fetchMatchResultsByIds(matchIds: string[]) {
+  if (!matchIds.length) {
+    return new Map<string, Database["public"]["Tables"]["match_result"]["Row"]>();
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("match_result")
+    .select("*")
+    .in("match_id", matchIds);
+
+  if (error) throw new Error(error.message);
+  return new Map((data ?? []).map((result) => [result.match_id, result]));
+}
+
+async function getMatchHistoryCardsForSnapshot(organizationId: string | null): Promise<MatchHistoryItem[]> {
+  if (!organizationId) return [];
+
+  const supabase = await createSupabaseServerClient();
+  const { data: finishedMatches, error } = await supabase
+    .from("matches")
+    .select("id, scheduled_at, modality, status")
+    .eq("organization_id", organizationId)
+    .in("status", ["finished", "cancelled"])
+    .order("scheduled_at", { ascending: false });
+  if (error) throw new Error(error.message);
+
+  const matches = (finishedMatches ?? []) as MatchRow[];
+  const resultsByMatchId = await fetchMatchResultsByIds(matches.map((match) => match.id));
+  return matches.map((match) => normalizeMatchCard(match, resultsByMatchId.get(match.id) ?? null));
+}
+
+async function getMatchHistoryCardsPageLive(
   organizationId: string | null,
   params?: {
     page?: number;
     pageSize?: number;
   }
-) {
+): Promise<OrganizationMatchesResponse> {
   const page = normalizePositiveInteger(params?.page, 1);
   const pageSize = Math.min(10, normalizePositiveInteger(params?.pageSize, 10));
 
   if (!organizationId) {
-    return {
+    return buildSnapshotMatchHistoryPage({
       organizationId: null,
-      matches: [],
-      pagination: {
-        page,
-        pageSize,
-        totalCount: 0,
-        totalPages: 1,
-        hasNextPage: false,
-        hasPreviousPage: page > 1
-      }
-    };
+      matchHistory: [],
+      page,
+      pageSize
+    });
   }
 
   const supabase = await createSupabaseServerClient();
@@ -415,21 +474,21 @@ export async function getMatchHistoryCardsPage(
   const to = from + pageSize - 1;
   const { data: finishedMatches, error, count } = await supabase
     .from("matches")
-    .select("*", { count: "exact" })
+    .select("id, scheduled_at, modality, status", { count: "exact" })
     .eq("organization_id", organizationId)
     .in("status", ["finished", "cancelled"])
     .order("scheduled_at", { ascending: false })
     .range(from, to);
   if (error) throw new Error(error.message);
 
-  const ids = (finishedMatches ?? []).map((match) => match.id);
-  const withTeams = await fetchMatchTeams(ids);
+  const matches = (finishedMatches ?? []) as MatchRow[];
+  const resultsByMatchId = await fetchMatchResultsByIds(matches.map((match) => match.id));
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return {
     organizationId,
-    matches: withTeams.map((row) => normalizeMatchCard(row.match, row.result)),
+    matches: matches.map((match) => normalizeMatchCard(match, resultsByMatchId.get(match.id) ?? null)),
     pagination: {
       page,
       pageSize,
@@ -441,12 +500,74 @@ export async function getMatchHistoryCardsPage(
   };
 }
 
+export async function getMatchHistoryCardsPage(
+  organizationId: string | null,
+  params?: {
+    page?: number;
+    pageSize?: number;
+  }
+) {
+  const page = normalizePositiveInteger(params?.page, 1);
+  const pageSize = Math.min(10, normalizePositiveInteger(params?.pageSize, 10));
+
+  if (!organizationId) {
+    return buildSnapshotMatchHistoryPage({
+      organizationId: null,
+      matchHistory: [],
+      page,
+      pageSize
+    });
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const matchHistory = await readOrganizationPublicMatchHistorySnapshot(supabase, organizationId);
+  if (matchHistory) {
+    return buildSnapshotMatchHistoryPage({
+      organizationId,
+      matchHistory,
+      page,
+      pageSize
+    });
+  }
+
+  return getMatchHistoryCardsPageLive(organizationId, { page, pageSize });
+}
+
 export async function getMatchHistoryCards(organizationId: string | null) {
   const data = await getMatchHistoryCardsPage(organizationId, {
     page: 1,
     pageSize: 10
   });
   return data.matches;
+}
+
+export async function refreshOrganizationPublicSnapshot(organizationId: string) {
+  const [summary, standings, matchHistory] = await Promise.all([
+    getHomeSummaryLive(organizationId),
+    getPlayersWithStatsLive(organizationId),
+    getMatchHistoryCardsForSnapshot(organizationId)
+  ]);
+  const payload = buildOrganizationPublicSnapshotPayload({
+    summary,
+    standings,
+    matchHistory
+  });
+  const supabase = await createSupabaseServerClient();
+  await writeOrganizationPublicSnapshot(supabase, organizationId, payload);
+  return payload;
+}
+
+export async function refreshOrganizationPublicSnapshotSafe(organizationId: string | null | undefined) {
+  if (!organizationId) return;
+
+  try {
+    await refreshOrganizationPublicSnapshot(organizationId);
+  } catch (error) {
+    console.warn("[public-snapshot] No se pudo refrescar el snapshot del grupo.", {
+      organizationId,
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
 }
 
 export async function getUpcomingConfirmedMatches(organizationId: string | null) {
