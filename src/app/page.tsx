@@ -6,10 +6,10 @@ import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery, withPublicQuery } from "@/lib/org";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
 import { getPublicLeagues } from "@/lib/queries/tournaments";
-import { formatDateTime } from "@/lib/utils";
 
 const problemItems = [
   "Equipos desbalanceados",
@@ -430,7 +430,7 @@ export default async function HomePage({
                   key={match.id}
                 >
                   <span>
-                    {match.modality} - {formatDateTime(match.scheduled_at)}
+                    {match.modality} - {formatMatchDateTime(match.scheduled_at)}
                   </span>
                   <span className="font-semibold text-emerald-300">Ver detalle</span>
                 </Link>

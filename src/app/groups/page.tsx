@@ -5,10 +5,10 @@ import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import { formatMatchDateTime } from "@/lib/match-datetime";
 import { getOrganizationImageUrl } from "@/lib/organization-images";
 import { withOrgQuery } from "@/lib/org";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
-import { formatDateTime } from "@/lib/utils";
 
 export default async function GroupsPage({
   searchParams
@@ -118,7 +118,7 @@ export default async function GroupsPage({
                       key={match.id}
                       >
                         <span>
-                          {match.modality} - {formatDateTime(match.scheduled_at)}
+                          {match.modality} - {formatMatchDateTime(match.scheduled_at)}
                       </span>
                       <span className="font-semibold text-emerald-300">Ver detalle</span>
                     </Link>

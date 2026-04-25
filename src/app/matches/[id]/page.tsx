@@ -5,9 +5,9 @@ import { notFound } from "next/navigation";
 import { MatchStatusBadge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { getMatchDetails } from "@/lib/queries/public";
-import { formatDateTime } from "@/lib/utils";
 
 export async function generateMetadata({
   params,
@@ -20,7 +20,7 @@ export async function generateMetadata({
     const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
     const details = await getMatchDetails(id, resolvedSearchParams.org);
     if (!details) return { title: "Partido no encontrado" };
-    const title = `Partido ${formatDateTime(details.match.scheduled_at)}`;
+    const title = `Partido ${formatMatchDateTime(details.match.scheduled_at)}`;
     const description = `Detalle del partido ${details.match.modality} en Fabrica de Futbol.`;
     return {
       title,
@@ -50,7 +50,7 @@ export default async function MatchDetailPage({
         Volver al historial
       </Link>
       <Card>
-        <CardTitle>Partido {formatDateTime(details.match.scheduled_at)}</CardTitle>
+        <CardTitle>Partido {formatMatchDateTime(details.match.scheduled_at)}</CardTitle>
         <CardDescription className="mt-1">
           {details.match.modality} | <MatchStatusBadge status={details.match.status} />
         </CardDescription>

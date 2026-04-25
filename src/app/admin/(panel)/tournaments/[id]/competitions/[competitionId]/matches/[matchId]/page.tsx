@@ -6,12 +6,12 @@ import { TournamentMatchSheetEditor } from "@/components/admin/tournament-match-
 import { TournamentMatchStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { requireAdminCompetition } from "@/lib/auth/tournaments";
+import { formatMatchDateTime } from "@/lib/match-datetime";
 import { getAdminCompetitionMatchSheetData } from "@/lib/queries/tournaments";
-import { formatDateTime } from "@/lib/utils";
 import type { TournamentMatchStatus } from "@/types/domain";
 
 function formatScheduledAt(value: string | null) {
-  return value ? formatDateTime(value) : "Sin horario cargado";
+  return value ? formatMatchDateTime(value) : "Sin horario cargado";
 }
 
 function getPhaseLabel(phase: "league" | "cup") {

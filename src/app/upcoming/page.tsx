@@ -4,9 +4,9 @@ import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { getUpcomingConfirmedMatches, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
-import { formatDateTime } from "@/lib/utils";
 
 export default async function UpcomingPage({
   searchParams
@@ -41,7 +41,7 @@ export default async function UpcomingPage({
           {upcoming.map((item) => (
             <Card key={item.match.id}>
               <CardTitle>
-                {item.match.modality} - {formatDateTime(item.match.scheduled_at)}
+                {item.match.modality} - {formatMatchDateTime(item.match.scheduled_at)}
               </CardTitle>
               <CardDescription>{item.match.location || "Sin ubicacion definida"}</CardDescription>
               <div className="mt-4 grid gap-4 md:grid-cols-2">

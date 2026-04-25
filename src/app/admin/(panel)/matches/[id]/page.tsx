@@ -18,15 +18,9 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
+import { formatMatchDateTime, matchIsoToDatetimeLocal } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminMatchDetails, getSelectablePlayers } from "@/lib/queries/admin";
-import { formatDateTime } from "@/lib/utils";
-
-function toInputDateTime(isoDate: string) {
-  const date = new Date(isoDate);
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-}
 
 type OptionMember = {
   id: string;
@@ -106,7 +100,7 @@ export default async function AdminMatchDetailPage({
       </Card>
 
       <Card>
-        <CardTitle>Partido {formatDateTime(details.match.scheduled_at)}</CardTitle>
+        <CardTitle>Partido {formatMatchDateTime(details.match.scheduled_at)}</CardTitle>
         <CardDescription className="mt-1">
           {details.match.modality} | <MatchStatusBadge status={details.match.status} />
         </CardDescription>
@@ -120,7 +114,7 @@ export default async function AdminMatchDetailPage({
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="scheduledAt">
               Fecha y hora
             </label>
-            <Input defaultValue={toInputDateTime(details.match.scheduled_at)} id="scheduledAt" name="scheduledAt" required type="datetime-local" />
+            <Input defaultValue={matchIsoToDatetimeLocal(details.match.scheduled_at)} id="scheduledAt" name="scheduledAt" required type="datetime-local" />
           </div>
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="location">

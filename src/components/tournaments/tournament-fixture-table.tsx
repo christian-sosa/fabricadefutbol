@@ -2,11 +2,11 @@ import Link from "next/link";
 
 import { TournamentMatchStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
-import { formatDateTime } from "@/lib/utils";
+import { formatMatchDateTime } from "@/lib/match-datetime";
 import type { TournamentFixtureRow } from "@/types/domain";
 
 function formatScheduledAt(value: string | null) {
-  return value ? formatDateTime(value) : "Por definir";
+  return value ? formatMatchDateTime(value) : "Por definir";
 }
 
 function formatFixtureScore(row: TournamentFixtureRow) {
