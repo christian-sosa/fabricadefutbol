@@ -6,6 +6,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { getPublicCompetitionMatchDetails } from "@/lib/queries/tournaments";
 import { formatDateTime } from "@/lib/utils";
+import type { TournamentMatchStatus } from "@/types/domain";
 
 function formatScheduledAt(value: string | null) {
   return value ? formatDateTime(value) : "Sin horario";
@@ -40,7 +41,7 @@ export default async function CompetitionMatchDetailPage({
               {formatScheduledAt(data.match.scheduledAt)} · {data.match.venue || data.competition.venueOverride || data.league.venueName || "Sin sede"}
             </p>
           </div>
-          <TournamentMatchStatusBadge status={data.match.status} />
+          <TournamentMatchStatusBadge status={data.match.status as TournamentMatchStatus} />
         </div>
       </Card>
 
@@ -50,6 +51,11 @@ export default async function CompetitionMatchDetailPage({
           <p className="text-3xl font-black text-slate-100">
             {data.match.homeScore ?? 0} - {data.match.awayScore ?? 0}
           </p>
+          {data.result && data.result.penalty_home_score !== null && data.result.penalty_away_score !== null ? (
+            <p className="text-sm text-amber-200">
+              Penales: {data.result.penalty_home_score} - {data.result.penalty_away_score}
+            </p>
+          ) : null}
           <p className="text-sm text-slate-400">
             Figura: {data.result?.mvp_player_name ?? "Sin figura cargada"}
           </p>
@@ -78,7 +84,7 @@ export default async function CompetitionMatchDetailPage({
                     <TD>{row.goals}</TD>
                     <TD>{row.yellow_cards}</TD>
                     <TD>{row.red_cards}</TD>
-                    <TD>{row.is_mvp ? "Sí" : "-"}</TD>
+                    <TD>{row.is_mvp ? "Si" : "-"}</TD>
                   </tr>
                 ))}
                 {!data.homeStats.length ? (
@@ -113,7 +119,7 @@ export default async function CompetitionMatchDetailPage({
                     <TD>{row.goals}</TD>
                     <TD>{row.yellow_cards}</TD>
                     <TD>{row.red_cards}</TD>
-                    <TD>{row.is_mvp ? "Sí" : "-"}</TD>
+                    <TD>{row.is_mvp ? "Si" : "-"}</TD>
                   </tr>
                 ))}
                 {!data.awayStats.length ? (

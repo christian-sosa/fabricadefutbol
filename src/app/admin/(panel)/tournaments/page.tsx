@@ -6,6 +6,7 @@ import {
   createLeagueAction,
   deleteLeagueAction
 } from "@/app/admin/(panel)/tournaments/actions";
+import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -52,12 +53,12 @@ export default async function AdminTournamentsPage({
         if (resolvedSearchParams.checkout === "failure") {
           checkoutMessage = {
             tone: "danger",
-            text: "El pago no se completó. Puedes intentarlo de nuevo cuando quieras."
+            text: "El pago no se completo. Puedes intentarlo de nuevo cuando quieras."
           };
         } else if (resolvedSearchParams.checkout === "pending") {
           checkoutMessage = {
             tone: "info",
-            text: "El pago quedó pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear la liga."
+            text: "El pago quedo pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear la liga."
           };
         } else if (syncResult.updated && syncResult.status === "approved") {
           checkoutMessage = {
@@ -80,12 +81,12 @@ export default async function AdminTournamentsPage({
   } else if (resolvedSearchParams.checkout === "failure") {
     checkoutMessage = {
       tone: "danger",
-      text: "El pago no se completó. Puedes intentarlo de nuevo cuando quieras."
+      text: "El pago no se completo. Puedes intentarlo de nuevo cuando quieras."
     };
   } else if (resolvedSearchParams.checkout === "pending") {
     checkoutMessage = {
       tone: "info",
-      text: "El pago quedó pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear la liga."
+      text: "El pago quedo pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear la liga."
     };
   }
 
@@ -103,6 +104,11 @@ export default async function AdminTournamentsPage({
         <CardDescription>
           Crea y administra ligas con sus equipos maestros, competencias y admins sin mezclar este flujo con Grupos.
         </CardDescription>
+        <div className="mt-3">
+          <Link className="text-sm font-semibold text-emerald-300 hover:underline" href="/admin/tournaments/billing">
+            Ir a facturacion de ligas
+          </Link>
+        </div>
         {feedbackMessage ? (
           <p
             className={
@@ -122,7 +128,7 @@ export default async function AdminTournamentsPage({
         <CardTitle>Nueva liga</CardTitle>
         <CardDescription className="mt-2">
           {TEMP_SKIP_TOURNAMENT_CHECKOUT
-            ? "Carga el nombre de la liga y la creamos al instante. Luego podrás cargar equipos, competencias y capitanes opcionales."
+            ? "Carga el nombre de la liga y la creamos al instante. Luego podras cargar equipos, competencias y capitanes opcionales."
             : "Carga el nombre de la liga y te llevamos a Mercado Pago para confirmar el alta antes de habilitar equipos y competencias."}
         </CardDescription>
         <form action={createLeagueAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
@@ -151,22 +157,24 @@ export default async function AdminTournamentsPage({
                 className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 md:flex-row md:items-center md:justify-between"
                 key={league.id}
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-base font-semibold text-slate-100">{league.name}</p>
-                    <TournamentStatusBadge status={league.status} />
-                  </div>
-                  <p className="mt-1 text-sm text-slate-400">/{league.slug}</p>
-                  <p className="mt-2 text-xs text-slate-500">
-                    {league.isPublic ? "Visible públicamente" : "Solo admin"} · {league.teamCount} equipos ·{" "}
-                    {league.competitionCount} competencias
-                  </p>
-                  {league.venueName || league.locationNotes ? (
-                    <p className="mt-1 text-xs text-slate-400">
-                      {league.venueName ?? "Sede sin nombre"}
-                      {league.locationNotes ? ` · ${league.locationNotes}` : ""}
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <LeagueLogo alt={`Logo de ${league.name}`} size={56} src={league.logoUrl} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-base font-semibold text-slate-100">{league.name}</p>
+                      <TournamentStatusBadge status={league.status} />
+                    </div>
+                    <p className="mt-1 text-sm text-slate-400">/{league.slug}</p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {league.isPublic ? "Visible publicamente" : "Solo admin"} · {league.teamCount} equipos · {league.competitionCount} competencias
                     </p>
-                  ) : null}
+                    {league.venueName || league.locationNotes ? (
+                      <p className="mt-1 text-xs text-slate-400">
+                        {league.venueName ? `Sede: ${league.venueName}` : "Sede pendiente"}
+                        {league.locationNotes ? ` · ${league.locationNotes}` : ""}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -180,7 +188,7 @@ export default async function AdminTournamentsPage({
                     className="text-sm font-semibold text-sky-300 hover:underline"
                     href={`/tournaments/${league.slug}`}
                   >
-                    Ver pública
+                    Ver publica
                   </Link>
                   {league.status !== "archived" ? (
                     <form action={archiveLeagueAction}>
@@ -194,7 +202,7 @@ export default async function AdminTournamentsPage({
                     <input name="leagueId" type="hidden" value={league.id} />
                     <ConfirmSubmitButton
                       className="h-8 px-3 text-xs"
-                      confirmMessage={`¿Seguro que quieres borrar la liga ${league.name}? Antes debe estar sin competencias.`}
+                      confirmMessage={`Seguro que quieres borrar la liga ${league.name}? Antes debe estar sin competencias.`}
                       label="Borrar"
                       variant="ghost"
                     />
@@ -203,7 +211,7 @@ export default async function AdminTournamentsPage({
               </div>
             ))
           ) : (
-            <p className="text-sm text-slate-400">Todavía no administras ninguna liga.</p>
+            <p className="text-sm text-slate-400">Todavia no administras ninguna liga.</p>
           )}
         </div>
       </Card>

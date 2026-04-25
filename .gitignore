@@ -10,14 +10,21 @@
 
 # production
 /build
-/docs/*
-!/docs/TESTING.md
+
+# private project folders
+/docs/
+/supabase/
+/public/players/
+/README.md
 
 # misc
 .DS_Store
 *.pem
+*.swp
+*.swo
 
-# debug
+# logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -26,6 +33,7 @@ pnpm-debug.log*
 # local env files (keep template tracked)
 .env
 .env.*
+*.local
 !.env.example
 !.env.test.example
 
@@ -35,19 +43,15 @@ pnpm-debug.log*
 # typescript
 *.tsbuildinfo
 
-# project-specific private files
-/supabase/*
-!/supabase/generated/
-/supabase/generated/*
-!/supabase/generated/policies.storage.sql
-!/supabase/migrations/
-/supabase/migrations/*
-!/supabase/migrations/2026_04_21_tournament_captains_core.sql
-!/supabase/migrations/2026_04_21_tournament_player_photo_storage.sql
-!/supabase/migrations/20260423211543_billing_rls_security_advisor.sql
-!/supabase/migrations/20260424103000_tournament_billing_payments_schema_fix.sql
-/public/players/
-/README.md
+# editor / IDE
+.vscode/
+.idea/
+
+# build / tooling caches
+.cache/
+.turbo/
+.parcel-cache/
+.eslintcache
 
 # local data/backups
 *.dump

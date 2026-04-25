@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
+import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
@@ -494,13 +495,18 @@ export default async function HomePage({
                 href={`/tournaments/${league.slug}`}
                 key={league.id}
               >
-                <div className="flex flex-wrap items-center gap-2">
-                  <CardTitle className="text-base">{league.name}</CardTitle>
-                  <TournamentStatusBadge status={league.status} />
+                <div className="flex items-start gap-3">
+                  <LeagueLogo alt={`Logo de ${league.name}`} size={52} src={league.logoUrl} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CardTitle className="text-base">{league.name}</CardTitle>
+                      <TournamentStatusBadge status={league.status} />
+                    </div>
+                    <CardDescription className="mt-2">
+                      {league.description || league.venueName || "Liga publica disponible para consultar sus competencias."}
+                    </CardDescription>
+                  </div>
                 </div>
-                <CardDescription className="mt-2">
-                  {league.description || league.venueName || "Liga publica disponible para consultar sus competencias."}
-                </CardDescription>
               </Link>
             ))
           ) : (

@@ -18,6 +18,7 @@ type TableName =
   | "competition_captain_invites"
   | "competition_team_players"
   | "competition_rounds"
+  | "competition_byes"
   | "competition_matches"
   | "competition_match_results"
   | "competition_match_player_stats"
@@ -79,6 +80,7 @@ function createEmptyDatabase(): FakeDatabase {
     competition_captain_invites: [],
     competition_team_players: [],
     competition_rounds: [],
+    competition_byes: [],
     competition_matches: [],
     competition_match_results: [],
     competition_match_player_stats: [],
@@ -129,6 +131,7 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       break;
     case "leagues":
       if (!("description" in normalized)) normalized.description = null;
+      if (!("logo_path" in normalized)) normalized.logo_path = null;
       if (!("venue_name" in normalized)) normalized.venue_name = null;
       if (!("location_notes" in normalized)) normalized.location_notes = null;
       if (!("is_public" in normalized)) normalized.is_public = true;
@@ -162,6 +165,8 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
     case "competitions":
       if (!("description" in normalized)) normalized.description = null;
       if (!("venue_override" in normalized)) normalized.venue_override = null;
+      if (!("type" in normalized)) normalized.type = "league";
+      if (!("playoff_size" in normalized)) normalized.playoff_size = null;
       if (!("is_public" in normalized)) normalized.is_public = true;
       if (!normalized.status) normalized.status = "draft";
       if (!normalized.updated_at) normalized.updated_at = now;
@@ -186,18 +191,30 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "competition_rounds":
+      if (!("phase" in normalized)) normalized.phase = "league";
+      if (!("stage_label" in normalized)) normalized.stage_label = normalized.name ?? null;
       if (!("starts_at" in normalized)) normalized.starts_at = null;
       if (!("ends_at" in normalized)) normalized.ends_at = null;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
+    case "competition_byes":
+      if (!("phase" in normalized)) normalized.phase = "league";
+      if (!("kind" in normalized)) normalized.kind = "free_round";
+      if (!("note" in normalized)) normalized.note = null;
+      break;
     case "competition_matches":
       if (!("round_id" in normalized)) normalized.round_id = null;
+      if (!("phase" in normalized)) normalized.phase = "league";
+      if (!("stage_label" in normalized)) normalized.stage_label = null;
       if (!("scheduled_at" in normalized)) normalized.scheduled_at = null;
       if (!("venue" in normalized)) normalized.venue = null;
       if (!normalized.status) normalized.status = "draft";
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "competition_match_results":
+      if (!("penalty_home_score" in normalized)) normalized.penalty_home_score = null;
+      if (!("penalty_away_score" in normalized)) normalized.penalty_away_score = null;
+      if (!("winner_team_id" in normalized)) normalized.winner_team_id = null;
       if (!("mvp_player_id" in normalized)) normalized.mvp_player_id = null;
       if (!("mvp_player_name" in normalized)) normalized.mvp_player_name = null;
       if (!("notes" in normalized)) normalized.notes = null;
@@ -416,6 +433,9 @@ class FakeSupabaseState {
       this.db.competition_team_players = this.db.competition_team_players.filter(
         (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
       );
+      this.db.competition_byes = this.db.competition_byes.filter(
+        (row) => !deletedCompetitionIds.has(String(row.competition_id))
+      );
       this.db.competition_rounds = this.db.competition_rounds.filter(
         (row) => !deletedCompetitionIds.has(String(row.competition_id))
       );
@@ -465,6 +485,9 @@ class FakeSupabaseState {
       this.db.competition_team_players = this.db.competition_team_players.filter(
         (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
       );
+      this.db.competition_byes = this.db.competition_byes.filter(
+        (row) => !deletedCompetitionIds.has(String(row.competition_id))
+      );
       this.db.competition_rounds = this.db.competition_rounds.filter(
         (row) => !deletedCompetitionIds.has(String(row.competition_id))
       );
@@ -507,6 +530,9 @@ class FakeSupabaseState {
       );
       this.db.competition_match_player_stats = this.db.competition_match_player_stats.filter(
         (row) => !deletedCompetitionTeamIds.has(String(row.team_id))
+      );
+      this.db.competition_byes = this.db.competition_byes.filter(
+        (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
       );
     }
 

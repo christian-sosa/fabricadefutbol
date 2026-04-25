@@ -7,10 +7,143 @@ import { TournamentStandingsTable } from "@/components/tournaments/tournament-st
 import { TournamentTabs } from "@/components/tournaments/tournament-tabs";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
-import { getPublicCompetitionBySlugs } from "@/lib/queries/tournaments";
+import { getPublicCompetitionBySlugs, groupFixtureByRound } from "@/lib/queries/tournaments";
+import type { CompetitionType, TournamentFixtureRow } from "@/types/domain";
 
 function buildTabHref(leagueSlug: string, competitionSlug: string, tab: string) {
   return `/tournaments/${leagueSlug}/${competitionSlug}?tab=${encodeURIComponent(tab)}`;
+}
+
+function getCompetitionTypeLabel(type: CompetitionType) {
+  switch (type) {
+    case "cup":
+      return "Copa";
+    case "league_and_cup":
+      return "Liga + copa";
+    default:
+      return "Liga";
+  }
+}
+
+function renderFixtureSections(params: {
+  leagueSlug: string;
+  competitionSlug: string;
+  fixture: TournamentFixtureRow[];
+  type: CompetitionType;
+}) {
+  const grouped = groupFixtureByRound(params.fixture);
+  const leagueRows = grouped.filter((group) => group.phase === "league");
+  const cupRows = grouped.filter((group) => group.phase === "cup");
+
+  if (params.type === "league") {
+    return (
+      <Card>
+        <CardTitle>Fixture</CardTitle>
+        <div className="mt-4">
+          <TournamentFixtureTable
+            buildMatchHref={(row) =>
+              row.kind === "match"
+                ? `/tournaments/${params.leagueSlug}/${params.competitionSlug}/matches/${row.id}`
+                : null
+            }
+            linkLabel="Detalle"
+            rows={params.fixture}
+          />
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {params.type === "league_and_cup" ? (
+        <>
+          <Card>
+            <CardTitle>Fase liga</CardTitle>
+            <CardDescription>
+              La tabla se calcula solo con estos partidos. Si hay cantidad impar de equipos, la fecha libre se muestra explicitamente.
+            </CardDescription>
+            <div className="mt-4 space-y-4">
+              {leagueRows.length ? (
+                leagueRows.map((group) => (
+                  <div key={`${group.phase}:${group.roundNumber}`}>
+                    <p className="mb-2 text-sm font-semibold text-slate-200">{group.roundName}</p>
+                    <TournamentFixtureTable
+                      buildMatchHref={(row) =>
+                        row.kind === "match"
+                          ? `/tournaments/${params.leagueSlug}/${params.competitionSlug}/matches/${row.id}`
+                          : null
+                      }
+                      linkLabel="Detalle"
+                      rows={group.matches}
+                    />
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-400">Todavia no hay fechas de liga generadas.</p>
+              )}
+            </div>
+          </Card>
+
+          <Card>
+            <CardTitle>Fase copa</CardTitle>
+            <CardDescription>
+              Los cruces empatados se definen por penales y los avances automaticos se muestran como &quot;Pasa de ronda&quot;.
+            </CardDescription>
+            <div className="mt-4 space-y-4">
+              {cupRows.length ? (
+                cupRows.map((group) => (
+                  <div key={`${group.phase}:${group.roundNumber}`}>
+                    <p className="mb-2 text-sm font-semibold text-slate-200">{group.stageLabel}</p>
+                    <TournamentFixtureTable
+                      buildMatchHref={(row) =>
+                        row.kind === "match"
+                          ? `/tournaments/${params.leagueSlug}/${params.competitionSlug}/matches/${row.id}`
+                          : null
+                      }
+                      linkLabel="Detalle"
+                      rows={group.matches}
+                    />
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-400">La copa todavia no fue generada.</p>
+              )}
+            </div>
+          </Card>
+        </>
+      ) : null}
+
+      {params.type === "cup" ? (
+        <Card>
+          <CardTitle>Fixture y resultados</CardTitle>
+          <CardDescription>
+            Los byes se muestran como avances automaticos y los cruces empatados quedan definidos por penales.
+          </CardDescription>
+          <div className="mt-4 space-y-4">
+            {cupRows.length ? (
+              cupRows.map((group) => (
+                <div key={`${group.phase}:${group.roundNumber}`}>
+                  <p className="mb-2 text-sm font-semibold text-slate-200">{group.stageLabel}</p>
+                  <TournamentFixtureTable
+                    buildMatchHref={(row) =>
+                      row.kind === "match"
+                        ? `/tournaments/${params.leagueSlug}/${params.competitionSlug}/matches/${row.id}`
+                        : null
+                    }
+                    linkLabel="Detalle"
+                    rows={group.matches}
+                  />
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-slate-400">Todavia no hay cruces generados.</p>
+            )}
+          </div>
+        </Card>
+      ) : null}
+    </div>
+  );
 }
 
 export default async function CompetitionDetailPage({
@@ -24,10 +157,11 @@ export default async function CompetitionDetailPage({
   const data = await getPublicCompetitionBySlugs({ leagueSlug, competitionSlug });
   if (!data) notFound();
 
-  const selectedTab = resolvedSearchParams.tab ?? "table";
+  const supportsTable = data.competition.type !== "cup";
+  const selectedTab = resolvedSearchParams.tab ?? (supportsTable ? "table" : "fixture");
   const tabs = [
-    { key: "table", label: "Tabla" },
-    { key: "fixture", label: "Fixture" },
+    ...(supportsTable ? [{ key: "table", label: "Tabla" }] : []),
+    { key: "fixture", label: data.competition.type === "cup" ? "Cruces" : "Fixture" },
     { key: "scorers", label: "Goleadores" },
     { key: "mvps", label: "Figuras" },
     { key: "defense", label: "Vallas" }
@@ -43,12 +177,20 @@ export default async function CompetitionDetailPage({
               <TournamentStatusBadge status={data.competition.status} />
             </div>
             <CardDescription className="mt-2">
-              {data.competition.description || "Tabla, fixture y estadísticas de la competencia."}
+              {data.competition.description || "Tabla, fixture y estadisticas de la competencia."}
             </CardDescription>
             <div className="mt-3 space-y-1 text-xs text-slate-500">
               <p>Liga: {data.league.name}</p>
               <p>Temporada {data.competition.seasonLabel}</p>
-              <p>{data.competition.venueOverride ? `Sede: ${data.competition.venueOverride}` : data.league.venueName ? `Usa la sede general: ${data.league.venueName}` : "Sede pendiente"}</p>
+              <p>Formato: {getCompetitionTypeLabel(data.competition.type)}</p>
+              {data.competition.playoffSize ? <p>Playoff: top {data.competition.playoffSize}</p> : null}
+              <p>
+                {data.competition.venueOverride
+                  ? `Sede: ${data.competition.venueOverride}`
+                  : data.league.venueName
+                    ? `Usa la sede general: ${data.league.venueName}`
+                    : "Sede pendiente"}
+              </p>
             </div>
           </div>
           <Link className="text-sm font-semibold text-slate-300 hover:underline" href={`/tournaments/${data.league.slug}`}>
@@ -67,27 +209,27 @@ export default async function CompetitionDetailPage({
         />
       </Card>
 
-      {selectedTab === "table" ? (
+      {selectedTab === "table" && supportsTable ? (
         <Card>
-          <CardTitle>Tabla de posiciones</CardTitle>
+          <CardTitle>{data.competition.type === "league_and_cup" ? "Tabla fase liga" : "Tabla de posiciones"}</CardTitle>
           <div className="mt-4">
-            <TournamentStandingsTable rows={data.standings} />
+            {data.standings.length ? (
+              <TournamentStandingsTable rows={data.standings} />
+            ) : (
+              <p className="text-sm text-slate-400">La tabla aparecera cuando haya partidos jugados en fase liga.</p>
+            )}
           </div>
         </Card>
       ) : null}
 
-      {selectedTab === "fixture" ? (
-        <Card>
-          <CardTitle>Fixture</CardTitle>
-          <div className="mt-4">
-            <TournamentFixtureTable
-              buildMatchHref={(row) => `/tournaments/${data.league.slug}/${data.competition.slug}/matches/${row.id}`}
-              linkLabel="Detalle"
-              rows={data.fixture}
-            />
-          </div>
-        </Card>
-      ) : null}
+      {selectedTab === "fixture"
+        ? renderFixtureSections({
+            leagueSlug: data.league.slug,
+            competitionSlug: data.competition.slug,
+            fixture: data.fixture,
+            type: data.competition.type
+          })
+        : null}
 
       {selectedTab === "scorers" ? (
         <Card>
@@ -112,7 +254,7 @@ export default async function CompetitionDetailPage({
                 {!data.topScorers.length ? (
                   <tr>
                     <TD className="py-6 text-sm text-slate-400" colSpan={3}>
-                      Todavía no hay goles cargados.
+                      Todavia no hay goles cargados.
                     </TD>
                   </tr>
                 ) : null}
@@ -145,7 +287,7 @@ export default async function CompetitionDetailPage({
                 {!data.topFigures.length ? (
                   <tr>
                     <TD className="py-6 text-sm text-slate-400" colSpan={3}>
-                      Todavía no hay figuras cargadas.
+                      Todavia no hay figuras cargadas.
                     </TD>
                   </tr>
                 ) : null}
@@ -178,7 +320,7 @@ export default async function CompetitionDetailPage({
                 {!data.bestDefense.length ? (
                   <tr>
                     <TD className="py-6 text-sm text-slate-400" colSpan={3}>
-                      Todavía no hay partidos jugados.
+                      Todavia no hay partidos jugados.
                     </TD>
                   </tr>
                 ) : null}

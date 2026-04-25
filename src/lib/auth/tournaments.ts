@@ -2,12 +2,13 @@ import { redirect } from "next/navigation";
 
 import { assertAdminAction, requireAdminSession, type AdminSession } from "@/lib/auth/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { CompetitionStatus, LeagueStatus } from "@/types/domain";
+import type { CompetitionStatus, CompetitionType, LeagueStatus } from "@/types/domain";
 
 export type AdminLeague = {
   id: string;
   name: string;
   slug: string;
+  logo_path: string | null;
   venue_name: string | null;
   location_notes: string | null;
   status: LeagueStatus;
@@ -23,6 +24,8 @@ export type AdminCompetition = {
   season_label: string;
   description: string | null;
   venue_override: string | null;
+  type: CompetitionType;
+  playoff_size: number | null;
   status: CompetitionStatus;
   is_public: boolean;
   created_at: string;
@@ -32,7 +35,7 @@ async function loadLeagueById(leagueId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("leagues")
-    .select("id, name, slug, venue_name, location_notes, status, is_public, created_at")
+    .select("id, name, slug, logo_path, venue_name, location_notes, status, is_public, created_at")
     .eq("id", leagueId)
     .maybeSingle();
 
@@ -49,7 +52,7 @@ export async function getAdminLeagues(admin: AdminSession): Promise<AdminLeague[
   if (admin.isSuperAdmin) {
     const { data, error } = await supabase
       .from("leagues")
-      .select("id, name, slug, venue_name, location_notes, status, is_public, created_at")
+      .select("id, name, slug, logo_path, venue_name, location_notes, status, is_public, created_at")
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
@@ -76,7 +79,7 @@ export async function getAdminLeagues(admin: AdminSession): Promise<AdminLeague[
 
   const { data, error } = await supabase
     .from("leagues")
-    .select("id, name, slug, venue_name, location_notes, status, is_public, created_at")
+    .select("id, name, slug, logo_path, venue_name, location_notes, status, is_public, created_at")
     .in("id", leagueIds)
     .order("created_at", { ascending: false });
 
@@ -88,7 +91,7 @@ export async function getAdminCompetitionsForLeague(leagueId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("competitions")
-    .select("id, league_id, name, slug, season_label, description, venue_override, status, is_public, created_at")
+    .select("id, league_id, name, slug, season_label, description, venue_override, type, playoff_size, status, is_public, created_at")
     .eq("league_id", leagueId)
     .order("created_at", { ascending: false });
 
@@ -219,7 +222,7 @@ export async function requireAdminCompetition(params: {
       const supabase = await createSupabaseServerClient();
       const { data, error } = await supabase
         .from("competitions")
-        .select("id, league_id, name, slug, season_label, description, venue_override, status, is_public, created_at")
+        .select("id, league_id, name, slug, season_label, description, venue_override, type, playoff_size, status, is_public, created_at")
         .eq("id", competitionId)
         .eq("league_id", leagueId)
         .maybeSingle();

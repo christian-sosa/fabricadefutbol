@@ -7,6 +7,11 @@ export type TournamentStatus = "draft" | "active" | "finished" | "archived";
 export type TournamentMatchStatus = "draft" | "scheduled" | "played" | "cancelled";
 export type LeagueStatus = TournamentStatus;
 export type CompetitionStatus = TournamentStatus;
+export type CompetitionType = "league" | "cup" | "league_and_cup";
+export type CompetitionPhase = "league" | "cup";
+export type CompetitionPlayoffSize = 4 | 8;
+export type TournamentFixtureItemKind = "match" | "bye";
+export type TournamentByeKind = "free_round" | "advance";
 
 export type PlayerRatingInput = {
   id: string;
@@ -63,6 +68,7 @@ export type LeagueListItem = {
   description: string | null;
   venueName: string | null;
   locationNotes: string | null;
+  logoUrl: string | null;
   isPublic: boolean;
   status: LeagueStatus;
   createdAt: string;
@@ -78,6 +84,8 @@ export type CompetitionListItem = {
   seasonLabel: string;
   description: string | null;
   venueOverride: string | null;
+  type: CompetitionType;
+  playoffSize: CompetitionPlayoffSize | null;
   isPublic: boolean;
   status: CompetitionStatus;
   createdAt: string;
@@ -100,20 +108,30 @@ export type TournamentStandingRow = {
 
 export type TournamentFixtureRow = {
   id: string;
+  kind: TournamentFixtureItemKind;
   roundId: string | null;
   roundNumber: number;
   roundName: string;
+  phase: CompetitionPhase;
+  stageLabel: string;
   scheduledAt: string | null;
   venue: string | null;
-  status: TournamentMatchStatus;
-  homeTeamId: string;
-  homeTeamName: string;
+  status: TournamentMatchStatus | "bye";
+  homeTeamId: string | null;
+  homeTeamName: string | null;
   homeTeamShortName: string | null;
-  awayTeamId: string;
-  awayTeamName: string;
+  awayTeamId: string | null;
+  awayTeamName: string | null;
   awayTeamShortName: string | null;
   homeScore: number | null;
   awayScore: number | null;
+  penaltyHomeScore: number | null;
+  penaltyAwayScore: number | null;
+  winnerTeamId: string | null;
+  byeKind: TournamentByeKind | null;
+  byeTeamId: string | null;
+  byeTeamName: string | null;
+  byeTeamShortName: string | null;
 };
 
 export type TournamentTopScorerRow = {
@@ -145,6 +163,8 @@ export type TournamentBestDefenseRow = {
 export type TournamentMatchSheetInput = {
   homeScore: number;
   awayScore: number;
+  penaltyHomeScore?: number | null;
+  penaltyAwayScore?: number | null;
   notes?: string;
   mvpEntryKey?: string | null;
   stats: Array<{

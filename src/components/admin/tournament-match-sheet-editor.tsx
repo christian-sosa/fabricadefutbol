@@ -60,7 +60,10 @@ export function TournamentMatchSheetEditor({
   extraStats,
   defaultHomeScore,
   defaultAwayScore,
-  defaultNotes
+  defaultPenaltyHomeScore,
+  defaultPenaltyAwayScore,
+  defaultNotes,
+  requiresShootout
 }: {
   action: (formData: FormData) => void | Promise<void>;
   homeTeam: TeamSummary;
@@ -69,7 +72,10 @@ export function TournamentMatchSheetEditor({
   extraStats: ExtraStatRow[];
   defaultHomeScore: number;
   defaultAwayScore: number;
+  defaultPenaltyHomeScore?: number | null;
+  defaultPenaltyAwayScore?: number | null;
   defaultNotes?: string | null;
+  requiresShootout?: boolean;
 }) {
   const [registeredRows, setRegisteredRows] = useState<EditorRow[]>(() =>
     registeredPlayers.map((player) => ({
@@ -297,13 +303,50 @@ export function TournamentMatchSheetEditor({
           </label>
           <Input defaultValue={defaultAwayScore} id="awayScore" min={0} name="awayScore" required type="number" />
         </div>
-        <div className="md:col-span-2">
+        {requiresShootout ? (
+          <>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="penaltyHomeScore">
+                Penales {homeTeam.name}
+              </label>
+              <Input
+                defaultValue={defaultPenaltyHomeScore ?? ""}
+                id="penaltyHomeScore"
+                min={0}
+                name="penaltyHomeScore"
+                type="number"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="penaltyAwayScore">
+                Penales {awayTeam.name}
+              </label>
+              <Input
+                defaultValue={defaultPenaltyAwayScore ?? ""}
+                id="penaltyAwayScore"
+                min={0}
+                name="penaltyAwayScore"
+                type="number"
+              />
+            </div>
+          </>
+        ) : null}
+        <div className={requiresShootout ? "md:col-span-4" : "md:col-span-2"}>
           <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="notes">
             Notas
           </label>
           <Textarea defaultValue={defaultNotes ?? ""} id="notes" name="notes" rows={3} />
         </div>
       </div>
+
+      {requiresShootout ? (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+          <p className="text-sm font-semibold text-amber-100">Los cruces de copa no pueden terminar empatados.</p>
+          <p className="mt-2 text-xs text-amber-200/80">
+            Si el tiempo regular termina igualado, completa la definicion por penales para cerrar el acta.
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {renderTeamRows(homeTeam, homeRows)}

@@ -8,9 +8,14 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { requireAdminCompetition } from "@/lib/auth/tournaments";
 import { getAdminCompetitionMatchSheetData } from "@/lib/queries/tournaments";
 import { formatDateTime } from "@/lib/utils";
+import type { TournamentMatchStatus } from "@/types/domain";
 
 function formatScheduledAt(value: string | null) {
   return value ? formatDateTime(value) : "Sin horario cargado";
+}
+
+function getPhaseLabel(phase: "league" | "cup") {
+  return phase === "cup" ? "Fase copa" : "Fase liga";
 }
 
 export default async function AdminCompetitionMatchSheetPage({
@@ -41,11 +46,12 @@ export default async function AdminCompetitionMatchSheetPage({
             <CardDescription className="mt-1">
               {data.competition.name} · {data.league.name}
             </CardDescription>
-            <p className="mt-2 text-sm text-slate-400">
-              {formatScheduledAt(data.match.scheduledAt)} · {data.match.venue || data.competition.venueOverride || data.league.venueName || "Sin sede"}
-            </p>
+            <div className="mt-2 space-y-1 text-sm text-slate-400">
+              <p>{formatScheduledAt(data.match.scheduledAt)} · {data.match.venue || data.competition.venueOverride || data.league.venueName || "Sin sede"}</p>
+              <p>{getPhaseLabel(data.match.phase)} · {data.match.stageLabel}</p>
+            </div>
           </div>
-          <TournamentMatchStatusBadge status={data.match.status} />
+          <TournamentMatchStatusBadge status={data.match.status as TournamentMatchStatus} />
         </div>
         {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
         {resolvedSearchParams.success ? <p className="mt-3 text-sm font-semibold text-emerald-300">{resolvedSearchParams.success}</p> : null}
@@ -54,18 +60,21 @@ export default async function AdminCompetitionMatchSheetPage({
       <Card>
         <CardTitle>Acta del partido</CardTitle>
         <CardDescription>
-          Carga marcador, notas y estadísticas si las tienes. La figura del partido es opcional y puedes agregar nombres libres si el jugador no estaba cargado.
+          Carga marcador, notas y estadisticas si las tienes. La figura del partido es opcional y puedes agregar nombres libres si el jugador no estaba cargado.
         </CardDescription>
         <div className="mt-4">
           <TournamentMatchSheetEditor
             action={saveCompetitionMatchSheetAction.bind(null, id, competitionId, matchId)}
-            awayTeam={{ id: data.match.awayTeamId, name: data.match.awayTeamName }}
+            awayTeam={{ id: data.match.awayTeamId!, name: data.match.awayTeamName! }}
             defaultAwayScore={data.result?.away_score ?? data.match.awayScore ?? 0}
             defaultHomeScore={data.result?.home_score ?? data.match.homeScore ?? 0}
             defaultNotes={data.result?.notes ?? ""}
+            defaultPenaltyAwayScore={data.result?.penalty_away_score ?? null}
+            defaultPenaltyHomeScore={data.result?.penalty_home_score ?? null}
             extraStats={data.extraStats}
-            homeTeam={{ id: data.match.homeTeamId, name: data.match.homeTeamName }}
+            homeTeam={{ id: data.match.homeTeamId!, name: data.match.homeTeamName! }}
             registeredPlayers={data.registeredPlayers}
+            requiresShootout={data.match.phase === "cup"}
           />
         </div>
       </Card>
@@ -75,7 +84,7 @@ export default async function AdminCompetitionMatchSheetPage({
           Volver a resultados
         </Link>
         <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={`/tournaments/${data.league.slug}/${data.competition.slug}/matches/${matchId}`}>
-          Ver página pública del partido
+          Ver pagina publica del partido
         </Link>
       </div>
     </div>
