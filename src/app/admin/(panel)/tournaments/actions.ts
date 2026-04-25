@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { assertAdminAction } from "@/lib/auth/admin";
-import { assertTournamentMembershipAction, getTournamentSlugById } from "@/lib/auth/tournaments";
+import { assertLeagueMembershipAction, getLeagueSlugById } from "@/lib/auth/tournaments";
 import {
   ORGANIZATION_BILLING_CURRENCY,
   TEMP_SKIP_TOURNAMENT_CHECKOUT,
@@ -26,21 +26,13 @@ import { createCheckoutProPreference } from "@/lib/payments/mercadopago";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const optionalUuidField = z.preprocess((value) => {
-  if (typeof value !== "string") return undefined;
-  const normalized = value.trim();
-  return normalized.length ? normalized : undefined;
-}, z.string().uuid().optional());
-
-const createTournamentSchema = z.object({
-  name: z.string().min(3, "El nombre del torneo debe tener al menos 3 caracteres.").max(100),
-  parentTournamentId: optionalUuidField,
-  returnToTournamentId: optionalUuidField
+const createLeagueSchema = z.object({
+  name: z.string().min(3, "El nombre de la liga debe tener al menos 3 caracteres.").max(100)
 });
 
 const MERCADOPAGO_PREFERENCE_TTL_MS = 24 * 60 * 60 * 1000;
 
-function buildTournamentIndexPath(params?: {
+function buildLeagueIndexPath(params?: {
   error?: string;
   success?: string;
   checkout?: string;
@@ -54,26 +46,21 @@ function buildTournamentIndexPath(params?: {
   return `${basePath}?${url.searchParams.toString()}`;
 }
 
-function buildTournamentDetailPath(
-  tournamentId: string,
+function buildLeagueDetailPath(
+  leagueId: string,
   params?: {
+    tab?: string;
     error?: string;
     success?: string;
   }
 ) {
-  const basePath = `/admin/tournaments/${tournamentId}`;
+  const basePath = `/admin/tournaments/${leagueId}`;
   const url = new URL(basePath, "http://localhost");
+  if (params?.tab) url.searchParams.set("tab", params.tab);
   if (params?.error) url.searchParams.set("error", params.error);
   if (params?.success) url.searchParams.set("success", params.success);
-  if (!params?.error && !params?.success) return basePath;
+  if (!params?.tab && !params?.error && !params?.success) return basePath;
   return `${basePath}?${url.searchParams.toString()}`;
-}
-
-function buildCreateTournamentErrorPath(message: string, returnToTournamentId?: string | null) {
-  if (returnToTournamentId) {
-    return buildTournamentDetailPath(returnToTournamentId, { error: message });
-  }
-  return buildTournamentIndexPath({ error: message });
 }
 
 function stripTrailingSlashes(value: string) {
@@ -121,40 +108,22 @@ function parseNextSlug(baseSlug: string, existingSlugs: string[]) {
   return `${baseSlug}-${suffix}`;
 }
 
-function revalidateTournamentPages(tournamentSlug?: string | null) {
+function revalidateLeaguePages(leagueSlug?: string | null) {
   revalidatePath("/admin/tournaments");
   revalidatePath("/tournaments");
   revalidatePath("/admin");
-  if (tournamentSlug) {
-    revalidatePath(`/tournaments/${tournamentSlug}`);
+  if (leagueSlug) {
+    revalidatePath(`/tournaments/${leagueSlug}`);
   }
 }
 
-async function resolveTournamentRootId(tournamentId: string) {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("tournaments")
-    .select("id, name, parent_tournament_id")
-    .eq("id", tournamentId)
-    .maybeSingle();
-
-  if (error || !data) {
-    throw new Error("No se encontro el torneo base para crear el subtorneo.");
-  }
-
-  return {
-    id: data.parent_tournament_id ?? data.id,
-    name: data.parent_tournament_id ? null : data.name
-  };
-}
-
-async function resolveUniqueTournamentSlug(params: {
+async function resolveUniqueLeagueSlug(params: {
   supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
   normalizedName: string;
 }) {
-  const baseSlug = slugifyTournamentName(params.normalizedName) || `torneo-${Date.now()}`;
+  const baseSlug = slugifyTournamentName(params.normalizedName) || `liga-${Date.now()}`;
   const { data: existingRows, error: existingError } = await params.supabase
-    .from("tournaments")
+    .from("leagues")
     .select("slug")
     .ilike("slug", `${baseSlug}%`);
 
@@ -168,12 +137,12 @@ async function resolveUniqueTournamentSlug(params: {
   );
 }
 
-async function assertUniqueTournamentName(params: {
+async function assertUniqueLeagueName(params: {
   supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
   normalizedName: string;
 }) {
-  const { data: existingTournamentByName, error } = await params.supabase
-    .from("tournaments")
+  const { data: existingLeagueByName, error } = await params.supabase
+    .from("leagues")
     .select("id")
     .ilike("name", params.normalizedName)
     .limit(1)
@@ -183,132 +152,63 @@ async function assertUniqueTournamentName(params: {
     throw new Error(error.message);
   }
 
-  if (existingTournamentByName) {
-    throw new Error("Ya existe un torneo con ese nombre.");
+  if (existingLeagueByName) {
+    throw new Error("Ya existe una liga con ese nombre.");
   }
 }
 
-async function createDirectTournament(params: {
-  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
-  adminId: string;
-  normalizedName: string;
-  requestedSlug: string;
-  parentTournamentId?: string;
-}) {
-  const seasonLabel = String(new Date().getFullYear());
-  const { data: insertedTournament, error } = await params.supabase
-    .from("tournaments")
-    .insert({
-      name: params.normalizedName,
-      slug: params.requestedSlug,
-      season_label: seasonLabel,
-      description: null,
-      is_public: true,
-      status: "draft",
-      created_by: params.adminId,
-      parent_tournament_id: params.parentTournamentId ?? null
-    })
-    .select("id, slug")
-    .single();
-
-  if (error || !insertedTournament) {
-    throw new Error(error?.message ?? "No se pudo crear el torneo.");
-  }
-
-  return {
-    id: String(insertedTournament.id),
-    slug: String(insertedTournament.slug)
-  };
-}
-
-export async function createTournamentAction(formData: FormData) {
+export async function createLeagueAction(formData: FormData) {
   try {
     const admin = await assertAdminAction();
-    const rawReturnToTournamentId = String(formData.get("returnToTournamentId") ?? "").trim() || null;
-    const parsed = createTournamentSchema.safeParse({
-      name: formData.get("name"),
-      parentTournamentId: formData.get("parentTournamentId"),
-      returnToTournamentId: formData.get("returnToTournamentId")
+    const parsed = createLeagueSchema.safeParse({
+      name: formData.get("name")
     });
 
     if (!parsed.success) {
-      redirect(buildCreateTournamentErrorPath(parsed.error.issues[0]?.message ?? "Datos invalidos.", rawReturnToTournamentId));
+      redirect(buildLeagueIndexPath({ error: parsed.error.issues[0]?.message ?? "Datos invalidos." }));
     }
 
     const supabaseAdmin = createSupabaseAdminClient();
     if (!supabaseAdmin) {
-      redirect(
-        buildCreateTournamentErrorPath(
-          "Falta SUPABASE_SERVICE_ROLE_KEY para iniciar el pago del torneo.",
-          parsed.data.returnToTournamentId
-        )
-      );
+      redirect(buildLeagueIndexPath({ error: "Falta SUPABASE_SERVICE_ROLE_KEY para iniciar el pago de la liga." }));
     }
 
     const normalizedName = parsed.data.name.trim();
     try {
-      await assertUniqueTournamentName({
+      await assertUniqueLeagueName({
         supabase: supabaseAdmin,
         normalizedName
       });
     } catch (error) {
       redirect(
-        buildCreateTournamentErrorPath(
-          toUserMessage(error, "No se pudo validar el nombre del torneo."),
-          parsed.data.returnToTournamentId
-        )
+        buildLeagueIndexPath({
+          error: toUserMessage(error, "No se pudo validar el nombre de la liga.")
+        })
       );
     }
 
     let requestedSlug: string;
     try {
-      requestedSlug = await resolveUniqueTournamentSlug({
+      requestedSlug = await resolveUniqueLeagueSlug({
         supabase: supabaseAdmin,
         normalizedName
       });
     } catch (error) {
       redirect(
-        buildCreateTournamentErrorPath(
-          toUserMessage(error, "No se pudo iniciar el alta del torneo."),
-          parsed.data.returnToTournamentId
-        )
-      );
-    }
-
-    if (parsed.data.parentTournamentId) {
-      await assertTournamentMembershipAction(parsed.data.parentTournamentId);
-      const resolvedRoot = await resolveTournamentRootId(parsed.data.parentTournamentId);
-
-      const createdSubtournament = await createDirectTournament({
-        supabase: supabaseAdmin,
-        adminId: admin.userId,
-        normalizedName,
-        requestedSlug,
-        parentTournamentId: resolvedRoot.id
-      });
-
-      revalidateTournamentPages(createdSubtournament.slug);
-      revalidatePath(`/admin/tournaments/${createdSubtournament.id}`);
-      revalidatePath(`/admin/tournaments/${resolvedRoot.id}`);
-
-      const rootTournamentSlug = await getTournamentSlugById(resolvedRoot.id);
-      revalidateTournamentPages(rootTournamentSlug);
-
-      redirect(
-        buildTournamentDetailPath(createdSubtournament.id, {
-          success: "Subtorneo creado."
+        buildLeagueIndexPath({
+          error: toUserMessage(error, "No se pudo iniciar el alta de la liga.")
         })
       );
     }
 
-    const externalReference = `tournament-create:${admin.userId}:${Date.now()}:${randomUUID().slice(0, 8)}`;
+    const externalReference = `league-create:${admin.userId}:${Date.now()}:${randomUUID().slice(0, 8)}`;
 
     const { data: insertedPayment, error: insertPaymentError } = await supabaseAdmin
-      .from("tournament_billing_payments")
+      .from("league_billing_payments")
       .insert({
         admin_id: admin.userId,
-        requested_tournament_name: normalizedName,
-        requested_tournament_slug: requestedSlug,
+        requested_league_name: normalizedName,
+        requested_league_slug: requestedSlug,
         amount: TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS,
         currency_id: ORGANIZATION_BILLING_CURRENCY,
         status: "pending",
@@ -319,10 +219,9 @@ export async function createTournamentAction(formData: FormData) {
 
     if (insertPaymentError || !insertedPayment) {
       redirect(
-        buildCreateTournamentErrorPath(
-          toUserMessage(insertPaymentError, "No se pudo registrar el pago del torneo."),
-          parsed.data.returnToTournamentId
-        )
+        buildLeagueIndexPath({
+          error: toUserMessage(insertPaymentError, "No se pudo registrar el pago de la liga.")
+        })
       );
     }
 
@@ -332,20 +231,20 @@ export async function createTournamentAction(formData: FormData) {
         localPaymentId: insertedPayment.id
       });
 
-      if (!debugApproval.updated || !debugApproval.createdTournamentId) {
-          redirect(
-          buildCreateTournamentErrorPath(
-            "reason" in debugApproval && debugApproval.reason
-              ? debugApproval.reason
-              : "No se pudo simular el pago del torneo.",
-            parsed.data.returnToTournamentId
-          )
+      if (!debugApproval.updated || !debugApproval.createdLeagueId) {
+        redirect(
+          buildLeagueIndexPath({
+            error:
+              "reason" in debugApproval && debugApproval.reason
+                ? debugApproval.reason
+                : "No se pudo simular el pago de la liga."
+          })
         );
       }
 
       redirect(
-        buildTournamentDetailPath(debugApproval.createdTournamentId, {
-          success: "Torneo creado."
+        buildLeagueDetailPath(debugApproval.createdLeagueId, {
+          success: "Liga creada."
         })
       );
     }
@@ -357,7 +256,7 @@ export async function createTournamentAction(formData: FormData) {
     const notificationPath = "/api/payments/mercadopago/webhook";
 
     const preference = await createCheckoutProPreference({
-      title: `Crear torneo (${normalizedName})`,
+      title: `Crear liga (${normalizedName})`,
       unitPrice: TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS,
       currencyId: ORGANIZATION_BILLING_CURRENCY,
       quantity: 1,
@@ -369,14 +268,14 @@ export async function createTournamentAction(formData: FormData) {
       expiresAt: buildMercadoPagoPreferenceExpirationDate(),
       payerEmail: admin.email,
       metadata: {
-        purpose: "tournament_creation",
+        purpose: "league_creation",
         admin_id: admin.userId,
-        tournament_billing_payment_id: insertedPayment.id
+        league_billing_payment_id: insertedPayment.id
       }
     });
 
     const { error: updatePaymentError } = await supabaseAdmin
-      .from("tournament_billing_payments")
+      .from("league_billing_payments")
       .update({
         mp_preference_id: preference.id,
         checkout_url: preference.init_point,
@@ -386,10 +285,9 @@ export async function createTournamentAction(formData: FormData) {
 
     if (updatePaymentError) {
       redirect(
-        buildCreateTournamentErrorPath(
-          toUserMessage(updatePaymentError, "No se pudo guardar la preferencia de pago."),
-          parsed.data.returnToTournamentId
-        )
+        buildLeagueIndexPath({
+          error: toUserMessage(updatePaymentError, "No se pudo guardar la preferencia de pago.")
+        })
       );
     }
 
@@ -399,135 +297,105 @@ export async function createTournamentAction(formData: FormData) {
 
     if (!redirectUrl) {
       redirect(
-        buildCreateTournamentErrorPath(
-          "Mercado Pago no devolvio una URL valida para continuar el pago.",
-          parsed.data.returnToTournamentId
-        )
+        buildLeagueIndexPath({
+          error: "Mercado Pago no devolvio una URL valida para continuar el pago."
+        })
       );
     }
 
     redirect(redirectUrl);
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildCreateTournamentErrorPath(
-        toUserMessage(error, "No se pudo iniciar el pago del torneo."),
-        String(formData.get("returnToTournamentId") ?? "").trim() || null
-      )
-    );
+    redirect(buildLeagueIndexPath({ error: toUserMessage(error, "No se pudo iniciar el alta de la liga.") }));
   }
 }
 
-export async function deleteTournamentAction(formData: FormData) {
+export async function deleteLeagueAction(formData: FormData) {
   try {
     const admin = await assertAdminAction();
-    const tournamentId = String(formData.get("tournamentId") ?? "").trim();
-    const returnToTournamentId = String(formData.get("returnToTournamentId") ?? "").trim() || null;
+    const leagueId = String(formData.get("leagueId") ?? "").trim();
 
-    if (!tournamentId) {
-      redirect(buildTournamentIndexPath({ error: "Falta el torneo a borrar." }));
+    if (!leagueId) {
+      redirect(buildLeagueIndexPath({ error: "Falta la liga a borrar." }));
     }
 
-    await assertTournamentMembershipAction(tournamentId);
+    await assertLeagueMembershipAction(leagueId);
 
     const supabase = await createSupabaseServerClient();
-    const { data: tournament, error: tournamentError } = await supabase
-      .from("tournaments")
-      .select("id, name, slug, created_by, parent_tournament_id")
-      .eq("id", tournamentId)
+    const { data: league, error: leagueError } = await supabase
+      .from("leagues")
+      .select("id, name, slug, created_by")
+      .eq("id", leagueId)
       .maybeSingle();
 
-    if (tournamentError || !tournament) {
-      redirect(buildTournamentIndexPath({ error: "No se encontro el torneo a borrar." }));
+    if (leagueError || !league) {
+      redirect(buildLeagueIndexPath({ error: "No se encontro la liga a borrar." }));
     }
 
-    if (!admin.isSuperAdmin && tournament.created_by !== admin.userId) {
-      const targetPath = returnToTournamentId
-        ? buildTournamentDetailPath(returnToTournamentId, {
-            error: "Solo el creador del torneo puede borrarlo."
-          })
-        : buildTournamentIndexPath({ error: "Solo el creador del torneo puede borrarlo." });
-      redirect(targetPath);
+    if (!admin.isSuperAdmin && league.created_by !== admin.userId) {
+      redirect(buildLeagueIndexPath({ error: "Solo el creador de la liga puede borrarla." }));
     }
 
-    const { count: childrenCount, error: childrenError } = await supabase
-      .from("tournaments")
+    const { count: competitionsCount, error: competitionsError } = await supabase
+      .from("competitions")
       .select("id", { count: "exact", head: true })
-      .eq("parent_tournament_id", tournamentId);
+      .eq("league_id", leagueId);
 
-    if (childrenError) {
+    if (competitionsError) {
       redirect(
-        buildTournamentDetailPath(tournamentId, {
-          error: toUserMessage(childrenError, "No se pudo validar si el torneo tiene subtorneos.")
+        buildLeagueDetailPath(leagueId, {
+          error: toUserMessage(competitionsError, "No se pudo validar si la liga tiene competencias.")
         })
       );
     }
 
-    if ((childrenCount ?? 0) > 0) {
+    if ((competitionsCount ?? 0) > 0) {
       redirect(
-        buildTournamentDetailPath(tournamentId, {
-          error: "Primero borra o mueve los subtorneos que cuelgan de este torneo."
+        buildLeagueDetailPath(leagueId, {
+          error: "Primero elimina las competencias de esta liga."
         })
       );
     }
 
-    const { error: deleteError } = await supabase.from("tournaments").delete().eq("id", tournamentId);
+    const { error: deleteError } = await supabase.from("leagues").delete().eq("id", leagueId);
 
     if (deleteError) {
-      const targetPath = returnToTournamentId
-        ? buildTournamentDetailPath(
-            returnToTournamentId,
-            { error: toUserMessage(deleteError, "No se pudo borrar el torneo.") }
-          )
-        : buildTournamentIndexPath({ error: toUserMessage(deleteError, "No se pudo borrar el torneo.") });
-      redirect(targetPath);
+      redirect(buildLeagueIndexPath({ error: toUserMessage(deleteError, "No se pudo borrar la liga.") }));
     }
 
-    revalidateTournamentPages(tournament.slug);
-    revalidatePath(`/admin/tournaments/${tournamentId}`);
-
-    const parentTournamentId = returnToTournamentId ?? tournament.parent_tournament_id ?? null;
-    if (parentTournamentId) {
-      revalidatePath(`/admin/tournaments/${parentTournamentId}`);
-      const parentSlug = await getTournamentSlugById(parentTournamentId);
-      revalidateTournamentPages(parentSlug);
-      redirect(
-        buildTournamentDetailPath(parentTournamentId, {
-          success: "Subtorneo eliminado."
-        })
-      );
-    }
-
-    redirect(buildTournamentIndexPath({ success: "Torneo eliminado." }));
+    revalidateLeaguePages(league.slug);
+    revalidatePath(`/admin/tournaments/${leagueId}`);
+    redirect(buildLeagueIndexPath({ success: "Liga eliminada." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(buildTournamentIndexPath({ error: toUserMessage(error, "No se pudo borrar el torneo.") }));
+    redirect(buildLeagueIndexPath({ error: toUserMessage(error, "No se pudo borrar la liga.") }));
   }
 }
 
-export async function archiveTournamentAction(formData: FormData) {
+export async function archiveLeagueAction(formData: FormData) {
   try {
-    const tournamentId = String(formData.get("tournamentId") ?? "");
-    if (!tournamentId) {
-      redirect(buildTournamentIndexPath({ error: "Falta el torneo a archivar." }));
+    const leagueId = String(formData.get("leagueId") ?? "").trim();
+    if (!leagueId) {
+      redirect(buildLeagueIndexPath({ error: "Falta la liga a archivar." }));
     }
 
-    await assertTournamentMembershipAction(tournamentId);
+    await assertLeagueMembershipAction(leagueId);
     const supabase = await createSupabaseServerClient();
-    const { error } = await supabase
-      .from("tournaments")
-      .update({ status: "archived" })
-      .eq("id", tournamentId);
+    const { error } = await supabase.from("leagues").update({ status: "archived" }).eq("id", leagueId);
 
     if (error) {
-      redirect(buildTournamentIndexPath({ error: toUserMessage(error, "No se pudo archivar el torneo.") }));
+      redirect(buildLeagueIndexPath({ error: toUserMessage(error, "No se pudo archivar la liga.") }));
     }
 
-    const slug = await getTournamentSlugById(tournamentId);
-    revalidateTournamentPages(slug);
-    redirect(buildTournamentIndexPath({ success: "Torneo archivado." }));
+    const slug = await getLeagueSlugById(leagueId);
+    revalidateLeaguePages(slug);
+    redirect(buildLeagueIndexPath({ success: "Liga archivada." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(buildTournamentIndexPath({ error: toUserMessage(error, "No se pudo archivar el torneo.") }));
+    redirect(buildLeagueIndexPath({ error: toUserMessage(error, "No se pudo archivar la liga.") }));
   }
 }
+
+export const createTournamentAction = createLeagueAction;
+export const deleteTournamentAction = deleteLeagueAction;
+export const archiveTournamentAction = archiveLeagueAction;

@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import {
+  getCompetitionPlayerPhotoObjectPath,
   CONTENT_TYPE_BY_EXTENSION,
   getLegacyPhotoPath,
   getOrganizationPlayerPhotoObjectPath,
@@ -96,6 +97,39 @@ export async function GET(
     }
   }
 
+  const { data: competitionPlayer, error: competitionPlayerError } = await supabase
+    .from("competition_team_players")
+    .select("competition_team_id")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  if (!competitionPlayerError && competitionPlayer?.competition_team_id) {
+    const { data: competitionTeam, error: competitionTeamError } = await supabase
+      .from("competition_teams")
+      .select("competition_id")
+      .eq("id", competitionPlayer.competition_team_id)
+      .maybeSingle();
+
+    if (!competitionTeamError && competitionTeam?.competition_id) {
+      const objectPath = getCompetitionPlayerPhotoObjectPath(
+        schemaName,
+        competitionTeam.competition_id,
+        playerId
+      );
+      const { data: photoFile, error: photoError } = await supabase.storage.from(bucketName).download(objectPath);
+
+      if (!photoError && photoFile) {
+        const fileBuffer = Buffer.from(await photoFile.arrayBuffer());
+        return new NextResponse(fileBuffer, {
+          headers: {
+            "content-type": "image/webp",
+            "cache-control": PLAYER_PHOTO_CACHE_CONTROL
+          }
+        });
+      }
+    }
+  }
+
   const { data: tournamentPlayer, error: tournamentPlayerError } = await supabase
     .from("tournament_players")
     .select("tournament_id")
@@ -103,11 +137,7 @@ export async function GET(
     .maybeSingle();
 
   if (!tournamentPlayerError && tournamentPlayer?.tournament_id) {
-    const objectPath = getTournamentPlayerPhotoObjectPath(
-      schemaName,
-      tournamentPlayer.tournament_id,
-      playerId
-    );
+    const objectPath = getTournamentPlayerPhotoObjectPath(schemaName, tournamentPlayer.tournament_id, playerId);
     const { data: photoFile, error: photoError } = await supabase.storage.from(bucketName).download(objectPath);
 
     if (!photoError && photoFile) {

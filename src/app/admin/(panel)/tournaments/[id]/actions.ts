@@ -1,110 +1,83 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { assertTournamentMembershipAction, getTournamentSlugById } from "@/lib/auth/tournaments";
-import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
-import { generateTournamentFixture, validateTournamentMatchPair } from "@/lib/domain/tournament-workflow";
-import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
+import { assertLeagueMembershipAction, getLeagueSlugById } from "@/lib/auth/tournaments";
 import { toUserMessage } from "@/lib/errors";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { normalizeEmail, slugifyTournamentName } from "@/lib/org";
-import {
-  getTournamentPlayerPhotoObjectPath,
-  inferPlayerPhotoExtension,
-  MAX_PLAYER_PHOTO_SIZE_MB,
-  optimizePlayerAvatarImage
-} from "@/lib/player-photos";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const updateTournamentSchema = z.object({
-  name: z.string().min(3, "El nombre del torneo debe tener al menos 3 caracteres.").max(100),
+const updateLeagueSchema = z.object({
+  name: z.string().min(3, "El nombre de la liga debe tener al menos 3 caracteres.").max(100),
+  description: z.string().max(500).optional(),
+  venueName: z.string().max(120).optional(),
+  locationNotes: z.string().max(300).optional(),
   isPublic: z.boolean().default(false),
   status: z.enum(["draft", "active", "finished", "archived"])
 });
 
-const teamSchema = z.object({
+const leagueTeamSchema = z.object({
   name: z.string().min(2, "El equipo debe tener al menos 2 caracteres.").max(80),
   shortName: z.string().max(20).optional(),
-  notes: z.string().max(300).optional(),
-  displayOrder: z.coerce.number().int().positive("El orden debe ser positivo.")
+  notes: z.string().max(300).optional()
 });
 
-const captainInviteSchema = z.object({
-  teamId: z.string().uuid(),
-  email: z.string().email("Ingresa un email valido.")
-});
-
-const tournamentAdminInviteSchema = z.object({
-  email: z.string().email("Ingresa un email valido.")
-});
-
-const removeTournamentAdminSchema = z.object({
-  adminId: z.string().uuid()
-});
-
-const tournamentAdminInviteDeleteSchema = z.object({
-  inviteId: z.string().uuid()
-});
-
-const teamCaptainSchema = z.object({
+const leagueTeamUpdateSchema = leagueTeamSchema.extend({
   teamId: z.string().uuid()
 });
 
-const captainInviteDeleteSchema = z.object({
+const leagueAdminInviteSchema = z.object({
+  email: z.string().email("Ingresa un email válido.")
+});
+
+const removeLeagueAdminSchema = z.object({
+  adminId: z.string().uuid()
+});
+
+const leagueAdminInviteDeleteSchema = z.object({
   inviteId: z.string().uuid()
 });
 
-const playerSchema = z.object({
-  teamId: z.string().uuid(),
-  fullName: z.string().min(2, "El jugador debe tener al menos 2 caracteres.").max(80),
-  shirtNumber: z.preprocess(
-    (value) => (typeof value === "string" && value.trim() ? Number(value) : null),
-    z.number().int().positive().max(99).nullable()
-  ),
-  position: z.string().max(30).optional()
+const createCompetitionSchema = z.object({
+  name: z.string().min(3, "La competencia debe tener al menos 3 caracteres.").max(100),
+  seasonLabel: z.string().max(40).optional(),
+  description: z.string().max(500).optional(),
+  venueOverride: z.string().max(120).optional(),
+  isPublic: z.boolean().default(false)
 });
 
-const playerPhotoSchema = z.object({
-  playerId: z.string().uuid()
-});
-
-const manualMatchSchema = z.object({
-  roundName: z.string().min(2, "La fecha debe tener al menos 2 caracteres.").max(80),
-  homeTeamId: z.string().uuid(),
-  awayTeamId: z.string().uuid(),
-  scheduledAt: z.string().optional(),
-  venue: z.string().max(120).optional(),
-  status: z.enum(["draft", "scheduled", "cancelled"])
-});
-
-const updateMatchSchema = z.object({
-  matchId: z.string().uuid(),
-  roundId: z.string().uuid().nullable(),
-  homeTeamId: z.string().uuid(),
-  awayTeamId: z.string().uuid(),
-  scheduledAt: z.string().optional(),
-  venue: z.string().max(120).optional(),
-  status: z.enum(["draft", "scheduled", "cancelled"])
-});
-
-function buildTournamentDetailPath(params: {
-  tournamentId: string;
+function buildLeagueDetailPath(params: {
+  leagueId: string;
   tab?: string;
   error?: string;
   success?: string;
 }) {
-  const { tournamentId, tab, error, success } = params;
-  const basePath = `/admin/tournaments/${tournamentId}`;
+  const { leagueId, tab, error, success } = params;
+  const basePath = `/admin/tournaments/${leagueId}`;
   const searchParams = new URLSearchParams();
   if (tab) searchParams.set("tab", tab);
   if (error) searchParams.set("error", error);
   if (success) searchParams.set("success", success);
+  const search = searchParams.toString();
+  return search ? `${basePath}?${search}` : basePath;
+}
+
+function buildCompetitionDetailPath(params: {
+  leagueId: string;
+  competitionId: string;
+  tab?: string;
+  error?: string;
+  success?: string;
+}) {
+  const basePath = `/admin/tournaments/${params.leagueId}/competitions/${params.competitionId}`;
+  const searchParams = new URLSearchParams();
+  if (params.tab) searchParams.set("tab", params.tab);
+  if (params.error) searchParams.set("error", params.error);
+  if (params.success) searchParams.set("success", params.success);
   const search = searchParams.toString();
   return search ? `${basePath}?${search}` : basePath;
 }
@@ -120,63 +93,17 @@ function parseNextSlug(baseSlug: string, existingSlugs: string[]) {
   return `${baseSlug}-${suffix}`;
 }
 
-function normalizeScheduledAt(value: string | undefined) {
-  if (!value?.trim()) return null;
-  return new Date(value).toISOString();
+function buildInviteExpiresAt() {
+  return new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
 }
 
-async function assertTournamentTeamPlayerCapacity(params: {
-  tournamentId: string;
-  teamId: string;
-}) {
-  const supabase = await createSupabaseServerClient();
-  const { count, error } = await supabase
-    .from("tournament_players")
-    .select("id", { count: "exact", head: true })
-    .eq("tournament_id", params.tournamentId)
-    .eq("team_id", params.teamId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if ((count ?? 0) >= MAX_TOURNAMENT_PLAYERS_PER_TEAM) {
-    throw new Error(`Cada equipo admite hasta ${MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores.`);
-  }
-}
-
-async function activateTournamentIfStillDraft(tournamentId: string) {
-  const supabase = await createSupabaseServerClient();
-  const { data: tournament, error: tournamentError } = await supabase
-    .from("tournaments")
-    .select("status")
-    .eq("id", tournamentId)
-    .maybeSingle();
-
-  if (tournamentError || !tournament) {
-    throw new Error(tournamentError?.message ?? "No se encontro el torneo.");
-  }
-
-  if (tournament.status !== "draft") return;
-
-  const { error: updateError } = await supabase
-    .from("tournaments")
-    .update({ status: "active" })
-    .eq("id", tournamentId)
-    .eq("status", "draft");
-
-  if (updateError) {
-    throw new Error(updateError.message);
-  }
-}
-
-async function validateTournamentNameAvailability(params: {
+async function validateLeagueNameAvailability(params: {
   name: string;
-  ignoreTournamentId: string;
+  ignoreLeagueId: string;
 }) {
   const supabase = createSupabaseAdminClient() ?? (await createSupabaseServerClient());
   const { data, error } = await supabase
-    .from("tournaments")
+    .from("leagues")
     .select("id")
     .ilike("name", params.name)
     .limit(1)
@@ -186,28 +113,24 @@ async function validateTournamentNameAvailability(params: {
     throw new Error(error.message);
   }
 
-  if (data && String(data.id) !== params.ignoreTournamentId) {
-    return "Ya existe un torneo con ese nombre.";
+  if (data && String(data.id) !== params.ignoreLeagueId) {
+    return "Ya existe una liga con ese nombre.";
   }
 
   return null;
 }
 
-function buildCaptainInviteExpiresAt() {
-  return new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
-}
-
-async function tournamentAlreadyHasAdminWithEmail(params: {
-  tournamentId: string;
+async function leagueAlreadyHasAdminWithEmail(params: {
+  leagueId: string;
   normalizedEmail: string;
 }) {
   const supabaseAdmin = createSupabaseAdminClient();
   if (!supabaseAdmin) return false;
 
   const { data: memberships, error: membershipsError } = await supabaseAdmin
-    .from("tournament_admins")
+    .from("league_admins")
     .select("admin_id")
-    .eq("tournament_id", params.tournamentId);
+    .eq("league_id", params.leagueId);
 
   if (membershipsError) {
     throw new Error(membershipsError.message);
@@ -234,192 +157,130 @@ async function tournamentAlreadyHasAdminWithEmail(params: {
   return adminIds.some((adminId) => currentAdminEmails.get(adminId) === params.normalizedEmail);
 }
 
-async function revalidateTournamentPaths(tournamentId: string) {
-  const slug = await getTournamentSlugById(tournamentId);
+async function revalidateLeaguePaths(leagueId: string) {
+  const slug = await getLeagueSlugById(leagueId);
   revalidatePath("/admin/tournaments");
-  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath(`/admin/tournaments/${leagueId}`);
   revalidatePath("/tournaments");
   revalidatePath(`/tournaments/${slug}`);
   return slug;
 }
 
-async function resolveRoundIdByName(params: {
-  tournamentId: string;
-  roundName: string;
+async function resolveUniqueCompetitionSlug(params: {
+  leagueId: string;
+  normalizedName: string;
 }) {
-  const { tournamentId, roundName } = params;
-  const supabase = await createSupabaseServerClient();
-  const normalizedRoundName = roundName.trim().toLowerCase();
-  const { data: existingRounds, error: roundsError } = await supabase
-    .from("tournament_rounds")
-    .select("id, round_number, name")
-    .eq("tournament_id", tournamentId)
-    .order("round_number", { ascending: true });
+  const supabase = createSupabaseAdminClient() ?? (await createSupabaseServerClient());
+  const baseSlug = slugifyTournamentName(params.normalizedName) || `competencia-${Date.now()}`;
+  const { data: existingRows, error } = await supabase
+    .from("competitions")
+    .select("slug")
+    .eq("league_id", params.leagueId)
+    .ilike("slug", `${baseSlug}%`);
 
-  if (roundsError) {
-    throw new Error(`No se pudieron leer las fechas del torneo: ${roundsError.message}`);
+  if (error) {
+    throw new Error(error.message);
   }
 
-  const existingRound = (existingRounds ?? []).find((row) => row.name.trim().toLowerCase() === normalizedRoundName);
-  if (existingRound) return existingRound.id;
-
-  const nextRoundNumber =
-    Math.max(0, ...(existingRounds ?? []).map((row) => Number(row.round_number))) + 1;
-  const { data: insertedRound, error: insertError } = await supabase
-    .from("tournament_rounds")
-    .insert({
-      tournament_id: tournamentId,
-      round_number: nextRoundNumber,
-      name: roundName.trim()
-    })
-    .select("id")
-    .single();
-
-  if (insertError || !insertedRound) {
-    throw new Error(`No se pudo crear la fecha del torneo: ${insertError?.message ?? "sin detalle"}`);
-  }
-
-  return insertedRound.id;
+  return parseNextSlug(
+    baseSlug,
+    (existingRows ?? []).map((row) => String(row.slug).toLowerCase())
+  );
 }
 
-export async function updateTournamentAction(tournamentId: string, formData: FormData) {
+export async function updateLeagueAction(leagueId: string, formData: FormData) {
   try {
-    await assertTournamentMembershipAction(tournamentId);
-    const parsed = updateTournamentSchema.safeParse({
+    await assertLeagueMembershipAction(leagueId);
+    const parsed = updateLeagueSchema.safeParse({
       name: formData.get("name"),
+      description: formData.get("description"),
+      venueName: formData.get("venueName"),
+      locationNotes: formData.get("locationNotes"),
       isPublic: formData.get("isPublic") === "on",
       status: formData.get("status")
     });
 
     if (!parsed.success) {
       redirect(
-        buildTournamentDetailPath({
-          tournamentId,
+        buildLeagueDetailPath({
+          leagueId,
           tab: "summary",
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
+          error: parsed.error.issues[0]?.message ?? "Datos inválidos."
         })
       );
     }
 
     const normalizedName = parsed.data.name.trim();
-    const duplicateNameMessage = await validateTournamentNameAvailability({
+    const duplicateNameMessage = await validateLeagueNameAvailability({
       name: normalizedName,
-      ignoreTournamentId: tournamentId
+      ignoreLeagueId: leagueId
     });
     if (duplicateNameMessage) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: duplicateNameMessage
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "summary", error: duplicateNameMessage }));
     }
 
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase
-      .from("tournaments")
+      .from("leagues")
       .update({
         name: normalizedName,
+        description: parsed.data.description?.trim() || null,
+        venue_name: parsed.data.venueName?.trim() || null,
+        location_notes: parsed.data.locationNotes?.trim() || null,
         is_public: parsed.data.isPublic,
         status: parsed.data.status
       })
-      .eq("id", tournamentId);
+      .eq("id", leagueId);
 
     if (error) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: toUserMessage(error, "No se pudo actualizar el torneo.")
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "summary", error: toUserMessage(error, "No se pudo actualizar la liga.") }));
     }
 
-    await revalidateTournamentPaths(tournamentId);
-    redirect(buildTournamentDetailPath({ tournamentId, tab: "summary", success: "Resumen actualizado." }));
+    await revalidateLeaguePaths(leagueId);
+    redirect(buildLeagueDetailPath({ leagueId, tab: "summary", success: "Resumen actualizado." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "summary",
-        error: toUserMessage(error, "No se pudo actualizar el torneo.")
-      })
-    );
+    redirect(buildLeagueDetailPath({ leagueId, tab: "summary", error: toUserMessage(error, "No se pudo actualizar la liga.") }));
   }
 }
 
-export async function inviteTournamentAdminAction(tournamentId: string, formData: FormData) {
+export async function inviteLeagueAdminAction(leagueId: string, formData: FormData) {
   try {
-    const admin = await assertTournamentMembershipAction(tournamentId);
-    const parsed = tournamentAdminInviteSchema.safeParse({
+    const admin = await assertLeagueMembershipAction(leagueId);
+    const parsed = leagueAdminInviteSchema.safeParse({
       email: formData.get("email")
     });
 
     if (!parsed.success) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
     const normalizedEmail = normalizeEmail(parsed.data.email);
     if (normalizedEmail === admin.email) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: "Tu usuario ya administra este torneo."
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: "Tu usuario ya administra esta liga." }));
     }
 
-    if (await tournamentAlreadyHasAdminWithEmail({ tournamentId, normalizedEmail })) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: "Ese email ya administra este torneo."
-        })
-      );
+    if (await leagueAlreadyHasAdminWithEmail({ leagueId, normalizedEmail })) {
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: "Ese email ya administra esta liga." }));
     }
 
     const supabase = await createSupabaseServerClient();
     const [{ count: currentAdmins, error: adminCountError }, { data: inviteRows, error: inviteRowsError }] =
       await Promise.all([
+        supabase.from("league_admins").select("id", { count: "exact", head: true }).eq("league_id", leagueId),
         supabase
-          .from("tournament_admins")
-          .select("id", { count: "exact", head: true })
-          .eq("tournament_id", tournamentId),
-        supabase
-          .from("tournament_admin_invites")
+          .from("league_admin_invites")
           .select("id, expires_at")
-          .eq("tournament_id", tournamentId)
+          .eq("league_id", leagueId)
           .eq("status", "pending")
       ]);
 
     if (adminCountError) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: toUserMessage(adminCountError, "No se pudo verificar los admins actuales.")
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: toUserMessage(adminCountError, "No se pudo verificar los admins actuales.") }));
     }
 
     if (inviteRowsError) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: toUserMessage(inviteRowsError, "No se pudo verificar invitaciones pendientes.")
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: toUserMessage(inviteRowsError, "No se pudo verificar invitaciones pendientes.") }));
     }
 
     const activePendingInvites = (inviteRows ?? []).filter((row) => {
@@ -428,1014 +289,350 @@ export async function inviteTournamentAdminAction(tournamentId: string, formData
     });
     const slotsUsed = (currentAdmins ?? 0) + activePendingInvites.length;
     if (slotsUsed >= 4) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: "Este torneo ya alcanzo el maximo de 4 administradores."
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: "Esta liga ya alcanzó el máximo de 4 administradores." }));
     }
 
     const { error: cleanupInviteError } = await supabase
-      .from("tournament_admin_invites")
+      .from("league_admin_invites")
       .delete()
-      .eq("tournament_id", tournamentId)
+      .eq("league_id", leagueId)
       .eq("email", normalizedEmail)
       .eq("status", "pending")
       .lte("expires_at", new Date().toISOString());
 
     if (cleanupInviteError) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: toUserMessage(cleanupInviteError, "No se pudo preparar la invitacion.")
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: toUserMessage(cleanupInviteError, "No se pudo preparar la invitación.") }));
     }
 
-    const { error: inviteError } = await supabase.from("tournament_admin_invites").insert({
-      tournament_id: tournamentId,
+    const { error: inviteError } = await supabase.from("league_admin_invites").insert({
+      league_id: leagueId,
       email: normalizedEmail,
       invited_by: admin.userId,
       status: "pending",
-      expires_at: buildCaptainInviteExpiresAt()
+      expires_at: buildInviteExpiresAt()
     });
 
     if (inviteError) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error:
-            inviteError.code === "23505"
-              ? "Ese email ya tiene una invitacion pendiente."
-              : toUserMessage(inviteError, "No se pudo generar la invitacion.")
-        })
-      );
+      redirect(buildLeagueDetailPath({
+        leagueId,
+        tab: "admins",
+        error:
+          inviteError.code === "23505"
+            ? "Ese email ya tiene una invitación pendiente."
+            : toUserMessage(inviteError, "No se pudo generar la invitación.")
+      }));
     }
 
-    await revalidateTournamentPaths(tournamentId);
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "summary",
-        success: "Invitacion de admin preparada."
-      })
-    );
+    await revalidateLeaguePaths(leagueId);
+    redirect(buildLeagueDetailPath({ leagueId, tab: "admins", success: "Invitación de admin preparada." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "summary",
-        error: toUserMessage(error, "No se pudo generar la invitacion.")
-      })
-    );
+    redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: toUserMessage(error, "No se pudo generar la invitación.") }));
   }
 }
 
-export async function revokeTournamentAdminInviteAction(tournamentId: string, formData: FormData) {
+export async function revokeLeagueAdminInviteAction(leagueId: string, formData: FormData) {
   try {
-    await assertTournamentMembershipAction(tournamentId);
-    const parsed = tournamentAdminInviteDeleteSchema.safeParse({
+    await assertLeagueMembershipAction(leagueId);
+    const parsed = leagueAdminInviteDeleteSchema.safeParse({
       inviteId: formData.get("inviteId")
     });
 
     if (!parsed.success) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase
-      .from("tournament_admin_invites")
+      .from("league_admin_invites")
       .delete()
       .eq("id", parsed.data.inviteId)
-      .eq("tournament_id", tournamentId);
+      .eq("league_id", leagueId);
 
     if (error) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: toUserMessage(error, "No se pudo cancelar la invitacion.")
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: toUserMessage(error, "No se pudo cancelar la invitación.") }));
     }
 
-    await revalidateTournamentPaths(tournamentId);
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "summary",
-        success: "Invitacion cancelada."
-      })
-    );
+    await revalidateLeaguePaths(leagueId);
+    redirect(buildLeagueDetailPath({ leagueId, tab: "admins", success: "Invitación cancelada." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "summary",
-        error: toUserMessage(error, "No se pudo cancelar la invitacion.")
-      })
-    );
+    redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: toUserMessage(error, "No se pudo cancelar la invitación.") }));
   }
 }
 
-export async function removeTournamentAdminAction(tournamentId: string, formData: FormData) {
+export async function removeLeagueAdminAction(leagueId: string, formData: FormData) {
   try {
-    const actingAdmin = await assertTournamentMembershipAction(tournamentId);
-    const parsed = removeTournamentAdminSchema.safeParse({
+    const actingAdmin = await assertLeagueMembershipAction(leagueId);
+    const parsed = removeLeagueAdminSchema.safeParse({
       adminId: formData.get("adminId")
     });
 
     if (!parsed.success) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
     if (actingAdmin.userId === parsed.data.adminId) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: "No puedes quitarte a ti mismo como admin de este torneo."
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: "No puedes quitarte a ti mismo como admin de esta liga." }));
     }
 
     const supabase = await createSupabaseServerClient();
     const { count: adminsCount, error: adminsCountError } = await supabase
-      .from("tournament_admins")
+      .from("league_admins")
       .select("id", { count: "exact", head: true })
-      .eq("tournament_id", tournamentId);
+      .eq("league_id", leagueId);
 
     if (adminsCountError) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: toUserMessage(adminsCountError, "No se pudo contar los admins actuales.")
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: toUserMessage(adminsCountError, "No se pudo contar los admins actuales.") }));
     }
 
     if ((adminsCount ?? 0) <= 1) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: "El torneo debe mantener al menos 1 admin activo."
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: "La liga debe mantener al menos 1 admin activo." }));
     }
 
     const { error: deleteError } = await supabase
-      .from("tournament_admins")
+      .from("league_admins")
       .delete()
-      .eq("tournament_id", tournamentId)
+      .eq("league_id", leagueId)
       .eq("admin_id", parsed.data.adminId);
 
     if (deleteError) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "summary",
-          error: toUserMessage(deleteError, "No se pudo quitar al administrador.")
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: toUserMessage(deleteError, "No se pudo quitar al administrador.") }));
     }
 
-    await revalidateTournamentPaths(tournamentId);
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "summary",
-        success: "Administrador quitado."
-      })
-    );
+    await revalidateLeaguePaths(leagueId);
+    redirect(buildLeagueDetailPath({ leagueId, tab: "admins", success: "Administrador quitado." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "summary",
-        error: toUserMessage(error, "No se pudo quitar al administrador.")
-      })
-    );
+    redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: toUserMessage(error, "No se pudo quitar al administrador.") }));
   }
 }
 
-export async function addTournamentTeamAction(tournamentId: string, formData: FormData) {
+export async function addLeagueTeamAction(leagueId: string, formData: FormData) {
   try {
-    await assertTournamentMembershipAction(tournamentId);
-    const parsed = teamSchema.safeParse({
+    await assertLeagueMembershipAction(leagueId);
+    const parsed = leagueTeamSchema.safeParse({
       name: formData.get("name"),
       shortName: formData.get("shortName"),
-      notes: formData.get("notes"),
-      displayOrder: formData.get("displayOrder")
+      notes: formData.get("notes")
     });
 
     if (!parsed.success) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
     const supabase = await createSupabaseServerClient();
-    const { data: existingTeams, error: existingError } = await supabase
-      .from("tournament_teams")
-      .select("slug")
-      .eq("tournament_id", tournamentId);
+    const normalizedName = parsed.data.name.trim();
+    const normalizedSlug = slugifyTournamentName(normalizedName) || `equipo-${Date.now()}`;
+    const { data: existingTeams, error: existingTeamsError } = await supabase
+      .from("league_teams")
+      .select("id, name, slug")
+      .eq("league_id", leagueId);
 
-    if (existingError) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: toUserMessage(existingError, "No se pudo crear el equipo.")
-        })
-      );
+    if (existingTeamsError) {
+      redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: toUserMessage(existingTeamsError, "No se pudo validar el equipo.") }));
     }
 
-    const baseSlug = slugifyTournamentName(parsed.data.name) || `equipo-${Date.now()}`;
-    const slug = parseNextSlug(
-      baseSlug,
-      (existingTeams ?? []).map((row) => row.slug.toLowerCase())
+    const normalizedNames = new Set((existingTeams ?? []).map((team) => String(team.name).trim().toLowerCase()));
+    if (normalizedNames.has(normalizedName.toLowerCase())) {
+      redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: "Ya existe un equipo con ese nombre en la liga." }));
+    }
+
+    const teamSlug = parseNextSlug(
+      normalizedSlug,
+      (existingTeams ?? []).map((team) => String(team.slug).toLowerCase())
     );
 
-    const { error } = await supabase.from("tournament_teams").insert({
-      tournament_id: tournamentId,
-      name: parsed.data.name.trim(),
+    const { error } = await supabase.from("league_teams").insert({
+      league_id: leagueId,
+      name: normalizedName,
       short_name: parsed.data.shortName?.trim() || null,
-      slug,
-      display_order: parsed.data.displayOrder,
+      slug: teamSlug,
       notes: parsed.data.notes?.trim() || null
     });
 
     if (error) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: toUserMessage(error, "No se pudo crear el equipo.")
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: toUserMessage(error, "No se pudo agregar el equipo.") }));
     }
 
-    await revalidateTournamentPaths(tournamentId);
-    redirect(buildTournamentDetailPath({ tournamentId, tab: "teams", success: "Equipo agregado." }));
+    await revalidateLeaguePaths(leagueId);
+    redirect(buildLeagueDetailPath({ leagueId, tab: "teams", success: "Equipo maestro agregado." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "teams",
-        error: toUserMessage(error, "No se pudo crear el equipo.")
-      })
-    );
+    redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: toUserMessage(error, "No se pudo agregar el equipo.") }));
   }
 }
 
-export async function updateTournamentTeamAction(tournamentId: string, formData: FormData) {
+export async function updateLeagueTeamAction(leagueId: string, formData: FormData) {
   try {
-    await assertTournamentMembershipAction(tournamentId);
-    const teamId = String(formData.get("teamId") ?? "");
-    const parsed = teamSchema.safeParse({
+    await assertLeagueMembershipAction(leagueId);
+    const parsed = leagueTeamUpdateSchema.safeParse({
+      teamId: formData.get("teamId"),
       name: formData.get("name"),
       shortName: formData.get("shortName"),
-      notes: formData.get("notes"),
-      displayOrder: formData.get("displayOrder")
+      notes: formData.get("notes")
     });
 
-    if (!teamId) {
-      redirect(buildTournamentDetailPath({ tournamentId, tab: "teams", error: "Falta el equipo a actualizar." }));
-    }
     if (!parsed.success) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
     const supabase = await createSupabaseServerClient();
-    const { data: existingTeams, error: existingError } = await supabase
-      .from("tournament_teams")
-      .select("id, slug")
-      .eq("tournament_id", tournamentId);
+    const normalizedName = parsed.data.name.trim();
 
-    if (existingError) {
-      redirect(buildTournamentDetailPath({ tournamentId, tab: "teams", error: toUserMessage(existingError) }));
+    const { data: siblingTeams, error: siblingTeamsError } = await supabase
+      .from("league_teams")
+      .select("id, name")
+      .eq("league_id", leagueId);
+
+    if (siblingTeamsError) {
+      redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: toUserMessage(siblingTeamsError, "No se pudo validar el equipo.") }));
     }
 
-    const baseSlug = slugifyTournamentName(parsed.data.name) || `equipo-${Date.now()}`;
-    const otherSlugs = (existingTeams ?? [])
-      .filter((row) => row.id !== teamId)
-      .map((row) => row.slug.toLowerCase());
-    const slug = parseNextSlug(baseSlug, otherSlugs);
+    const duplicate = (siblingTeams ?? []).find(
+      (team) => String(team.id) !== parsed.data.teamId && String(team.name).trim().toLowerCase() === normalizedName.toLowerCase()
+    );
+    if (duplicate) {
+      redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: "Ya existe otro equipo con ese nombre en la liga." }));
+    }
 
     const { error } = await supabase
-      .from("tournament_teams")
+      .from("league_teams")
       .update({
-        name: parsed.data.name.trim(),
+        name: normalizedName,
         short_name: parsed.data.shortName?.trim() || null,
-        notes: parsed.data.notes?.trim() || null,
-        display_order: parsed.data.displayOrder,
-        slug
+        notes: parsed.data.notes?.trim() || null
       })
-      .eq("id", teamId)
-      .eq("tournament_id", tournamentId);
+      .eq("id", parsed.data.teamId)
+      .eq("league_id", leagueId);
 
     if (error) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: toUserMessage(error, "No se pudo actualizar el equipo.")
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: toUserMessage(error, "No se pudo actualizar el equipo.") }));
     }
 
-    await revalidateTournamentPaths(tournamentId);
-    redirect(buildTournamentDetailPath({ tournamentId, tab: "teams", success: "Equipo actualizado." }));
+    await revalidateLeaguePaths(leagueId);
+    redirect(buildLeagueDetailPath({ leagueId, tab: "teams", success: "Equipo maestro actualizado." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "teams",
-        error: toUserMessage(error, "No se pudo actualizar el equipo.")
-      })
-    );
+    redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: toUserMessage(error, "No se pudo actualizar el equipo.") }));
   }
 }
 
-export async function deleteTournamentTeamAction(tournamentId: string, formData: FormData) {
+export async function deleteLeagueTeamAction(leagueId: string, formData: FormData) {
   try {
-    await assertTournamentMembershipAction(tournamentId);
+    await assertLeagueMembershipAction(leagueId);
     const teamId = String(formData.get("teamId") ?? "");
     if (!teamId) {
-      redirect(buildTournamentDetailPath({ tournamentId, tab: "teams", error: "Falta el equipo a borrar." }));
+      redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: "Falta el equipo a borrar." }));
     }
 
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase
-      .from("tournament_teams")
+      .from("league_teams")
       .delete()
       .eq("id", teamId)
-      .eq("tournament_id", tournamentId);
+      .eq("league_id", leagueId);
 
     if (error) {
       const userMessage =
         error.code === "23503"
-          ? "No se puede borrar el equipo porque ya esta vinculado a partidos del fixture."
+          ? "No se puede borrar el equipo porque ya está inscripto en alguna competencia."
           : toUserMessage(error, "No se pudo borrar el equipo.");
-      redirect(buildTournamentDetailPath({ tournamentId, tab: "teams", error: userMessage }));
+      redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: userMessage }));
     }
 
-    await revalidateTournamentPaths(tournamentId);
-    redirect(buildTournamentDetailPath({ tournamentId, tab: "teams", success: "Equipo eliminado." }));
+    await revalidateLeaguePaths(leagueId);
+    redirect(buildLeagueDetailPath({ leagueId, tab: "teams", success: "Equipo maestro eliminado." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "teams",
-        error: toUserMessage(error, "No se pudo borrar el equipo.")
-      })
-    );
+    redirect(buildLeagueDetailPath({ leagueId, tab: "teams", error: toUserMessage(error, "No se pudo borrar el equipo.") }));
   }
 }
 
-export async function inviteTournamentCaptainAction(tournamentId: string, formData: FormData) {
+export async function createCompetitionAction(leagueId: string, formData: FormData) {
   try {
-    const admin = await assertTournamentMembershipAction(tournamentId);
-    const parsed = captainInviteSchema.safeParse({
-      teamId: formData.get("teamId"),
-      email: formData.get("email")
+    await assertLeagueMembershipAction(leagueId);
+    const parsed = createCompetitionSchema.safeParse({
+      name: formData.get("name"),
+      seasonLabel: formData.get("seasonLabel"),
+      description: formData.get("description"),
+      venueOverride: formData.get("venueOverride"),
+      isPublic: formData.get("isPublic") === "on"
     });
 
     if (!parsed.success) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
-        })
-      );
+      redirect(buildLeagueDetailPath({ leagueId, tab: "competitions", error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
-    const normalizedEmail = normalizeEmail(parsed.data.email);
-    const supabase = await createSupabaseServerClient();
-    const [{ data: team, error: teamError }, { data: currentCaptain, error: captainError }] = await Promise.all([
-      supabase
-        .from("tournament_teams")
-        .select("id")
-        .eq("id", parsed.data.teamId)
-        .eq("tournament_id", tournamentId)
-        .maybeSingle(),
-      supabase
-        .from("tournament_team_captains")
-        .select("id")
-        .eq("tournament_id", tournamentId)
-        .eq("team_id", parsed.data.teamId)
-        .maybeSingle()
-    ]);
-
-    if (teamError || !team) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: "No se encontro el equipo dentro de este torneo."
-        })
-      );
-    }
-
-    if (captainError) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: toUserMessage(captainError, "No se pudo preparar la invitacion del capitan.")
-        })
-      );
-    }
-
-    if (currentCaptain) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: "Este equipo ya tiene un capitan asignado. Quitalo antes de invitar a otro."
-        })
-      );
-    }
-
-    const inviteToken = randomUUID();
-    const { error } = await supabase.from("tournament_captain_invites").upsert(
-      {
-        tournament_id: tournamentId,
-        team_id: parsed.data.teamId,
-        email: normalizedEmail,
-        invite_token: inviteToken,
-        created_by: admin.userId,
-        expires_at: buildCaptainInviteExpiresAt()
-      },
-      {
-        onConflict: "team_id"
-      }
-    );
-
-    if (error) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: toUserMessage(error, "No se pudo preparar la invitacion del capitan.")
-        })
-      );
-    }
-
-    await revalidateTournamentPaths(tournamentId);
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "teams",
-        success: "Invitacion de capitan preparada."
-      })
-    );
-  } catch (error) {
-    if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "teams",
-        error: toUserMessage(error, "No se pudo preparar la invitacion del capitan.")
-      })
-    );
-  }
-}
-
-export async function deleteTournamentCaptainInviteAction(tournamentId: string, formData: FormData) {
-  try {
-    await assertTournamentMembershipAction(tournamentId);
-    const parsed = captainInviteDeleteSchema.safeParse({
-      inviteId: formData.get("inviteId")
-    });
-
-    if (!parsed.success) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: parsed.error.issues[0]?.message ?? "Falta la invitacion a revocar."
-        })
-      );
-    }
+    const selectedLeagueTeamIds = formData
+      .getAll("leagueTeamIds")
+      .map((value) => String(value))
+      .filter(Boolean);
 
     const supabase = await createSupabaseServerClient();
-    const { error } = await supabase
-      .from("tournament_captain_invites")
-      .delete()
-      .eq("id", parsed.data.inviteId)
-      .eq("tournament_id", tournamentId);
+    const normalizedName = parsed.data.name.trim();
+    const competitionSlug = await resolveUniqueCompetitionSlug({
+      leagueId,
+      normalizedName
+    });
 
-    if (error) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: toUserMessage(error, "No se pudo revocar la invitacion.")
-        })
-      );
-    }
-
-    await revalidateTournamentPaths(tournamentId);
-    redirect(buildTournamentDetailPath({ tournamentId, tab: "teams", success: "Invitacion revocada." }));
-  } catch (error) {
-    if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "teams",
-        error: toUserMessage(error, "No se pudo revocar la invitacion.")
+    const { data: competition, error: competitionError } = await supabase
+      .from("competitions")
+      .insert({
+        league_id: leagueId,
+        name: normalizedName,
+        slug: competitionSlug,
+        season_label: parsed.data.seasonLabel?.trim() || String(new Date().getFullYear()),
+        description: parsed.data.description?.trim() || null,
+        venue_override: parsed.data.venueOverride?.trim() || null,
+        is_public: parsed.data.isPublic,
+        status: "draft"
       })
-    );
-  }
-}
-
-export async function removeTournamentCaptainAction(tournamentId: string, formData: FormData) {
-  try {
-    await assertTournamentMembershipAction(tournamentId);
-    const parsed = teamCaptainSchema.safeParse({
-      teamId: formData.get("teamId")
-    });
-
-    if (!parsed.success) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: parsed.error.issues[0]?.message ?? "Falta el capitan a quitar."
-        })
-      );
-    }
-
-    const supabase = await createSupabaseServerClient();
-    const { error } = await supabase
-      .from("tournament_team_captains")
-      .delete()
-      .eq("tournament_id", tournamentId)
-      .eq("team_id", parsed.data.teamId);
-
-    if (error) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "teams",
-          error: toUserMessage(error, "No se pudo quitar al capitan.")
-        })
-      );
-    }
-
-    revalidatePath("/captain");
-    await revalidateTournamentPaths(tournamentId);
-    redirect(buildTournamentDetailPath({ tournamentId, tab: "teams", success: "Capitan removido." }));
-  } catch (error) {
-    if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "teams",
-        error: toUserMessage(error, "No se pudo quitar al capitan.")
-      })
-    );
-  }
-}
-
-export async function addTournamentPlayerAction(tournamentId: string, formData: FormData) {
-  try {
-    await assertTournamentMembershipAction(tournamentId);
-    const parsed = playerSchema.safeParse({
-      teamId: formData.get("teamId"),
-      fullName: formData.get("fullName"),
-      shirtNumber: formData.get("shirtNumber"),
-      position: formData.get("position")
-    });
-
-    if (!parsed.success) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "players",
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
-        })
-      );
-    }
-
-    await assertTournamentTeamPlayerCapacity({
-      tournamentId,
-      teamId: parsed.data.teamId
-    });
-
-    const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.from("tournament_players").insert({
-      tournament_id: tournamentId,
-      team_id: parsed.data.teamId,
-      full_name: parsed.data.fullName.trim(),
-      shirt_number: parsed.data.shirtNumber,
-      position: parsed.data.position?.trim() || null,
-      active: true
-    });
-
-    if (error) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "players",
-          error: toUserMessage(error, "No se pudo agregar el jugador.")
-        })
-      );
-    }
-
-    await revalidateTournamentPaths(tournamentId);
-    redirect(buildTournamentDetailPath({ tournamentId, tab: "players", success: "Jugador agregado." }));
-  } catch (error) {
-    if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "players",
-        error: toUserMessage(error, "No se pudo agregar el jugador.")
-      })
-    );
-  }
-}
-
-export async function deleteTournamentPlayerAction(tournamentId: string, formData: FormData) {
-  try {
-    await assertTournamentMembershipAction(tournamentId);
-    const playerId = String(formData.get("playerId") ?? "");
-    if (!playerId) {
-      redirect(buildTournamentDetailPath({ tournamentId, tab: "players", error: "Falta el jugador a borrar." }));
-    }
-
-    const supabase = await createSupabaseServerClient();
-    const { error } = await supabase
-      .from("tournament_players")
-      .delete()
-      .eq("id", playerId)
-      .eq("tournament_id", tournamentId);
-
-    if (error) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "players",
-          error: toUserMessage(error, "No se pudo borrar el jugador.")
-        })
-      );
-    }
-
-    await revalidateTournamentPaths(tournamentId);
-    redirect(buildTournamentDetailPath({ tournamentId, tab: "players", success: "Jugador eliminado." }));
-  } catch (error) {
-    if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "players",
-        error: toUserMessage(error, "No se pudo borrar el jugador.")
-      })
-    );
-  }
-}
-
-export async function uploadTournamentPlayerPhotoAction(tournamentId: string, formData: FormData) {
-  try {
-    await assertTournamentMembershipAction(tournamentId);
-    const parsed = playerPhotoSchema.safeParse({
-      playerId: formData.get("playerId")
-    });
-
-    if (!parsed.success) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "players",
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
-        })
-      );
-    }
-
-    const file = formData.get("photo");
-    if (!(file instanceof File) || file.size <= 0) {
-      redirect(buildTournamentDetailPath({ tournamentId, tab: "players", error: "Selecciona una imagen para subir." }));
-    }
-
-    const sizeLimitBytes = MAX_PLAYER_PHOTO_SIZE_MB * 1024 * 1024;
-    if (file.size > sizeLimitBytes) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "players",
-          error: `La imagen no puede superar ${MAX_PLAYER_PHOTO_SIZE_MB} MB.`
-        })
-      );
-    }
-
-    const extension = inferPlayerPhotoExtension(file);
-    if (!extension) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "players",
-          error: "Formato no soportado. Usa JPG, JPEG, PNG o WEBP."
-        })
-      );
-    }
-
-    const supabase = await createSupabaseServerClient();
-    const { data: player, error: playerError } = await supabase
-      .from("tournament_players")
       .select("id")
-      .eq("id", parsed.data.playerId)
-      .eq("tournament_id", tournamentId)
-      .maybeSingle();
+      .single();
 
-    if (playerError || !player) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "players",
-          error: "No se encontro el jugador en el torneo seleccionado."
-        })
+    if (competitionError || !competition) {
+      redirect(buildLeagueDetailPath({ leagueId, tab: "competitions", error: toUserMessage(competitionError, "No se pudo crear la competencia.") }));
+    }
+
+    if (selectedLeagueTeamIds.length) {
+      const { data: leagueTeams, error: leagueTeamsError } = await supabase
+        .from("league_teams")
+        .select("id, name, short_name, notes")
+        .eq("league_id", leagueId)
+        .in("id", selectedLeagueTeamIds);
+
+      if (leagueTeamsError) {
+        redirect(buildLeagueDetailPath({ leagueId, tab: "competitions", error: toUserMessage(leagueTeamsError, "No se pudieron cargar los equipos seleccionados.") }));
+      }
+
+      const orderedTeams = [...(leagueTeams ?? [])].sort((left, right) =>
+        String(left.name).localeCompare(String(right.name), "es")
       );
-    }
 
-    const optimizedBuffer = await optimizePlayerAvatarImage(file);
-    const objectPath = getTournamentPlayerPhotoObjectPath(
-      getSupabaseDbSchema(),
-      tournamentId,
-      parsed.data.playerId
-    );
-    const bucketName = getPlayerPhotosBucket();
-    const { error: uploadError } = await supabase.storage.from(bucketName).upload(objectPath, optimizedBuffer, {
-      upsert: true,
-      contentType: "image/webp",
-      cacheControl: "31536000"
-    });
+      if (orderedTeams.length) {
+        const { error: competitionTeamsError } = await supabase.from("competition_teams").insert(
+          orderedTeams.map((team, index) => ({
+            competition_id: competition.id,
+            league_team_id: team.id,
+            display_name: team.name,
+            short_name: team.short_name ?? null,
+            display_order: index + 1,
+            notes: team.notes ?? null
+          }))
+        );
 
-    if (uploadError) {
-      console.error("[tournaments] storage upload failed", {
-        tournamentId,
-        playerId: parsed.data.playerId,
-        message: uploadError.message
-      });
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "players",
-          error: "No se pudo guardar la foto en Storage. Intenta nuevamente."
-        })
-      );
-    }
-
-    await revalidateTournamentPaths(tournamentId);
-    revalidatePath(`/api/player-photo/${parsed.data.playerId}`);
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "players",
-        success: "Foto de jugador subida correctamente."
-      })
-    );
-  } catch (error) {
-    if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "players",
-        error: toUserMessage(error, "No se pudo subir la foto.")
-      })
-    );
-  }
-}
-
-export async function generateTournamentFixtureAction(tournamentId: string) {
-  try {
-    const admin = await assertTournamentMembershipAction(tournamentId);
-    const supabase = await createSupabaseServerClient();
-    await generateTournamentFixture({
-      supabase: supabase as never,
-      adminId: admin.userId,
-      tournamentId
-    });
-    await activateTournamentIfStillDraft(tournamentId);
-
-    await revalidateTournamentPaths(tournamentId);
-    redirect(buildTournamentDetailPath({ tournamentId, tab: "fixture", success: "Fixture generado." }));
-  } catch (error) {
-    if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "fixture",
-        error: toUserMessage(error, "No se pudo generar el fixture.")
-      })
-    );
-  }
-}
-
-export async function createManualTournamentMatchAction(tournamentId: string, formData: FormData) {
-  try {
-    const admin = await assertTournamentMembershipAction(tournamentId);
-    const parsed = manualMatchSchema.safeParse({
-      roundName: formData.get("roundName"),
-      homeTeamId: formData.get("homeTeamId"),
-      awayTeamId: formData.get("awayTeamId"),
-      scheduledAt: formData.get("scheduledAt"),
-      venue: formData.get("venue"),
-      status: formData.get("status")
-    });
-
-    if (!parsed.success) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "fixture",
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
-        })
-      );
-    }
-
-    const supabase = await createSupabaseServerClient();
-    await validateTournamentMatchPair({
-      supabase: supabase as never,
-      tournamentId,
-      homeTeamId: parsed.data.homeTeamId,
-      awayTeamId: parsed.data.awayTeamId
-    });
-    const roundId = await resolveRoundIdByName({
-      tournamentId,
-      roundName: parsed.data.roundName
-    });
-
-    const { error } = await supabase.from("tournament_matches").insert({
-      tournament_id: tournamentId,
-      round_id: roundId,
-      home_team_id: parsed.data.homeTeamId,
-      away_team_id: parsed.data.awayTeamId,
-      scheduled_at: normalizeScheduledAt(parsed.data.scheduledAt),
-      venue: parsed.data.venue?.trim() || null,
-      status: parsed.data.status,
-      created_by: admin.userId
-    });
-
-    if (error) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "fixture",
-          error: toUserMessage(error, "No se pudo crear el partido manual.")
-        })
-      );
-    }
-
-    await activateTournamentIfStillDraft(tournamentId);
-    await revalidateTournamentPaths(tournamentId);
-    redirect(buildTournamentDetailPath({ tournamentId, tab: "fixture", success: "Partido creado." }));
-  } catch (error) {
-    if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "fixture",
-        error: toUserMessage(error, "No se pudo crear el partido manual.")
-      })
-    );
-  }
-}
-
-export async function updateTournamentMatchAction(tournamentId: string, formData: FormData) {
-  try {
-    await assertTournamentMembershipAction(tournamentId);
-    const parsed = updateMatchSchema.safeParse({
-      matchId: formData.get("matchId"),
-      roundId: formData.get("roundId") ? String(formData.get("roundId")) : null,
-      homeTeamId: formData.get("homeTeamId"),
-      awayTeamId: formData.get("awayTeamId"),
-      scheduledAt: formData.get("scheduledAt"),
-      venue: formData.get("venue"),
-      status: formData.get("status")
-    });
-
-    if (!parsed.success) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "fixture",
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
-        })
-      );
-    }
-
-    const supabase = await createSupabaseServerClient();
-    const { data: currentMatch, error: matchError } = await supabase
-      .from("tournament_matches")
-      .select("id, home_team_id, away_team_id, round_id, status")
-      .eq("id", parsed.data.matchId)
-      .eq("tournament_id", tournamentId)
-      .maybeSingle();
-
-    if (matchError || !currentMatch) {
-      redirect(buildTournamentDetailPath({ tournamentId, tab: "fixture", error: "No se encontro el partido." }));
-    }
-    if (currentMatch.status === "played") {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "fixture",
-          error: "Los partidos jugados solo se editan desde el acta."
-        })
-      );
-    }
-
-    await validateTournamentMatchPair({
-      supabase: supabase as never,
-      tournamentId,
-      homeTeamId: parsed.data.homeTeamId,
-      awayTeamId: parsed.data.awayTeamId,
-      ignoreMatchId: parsed.data.matchId
-    });
-
-    if (parsed.data.roundId) {
-      const { data: round, error: roundError } = await supabase
-        .from("tournament_rounds")
-        .select("id")
-        .eq("id", parsed.data.roundId)
-        .eq("tournament_id", tournamentId)
-        .maybeSingle();
-
-      if (roundError || !round) {
-        redirect(buildTournamentDetailPath({ tournamentId, tab: "fixture", error: "La fecha elegida no existe." }));
+        if (competitionTeamsError) {
+          redirect(buildLeagueDetailPath({ leagueId, tab: "competitions", error: toUserMessage(competitionTeamsError, "No se pudieron inscribir los equipos seleccionados.") }));
+        }
       }
     }
 
-    const { error } = await supabase
-      .from("tournament_matches")
-      .update({
-        round_id: parsed.data.roundId,
-        home_team_id: parsed.data.homeTeamId,
-        away_team_id: parsed.data.awayTeamId,
-        scheduled_at: normalizeScheduledAt(parsed.data.scheduledAt),
-        venue: parsed.data.venue?.trim() || null,
-        status: parsed.data.status
-      })
-      .eq("id", parsed.data.matchId)
-      .eq("tournament_id", tournamentId);
-
-    if (error) {
-      redirect(
-        buildTournamentDetailPath({
-          tournamentId,
-          tab: "fixture",
-          error: toUserMessage(error, "No se pudo actualizar el partido.")
-        })
-      );
-    }
-
-    await revalidateTournamentPaths(tournamentId);
-    redirect(buildTournamentDetailPath({ tournamentId, tab: "fixture", success: "Partido actualizado." }));
+    await revalidateLeaguePaths(leagueId);
+    revalidatePath(`/admin/tournaments/${leagueId}/competitions/${competition.id}`);
+    redirect(buildCompetitionDetailPath({ leagueId, competitionId: competition.id, success: "Competencia creada." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildTournamentDetailPath({
-        tournamentId,
-        tab: "fixture",
-        error: toUserMessage(error, "No se pudo actualizar el partido.")
-      })
-    );
+    redirect(buildLeagueDetailPath({ leagueId, tab: "competitions", error: toUserMessage(error, "No se pudo crear la competencia.") }));
   }
 }

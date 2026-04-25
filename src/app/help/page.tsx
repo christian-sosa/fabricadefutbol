@@ -155,35 +155,40 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
     eyebrow: "Centro de ayuda",
     title: "Como funciona el modulo Torneos",
     description:
-      "Torneos esta pensado para ligas y competencias con uno o varios subtorneos. Permite cargar equipos, planteles propios, definir admins, elegir si usas capitanes, armar fixture y publicar tabla y estadisticas.",
+      "Torneos esta pensado para ligas y competencias. Permite cargar equipos maestros en la liga, inscribirlos en cada competencia, definir admins, elegir si usas capitanes, armar fixture y publicar tabla y estadisticas.",
     capabilities: [
-      "Crear varios torneos o subtorneos independientes del modulo Grupos.",
-      "Cargar equipos, jugadores y fotos dentro de cada torneo.",
-      "Definir hasta 4 administradores por torneo.",
+      "Crear varias competencias dentro de una misma liga, separadas del modulo Grupos.",
+      "Cargar equipos maestros en la liga y planteles propios dentro de cada competencia.",
+      "Definir hasta 4 administradores por liga.",
       "Elegir entre fixture automatico o armado manual fecha por fecha."
     ],
     focusTitle: "En que conviene enfocarse al principio",
     focusDescription:
-      "Primero conviene definir el torneo o subtorneo, cargar los equipos y dejar claras las responsabilidades. Despues puedes decidir si usaras capitanes o si toda la carga quedara en admins, y avanzar con el fixture para ordenar la operacion.",
+      "Primero conviene crear la liga, cargar los equipos maestros y dejar claras las responsabilidades. Despues puedes definir cada competencia, decidir si usaras capitanes o si toda la carga quedara en admins, y avanzar con el fixture para ordenar la operacion.",
     gettingStartedLabel: "Primeros pasos",
     gettingStarted: [
       {
-        title: "1. Crea el torneo o subtorneo",
+        title: "1. Crea la liga",
         description:
-          "Desde el panel de Torneos cargas un nombre unico y arrancas el alta desde Mercado Pago. La misma cuenta puede crear varios torneos o subtorneos como Viernes A1 y Viernes A2."
+          "Desde el panel de Torneos cargas el nombre de la liga y arrancas el alta desde Mercado Pago. Despues, dentro de esa liga, puedes crear competencias como Viernes A, Viernes B o Clausura."
       },
       {
-        title: "2. Carga los equipos",
+        title: "2. Carga los equipos maestros",
         description:
-          "Agrega los equipos participantes con nombre, nombre corto y orden visual. Ese plantel es totalmente independiente del modulo Grupos."
+          "Agrega los equipos participantes con nombre, nombre corto y notas. Ese catalogo queda disponible para inscribir los equipos que correspondan en cada competencia."
       },
       {
-        title: "3. Invita capitanes o carga el plantel tu mismo",
+        title: "3. Crea una competencia e inscribe los equipos",
         description:
-          "Puedes asignar un capitan por equipo para que complete jugadores y fotos, pero es opcional. Si prefieres, todo el plantel puede quedar administrado solo por el equipo admin del torneo."
+          "Cada competencia toma un subconjunto de equipos de la liga. Asi puedes reutilizar el mismo equipo maestro en distintas competencias sin duplicar la base."
       },
       {
-        title: "4. Genera el fixture y publica la competencia",
+        title: "4. Invita capitanes o carga el plantel tu mismo",
+        description:
+          "Puedes asignar un capitan por equipo inscripto para que complete jugadores y fotos, pero es opcional. Si prefieres, todo el plantel puede quedar administrado solo por el equipo admin de la liga."
+      },
+      {
+        title: "5. Genera el fixture y publica la competencia",
         description:
           "Cuando ya tienes al menos dos equipos, puedes crear el fixture tipo round robin o armarlo manualmente fecha por fecha con horario, sede y cruces definidos por ti."
       }
@@ -265,7 +270,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         question: "Cuantos admins puede tener un torneo?",
         answer:
-          "Cada torneo puede tener hasta 4 administradores. Asi puedes repartir la gestion sin perder control del torneo o subtorneo."
+          "Cada liga puede tener hasta 4 administradores. Asi puedes repartir la gestion sin perder control de la estructura general y sus competencias."
       },
       {
         question: "Que pasa si falta un jugador en el plantel al cargar un partido?",

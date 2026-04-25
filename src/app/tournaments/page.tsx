@@ -2,42 +2,48 @@ import Link from "next/link";
 
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { getPublicTournaments } from "@/lib/queries/tournaments";
+import { getPublicLeagues } from "@/lib/queries/tournaments";
 
 export default async function TournamentsPage() {
-  const tournaments = await getPublicTournaments();
+  const leagues = await getPublicLeagues();
 
   return (
     <div className="space-y-4">
       <Card>
-        <CardTitle>Torneos</CardTitle>
+        <CardTitle>Ligas</CardTitle>
         <CardDescription>
-          Explora ligas y torneos independientes del modulo de grupos.
+          Explora ligas públicas, su sede general y las competencias disponibles dentro de cada una.
         </CardDescription>
       </Card>
 
       <section className="grid gap-4 md:grid-cols-2">
-        {tournaments.map((tournament) => (
-          <Card key={tournament.id}>
+        {leagues.map((league) => (
+          <Card key={league.id}>
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle>{tournament.name}</CardTitle>
-              <TournamentStatusBadge status={tournament.status} />
+              <CardTitle>{league.name}</CardTitle>
+              <TournamentStatusBadge status={league.status} />
             </div>
             <CardDescription className="mt-2">
-              {tournament.description || "Competencia publica disponible para consultar."}
+              {league.description || "Liga pública disponible para consultar."}
             </CardDescription>
+            <div className="mt-4 space-y-1 text-xs text-slate-500">
+              <p>{league.venueName ? `Dónde se juega: ${league.venueName}` : "Sede general pendiente"}</p>
+              <p>
+                {league.teamCount} equipos · {league.competitionCount} competencias
+              </p>
+            </div>
             <div className="mt-4 flex items-center justify-between gap-3">
-              <p className="text-xs text-slate-500">/{tournament.slug}</p>
-              <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={`/tournaments/${tournament.slug}`}>
-                Ver torneo
+              <p className="text-xs text-slate-500">/{league.slug}</p>
+              <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={`/tournaments/${league.slug}`}>
+                Ver liga
               </Link>
             </div>
           </Card>
         ))}
 
-        {!tournaments.length ? (
+        {!leagues.length ? (
           <Card>
-            <CardDescription>Todavia no hay torneos publicos cargados.</CardDescription>
+            <CardDescription>Todavía no hay ligas públicas cargadas.</CardDescription>
           </Card>
         ) : null}
       </section>

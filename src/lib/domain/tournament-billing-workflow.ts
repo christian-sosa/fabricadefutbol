@@ -7,12 +7,12 @@ type DbClient =
   | Awaited<ReturnType<typeof createSupabaseServerClient>>
   | NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
 
-type TournamentBillingPaymentRow = {
+type LeagueBillingPaymentRow = {
   id: string;
   admin_id: string;
-  requested_tournament_name: string;
-  requested_tournament_slug: string;
-  created_tournament_id: string | null;
+  requested_league_name: string;
+  requested_league_slug: string;
+  created_league_id: string | null;
   mp_external_reference: string | null;
   mp_payment_id: string | null;
   status: string;
@@ -33,7 +33,7 @@ function parseNextSlug(baseSlug: string, existingSlugs: string[]) {
   return `${baseSlug}-${suffix}`;
 }
 
-async function findTournamentBillingPaymentRow(params: {
+async function findLeagueBillingPaymentRow(params: {
   supabase: DbClient;
   paymentId: string;
   externalReference: string | null;
@@ -41,7 +41,7 @@ async function findTournamentBillingPaymentRow(params: {
   const { supabase, paymentId, externalReference } = params;
 
   const byPaymentId = await supabase
-    .from("tournament_billing_payments")
+    .from("league_billing_payments")
     .select("*")
     .eq("mp_payment_id", paymentId)
     .order("created_at", { ascending: false })
@@ -49,12 +49,12 @@ async function findTournamentBillingPaymentRow(params: {
     .maybeSingle();
 
   if (byPaymentId.error) throw new Error(byPaymentId.error.message);
-  if (byPaymentId.data) return byPaymentId.data as TournamentBillingPaymentRow;
+  if (byPaymentId.data) return byPaymentId.data as LeagueBillingPaymentRow;
 
   if (!externalReference) return null;
 
   const byExternalReference = await supabase
-    .from("tournament_billing_payments")
+    .from("league_billing_payments")
     .select("*")
     .eq("mp_external_reference", externalReference)
     .order("created_at", { ascending: false })
@@ -63,51 +63,51 @@ async function findTournamentBillingPaymentRow(params: {
 
   if (byExternalReference.error) throw new Error(byExternalReference.error.message);
   if (!byExternalReference.data) return null;
-  return byExternalReference.data as TournamentBillingPaymentRow;
+  return byExternalReference.data as LeagueBillingPaymentRow;
 }
 
-async function createTournamentFromApprovedPayment(params: {
+async function createLeagueFromApprovedPayment(params: {
   supabase: DbClient;
-  paymentRow: TournamentBillingPaymentRow;
+  paymentRow: LeagueBillingPaymentRow;
 }) {
   const { supabase, paymentRow } = params;
-  if (paymentRow.created_tournament_id) return paymentRow.created_tournament_id;
+  if (paymentRow.created_league_id) return paymentRow.created_league_id;
 
-  const requestedName = paymentRow.requested_tournament_name?.trim();
+  const requestedName = paymentRow.requested_league_name?.trim();
   const requestedByAdminId = paymentRow.admin_id?.trim();
   if (!requestedName || !requestedByAdminId) return null;
 
-  const existingTournament = await supabase
-    .from("tournaments")
+  const existingLeague = await supabase
+    .from("leagues")
     .select("id, created_by")
     .ilike("name", requestedName)
     .maybeSingle();
 
-  if (existingTournament.error) throw new Error(existingTournament.error.message);
-  if (existingTournament.data) {
-    if (existingTournament.data.created_by !== requestedByAdminId) {
-      throw new Error("Ya existe un torneo con ese nombre.");
+  if (existingLeague.error) throw new Error(existingLeague.error.message);
+  if (existingLeague.data) {
+    if (existingLeague.data.created_by !== requestedByAdminId) {
+      throw new Error("Ya existe una liga con ese nombre.");
     }
 
-    const existingTournamentId = String(existingTournament.data.id);
+    const existingLeagueId = String(existingLeague.data.id);
     const { error: markExistingError } = await supabase
-      .from("tournament_billing_payments")
+      .from("league_billing_payments")
       .update({
-        created_tournament_id: existingTournamentId
+        created_league_id: existingLeagueId
       })
       .eq("id", paymentRow.id)
-      .is("created_tournament_id", null);
+      .is("created_league_id", null);
 
     if (markExistingError) throw new Error(markExistingError.message);
-    paymentRow.created_tournament_id = existingTournamentId;
-    return existingTournamentId;
+    paymentRow.created_league_id = existingLeagueId;
+    return existingLeagueId;
   }
 
   const baseSlug =
-    slugifyTournamentName(paymentRow.requested_tournament_slug?.trim() || requestedName) ||
-    `torneo-${Date.now()}`;
+    slugifyTournamentName(paymentRow.requested_league_slug?.trim() || requestedName) ||
+    `liga-${Date.now()}`;
   const { data: existingRows, error: existingRowsError } = await supabase
-    .from("tournaments")
+    .from("leagues")
     .select("slug")
     .ilike("slug", `${baseSlug}%`);
 
@@ -117,15 +117,15 @@ async function createTournamentFromApprovedPayment(params: {
     baseSlug,
     (existingRows ?? []).map((row) => String(row.slug).toLowerCase())
   );
-  const seasonLabel = String(new Date().getFullYear());
 
-  const { data: tournament, error: insertTournamentError } = await supabase
-    .from("tournaments")
+  const { data: league, error: insertLeagueError } = await supabase
+    .from("leagues")
     .insert({
       name: requestedName,
       slug,
-      season_label: seasonLabel,
       description: null,
+      venue_name: null,
+      location_notes: null,
       is_public: true,
       status: "draft",
       created_by: requestedByAdminId
@@ -133,12 +133,12 @@ async function createTournamentFromApprovedPayment(params: {
     .select("id")
     .single();
 
-  if (insertTournamentError || !tournament) {
-    throw new Error(insertTournamentError?.message ?? "No se pudo crear el torneo.");
+  if (insertLeagueError || !league) {
+    throw new Error(insertLeagueError?.message ?? "No se pudo crear la liga.");
   }
 
-  const { error: membershipError } = await supabase.from("tournament_admins").insert({
-    tournament_id: tournament.id,
+  const { error: membershipError } = await supabase.from("league_admins").insert({
+    league_id: league.id,
     admin_id: requestedByAdminId,
     role: "owner",
     created_by: requestedByAdminId
@@ -149,16 +149,16 @@ async function createTournamentFromApprovedPayment(params: {
   }
 
   const { error: markCreatedError } = await supabase
-    .from("tournament_billing_payments")
+    .from("league_billing_payments")
     .update({
-      created_tournament_id: tournament.id
+      created_league_id: league.id
     })
     .eq("id", paymentRow.id);
 
   if (markCreatedError) throw new Error(markCreatedError.message);
 
-  paymentRow.created_tournament_id = String(tournament.id);
-  return paymentRow.created_tournament_id;
+  paymentRow.created_league_id = String(league.id);
+  return paymentRow.created_league_id;
 }
 
 export async function approveTournamentBillingPaymentForDebug(params: {
@@ -167,7 +167,7 @@ export async function approveTournamentBillingPaymentForDebug(params: {
 }) {
   const { supabase, localPaymentId } = params;
   const paymentResult = await supabase
-    .from("tournament_billing_payments")
+    .from("league_billing_payments")
     .select("*")
     .eq("id", localPaymentId)
     .maybeSingle();
@@ -180,12 +180,12 @@ export async function approveTournamentBillingPaymentForDebug(params: {
     };
   }
 
-  const paymentRow = paymentResult.data as TournamentBillingPaymentRow;
+  const paymentRow = paymentResult.data as LeagueBillingPaymentRow;
   const approvedAt = new Date().toISOString();
   const simulatedPaymentId = paymentRow.mp_payment_id?.trim() || `debug-skip-${paymentRow.id}`;
 
   const { error: updatePaymentError } = await supabase
-    .from("tournament_billing_payments")
+    .from("league_billing_payments")
     .update({
       mp_payment_id: simulatedPaymentId,
       status: "approved",
@@ -202,7 +202,7 @@ export async function approveTournamentBillingPaymentForDebug(params: {
 
   if (updatePaymentError) throw new Error(updatePaymentError.message);
 
-  const createdTournamentId = await createTournamentFromApprovedPayment({
+  const createdLeagueId = await createLeagueFromApprovedPayment({
     supabase,
     paymentRow
   });
@@ -211,7 +211,8 @@ export async function approveTournamentBillingPaymentForDebug(params: {
     updated: true,
     localPaymentId: paymentRow.id,
     status: "approved",
-    createdTournamentId,
+    createdLeagueId,
+    createdTournamentId: createdLeagueId,
     skippedCheckout: true
   };
 }
@@ -240,7 +241,7 @@ export async function syncTournamentBillingPaymentFromMercadoPago(params: {
   const externalReference = payment.external_reference?.trim() || null;
   const normalizedStatus = normalizePaymentStatus(payment.status);
 
-  const paymentRow = await findTournamentBillingPaymentRow({
+  const paymentRow = await findLeagueBillingPaymentRow({
     supabase,
     paymentId,
     externalReference
@@ -255,7 +256,7 @@ export async function syncTournamentBillingPaymentFromMercadoPago(params: {
 
   const approvedAt = payment.date_approved ?? null;
   const { error: updatePaymentError } = await supabase
-    .from("tournament_billing_payments")
+    .from("league_billing_payments")
     .update({
       mp_payment_id: paymentId,
       status: normalizedStatus,
@@ -266,9 +267,9 @@ export async function syncTournamentBillingPaymentFromMercadoPago(params: {
 
   if (updatePaymentError) throw new Error(updatePaymentError.message);
 
-  let createdTournamentId: string | null = paymentRow.created_tournament_id;
+  let createdLeagueId: string | null = paymentRow.created_league_id;
   if (normalizedStatus === "approved") {
-    createdTournamentId = await createTournamentFromApprovedPayment({
+    createdLeagueId = await createLeagueFromApprovedPayment({
       supabase,
       paymentRow
     });
@@ -278,6 +279,7 @@ export async function syncTournamentBillingPaymentFromMercadoPago(params: {
     updated: true,
     localPaymentId: paymentRow.id,
     status: normalizedStatus,
-    createdTournamentId
+    createdLeagueId,
+    createdTournamentId: createdLeagueId
   };
 }

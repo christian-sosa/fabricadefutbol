@@ -10,16 +10,15 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type InviteRow = {
   id: string;
-  tournament_id: string;
-  team_id: string;
+  competition_id: string;
+  competition_team_id: string;
   email: string;
-  created_by: string;
   expires_at: string;
 };
 
-function buildCaptainPanelHref(params: { tournamentId: string; teamId: string }) {
+function buildCaptainPanelHref(params: { competitionId: string; teamId: string }) {
   const searchParams = new URLSearchParams({
-    tournament: params.tournamentId,
+    competition: params.competitionId,
     team: params.teamId,
     success: "Ya tienes acceso a tu equipo."
   });
@@ -38,8 +37,8 @@ export default async function CaptainInvitePage({
   const privilegedSupabase = createSupabaseAdminClient() ?? supabase;
 
   const { data: invite, error: inviteError } = await privilegedSupabase
-    .from("tournament_captain_invites")
-    .select("id, tournament_id, team_id, email, created_by, expires_at")
+    .from("competition_captain_invites")
+    .select("id, competition_id, competition_team_id, email, expires_at")
     .eq("invite_token", token)
     .maybeSingle();
 
@@ -52,9 +51,9 @@ export default async function CaptainInvitePage({
     return (
       <div className="py-6">
         <Card>
-          <CardTitle>Invitacion invalida</CardTitle>
+          <CardTitle>Invitación inválida</CardTitle>
           <CardDescription>
-            Este enlace no existe, ya fue usado o la invitacion fue revocada.
+            Este enlace no existe, ya fue usado o la invitación fue revocada.
           </CardDescription>
           <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href={loginHref}>
             Ir a login
@@ -69,9 +68,9 @@ export default async function CaptainInvitePage({
     return (
       <div className="py-6">
         <Card>
-          <CardTitle>Invitacion vencida</CardTitle>
+          <CardTitle>Invitación vencida</CardTitle>
           <CardDescription>
-            Este enlace ya expiro. Pide una nueva invitacion al admin del torneo.
+            Este enlace ya expiró. Pide una nueva invitación al admin de la competencia.
           </CardDescription>
           <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href={loginHref}>
             Ir a login
@@ -98,7 +97,7 @@ export default async function CaptainInvitePage({
         <Card>
           <CardTitle>Email no coincide</CardTitle>
           <CardDescription>
-            Esta invitacion corresponde a <strong>{pendingInvite.email}</strong>, pero estas logueado con{" "}
+            Esta invitación corresponde a <strong>{pendingInvite.email}</strong>, pero estás logueado con{" "}
             <strong>{user.email}</strong>.
           </CardDescription>
           <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href={loginHref}>
@@ -121,36 +120,24 @@ export default async function CaptainInvitePage({
     throw new Error(ensureAdminError.message);
   }
 
-  const [{ data: currentTeamCaptain, error: currentTeamCaptainError }, { data: currentTournamentCaptain, error: currentTournamentCaptainError }] =
-    await Promise.all([
-      privilegedSupabase
-        .from("tournament_team_captains")
-        .select("id, captain_id")
-        .eq("tournament_id", pendingInvite.tournament_id)
-        .eq("team_id", pendingInvite.team_id)
-        .maybeSingle(),
-      privilegedSupabase
-        .from("tournament_team_captains")
-        .select("id, team_id")
-        .eq("tournament_id", pendingInvite.tournament_id)
-        .eq("captain_id", user.id)
-        .maybeSingle()
-    ]);
+  const { data: currentCaptain, error: currentCaptainError } = await privilegedSupabase
+    .from("competition_team_captains")
+    .select("id, captain_id")
+    .eq("competition_id", pendingInvite.competition_id)
+    .eq("competition_team_id", pendingInvite.competition_team_id)
+    .maybeSingle();
 
-  if (currentTeamCaptainError) {
-    throw new Error(currentTeamCaptainError.message);
-  }
-  if (currentTournamentCaptainError) {
-    throw new Error(currentTournamentCaptainError.message);
+  if (currentCaptainError) {
+    throw new Error(currentCaptainError.message);
   }
 
-  if (currentTeamCaptain && currentTeamCaptain.captain_id !== user.id) {
+  if (currentCaptain && currentCaptain.captain_id !== user.id) {
     return (
       <div className="py-6">
         <Card>
           <CardTitle>Equipo ya asignado</CardTitle>
           <CardDescription>
-            Este equipo ya tiene un capitan confirmado. Pide al admin del torneo que genere una nueva invitacion.
+            Este equipo ya tiene un capitán confirmado. Pide al admin de la competencia que genere una nueva invitación.
           </CardDescription>
           <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href="/captain">
             Ir a mi panel
@@ -160,28 +147,11 @@ export default async function CaptainInvitePage({
     );
   }
 
-  if (currentTournamentCaptain && currentTournamentCaptain.team_id !== pendingInvite.team_id) {
-    return (
-      <div className="py-6">
-        <Card>
-          <CardTitle>Ya administras otro equipo</CardTitle>
-          <CardDescription>
-            Ya tienes un equipo asignado dentro de este torneo. Si necesitas cambiarlo, pide al admin que actualice tu acceso.
-          </CardDescription>
-          <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href="/captain">
-            Ir a mi panel
-          </Link>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!currentTeamCaptain) {
-    const { error: assignmentError } = await privilegedSupabase.from("tournament_team_captains").insert({
-      tournament_id: pendingInvite.tournament_id,
-      team_id: pendingInvite.team_id,
-      captain_id: user.id,
-      created_by: pendingInvite.created_by
+  if (!currentCaptain) {
+    const { error: assignmentError } = await privilegedSupabase.from("competition_team_captains").insert({
+      competition_id: pendingInvite.competition_id,
+      competition_team_id: pendingInvite.competition_team_id,
+      captain_id: user.id
     });
 
     if (assignmentError && assignmentError.code !== "23505") {
@@ -190,21 +160,16 @@ export default async function CaptainInvitePage({
   }
 
   const { error: deleteInviteError } = await privilegedSupabase
-    .from("tournament_captain_invites")
+    .from("competition_captain_invites")
     .delete()
     .eq("id", pendingInvite.id)
-    .eq("team_id", pendingInvite.team_id)
-    .eq("tournament_id", pendingInvite.tournament_id)
+    .eq("competition_team_id", pendingInvite.competition_team_id)
+    .eq("competition_id", pendingInvite.competition_id)
     .eq("email", invitedEmail);
 
   if (deleteInviteError) {
     throw new Error(deleteInviteError.message);
   }
 
-  redirect(
-    buildCaptainPanelHref({
-      tournamentId: pendingInvite.tournament_id,
-      teamId: pendingInvite.team_id
-    })
-  );
+  redirect(buildCaptainPanelHref({ competitionId: pendingInvite.competition_id, teamId: pendingInvite.competition_team_id }));
 }

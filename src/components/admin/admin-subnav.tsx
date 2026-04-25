@@ -24,6 +24,10 @@ function buildTournamentTabHref(tournamentId: string, tab: string) {
   return `/admin/tournaments/${tournamentId}?tab=${encodeURIComponent(tab)}`;
 }
 
+function buildCompetitionTabHref(tournamentId: string, competitionId: string, tab: string) {
+  return `/admin/tournaments/${tournamentId}/competitions/${competitionId}?tab=${encodeURIComponent(tab)}`;
+}
+
 function buildOrganizationItems(pathname: string, organizationKey: string | null): AdminSubnavItem[] {
   const isMatchDetail =
     pathname.startsWith("/admin/matches/") && !pathname.startsWith("/admin/matches/new");
@@ -68,19 +72,31 @@ function buildTournamentItems(pathname: string, tournamentId: string | null, cur
     ];
   }
 
+  const segments = pathname.split("/").filter(Boolean);
+  const competitionId = segments[3] === "competitions" ? segments[4] ?? null : null;
+
   const activeTab = pathname.includes("/matches/") ? "results" : currentTab ?? "summary";
-  const tabItems = [
-    { key: "summary", label: "Resumen" },
-    { key: "teams", label: "Equipos" },
-    { key: "players", label: "Jugadores" },
-    { key: "fixture", label: "Fixture" },
-    { key: "results", label: "Resultados" },
-    { key: "stats", label: "Estadisticas" }
-  ];
+  const tabItems = competitionId
+    ? [
+        { key: "summary", label: "Resumen" },
+        { key: "teams", label: "Inscriptos" },
+        { key: "rosters", label: "Planteles" },
+        { key: "fixture", label: "Fixture" },
+        { key: "results", label: "Resultados" },
+        { key: "stats", label: "Estadisticas" }
+      ]
+    : [
+        { key: "summary", label: "Resumen" },
+        { key: "teams", label: "Equipos" },
+        { key: "competitions", label: "Competencias" },
+        { key: "admins", label: "Admins" }
+      ];
 
   return [
     ...tabItems.map((item) => ({
-      href: buildTournamentTabHref(tournamentId, item.key),
+      href: competitionId
+        ? buildCompetitionTabHref(tournamentId, competitionId, item.key)
+        : buildTournamentTabHref(tournamentId, item.key),
       label: item.label,
       active: activeTab === item.key
     }))
@@ -114,7 +130,7 @@ export function AdminSubnav() {
           </p>
           <p className="mt-1 text-sm text-slate-400">
             {isTournamentArea
-              ? "Gestiona competiciones, fixture, resultados y estadisticas sin mezclarte con grupos."
+              ? "Gestiona ligas, competencias, inscriptos y estadísticas sin mezclarte con grupos."
               : "Gestiona jugadores, partidos, historial y billing del grupo activo desde un subpanel dedicado."}
           </p>
         </div>

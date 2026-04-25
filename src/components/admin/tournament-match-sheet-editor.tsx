@@ -105,11 +105,6 @@ export function TournamentMatchSheetEditor({
       return buildEntryKey(extraMvp.teamId, null, `extra-${index + 1}-${extraMvp.playerName.toLowerCase()}`);
     }
 
-    const firstPlayer = registeredPlayers[0];
-    if (firstPlayer) {
-      return buildEntryKey(firstPlayer.teamId, firstPlayer.id, firstPlayer.fullName.toLowerCase());
-    }
-
     return "";
   });
   const [extraSequence, setExtraSequence] = useState(extraStats.length + 1);
@@ -119,16 +114,21 @@ export function TournamentMatchSheetEditor({
   const awayRows = useMemo(() => allRows.filter((row) => row.teamId === awayTeam.id), [allRows, awayTeam.id]);
 
   useEffect(() => {
-    if (selectedMvpKey && allRows.some((row) => row.entryKey === selectedMvpKey)) {
+    if (!selectedMvpKey) {
       return;
     }
-    setSelectedMvpKey(allRows[0]?.entryKey ?? "");
+
+    if (allRows.some((row) => row.entryKey === selectedMvpKey)) {
+      return;
+    }
+
+    setSelectedMvpKey("");
   }, [allRows, selectedMvpKey]);
 
   const payload = useMemo(
     () =>
       JSON.stringify({
-        mvpEntryKey: selectedMvpKey,
+        mvpEntryKey: selectedMvpKey || null,
         stats: allRows.map((row) => ({
           entryKey: row.entryKey,
           teamId: row.teamId,
@@ -308,6 +308,22 @@ export function TournamentMatchSheetEditor({
       <div className="grid gap-4 lg:grid-cols-2">
         {renderTeamRows(homeTeam, homeRows)}
         {renderTeamRows(awayTeam, awayRows)}
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+        <label className="flex items-center gap-3 text-sm font-semibold text-slate-200">
+          <input
+            checked={!selectedMvpKey}
+            className="h-4 w-4 accent-emerald-400"
+            name="mvpSelector"
+            onChange={() => setSelectedMvpKey("")}
+            type="radio"
+          />
+          Guardar el partido sin figura
+        </label>
+        <p className="mt-2 text-xs text-slate-400">
+          Puedes cerrar el acta solo con resultado y notas. Las figuras y estadísticas quedan abiertas para más tarde.
+        </p>
       </div>
 
       <Button type="submit">Guardar acta</Button>
