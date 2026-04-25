@@ -18,12 +18,12 @@ import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { getCaptainContext } from "@/lib/auth/captains";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
-import { getCaptainTournamentTeamPanelData } from "@/lib/queries/tournaments";
+import { getCaptainCompetitionTeamPanelData } from "@/lib/queries/tournaments";
 import { formatDateTime } from "@/lib/utils";
 
-function buildCaptainTabHref(tournamentId?: string | null, teamId?: string | null) {
+function buildCaptainTabHref(competitionId?: string | null, teamId?: string | null) {
   const searchParams = new URLSearchParams();
-  if (tournamentId) searchParams.set("tournament", tournamentId);
+  if (competitionId) searchParams.set("competition", competitionId);
   if (teamId) searchParams.set("team", teamId);
   const query = searchParams.toString();
   return query ? `/captain?${query}` : "/captain";
@@ -39,15 +39,15 @@ function formatTeamMatchLabel(params: {
   const prefix = params.isHome ? "vs" : "@";
   const schedule = params.scheduledAt ? formatDateTime(params.scheduledAt) : "Sin horario";
   const score =
-    params.homeScore !== null && params.awayScore !== null ? ` - ${params.homeScore}-${params.awayScore}` : "";
-  return `${prefix} ${params.opponentName} - ${schedule}${score}`;
+    params.homeScore !== null && params.awayScore !== null ? ` · ${params.homeScore}-${params.awayScore}` : "";
+  return `${prefix} ${params.opponentName} · ${schedule}${score}`;
 }
 
 export default async function CaptainPage({
   searchParams
 }: {
   searchParams: Promise<{
-    tournament?: string;
+    competition?: string;
     team?: string;
     error?: string;
     success?: string;
@@ -55,25 +55,25 @@ export default async function CaptainPage({
 }) {
   const resolvedSearchParams = await searchParams;
   const context = await getCaptainContext({
-    tournamentId: resolvedSearchParams.tournament,
+    competitionId: resolvedSearchParams.competition,
     teamId: resolvedSearchParams.team,
-    nextPath: buildCaptainTabHref(resolvedSearchParams.tournament, resolvedSearchParams.team)
+    nextPath: buildCaptainTabHref(resolvedSearchParams.competition, resolvedSearchParams.team)
   });
 
   if (!context.assignments.length) {
     return (
       <div className="space-y-4 py-6">
         <Card>
-          <CardTitle>Tus equipos de torneo</CardTitle>
+          <CardTitle>Tus equipos de competencia</CardTitle>
           <CardDescription className="mt-2">
-            Todavia no tienes equipos asignados como capitan. Cuando un admin te invite a un torneo, los veras aqui.
+            Todavía no tienes equipos asignados como capitán. Cuando un admin te invite a una competencia, los verás aquí.
           </CardDescription>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link className="text-sm font-semibold text-emerald-300 hover:underline" href="/admin">
               Ir al panel admin
             </Link>
             <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/tournaments">
-              Ver torneos publicos
+              Ver ligas públicas
             </Link>
           </div>
         </Card>
@@ -84,9 +84,9 @@ export default async function CaptainPage({
   const selectedAssignment = context.selectedAssignment ?? context.assignments[0] ?? null;
   if (!selectedAssignment) return null;
 
-  const panelData = await getCaptainTournamentTeamPanelData({
-    tournamentId: selectedAssignment.tournamentId,
-    teamId: selectedAssignment.teamId
+  const panelData = await getCaptainCompetitionTeamPanelData({
+    competitionId: selectedAssignment.competitionId,
+    competitionTeamId: selectedAssignment.competitionTeamId
   });
 
   if (!panelData) {
@@ -95,7 +95,7 @@ export default async function CaptainPage({
         <Card>
           <CardTitle>No pudimos cargar tu equipo</CardTitle>
           <CardDescription className="mt-2">
-            Intenta nuevamente en unos segundos. Si el problema sigue, pide al admin del torneo que revise tu acceso.
+            Intenta nuevamente en unos segundos. Si el problema sigue, pide al admin de la competencia que revise tu acceso.
           </CardDescription>
         </Card>
       </div>
@@ -110,23 +110,20 @@ export default async function CaptainPage({
       <Card>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-400">Panel capitan</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-400">Panel capitán</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <CardTitle>{panelData.tournament.name}</CardTitle>
-              <TournamentStatusBadge status={panelData.tournament.status} />
+              <CardTitle>{panelData.competition.name}</CardTitle>
+              <TournamentStatusBadge status={panelData.competition.status} />
             </div>
-            <p className="mt-2 text-sm font-semibold text-slate-200">Equipo asignado: {panelData.team.name}</p>
+            <p className="mt-2 text-sm font-semibold text-slate-200">Equipo asignado: {panelData.team.displayName}</p>
             <CardDescription className="mt-2">
-              Gestiona los jugadores y las fotos de {panelData.team.name} dentro de {panelData.tournament.name}.
+              Gestiona el plantel y las fotos de {panelData.team.displayName} dentro de {panelData.competition.name}.
             </CardDescription>
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Link
-              className="text-sm font-semibold text-emerald-300 hover:underline"
-              href={`/tournaments/${panelData.tournament.slug}`}
-            >
-              Ver torneo
+            <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={`/tournaments/${panelData.league.slug}/${panelData.competition.slug}`}>
+              Ver competencia
             </Link>
             <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/admin">
               Ir al panel admin
@@ -134,22 +131,17 @@ export default async function CaptainPage({
           </div>
         </div>
 
-        {resolvedSearchParams.error ? (
-          <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p>
-        ) : null}
-        {resolvedSearchParams.success ? (
-          <p className="mt-3 text-sm font-semibold text-emerald-300">{resolvedSearchParams.success}</p>
-        ) : null}
+        {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
+        {resolvedSearchParams.success ? <p className="mt-3 text-sm font-semibold text-emerald-300">{resolvedSearchParams.success}</p> : null}
       </Card>
 
       <Card>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Equipos donde eres capitan
-        </p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Equipos donde eres capitán</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {context.assignments.map((assignment) => {
             const active =
-              assignment.tournamentId === selectedAssignment.tournamentId && assignment.teamId === selectedAssignment.teamId;
+              assignment.competitionId === selectedAssignment.competitionId &&
+              assignment.competitionTeamId === selectedAssignment.competitionTeamId;
             return (
               <Link
                 className={
@@ -157,10 +149,10 @@ export default async function CaptainPage({
                     ? "rounded-full border border-emerald-400/60 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-200"
                     : "rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:border-slate-500 hover:bg-slate-800"
                 }
-                href={buildCaptainTabHref(assignment.tournamentId, assignment.teamId)}
-                key={`${assignment.tournamentId}:${assignment.teamId}`}
+                href={buildCaptainTabHref(assignment.competitionId, assignment.competitionTeamId)}
+                key={`${assignment.competitionId}:${assignment.competitionTeamId}`}
               >
-                {assignment.teamName} - {assignment.tournamentName}
+                {assignment.teamName} · {assignment.competitionName}
               </Link>
             );
           })}
@@ -173,7 +165,7 @@ export default async function CaptainPage({
           <CardTitle className="mt-1 text-3xl">{panelData.roster.length}</CardTitle>
         </Card>
         <Card>
-          <CardDescription>Posicion actual</CardDescription>
+          <CardDescription>Posición actual</CardDescription>
           <CardTitle className="mt-1 text-3xl">
             {panelData.standingRow ? panelData.standings.indexOf(panelData.standingRow) + 1 : "-"}
           </CardTitle>
@@ -191,29 +183,22 @@ export default async function CaptainPage({
       <Card>
         <CardTitle>Agregar jugador</CardTitle>
         <CardDescription className="mt-2">
-          Carga a tus companeros del equipo. La foto se puede subir directamente dentro de cada jugador. Limite:
-          {" "}{MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores por equipo.
+          Carga a tus compañeros del equipo. Límite: {MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores por plantel.
         </CardDescription>
         <form action={addCaptainTournamentPlayerAction} className="mt-4 grid gap-3 md:grid-cols-2">
-          <input name="tournamentId" type="hidden" value={panelData.tournament.id} />
+          <input name="competitionId" type="hidden" value={panelData.competition.id} />
           <input name="teamId" type="hidden" value={panelData.team.id} />
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="captain-full-name">
-              Nombre completo
-            </label>
-            <Input id="captain-full-name" name="fullName" required />
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre completo</label>
+            <Input name="fullName" required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="captain-shirt-number">
-              Numero
-            </label>
-            <Input id="captain-shirt-number" max={99} min={1} name="shirtNumber" type="number" />
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Número</label>
+            <Input max={99} min={1} name="shirtNumber" type="number" />
           </div>
           <div className="md:col-span-2">
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="captain-position">
-              Posicion
-            </label>
-            <Input id="captain-position" name="position" placeholder="Arquero / Defensor / ..." />
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Posición</label>
+            <Input name="position" placeholder="Arquero / Defensor / ..." />
           </div>
           <div className="md:col-span-2">
             <Button type="submit">Agregar jugador</Button>
@@ -222,30 +207,22 @@ export default async function CaptainPage({
       </Card>
 
       <section className="space-y-4">
-        <Card>
-          <CardTitle>Jugadores del equipo</CardTitle>
-          <CardDescription className="mt-2">
-            Solo puedes editar jugadores de {panelData.team.name}. Los cambios impactan en el torneo, no en grupos.
-            Actualmente llevas {panelData.roster.length}/{MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores.
-          </CardDescription>
-        </Card>
-
         {panelData.roster.length ? (
           panelData.roster.map((player) => (
             <Card key={player.id}>
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="flex items-center gap-3">
-                  <PlayerAvatar name={player.full_name} playerId={player.id} size="md" />
+                  <PlayerAvatar name={player.fullName} playerId={player.id} size="md" />
                   <div>
-                    <CardTitle>{player.full_name}</CardTitle>
+                    <CardTitle>{player.fullName}</CardTitle>
                     <CardDescription className="mt-1">
-                      {player.shirt_number ? `#${player.shirt_number}` : "Sin numero"} - {player.position ?? "Sin posicion"}
+                      {player.shirtNumber ? `#${player.shirtNumber}` : "Sin número"} · {player.position ?? "Sin posición"}
                     </CardDescription>
                   </div>
                 </div>
 
                 <form action={deleteCaptainTournamentPlayerAction}>
-                  <input name="tournamentId" type="hidden" value={panelData.tournament.id} />
+                  <input name="competitionId" type="hidden" value={panelData.competition.id} />
                   <input name="teamId" type="hidden" value={panelData.team.id} />
                   <input name="playerId" type="hidden" value={player.id} />
                   <Button type="submit" variant="ghost">
@@ -255,38 +232,20 @@ export default async function CaptainPage({
               </div>
 
               <form action={updateCaptainTournamentPlayerAction} className="mt-4 grid gap-3 md:grid-cols-2">
-                <input name="tournamentId" type="hidden" value={panelData.tournament.id} />
+                <input name="competitionId" type="hidden" value={panelData.competition.id} />
                 <input name="teamId" type="hidden" value={panelData.team.id} />
                 <input name="playerId" type="hidden" value={player.id} />
                 <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`player-name-${player.id}`}>
-                    Nombre completo
-                  </label>
-                  <Input defaultValue={player.full_name} id={`player-name-${player.id}`} name="fullName" required />
+                  <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre completo</label>
+                  <Input defaultValue={player.fullName} name="fullName" required />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`player-number-${player.id}`}>
-                    Numero
-                  </label>
-                  <Input
-                    defaultValue={player.shirt_number ?? ""}
-                    id={`player-number-${player.id}`}
-                    max={99}
-                    min={1}
-                    name="shirtNumber"
-                    type="number"
-                  />
+                  <label className="mb-1 block text-sm font-semibold text-slate-200">Número</label>
+                  <Input defaultValue={player.shirtNumber ?? ""} max={99} min={1} name="shirtNumber" type="number" />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`player-position-${player.id}`}>
-                    Posicion
-                  </label>
-                  <Input
-                    defaultValue={player.position ?? ""}
-                    id={`player-position-${player.id}`}
-                    name="position"
-                    placeholder="Arquero / Defensor / ..."
-                  />
+                  <label className="mb-1 block text-sm font-semibold text-slate-200">Posición</label>
+                  <Input defaultValue={player.position ?? ""} name="position" />
                 </div>
                 <div className="md:col-span-2">
                   <Button type="submit" variant="secondary">
@@ -296,12 +255,12 @@ export default async function CaptainPage({
               </form>
 
               <form action={uploadCaptainTournamentPlayerPhotoAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-                <input name="tournamentId" type="hidden" value={panelData.tournament.id} />
+                <input name="competitionId" type="hidden" value={panelData.competition.id} />
                 <input name="teamId" type="hidden" value={panelData.team.id} />
                 <input name="playerId" type="hidden" value={player.id} />
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-slate-200">Foto del jugador</label>
-                  <PhotoUploadInput compact hint="Sube una foto para este jugador. Se optimiza automaticamente a WEBP." />
+                  <PhotoUploadInput compact hint="Se optimiza automáticamente a WEBP." />
                 </div>
                 <div className="md:self-end">
                   <Button type="submit" variant="secondary">
@@ -313,17 +272,14 @@ export default async function CaptainPage({
           ))
         ) : (
           <Card>
-            <CardDescription>Este equipo todavia no tiene jugadores cargados.</CardDescription>
+            <CardDescription>Este equipo todavía no tiene jugadores cargados.</CardDescription>
           </Card>
         )}
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
-          <CardTitle>Proximos partidos</CardTitle>
-          <CardDescription className="mt-2">
-            Revisa fixture, horarios y estado de los encuentros de tu equipo.
-          </CardDescription>
+          <CardTitle>Próximos partidos</CardTitle>
           <div className="mt-4 space-y-3">
             {upcomingMatches.length ? (
               upcomingMatches.map((match) => {
@@ -357,9 +313,6 @@ export default async function CaptainPage({
 
         <Card>
           <CardTitle>Partidos jugados</CardTitle>
-          <CardDescription className="mt-2">
-            Referencia rapida de los resultados ya cargados en el torneo.
-          </CardDescription>
           <div className="mt-4 space-y-3">
             {playedMatches.length ? (
               playedMatches.map((match) => {
@@ -388,7 +341,7 @@ export default async function CaptainPage({
                 );
               })
             ) : (
-              <p className="text-sm text-slate-400">Todavia no hay partidos jugados para este equipo.</p>
+              <p className="text-sm text-slate-400">Todavía no hay partidos jugados para este equipo.</p>
             )}
           </div>
         </Card>

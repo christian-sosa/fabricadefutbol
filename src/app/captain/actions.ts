@@ -5,13 +5,13 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { assertCaptainTeamAction } from "@/lib/auth/captains";
-import { getTournamentSlugById } from "@/lib/auth/tournaments";
+import { getCompetitionPublicPathById } from "@/lib/auth/tournaments";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import {
-  getTournamentPlayerPhotoObjectPath,
+  getCompetitionPlayerPhotoObjectPath,
   inferPlayerPhotoExtension,
   MAX_PLAYER_PHOTO_SIZE_MB,
   optimizePlayerAvatarImage
@@ -19,7 +19,7 @@ import {
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const captainPlayerSchema = z.object({
-  tournamentId: z.string().uuid(),
+  competitionId: z.string().uuid(),
   teamId: z.string().uuid(),
   fullName: z.string().min(2, "El jugador debe tener al menos 2 caracteres.").max(80),
   shirtNumber: z.preprocess(
@@ -34,25 +34,25 @@ const captainPlayerUpdateSchema = captainPlayerSchema.extend({
 });
 
 const captainPlayerDeleteSchema = z.object({
-  tournamentId: z.string().uuid(),
+  competitionId: z.string().uuid(),
   teamId: z.string().uuid(),
   playerId: z.string().uuid()
 });
 
 const captainPlayerPhotoSchema = z.object({
-  tournamentId: z.string().uuid(),
+  competitionId: z.string().uuid(),
   teamId: z.string().uuid(),
   playerId: z.string().uuid()
 });
 
 function buildCaptainPanelPath(params: {
-  tournamentId: string;
+  competitionId: string;
   teamId: string;
   error?: string;
   success?: string;
 }) {
   const searchParams = new URLSearchParams({
-    tournament: params.tournamentId,
+    competition: params.competitionId,
     team: params.teamId
   });
   if (params.error) searchParams.set("error", params.error);
@@ -60,23 +60,23 @@ function buildCaptainPanelPath(params: {
   return `/captain?${searchParams.toString()}`;
 }
 
-async function revalidateCaptainPaths(tournamentId: string) {
-  const tournamentSlug = await getTournamentSlugById(tournamentId);
+async function revalidateCaptainPaths(competitionId: string) {
   revalidatePath("/captain");
   revalidatePath("/tournaments");
-  revalidatePath(`/tournaments/${tournamentSlug}`);
+
+  const publicPath = await getCompetitionPublicPathById(competitionId);
+  if (publicPath) {
+    revalidatePath(`/tournaments/${publicPath.leagueSlug}`);
+    revalidatePath(`/tournaments/${publicPath.leagueSlug}/${publicPath.competitionSlug}`);
+  }
 }
 
-async function assertCaptainTeamPlayerCapacity(params: {
-  tournamentId: string;
-  teamId: string;
-}) {
+async function assertCaptainTeamPlayerCapacity(teamId: string) {
   const supabase = await createSupabaseServerClient();
   const { count, error } = await supabase
-    .from("tournament_players")
+    .from("competition_team_players")
     .select("id", { count: "exact", head: true })
-    .eq("tournament_id", params.tournamentId)
-    .eq("team_id", params.teamId);
+    .eq("competition_team_id", teamId);
 
   if (error) {
     throw new Error(error.message);
@@ -88,12 +88,12 @@ async function assertCaptainTeamPlayerCapacity(params: {
 }
 
 export async function addCaptainTournamentPlayerAction(formData: FormData) {
-  const rawTournamentId = String(formData.get("tournamentId") ?? "");
+  const rawCompetitionId = String(formData.get("competitionId") ?? "");
   const rawTeamId = String(formData.get("teamId") ?? "");
 
   try {
     const parsed = captainPlayerSchema.safeParse({
-      tournamentId: formData.get("tournamentId"),
+      competitionId: formData.get("competitionId"),
       teamId: formData.get("teamId"),
       fullName: formData.get("fullName"),
       shirtNumber: formData.get("shirtNumber"),
@@ -101,28 +101,18 @@ export async function addCaptainTournamentPlayerAction(formData: FormData) {
     });
 
     if (!parsed.success) {
-      redirect(
-        buildCaptainPanelPath({
-          tournamentId: rawTournamentId,
-          teamId: rawTeamId,
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
-        })
-      );
+      redirect(buildCaptainPanelPath({ competitionId: rawCompetitionId, teamId: rawTeamId, error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
     await assertCaptainTeamAction({
-      tournamentId: parsed.data.tournamentId,
-      teamId: parsed.data.teamId
+      competitionId: parsed.data.competitionId,
+      competitionTeamId: parsed.data.teamId
     });
-    await assertCaptainTeamPlayerCapacity({
-      tournamentId: parsed.data.tournamentId,
-      teamId: parsed.data.teamId
-    });
+    await assertCaptainTeamPlayerCapacity(parsed.data.teamId);
 
     const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.from("tournament_players").insert({
-      tournament_id: parsed.data.tournamentId,
-      team_id: parsed.data.teamId,
+    const { error } = await supabase.from("competition_team_players").insert({
+      competition_team_id: parsed.data.teamId,
       full_name: parsed.data.fullName.trim(),
       shirt_number: parsed.data.shirtNumber,
       position: parsed.data.position?.trim() || null,
@@ -130,42 +120,24 @@ export async function addCaptainTournamentPlayerAction(formData: FormData) {
     });
 
     if (error) {
-      redirect(
-        buildCaptainPanelPath({
-          tournamentId: parsed.data.tournamentId,
-          teamId: parsed.data.teamId,
-          error: toUserMessage(error, "No se pudo agregar el jugador.")
-        })
-      );
+      redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, error: toUserMessage(error, "No se pudo agregar el jugador.") }));
     }
 
-    await revalidateCaptainPaths(parsed.data.tournamentId);
-    redirect(
-      buildCaptainPanelPath({
-        tournamentId: parsed.data.tournamentId,
-        teamId: parsed.data.teamId,
-        success: "Jugador agregado al plantel."
-      })
-    );
+    await revalidateCaptainPaths(parsed.data.competitionId);
+    redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, success: "Jugador agregado al plantel." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildCaptainPanelPath({
-        tournamentId: rawTournamentId,
-        teamId: rawTeamId,
-        error: toUserMessage(error, "No se pudo agregar el jugador.")
-      })
-    );
+    redirect(buildCaptainPanelPath({ competitionId: rawCompetitionId, teamId: rawTeamId, error: toUserMessage(error, "No se pudo agregar el jugador.") }));
   }
 }
 
 export async function updateCaptainTournamentPlayerAction(formData: FormData) {
-  const rawTournamentId = String(formData.get("tournamentId") ?? "");
+  const rawCompetitionId = String(formData.get("competitionId") ?? "");
   const rawTeamId = String(formData.get("teamId") ?? "");
 
   try {
     const parsed = captainPlayerUpdateSchema.safeParse({
-      tournamentId: formData.get("tournamentId"),
+      competitionId: formData.get("competitionId"),
       teamId: formData.get("teamId"),
       playerId: formData.get("playerId"),
       fullName: formData.get("fullName"),
@@ -174,210 +146,125 @@ export async function updateCaptainTournamentPlayerAction(formData: FormData) {
     });
 
     if (!parsed.success) {
-      redirect(
-        buildCaptainPanelPath({
-          tournamentId: rawTournamentId,
-          teamId: rawTeamId,
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
-        })
-      );
+      redirect(buildCaptainPanelPath({ competitionId: rawCompetitionId, teamId: rawTeamId, error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
     await assertCaptainTeamAction({
-      tournamentId: parsed.data.tournamentId,
-      teamId: parsed.data.teamId
+      competitionId: parsed.data.competitionId,
+      competitionTeamId: parsed.data.teamId
     });
 
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase
-      .from("tournament_players")
+      .from("competition_team_players")
       .update({
         full_name: parsed.data.fullName.trim(),
         shirt_number: parsed.data.shirtNumber,
         position: parsed.data.position?.trim() || null
       })
       .eq("id", parsed.data.playerId)
-      .eq("tournament_id", parsed.data.tournamentId)
-      .eq("team_id", parsed.data.teamId);
+      .eq("competition_team_id", parsed.data.teamId);
 
     if (error) {
-      redirect(
-        buildCaptainPanelPath({
-          tournamentId: parsed.data.tournamentId,
-          teamId: parsed.data.teamId,
-          error: toUserMessage(error, "No se pudo actualizar el jugador.")
-        })
-      );
+      redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, error: toUserMessage(error, "No se pudo actualizar el jugador.") }));
     }
 
-    await revalidateCaptainPaths(parsed.data.tournamentId);
-    redirect(
-      buildCaptainPanelPath({
-        tournamentId: parsed.data.tournamentId,
-        teamId: parsed.data.teamId,
-        success: "Jugador actualizado."
-      })
-    );
+    await revalidateCaptainPaths(parsed.data.competitionId);
+    redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, success: "Jugador actualizado." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildCaptainPanelPath({
-        tournamentId: rawTournamentId,
-        teamId: rawTeamId,
-        error: toUserMessage(error, "No se pudo actualizar el jugador.")
-      })
-    );
+    redirect(buildCaptainPanelPath({ competitionId: rawCompetitionId, teamId: rawTeamId, error: toUserMessage(error, "No se pudo actualizar el jugador.") }));
   }
 }
 
 export async function deleteCaptainTournamentPlayerAction(formData: FormData) {
-  const rawTournamentId = String(formData.get("tournamentId") ?? "");
+  const rawCompetitionId = String(formData.get("competitionId") ?? "");
   const rawTeamId = String(formData.get("teamId") ?? "");
 
   try {
     const parsed = captainPlayerDeleteSchema.safeParse({
-      tournamentId: formData.get("tournamentId"),
+      competitionId: formData.get("competitionId"),
       teamId: formData.get("teamId"),
       playerId: formData.get("playerId")
     });
 
     if (!parsed.success) {
-      redirect(
-        buildCaptainPanelPath({
-          tournamentId: rawTournamentId,
-          teamId: rawTeamId,
-          error: parsed.error.issues[0]?.message ?? "Falta el jugador a eliminar."
-        })
-      );
+      redirect(buildCaptainPanelPath({ competitionId: rawCompetitionId, teamId: rawTeamId, error: parsed.error.issues[0]?.message ?? "Falta el jugador a eliminar." }));
     }
 
     await assertCaptainTeamAction({
-      tournamentId: parsed.data.tournamentId,
-      teamId: parsed.data.teamId
+      competitionId: parsed.data.competitionId,
+      competitionTeamId: parsed.data.teamId
     });
 
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase
-      .from("tournament_players")
+      .from("competition_team_players")
       .delete()
       .eq("id", parsed.data.playerId)
-      .eq("tournament_id", parsed.data.tournamentId)
-      .eq("team_id", parsed.data.teamId);
+      .eq("competition_team_id", parsed.data.teamId);
 
     if (error) {
-      redirect(
-        buildCaptainPanelPath({
-          tournamentId: parsed.data.tournamentId,
-          teamId: parsed.data.teamId,
-          error: toUserMessage(error, "No se pudo eliminar el jugador.")
-        })
-      );
+      redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, error: toUserMessage(error, "No se pudo eliminar el jugador.") }));
     }
 
-    await revalidateCaptainPaths(parsed.data.tournamentId);
-    redirect(
-      buildCaptainPanelPath({
-        tournamentId: parsed.data.tournamentId,
-        teamId: parsed.data.teamId,
-        success: "Jugador eliminado del plantel."
-      })
-    );
+    await revalidateCaptainPaths(parsed.data.competitionId);
+    redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, success: "Jugador eliminado del plantel." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildCaptainPanelPath({
-        tournamentId: rawTournamentId,
-        teamId: rawTeamId,
-        error: toUserMessage(error, "No se pudo eliminar el jugador.")
-      })
-    );
+    redirect(buildCaptainPanelPath({ competitionId: rawCompetitionId, teamId: rawTeamId, error: toUserMessage(error, "No se pudo eliminar el jugador.") }));
   }
 }
 
 export async function uploadCaptainTournamentPlayerPhotoAction(formData: FormData) {
-  const rawTournamentId = String(formData.get("tournamentId") ?? "");
+  const rawCompetitionId = String(formData.get("competitionId") ?? "");
   const rawTeamId = String(formData.get("teamId") ?? "");
 
   try {
     const parsed = captainPlayerPhotoSchema.safeParse({
-      tournamentId: formData.get("tournamentId"),
+      competitionId: formData.get("competitionId"),
       teamId: formData.get("teamId"),
       playerId: formData.get("playerId")
     });
 
     if (!parsed.success) {
-      redirect(
-        buildCaptainPanelPath({
-          tournamentId: rawTournamentId,
-          teamId: rawTeamId,
-          error: parsed.error.issues[0]?.message ?? "Datos invalidos."
-        })
-      );
+      redirect(buildCaptainPanelPath({ competitionId: rawCompetitionId, teamId: rawTeamId, error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
     await assertCaptainTeamAction({
-      tournamentId: parsed.data.tournamentId,
-      teamId: parsed.data.teamId
+      competitionId: parsed.data.competitionId,
+      competitionTeamId: parsed.data.teamId
     });
 
     const file = formData.get("photo");
     if (!(file instanceof File) || file.size <= 0) {
-      redirect(
-        buildCaptainPanelPath({
-          tournamentId: parsed.data.tournamentId,
-          teamId: parsed.data.teamId,
-          error: "Selecciona una imagen para subir."
-        })
-      );
+      redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, error: "Selecciona una imagen para subir." }));
     }
 
     const sizeLimitBytes = MAX_PLAYER_PHOTO_SIZE_MB * 1024 * 1024;
     if (file.size > sizeLimitBytes) {
-      redirect(
-        buildCaptainPanelPath({
-          tournamentId: parsed.data.tournamentId,
-          teamId: parsed.data.teamId,
-          error: `La imagen no puede superar ${MAX_PLAYER_PHOTO_SIZE_MB} MB.`
-        })
-      );
+      redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, error: `La imagen no puede superar ${MAX_PLAYER_PHOTO_SIZE_MB} MB.` }));
     }
 
     const extension = inferPlayerPhotoExtension(file);
     if (!extension) {
-      redirect(
-        buildCaptainPanelPath({
-          tournamentId: parsed.data.tournamentId,
-          teamId: parsed.data.teamId,
-          error: "Formato no soportado. Usa JPG, JPEG, PNG o WEBP."
-        })
-      );
+      redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, error: "Formato no soportado. Usa JPG, JPEG, PNG o WEBP." }));
     }
 
     const supabase = await createSupabaseServerClient();
     const { data: player, error: playerError } = await supabase
-      .from("tournament_players")
+      .from("competition_team_players")
       .select("id")
       .eq("id", parsed.data.playerId)
-      .eq("tournament_id", parsed.data.tournamentId)
-      .eq("team_id", parsed.data.teamId)
+      .eq("competition_team_id", parsed.data.teamId)
       .maybeSingle();
 
     if (playerError || !player) {
-      redirect(
-        buildCaptainPanelPath({
-          tournamentId: parsed.data.tournamentId,
-          teamId: parsed.data.teamId,
-          error: "No se encontro el jugador dentro de tu equipo."
-        })
-      );
+      redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, error: "No se encontró el jugador dentro de tu equipo." }));
     }
 
     const optimizedBuffer = await optimizePlayerAvatarImage(file);
-    const objectPath = getTournamentPlayerPhotoObjectPath(
-      getSupabaseDbSchema(),
-      parsed.data.tournamentId,
-      parsed.data.playerId
-    );
+    const objectPath = getCompetitionPlayerPhotoObjectPath(getSupabaseDbSchema(), parsed.data.competitionId, parsed.data.playerId);
     const bucketName = getPlayerPhotosBucket();
     const { error: uploadError } = await supabase.storage.from(bucketName).upload(objectPath, optimizedBuffer, {
       upsert: true,
@@ -386,32 +273,14 @@ export async function uploadCaptainTournamentPlayerPhotoAction(formData: FormDat
     });
 
     if (uploadError) {
-      redirect(
-        buildCaptainPanelPath({
-          tournamentId: parsed.data.tournamentId,
-          teamId: parsed.data.teamId,
-          error: "No se pudo guardar la foto del jugador."
-        })
-      );
+      redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, error: "No se pudo guardar la foto del jugador." }));
     }
 
-    await revalidateCaptainPaths(parsed.data.tournamentId);
+    await revalidateCaptainPaths(parsed.data.competitionId);
     revalidatePath(`/api/player-photo/${parsed.data.playerId}`);
-    redirect(
-      buildCaptainPanelPath({
-        tournamentId: parsed.data.tournamentId,
-        teamId: parsed.data.teamId,
-        success: "Foto actualizada."
-      })
-    );
+    redirect(buildCaptainPanelPath({ competitionId: parsed.data.competitionId, teamId: parsed.data.teamId, success: "Foto actualizada." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(
-      buildCaptainPanelPath({
-        tournamentId: rawTournamentId,
-        teamId: rawTeamId,
-        error: toUserMessage(error, "No se pudo subir la foto.")
-      })
-    );
+    redirect(buildCaptainPanelPath({ competitionId: rawCompetitionId, teamId: rawTeamId, error: toUserMessage(error, "No se pudo subir la foto.") }));
   }
 }

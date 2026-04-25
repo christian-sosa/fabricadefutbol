@@ -7,7 +7,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { withOrgQuery, withPublicQuery } from "@/lib/org";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
-import { getPublicTournaments } from "@/lib/queries/tournaments";
+import { getPublicLeagues } from "@/lib/queries/tournaments";
 import { formatDateTime } from "@/lib/utils";
 
 const problemItems = [
@@ -81,15 +81,15 @@ export default async function HomePage({
   searchParams: Promise<{ org?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const [{ organizations, selectedOrganization }, viewerAdminOrganizations, tournaments] = await Promise.all([
+  const [{ organizations, selectedOrganization }, viewerAdminOrganizations, leagues] = await Promise.all([
     resolvePublicOrganization(resolvedSearchParams.org, { defaultContext: "home" }),
     getViewerAdminOrganizations(),
-    getPublicTournaments()
+    getPublicLeagues()
   ]);
 
   const summary = await getHomeSummary(selectedOrganization?.id ?? null);
   const selectedOrganizationSlug = selectedOrganization?.slug ?? null;
-  const featuredTournaments = tournaments.slice(0, 3);
+  const featuredLeagues = leagues.slice(0, 3);
   const rankingPreviewRows = fallbackRankingPreview;
 
   return (
@@ -461,8 +461,8 @@ export default async function HomePage({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Tambien para ligas</p>
           <CardTitle className="mt-2">Cuando tu grupo crece, tambien puedes lanzar torneos</CardTitle>
           <CardDescription className="mt-3">
-            Equipos, subtorneos, fixture automatico o manual, resultados, figuras y capitanes opcionales dentro de un
-            modulo separado.
+            Cargas la liga, defines los equipos maestros y luego creas las competencias que necesites con los equipos
+            inscriptos en cada una.
           </CardDescription>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link
@@ -487,27 +487,27 @@ export default async function HomePage({
         </Card>
 
         <div className="space-y-3">
-          {featuredTournaments.length ? (
-            featuredTournaments.map((tournament) => (
+          {featuredLeagues.length ? (
+            featuredLeagues.map((league) => (
               <Link
                 className="block rounded-2xl border border-slate-800 bg-slate-900/80 p-4 transition hover:border-slate-600 hover:bg-slate-900"
-                href={`/tournaments/${tournament.slug}`}
-                key={tournament.id}
+                href={`/tournaments/${league.slug}`}
+                key={league.id}
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <CardTitle className="text-base">{tournament.name}</CardTitle>
-                  <TournamentStatusBadge status={tournament.status} />
+                  <CardTitle className="text-base">{league.name}</CardTitle>
+                  <TournamentStatusBadge status={league.status} />
                 </div>
                 <CardDescription className="mt-2">
-                  {tournament.description || "Competencia publica disponible para consultar."}
+                  {league.description || league.venueName || "Liga publica disponible para consultar sus competencias."}
                 </CardDescription>
               </Link>
             ))
           ) : (
             <Card>
               <CardDescription>
-                El modulo Torneos ya esta listo para mostrar ligas, subtorneos y competiciones publicas cuando se
-                publiquen.
+                El modulo Torneos ya esta listo para mostrar ligas publicas y las competencias activas dentro de cada
+                una.
               </CardDescription>
             </Card>
           )}

@@ -7,21 +7,21 @@ import { TournamentStandingsTable } from "@/components/tournaments/tournament-st
 import { TournamentTabs } from "@/components/tournaments/tournament-tabs";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
-import { getPublicTournamentBySlug } from "@/lib/queries/tournaments";
+import { getPublicCompetitionBySlugs } from "@/lib/queries/tournaments";
 
-function buildTabHref(slug: string, tab: string) {
-  return `/tournaments/${slug}?tab=${encodeURIComponent(tab)}`;
+function buildTabHref(leagueSlug: string, competitionSlug: string, tab: string) {
+  return `/tournaments/${leagueSlug}/${competitionSlug}?tab=${encodeURIComponent(tab)}`;
 }
 
-export default async function TournamentDetailPage({
+export default async function CompetitionDetailPage({
   params,
   searchParams
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ leagueSlug: string; competitionSlug: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const [{ slug }, resolvedSearchParams] = await Promise.all([params, searchParams]);
-  const data = await getPublicTournamentBySlug(slug);
+  const [{ leagueSlug, competitionSlug }, resolvedSearchParams] = await Promise.all([params, searchParams]);
+  const data = await getPublicCompetitionBySlugs({ leagueSlug, competitionSlug });
   if (!data) notFound();
 
   const selectedTab = resolvedSearchParams.tab ?? "table";
@@ -39,18 +39,20 @@ export default async function TournamentDetailPage({
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle>{data.tournament.name}</CardTitle>
-              <TournamentStatusBadge status={data.tournament.status} />
+              <CardTitle>{data.competition.name}</CardTitle>
+              <TournamentStatusBadge status={data.competition.status} />
             </div>
             <CardDescription className="mt-2">
-              {data.tournament.description || "Fixture, tabla y estadisticas del torneo."}
+              {data.competition.description || "Tabla, fixture y estadísticas de la competencia."}
             </CardDescription>
-            <p className="mt-2 text-xs text-slate-500">
-              {data.tournament.isPublic ? "Torneo publico" : "Solo lectura admin"}
-            </p>
+            <div className="mt-3 space-y-1 text-xs text-slate-500">
+              <p>Liga: {data.league.name}</p>
+              <p>Temporada {data.competition.seasonLabel}</p>
+              <p>{data.competition.venueOverride ? `Sede: ${data.competition.venueOverride}` : data.league.venueName ? `Usa la sede general: ${data.league.venueName}` : "Sede pendiente"}</p>
+            </div>
           </div>
-          <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/tournaments">
-            Volver al listado
+          <Link className="text-sm font-semibold text-slate-300 hover:underline" href={`/tournaments/${data.league.slug}`}>
+            Volver a la liga
           </Link>
         </div>
       </Card>
@@ -58,7 +60,7 @@ export default async function TournamentDetailPage({
       <Card>
         <TournamentTabs
           items={tabs.map((tab) => ({
-            href: buildTabHref(slug, tab.key),
+            href: buildTabHref(data.league.slug, data.competition.slug, tab.key),
             label: tab.label,
             active: selectedTab === tab.key
           }))}
@@ -79,7 +81,7 @@ export default async function TournamentDetailPage({
           <CardTitle>Fixture</CardTitle>
           <div className="mt-4">
             <TournamentFixtureTable
-              buildMatchHref={(row) => `/tournaments/${slug}/matches/${row.id}`}
+              buildMatchHref={(row) => `/tournaments/${data.league.slug}/${data.competition.slug}/matches/${row.id}`}
               linkLabel="Detalle"
               rows={data.fixture}
             />
@@ -110,7 +112,7 @@ export default async function TournamentDetailPage({
                 {!data.topScorers.length ? (
                   <tr>
                     <TD className="py-6 text-sm text-slate-400" colSpan={3}>
-                      Todavia no hay goles cargados.
+                      Todavía no hay goles cargados.
                     </TD>
                   </tr>
                 ) : null}
@@ -143,7 +145,7 @@ export default async function TournamentDetailPage({
                 {!data.topFigures.length ? (
                   <tr>
                     <TD className="py-6 text-sm text-slate-400" colSpan={3}>
-                      Todavia no hay figuras cargadas.
+                      Todavía no hay figuras cargadas.
                     </TD>
                   </tr>
                 ) : null}
@@ -176,7 +178,7 @@ export default async function TournamentDetailPage({
                 {!data.bestDefense.length ? (
                   <tr>
                     <TD className="py-6 text-sm text-slate-400" colSpan={3}>
-                      Todavia no hay partidos jugados.
+                      Todavía no hay partidos jugados.
                     </TD>
                   </tr>
                 ) : null}

@@ -4,21 +4,22 @@ import { notFound } from "next/navigation";
 import { TournamentMatchStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
-import { getPublicTournamentMatchDetails } from "@/lib/queries/tournaments";
+import { getPublicCompetitionMatchDetails } from "@/lib/queries/tournaments";
 import { formatDateTime } from "@/lib/utils";
 
 function formatScheduledAt(value: string | null) {
   return value ? formatDateTime(value) : "Sin horario";
 }
 
-export default async function TournamentMatchDetailPage({
+export default async function CompetitionMatchDetailPage({
   params
 }: {
-  params: Promise<{ slug: string; id: string }>;
+  params: Promise<{ leagueSlug: string; competitionSlug: string; id: string }>;
 }) {
-  const { slug, id } = await params;
-  const data = await getPublicTournamentMatchDetails({
-    slug,
+  const { leagueSlug, competitionSlug, id } = await params;
+  const data = await getPublicCompetitionMatchDetails({
+    leagueSlug,
+    competitionSlug,
     matchId: id
   });
 
@@ -32,9 +33,11 @@ export default async function TournamentMatchDetailPage({
             <CardTitle>
               {data.match.homeTeamName} vs {data.match.awayTeamName}
             </CardTitle>
-            <CardDescription className="mt-2">{data.tournament.name}</CardDescription>
+            <CardDescription className="mt-2">
+              {data.competition.name} · {data.league.name}
+            </CardDescription>
             <p className="mt-2 text-sm text-slate-400">
-              {formatScheduledAt(data.match.scheduledAt)} - {data.match.venue || "Sin sede"}
+              {formatScheduledAt(data.match.scheduledAt)} · {data.match.venue || data.competition.venueOverride || data.league.venueName || "Sin sede"}
             </p>
           </div>
           <TournamentMatchStatusBadge status={data.match.status} />
@@ -75,7 +78,7 @@ export default async function TournamentMatchDetailPage({
                     <TD>{row.goals}</TD>
                     <TD>{row.yellow_cards}</TD>
                     <TD>{row.red_cards}</TD>
-                    <TD>{row.is_mvp ? "Si" : "-"}</TD>
+                    <TD>{row.is_mvp ? "Sí" : "-"}</TD>
                   </tr>
                 ))}
                 {!data.homeStats.length ? (
@@ -110,7 +113,7 @@ export default async function TournamentMatchDetailPage({
                     <TD>{row.goals}</TD>
                     <TD>{row.yellow_cards}</TD>
                     <TD>{row.red_cards}</TD>
-                    <TD>{row.is_mvp ? "Si" : "-"}</TD>
+                    <TD>{row.is_mvp ? "Sí" : "-"}</TD>
                   </tr>
                 ))}
                 {!data.awayStats.length ? (
@@ -126,8 +129,8 @@ export default async function TournamentMatchDetailPage({
         </Card>
       </section>
 
-      <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={`/tournaments/${slug}?tab=fixture`}>
-        Volver al fixture del torneo
+      <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={`/tournaments/${leagueSlug}/${competitionSlug}?tab=fixture`}>
+        Volver al fixture de la competencia
       </Link>
     </div>
   );

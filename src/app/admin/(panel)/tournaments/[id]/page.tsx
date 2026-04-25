@@ -1,76 +1,40 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { deleteLeagueAction } from "@/app/admin/(panel)/tournaments/actions";
 import {
-  createTournamentAction,
-  deleteTournamentAction
-} from "@/app/admin/(panel)/tournaments/actions";
-import {
-  addTournamentPlayerAction,
-  addTournamentTeamAction,
-  createManualTournamentMatchAction,
-  deleteTournamentCaptainInviteAction,
-  deleteTournamentPlayerAction,
-  deleteTournamentTeamAction,
-  generateTournamentFixtureAction,
-  inviteTournamentCaptainAction,
-  inviteTournamentAdminAction,
-  removeTournamentAdminAction,
-  revokeTournamentAdminInviteAction,
-  removeTournamentCaptainAction,
-  updateTournamentAction,
-  updateTournamentMatchAction,
-  updateTournamentTeamAction,
-  uploadTournamentPlayerPhotoAction
+  addLeagueTeamAction,
+  createCompetitionAction,
+  inviteLeagueAdminAction,
+  removeLeagueAdminAction,
+  revokeLeagueAdminInviteAction,
+  updateLeagueAction,
+  updateLeagueTeamAction,
+  deleteLeagueTeamAction
 } from "@/app/admin/(panel)/tournaments/[id]/actions";
-import { TournamentFixtureTable } from "@/components/tournaments/tournament-fixture-table";
-import {
-  TOURNAMENT_MATCH_STATUS_LABELS,
-  TOURNAMENT_STATUS_LABELS,
-  TournamentMatchStatusBadge,
-  TournamentStatusBadge
-} from "@/components/tournaments/tournament-badges";
-import { TournamentStandingsTable } from "@/components/tournaments/tournament-standings-table";
-import { PhotoUploadInput } from "@/components/admin/photo-upload-input";
+import { TournamentTabs } from "@/components/tournaments/tournament-tabs";
+import { TOURNAMENT_STATUS_LABELS, TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
-import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
-import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { getAdminTournaments, requireAdminTournament } from "@/lib/auth/tournaments";
-import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
-import { findBestDefenseRows, findTopFigureRows, findTopScorerRows, getAdminTournamentDetails, groupFixtureByRound } from "@/lib/queries/tournaments";
-import { formatDateTime } from "@/lib/utils";
+import { requireAdminLeague } from "@/lib/auth/tournaments";
+import { getAdminLeagueDetails } from "@/lib/queries/tournaments";
 
-function toInputDateTime(isoDate: string | null) {
-  if (!isoDate) return "";
-  const date = new Date(isoDate);
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-}
-
-function formatMatchSchedule(value: string | null) {
-  return value ? formatDateTime(value) : "Sin horario";
-}
-
-function buildCaptainInviteUrl(inviteToken: string) {
-  const pathname = `/captain/invite/${inviteToken}`;
-  const appUrl = process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (!appUrl) return pathname;
-  return new URL(pathname, appUrl.replace(/\/+$/, "")).toString();
-}
-
-function buildTournamentAdminInviteUrl(inviteToken: string) {
+function buildAdminInviteUrl(inviteToken: string) {
   const pathname = `/admin/tournaments/invite/${inviteToken}`;
   const appUrl = process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (!appUrl) return pathname;
   return new URL(pathname, appUrl.replace(/\/+$/, "")).toString();
 }
 
-export default async function AdminTournamentDetailPage({
+function buildTabHref(leagueId: string, tab: string) {
+  return `/admin/tournaments/${leagueId}?tab=${encodeURIComponent(tab)}`;
+}
+
+export default async function AdminLeagueDetailPage({
   params,
   searchParams
 }: {
@@ -78,30 +42,18 @@ export default async function AdminTournamentDetailPage({
   searchParams: Promise<{ tab?: string; error?: string; success?: string }>;
 }) {
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
-  const { admin } = await requireAdminTournament(id);
-  const [details, allTournaments] = await Promise.all([getAdminTournamentDetails(id), getAdminTournaments(admin)]);
+  await requireAdminLeague(id);
+  const details = await getAdminLeagueDetails(id);
 
   if (!details) notFound();
 
   const selectedTab = resolvedSearchParams.tab ?? "summary";
-
-  const groupedFixture = groupFixtureByRound(details.fixture);
-  const playedMatches = details.fixture.filter((row) => row.status === "played").length;
-  const standingsLeaders = details.standings[0];
-  const topScorers = findTopScorerRows(details.topScorers);
-  const topFigures = findTopFigureRows(details.topFigures);
-  const bestDefense = findBestDefenseRows(details.bestDefense);
-  const tournamentAdminInvitesEnabled = details.schemaSupport.tournamentAdminInvites;
-  const captainManagementEnabled =
-    details.schemaSupport.tournamentTeamCaptains && details.schemaSupport.tournamentCaptainInvites;
-  const currentTournament = allTournaments.find((item) => item.id === id) ?? null;
-  const familyRootId = currentTournament?.parent_tournament_id ?? currentTournament?.id ?? null;
-  const rootTournament = familyRootId ? allTournaments.find((item) => item.id === familyRootId) ?? null : null;
-  const subtournaments = familyRootId
-    ? allTournaments
-        .filter((item) => item.parent_tournament_id === familyRootId)
-        .sort((left, right) => left.name.localeCompare(right.name, "es"))
-    : [];
+  const tabs = [
+    { key: "summary", label: "Resumen" },
+    { key: "teams", label: "Equipos" },
+    { key: "competitions", label: "Competencias" },
+    { key: "admins", label: "Admins" }
+  ];
 
   return (
     <div className="space-y-4">
@@ -109,40 +61,29 @@ export default async function AdminTournamentDetailPage({
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle>{details.tournament.name}</CardTitle>
-              <TournamentStatusBadge status={details.tournament.status} />
+              <CardTitle>{details.league.name}</CardTitle>
+              <TournamentStatusBadge status={details.league.status} />
             </div>
             <CardDescription className="mt-2">
-              Gestiona equipos, fixture, resultados y estadisticas del torneo desde este panel.
+              Gestiona la liga, sus equipos maestros, las competencias que cuelgan de ella y el equipo administrador.
             </CardDescription>
             <p className="mt-2 text-xs text-slate-400">
-              {details.tournament.isPublic ? "Visible publicamente" : "Solo visible en admin"} - /{details.tournament.slug}
+              {details.league.isPublic ? "Visible públicamente" : "Solo visible en admin"} · /{details.league.slug}
             </p>
-            {currentTournament?.parent_tournament_id && rootTournament ? (
-              <p className="mt-2 text-xs text-slate-400">
-                Torneo base:{" "}
-                <Link className="font-semibold text-emerald-300 hover:underline" href={`/admin/tournaments/${rootTournament.id}`}>
-                  {rootTournament.name}
-                </Link>
-              </p>
-            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-3">
             <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/admin/tournaments">
-              Volver a torneos
+              Volver a ligas
             </Link>
-            <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={`/tournaments/${details.tournament.slug}`}>
-              Ver publico
+            <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={`/tournaments/${details.league.slug}`}>
+              Ver pública
             </Link>
-            <form action={deleteTournamentAction}>
-              <input name="tournamentId" type="hidden" value={id} />
-              {rootTournament?.id && rootTournament.id !== id ? (
-                <input name="returnToTournamentId" type="hidden" value={rootTournament.id} />
-              ) : null}
+            <form action={deleteLeagueAction}>
+              <input name="leagueId" type="hidden" value={id} />
               <ConfirmSubmitButton
                 className="h-8 px-3 text-xs"
-                confirmMessage={`Estas seguro de borrar ${details.tournament.name}?`}
+                confirmMessage={`¿Seguro que quieres borrar ${details.league.name}?`}
                 label="Borrar"
                 variant="ghost"
               />
@@ -153,44 +94,54 @@ export default async function AdminTournamentDetailPage({
         {resolvedSearchParams.success ? <p className="mt-3 text-sm font-semibold text-emerald-300">{resolvedSearchParams.success}</p> : null}
       </Card>
 
+      <Card>
+        <TournamentTabs
+          items={tabs.map((tab) => ({
+            href: buildTabHref(id, tab.key),
+            label: tab.label,
+            active: selectedTab === tab.key
+          }))}
+        />
+      </Card>
+
       {selectedTab === "summary" ? (
         <>
           <section className="grid gap-4 md:grid-cols-4">
             <Card>
-              <CardDescription>Equipos</CardDescription>
-              <CardTitle className="mt-1 text-3xl">{details.teams.length}</CardTitle>
+              <CardDescription>Equipos maestros</CardDescription>
+              <CardTitle className="mt-1 text-3xl">{details.league.teamCount}</CardTitle>
             </Card>
             <Card>
-              <CardDescription>Jugadores</CardDescription>
-              <CardTitle className="mt-1 text-3xl">{details.players.length}</CardTitle>
+              <CardDescription>Competencias</CardDescription>
+              <CardTitle className="mt-1 text-3xl">{details.league.competitionCount}</CardTitle>
             </Card>
             <Card>
-              <CardDescription>Partidos</CardDescription>
-              <CardTitle className="mt-1 text-3xl">{details.fixture.length}</CardTitle>
+              <CardDescription>Admins activos</CardDescription>
+              <CardTitle className="mt-1 text-3xl">{details.leagueAdmins.admins.length}</CardTitle>
             </Card>
             <Card>
-              <CardDescription>Jugados</CardDescription>
-              <CardTitle className="mt-1 text-3xl">{playedMatches}</CardTitle>
+              <CardDescription>Invitaciones pendientes</CardDescription>
+              <CardTitle className="mt-1 text-3xl">{details.leagueAdmins.pendingInvites.length}</CardTitle>
             </Card>
           </section>
 
           <Card>
-            <CardTitle>Configuracion general</CardTitle>
+            <CardTitle>Configuración general</CardTitle>
             <CardDescription className="mt-2">
-              El torneo sale de borrador y pasa a activo automaticamente cuando generas el fixture o creas el primer partido manual.
+              La liga reúne sede, descripción y visibilidad. Las competencias heredan esta base, pero pueden tener su propia sede si hace falta.
             </CardDescription>
-            <form action={updateTournamentAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
+            <form action={updateLeagueAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="name">
                   Nombre
                 </label>
-                <Input defaultValue={details.tournament.name} id="name" name="name" required />
+                <Input defaultValue={details.league.name} id="name" name="name" required />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="status">
                   Estado
                 </label>
-                <Select defaultValue={details.tournament.status} id="status" name="status">
+                <Select defaultValue={details.league.status} id="status" name="status">
                   {(["draft", "active", "finished", "archived"] as const).map((status) => (
                     <option key={status} value={status}>
                       {TOURNAMENT_STATUS_LABELS[status]}
@@ -198,15 +149,28 @@ export default async function AdminTournamentDetailPage({
                   ))}
                 </Select>
               </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="venueName">
+                  Dónde se juega
+                </label>
+                <Input defaultValue={details.league.venueName ?? ""} id="venueName" name="venueName" placeholder="Ej: Complejo LAFAB" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="locationNotes">
+                  Notas de ubicación
+                </label>
+                <Input defaultValue={details.league.locationNotes ?? ""} id="locationNotes" name="locationNotes" placeholder="Ej: Caballito, CABA" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="description">
+                  Descripción
+                </label>
+                <Textarea defaultValue={details.league.description ?? ""} id="description" name="description" rows={4} />
+              </div>
               <div className="flex items-end">
                 <label className="flex items-center gap-2 text-sm text-slate-200">
-                  <input
-                    className="h-4 w-4 accent-emerald-400"
-                    defaultChecked={details.tournament.isPublic}
-                    name="isPublic"
-                    type="checkbox"
-                  />
-                  Torneo publico
+                  <input className="h-4 w-4 accent-emerald-400" defaultChecked={details.league.isPublic} name="isPublic" type="checkbox" />
+                  Liga pública
                 </label>
               </div>
               <div className="md:col-span-2">
@@ -214,255 +178,28 @@ export default async function AdminTournamentDetailPage({
               </div>
             </form>
           </Card>
-
-          <Card>
-            <CardTitle>{currentTournament?.parent_tournament_id ? "Competencia madre y subtorneos" : "Subtorneos"}</CardTitle>
-            <CardDescription className="mt-2">
-              Un torneo base puede tener varios subtorneos. Todos se administran por separado, pero quedan agrupados bajo la misma competencia.
-            </CardDescription>
-
-            {currentTournament?.parent_tournament_id && rootTournament ? (
-              <p className="mt-3 text-sm text-slate-300">
-                Torneo base:{" "}
-                <Link className="font-semibold text-emerald-300 hover:underline" href={`/admin/tournaments/${rootTournament.id}`}>
-                  {rootTournament.name}
-                </Link>
-              </p>
-            ) : null}
-
-            <form action={createTournamentAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-              <input name="parentTournamentId" type="hidden" value={familyRootId ?? id} />
-              <input name="returnToTournamentId" type="hidden" value={id} />
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="subtournament-name">
-                  Nombre del subtorneo
-                </label>
-                <Input id="subtournament-name" name="name" placeholder="Ej: Viernes A2" required />
-              </div>
-              <div className="md:self-end">
-                <Button type="submit" variant="secondary">
-                  Crear subtorneo
-                </Button>
-              </div>
-            </form>
-
-            <div className="mt-4 space-y-2">
-              {subtournaments.length ? (
-                subtournaments.map((subtournament) => {
-                  const isCurrent = subtournament.id === id;
-                  return (
-                    <div
-                      className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-3 md:flex-row md:items-center md:justify-between"
-                      key={subtournament.id}
-                    >
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-slate-100">{subtournament.name}</p>
-                          {isCurrent ? (
-                            <span className="rounded-full border border-emerald-400/35 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-200">
-                              Actual
-                            </span>
-                          ) : null}
-                          <TournamentStatusBadge status={subtournament.status} />
-                        </div>
-                        <p className="mt-1 text-xs text-slate-500">/{subtournament.slug}</p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-3">
-                        {!isCurrent ? (
-                          <Link
-                            className="text-sm font-semibold text-emerald-300 hover:underline"
-                            href={`/admin/tournaments/${subtournament.id}`}
-                          >
-                            Gestionar
-                          </Link>
-                        ) : null}
-                        <Link
-                          className="text-sm font-semibold text-sky-300 hover:underline"
-                          href={`/tournaments/${subtournament.slug}`}
-                        >
-                          Ver publico
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-sm text-slate-400">Todavia no hay subtorneos creados dentro de esta competencia.</p>
-              )}
-            </div>
-          </Card>
-
-          <Card>
-            <CardTitle>Equipo administrador (maximo 4)</CardTitle>
-            <CardDescription className="mt-2">
-              Puedes sumar hasta 4 admins para este torneo. Si un mismo organizador maneja varios subtorneos, cada uno
-              puede tener su propio equipo de administracion.
-            </CardDescription>
-
-            {tournamentAdminInvitesEnabled ? (
-              <form action={inviteTournamentAdminAction.bind(null, id)} className="mt-4 flex flex-col gap-3 md:flex-row">
-                <Input name="email" placeholder="email@dominio.com" required type="email" />
-                <Button type="submit" variant="secondary">
-                  Invitar admin
-                </Button>
-              </form>
-            ) : (
-              <p className="mt-4 text-sm text-amber-300">
-                Las invitaciones de admins estan ocultas temporalmente porque faltan tablas auxiliares en el schema activo.
-              </p>
-            )}
-
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Admins activos</p>
-                <div className="space-y-2">
-                  {details.tournamentAdmins.admins.map((member) => (
-                    <div
-                      className="flex items-start justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm"
-                      key={member.membershipId}
-                    >
-                      <div>
-                        <p className="font-semibold text-slate-100">{member.email ?? member.displayName}</p>
-                        <p className="text-xs text-slate-400">
-                          {member.role === "owner" ? "Owner" : "Editor"} desde {new Date(member.createdAt).toLocaleDateString("es-AR")}
-                        </p>
-                      </div>
-                      {member.id === admin.userId ? (
-                        <span className="rounded-md border border-slate-700 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-                          Tu cuenta
-                        </span>
-                      ) : (
-                        <form action={removeTournamentAdminAction.bind(null, id)}>
-                          <input name="adminId" type="hidden" value={member.id} />
-                          <ConfirmSubmitButton
-                            className="h-7 min-w-7 px-2 text-xs"
-                            confirmMessage={`Estas seguro de quitar a ${member.email ?? member.displayName} como admin de ${details.tournament.name}?`}
-                            label="X"
-                            variant="ghost"
-                          />
-                        </form>
-                      )}
-                    </div>
-                  ))}
-
-                  {!details.tournamentAdmins.admins.length ? (
-                    <p className="text-sm text-slate-400">No hay admins cargados para este torneo.</p>
-                  ) : null}
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Invitaciones pendientes</p>
-                <div className="space-y-2">
-                  {!tournamentAdminInvitesEnabled ? (
-                    <p className="text-sm text-slate-400">Esta funcion se habilita cuando el schema tenga las tablas de invitaciones.</p>
-                  ) : details.tournamentAdmins.pendingInvites.length ? (
-                    details.tournamentAdmins.pendingInvites.map((invite) => {
-                      const inviteUrl = buildTournamentAdminInviteUrl(invite.inviteToken);
-                      return (
-                        <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm" key={invite.id}>
-                          <p className="font-semibold text-slate-100">{invite.email}</p>
-                          <p className="text-xs text-slate-400">
-                            Enviada {new Date(invite.createdAt).toLocaleDateString("es-AR")} - vence {formatDateTime(invite.expiresAt)}
-                          </p>
-                          <p className="mt-2 text-xs text-slate-400">Link de invitacion:</p>
-                          <Link
-                            className="break-all text-xs font-semibold text-emerald-300 hover:underline"
-                            href={inviteUrl}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            {inviteUrl}
-                          </Link>
-                          <form action={revokeTournamentAdminInviteAction.bind(null, id)} className="mt-2">
-                            <input name="inviteId" type="hidden" value={invite.id} />
-                            <Button type="submit" variant="ghost">
-                              Cancelar invitacion
-                            </Button>
-                          </form>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="text-sm text-slate-400">No hay invitaciones pendientes.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <section className="grid gap-4 md:grid-cols-4">
-            <Card>
-              <CardTitle>Lider actual</CardTitle>
-              <CardDescription className="mt-2">
-                {standingsLeaders ? `${standingsLeaders.teamName} (${standingsLeaders.points} pts)` : "Todavia sin tabla"}
-              </CardDescription>
-            </Card>
-            <Card>
-              <CardTitle>Goleadores</CardTitle>
-              <CardDescription className="mt-2">
-                {topScorers.length
-                  ? topScorers.map((row) => `${row.playerName} (${row.goals})`).join(" / ")
-                  : "Todavia sin goles cargados"}
-              </CardDescription>
-            </Card>
-            <Card>
-              <CardTitle>Figuras</CardTitle>
-              <CardDescription className="mt-2">
-                {topFigures.length
-                  ? topFigures.map((row) => `${row.playerName} (${row.mvpCount})`).join(" / ")
-                  : "Todavia sin figuras cargadas"}
-              </CardDescription>
-            </Card>
-            <Card>
-              <CardTitle>Valla menos vencida</CardTitle>
-              <CardDescription className="mt-2">
-                {bestDefense.length
-                  ? bestDefense.map((row) => `${row.teamName} (${row.goalsAgainst} GC)`).join(" / ")
-                  : "Todavia sin partidos jugados"}
-              </CardDescription>
-            </Card>
-          </section>
         </>
       ) : null}
 
       {selectedTab === "teams" ? (
-        <>
+        <div className="space-y-4">
           <Card>
-            <CardTitle>Agregar equipo</CardTitle>
-            <form action={addTournamentTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
+            <CardTitle>Nuevo equipo maestro</CardTitle>
+            <CardDescription className="mt-2">
+              Aquí cargas el catálogo base de equipos de la liga. Luego eliges cuáles se inscriben en cada competencia.
+            </CardDescription>
+            <form action={addLeagueTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="teamName">
-                  Nombre
-                </label>
-                <Input id="teamName" name="name" placeholder="Los Pibes FC" required />
+                <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
+                <Input name="name" required />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="shortName">
-                  Nombre corto
-                </label>
-                <Input id="shortName" name="shortName" placeholder="LPF" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="displayOrder">
-                  Orden visual
-                </label>
-                <Input defaultValue={details.teams.length + 1} id="displayOrder" min={1} name="displayOrder" required type="number" />
-                <p className="mt-1 text-xs text-slate-500">
-                  Solo define como se ordena este equipo dentro del panel y de algunas listas del torneo.
-                </p>
+                <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre corto</label>
+                <Input maxLength={20} name="shortName" />
               </div>
               <div className="md:col-span-2">
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="teamNotes">
-                  Descripcion (opcional)
-                </label>
-                <Textarea
-                  id="teamNotes"
-                  name="notes"
-                  placeholder="Ej: categoria, zona, sponsor o una nota corta para identificar al equipo."
-                  rows={2}
-                />
+                <label className="mb-1 block text-sm font-semibold text-slate-200">Notas</label>
+                <Textarea name="notes" rows={3} />
               </div>
               <div className="md:col-span-2">
                 <Button type="submit">Agregar equipo</Button>
@@ -471,615 +208,237 @@ export default async function AdminTournamentDetailPage({
           </Card>
 
           <div className="space-y-4">
-            {details.teams.map((team) => (
-              <Card key={team.id}>
-                {(() => {
-                  const currentCaptain = details.teamCaptainsByTeam.get(team.id) ?? null;
-                  const pendingInvite = details.captainInvitesByTeam.get(team.id) ?? null;
-                  const captainInviteUrl = pendingInvite ? buildCaptainInviteUrl(pendingInvite.inviteToken) : null;
-
-                  return (
-                    <>
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <CardTitle>{team.name}</CardTitle>
-                    <CardDescription className="mt-1">
-                      {team.short_name ? `Corto: ${team.short_name}` : "Sin nombre corto"} - Orden visual {team.display_order}
-                    </CardDescription>
-                    {team.notes ? <p className="mt-2 text-sm text-slate-400">{team.notes}</p> : null}
-                    <p className="mt-1 text-xs text-slate-500">
-                      {details.playersByTeam.get(team.id)?.length ?? 0} jugador(es) en plantilla
-                    </p>
+            {details.leagueTeams.length ? (
+              details.leagueTeams.map((team) => (
+                <Card key={team.id}>
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <CardTitle>{team.name}</CardTitle>
+                      <CardDescription className="mt-1">
+                        {team.shortName ? `${team.shortName} · ` : ""}slug {team.slug}
+                      </CardDescription>
+                    </div>
+                    <form action={deleteLeagueTeamAction.bind(null, id)}>
+                      <input name="teamId" type="hidden" value={team.id} />
+                      <ConfirmSubmitButton
+                        className="h-8 px-3 text-xs"
+                        confirmMessage={`¿Seguro que quieres borrar ${team.name}?`}
+                        label="Borrar"
+                        variant="ghost"
+                      />
+                    </form>
                   </div>
-                  <form action={deleteTournamentTeamAction.bind(null, id)}>
+
+                  <form action={updateLeagueTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
                     <input name="teamId" type="hidden" value={team.id} />
-                    <Button type="submit" variant="danger">
-                      Borrar equipo
-                    </Button>
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
+                      <Input defaultValue={team.name} name="name" required />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre corto</label>
+                      <Input defaultValue={team.shortName ?? ""} name="shortName" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="mb-1 block text-sm font-semibold text-slate-200">Notas</label>
+                      <Textarea defaultValue={team.notes ?? ""} name="notes" rows={3} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Button type="submit" variant="secondary">
+                        Guardar equipo
+                      </Button>
+                    </div>
                   </form>
-                </div>
-
-                <div className="mt-4 grid gap-3 xl:grid-cols-2">
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
-                        Capitan actual
-                      </p>
-                    {!captainManagementEnabled ? (
-                      <p className="mt-3 text-sm text-slate-400">
-                        La gestion de capitanes esta oculta temporalmente porque faltan tablas auxiliares en el schema activo.
-                      </p>
-                    ) : currentCaptain ? (
-                      <div className="mt-3 space-y-3">
-                        <div>
-                          <p className="font-semibold text-slate-100">{currentCaptain.displayName}</p>
-                          <p className="text-xs text-slate-500">
-                            Asignado el {formatDateTime(currentCaptain.createdAt)}
-                          </p>
-                        </div>
-                        <form action={removeTournamentCaptainAction.bind(null, id)}>
-                          <input name="teamId" type="hidden" value={team.id} />
-                          <Button type="submit" variant="ghost">
-                            Quitar capitan
-                          </Button>
-                        </form>
-                      </div>
-                    ) : (
-                      <p className="mt-3 text-sm text-slate-400">
-                        Este equipo todavia no tiene capitan asignado.
-                      </p>
-                    )}
-                  </div>
-
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">
-                        Invitacion de capitan
-                      </p>
-                    {!captainManagementEnabled ? (
-                      <p className="mt-3 text-sm text-slate-400">
-                        Esta funcion se habilita cuando el schema tenga las tablas de capitanes e invitaciones.
-                      </p>
-                    ) : pendingInvite ? (
-                      <div className="mt-3 space-y-3">
-                        <div>
-                          <p className="font-semibold text-slate-100">{pendingInvite.email}</p>
-                          <p className="text-xs text-slate-500">
-                            Vence {formatDateTime(pendingInvite.expiresAt)}
-                          </p>
-                        </div>
-                        {captainInviteUrl ? (
-                          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                            <Link
-                              className="text-sm font-semibold text-emerald-300 hover:underline"
-                              href={captainInviteUrl}
-                              rel="noreferrer"
-                              target="_blank"
-                            >
-                              Abrir link de invitacion
-                            </Link>
-                            <p className="mt-2 break-all text-xs text-slate-500">{captainInviteUrl}</p>
-                          </div>
-                        ) : null}
-                        <form action={deleteTournamentCaptainInviteAction.bind(null, id)}>
-                          <input name="inviteId" type="hidden" value={pendingInvite.id} />
-                          <Button type="submit" variant="ghost">
-                            Revocar invitacion
-                          </Button>
-                        </form>
-                      </div>
-                    ) : currentCaptain ? (
-                      <p className="mt-3 text-sm text-slate-400">
-                        Este equipo ya tiene capitan. Si quieres reasignarlo, primero quitale el acceso actual.
-                      </p>
-                    ) : (
-                      <form action={inviteTournamentCaptainAction.bind(null, id)} className="mt-3 space-y-3">
-                        <input name="teamId" type="hidden" value={team.id} />
-                        <div>
-                          <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`captain-email-${team.id}`}>
-                            Email del capitan
-                          </label>
-                          <Input
-                            id={`captain-email-${team.id}`}
-                            name="email"
-                            placeholder="capitan@equipo.com"
-                            required
-                            type="email"
-                          />
-                        </div>
-                        <Button type="submit" variant="secondary">
-                          Generar invitacion
-                        </Button>
-                      </form>
-                    )}
-                  </div>
-                </div>
-
-                <form action={updateTournamentTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
-                  <input name="teamId" type="hidden" value={team.id} />
-                  <div>
-                    <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
-                    <Input defaultValue={team.name} name="name" required />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre corto</label>
-                    <Input defaultValue={team.short_name ?? ""} name="shortName" placeholder="Ej: LPF" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-semibold text-slate-200">Orden visual</label>
-                    <Input defaultValue={team.display_order} min={1} name="displayOrder" required type="number" />
-                    <p className="mt-1 text-xs text-slate-500">
-                      Solo cambia la posicion del equipo dentro del panel y de algunas listas del torneo.
-                    </p>
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-semibold text-slate-200">Descripcion (opcional)</label>
-                    <Textarea
-                      className="md:col-span-2"
-                      defaultValue={team.notes ?? ""}
-                      name="notes"
-                      placeholder="Ej: categoria, zona, sponsor o una nota corta para identificar al equipo."
-                      rows={2}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Button type="submit" variant="secondary">
-                      Guardar equipo
-                    </Button>
-                  </div>
-                </form>
-                    </>
-                  );
-                })()}
-              </Card>
-            ))}
-
-            {!details.teams.length ? (
+                </Card>
+              ))
+            ) : (
               <Card>
-                <CardDescription>Todavia no hay equipos cargados.</CardDescription>
+                <CardDescription>Todavía no hay equipos cargados para esta liga.</CardDescription>
               </Card>
-            ) : null}
+            )}
           </div>
-        </>
+        </div>
       ) : null}
 
-      {selectedTab === "players" ? (
-        <>
+      {selectedTab === "competitions" ? (
+        <div className="space-y-4">
           <Card>
-            <CardTitle>Subir foto de jugador</CardTitle>
-            <CardDescription>
-              La imagen se optimiza y se guarda en Supabase Storage. Cada foto queda asociada al jugador del torneo.
+            <CardTitle>Nueva competencia</CardTitle>
+            <CardDescription className="mt-2">
+              Crea una competencia en pocos pasos: datos básicos e inscriptos iniciales. Luego podrás sumar planteles, capitanes y fixture.
             </CardDescription>
-            <form action={uploadTournamentPlayerPhotoAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-              <Select name="playerId" required>
-                <option value="">Selecciona jugador</option>
-                {details.teams.flatMap((team) =>
-                  (details.playersByTeam.get(team.id) ?? []).map((player) => (
-                    <option key={player.id} value={player.id}>
-                      {team.name} - {player.full_name}
-                    </option>
-                  ))
-                )}
-              </Select>
-              <PhotoUploadInput />
-              <Button disabled={!details.players.length} type="submit" variant="secondary">
-                Subir foto
+            <form action={createCompetitionAction.bind(null, id)} className="mt-4 space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
+                  <Input name="name" placeholder="Ej: Viernes A" required />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-200">Temporada</label>
+                  <Input defaultValue={String(new Date().getFullYear())} name="seasonLabel" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-200">Sede específica</label>
+                  <Input name="venueOverride" placeholder="Opcional" />
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 text-sm text-slate-200">
+                    <input className="h-4 w-4 accent-emerald-400" name="isPublic" type="checkbox" />
+                    Competencia pública
+                  </label>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="mb-1 block text-sm font-semibold text-slate-200">Descripción</label>
+                  <Textarea name="description" rows={3} />
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-slate-200">Equipos inscriptos</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Selecciona los equipos que arrancan esta competencia. Si lo prefieres, puedes dejarla vacía y definirlos después.
+                </p>
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  {details.leagueTeams.map((team) => (
+                    <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-3 text-sm text-slate-200" key={team.id}>
+                      <input className="h-4 w-4 accent-emerald-400" name="leagueTeamIds" type="checkbox" value={team.id} />
+                      <span>
+                        {team.name}
+                        {team.shortName ? ` (${team.shortName})` : ""}
+                      </span>
+                    </label>
+                  ))}
+                  {!details.leagueTeams.length ? (
+                    <p className="text-sm text-slate-400">Primero necesitas cargar equipos maestros en la liga.</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <Button type="submit">Crear competencia</Button>
+            </form>
+          </Card>
+
+          <div className="space-y-3">
+            {details.competitions.length ? (
+              details.competitions.map((competition) => (
+                <Card key={competition.id}>
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <CardTitle>{competition.name}</CardTitle>
+                        <TournamentStatusBadge status={competition.status} />
+                      </div>
+                      <CardDescription className="mt-1">
+                        Temporada {competition.seasonLabel} · {competition.teamCount} inscriptos
+                      </CardDescription>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {competition.venueOverride ? `Sede: ${competition.venueOverride}` : "Usa la sede general de la liga"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <Link
+                        className="text-sm font-semibold text-emerald-300 hover:underline"
+                        href={`/admin/tournaments/${id}/competitions/${competition.id}`}
+                      >
+                        Gestionar
+                      </Link>
+                      <Link
+                        className="text-sm font-semibold text-sky-300 hover:underline"
+                        href={`/tournaments/${details.league.slug}/${competition.slug}`}
+                      >
+                        Ver pública
+                      </Link>
+                    </div>
+                  </div>
+                </Card>
+              ))
+            ) : (
+              <Card>
+                <CardDescription>Todavía no hay competencias creadas dentro de esta liga.</CardDescription>
+              </Card>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {selectedTab === "admins" ? (
+        <div className="space-y-4">
+          <Card>
+            <CardTitle>Equipo administrador</CardTitle>
+            <CardDescription className="mt-2">
+              Puedes sumar hasta 4 administradores por liga. Todos tendrán acceso a las competencias que cuelgan de ella.
+            </CardDescription>
+
+            <form action={inviteLeagueAdminAction.bind(null, id)} className="mt-4 flex flex-col gap-3 md:flex-row">
+              <Input name="email" placeholder="email@dominio.com" required type="email" />
+              <Button type="submit" variant="secondary">
+                Invitar admin
               </Button>
             </form>
           </Card>
 
-          <Card>
-            <CardTitle>Agregar jugador al torneo</CardTitle>
-            <CardDescription className="mt-2">
-              Cada equipo admite hasta {MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores.
-            </CardDescription>
-            <form action={addTournamentPlayerAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="playerTeamId">
-                  Equipo
-                </label>
-                <Select defaultValue={details.teams[0]?.id ?? ""} id="playerTeamId" name="teamId">
-                  {details.teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="fullName">
-                  Nombre completo
-                </label>
-                <Input id="fullName" name="fullName" required />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="shirtNumber">
-                  Numero
-                </label>
-                <Input id="shirtNumber" max={99} min={1} name="shirtNumber" type="number" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="position">
-                  Posicion
-                </label>
-                <Input id="position" name="position" placeholder="Arquero / Defensor / ..." />
-              </div>
-              <div className="md:col-span-2">
-                <Button disabled={!details.teams.length} type="submit">
-                  Agregar jugador
-                </Button>
-              </div>
-            </form>
-          </Card>
-
-          <div className="space-y-4">
-            {details.teams.map((team) => {
-              const players = details.playersByTeam.get(team.id) ?? [];
-              return (
-                <Card key={team.id}>
-                  <CardTitle>{team.name}</CardTitle>
-                  <CardDescription className="mt-2">
-                    {players.length}/{MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores cargados en este equipo.
-                  </CardDescription>
-                  <div className="mt-4 overflow-x-auto">
-                    <Table>
-                      <THead>
-                        <tr>
-                          <TH>Jugador</TH>
-                          <TH>Numero</TH>
-                          <TH>Posicion</TH>
-                          <TH>Activo</TH>
-                          <TH></TH>
-                        </tr>
-                      </THead>
-                      <TBody>
-                        {players.map((player) => (
-                          <tr className="transition-colors hover:bg-slate-800/70" key={player.id}>
-                            <TD className="font-semibold text-slate-100">
-                              <div className="flex items-center gap-3">
-                                <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
-                                <div>
-                                  <p className="font-semibold text-slate-100">{player.full_name}</p>
-                                  <p className="text-xs text-slate-500">Foto ID: {player.id}</p>
-                                </div>
-                              </div>
-                            </TD>
-                            <TD>{player.shirt_number ?? "-"}</TD>
-                            <TD>{player.position ?? "-"}</TD>
-                            <TD>{player.active ? "Si" : "No"}</TD>
-                            <TD>
-                              <form action={deleteTournamentPlayerAction.bind(null, id)}>
-                                <input name="playerId" type="hidden" value={player.id} />
-                                <Button type="submit" variant="ghost">
-                                  Borrar
-                                </Button>
-                              </form>
-                            </TD>
-                          </tr>
-                        ))}
-                        {!players.length ? (
-                          <tr>
-                            <TD className="py-6 text-sm text-slate-400" colSpan={5}>
-                              Este equipo todavia no tiene jugadores cargados.
-                            </TD>
-                          </tr>
-                        ) : null}
-                      </TBody>
-                    </Table>
-                  </div>
-                </Card>
-              );
-            })}
-
-            {!details.teams.length ? (
-              <Card>
-                <CardDescription>Primero necesitas cargar al menos un equipo.</CardDescription>
-              </Card>
-            ) : null}
-          </div>
-        </>
-      ) : null}
-
-      {selectedTab === "fixture" ? (
-        <>
-          <Card>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <CardTitle>Generacion automatica</CardTitle>
-                <CardDescription>
-                  Puedes elegir entre generar el fixture automaticamente o cargar cada fecha a mano. La generacion
-                  automatica solo esta disponible cuando hay al menos 2 equipos y todavia no existe ningun partido.
-                </CardDescription>
-              </div>
-              <form action={generateTournamentFixtureAction.bind(null, id)}>
-                <Button disabled={details.teams.length < 2 || details.fixture.length > 0} type="submit">
-                  Generar fixture
-                </Button>
-              </form>
-            </div>
-          </Card>
-
-          <Card>
-            <CardTitle>Crear partido manual</CardTitle>
-            <form action={createManualTournamentMatchAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-3">
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="roundName">
-                  Fecha
-                </label>
-                <Input defaultValue={`Fecha ${Math.max(1, details.rounds.length + 1)}`} id="roundName" name="roundName" required />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="homeTeamId">
-                  Local
-                </label>
-                <Select defaultValue={details.teams[0]?.id ?? ""} id="homeTeamId" name="homeTeamId">
-                  {details.teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="awayTeamId">
-                  Visitante
-                </label>
-                <Select defaultValue={details.teams[1]?.id ?? details.teams[0]?.id ?? ""} id="awayTeamId" name="awayTeamId">
-                  {details.teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="scheduledAt">
-                  Horario
-                </label>
-                <Input id="scheduledAt" name="scheduledAt" type="datetime-local" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="venue">
-                  Sede
-                </label>
-                <Input id="venue" name="venue" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="status">
-                  Estado
-                </label>
-                <Select defaultValue="scheduled" id="status" name="status">
-                  {(["draft", "scheduled", "cancelled"] as const).map((status) => (
-                    <option key={status} value={status}>
-                      {TOURNAMENT_MATCH_STATUS_LABELS[status]}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="md:col-span-3">
-                <Button disabled={details.teams.length < 2} type="submit">
-                  Crear partido
-                </Button>
-              </div>
-            </form>
-          </Card>
-
-          <div className="space-y-4">
-            {groupedFixture.map((round) => (
-              <Card key={`${round.roundNumber}:${round.roundName}`}>
-                <CardTitle>{round.roundName}</CardTitle>
-                <div className="mt-4 space-y-4">
-                  {round.matches.map((match) => (
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4" key={match.id}>
-                      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <p className="font-semibold text-slate-100">
-                            {match.homeTeamName} vs {match.awayTeamName}
-                          </p>
-                          <p className="text-sm text-slate-400">
-                            {formatMatchSchedule(match.scheduledAt)} - {match.venue || "Sin sede"}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <TournamentMatchStatusBadge status={match.status} />
-                          <Link
-                            className="text-sm font-semibold text-emerald-300 hover:underline"
-                            href={`/admin/tournaments/${id}/matches/${match.id}`}
-                          >
-                            Gestionar acta
-                          </Link>
-                        </div>
+          <section className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardTitle>Admins activos</CardTitle>
+              <div className="mt-4 space-y-2">
+                {details.leagueAdmins.admins.length ? (
+                  details.leagueAdmins.admins.map((member) => (
+                    <div className="flex items-start justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm" key={member.membershipId}>
+                      <div>
+                        <p className="font-semibold text-slate-100">{member.email ?? member.displayName}</p>
+                        <p className="text-xs text-slate-400">
+                          {member.role === "owner" ? "Owner" : "Editor"} desde {new Date(member.createdAt).toLocaleDateString("es-AR")}
+                        </p>
                       </div>
-
-                      <form action={updateTournamentMatchAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-3">
-                        <input name="matchId" type="hidden" value={match.id} />
-                        <div>
-                          <label className="mb-1 block text-sm font-semibold text-slate-200">Fecha</label>
-                          <Select defaultValue={match.roundId ?? ""} disabled={match.status === "played"} name="roundId">
-                            <option value="">Partido suelto</option>
-                            {details.rounds.map((roundOption) => (
-                              <option key={roundOption.id} value={roundOption.id}>
-                                {roundOption.name}
-                              </option>
-                            ))}
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-sm font-semibold text-slate-200">Local</label>
-                          <Select defaultValue={match.homeTeamId} disabled={match.status === "played"} name="homeTeamId">
-                            {details.teams.map((team) => (
-                              <option key={team.id} value={team.id}>
-                                {team.name}
-                              </option>
-                            ))}
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-sm font-semibold text-slate-200">Visitante</label>
-                          <Select defaultValue={match.awayTeamId} disabled={match.status === "played"} name="awayTeamId">
-                            {details.teams.map((team) => (
-                              <option key={team.id} value={team.id}>
-                                {team.name}
-                              </option>
-                            ))}
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-sm font-semibold text-slate-200">Horario</label>
-                          <Input
-                            defaultValue={toInputDateTime(match.scheduledAt)}
-                            disabled={match.status === "played"}
-                            name="scheduledAt"
-                            type="datetime-local"
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-sm font-semibold text-slate-200">Sede</label>
-                          <Input defaultValue={match.venue ?? ""} disabled={match.status === "played"} name="venue" />
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-sm font-semibold text-slate-200">Estado</label>
-                          <Select defaultValue={match.status} disabled={match.status === "played"} name="status">
-                            {(["draft", "scheduled", "cancelled"] as const).map((status) => (
-                              <option key={status} value={status}>
-                                {TOURNAMENT_MATCH_STATUS_LABELS[status]}
-                              </option>
-                            ))}
-                          </Select>
-                        </div>
-                        <div className="md:col-span-3">
-                          <Button disabled={match.status === "played"} type="submit" variant="secondary">
-                            Guardar partido
-                          </Button>
-                        </div>
+                      <form action={removeLeagueAdminAction.bind(null, id)}>
+                        <input name="adminId" type="hidden" value={member.id} />
+                        <ConfirmSubmitButton
+                          className="h-7 min-w-7 px-2 text-xs"
+                          confirmMessage={`¿Seguro que quieres quitar a ${member.email ?? member.displayName} como admin de ${details.league.name}?`}
+                          label="Quitar"
+                          variant="ghost"
+                        />
                       </form>
                     </div>
-                  ))}
-                </div>
-              </Card>
-            ))}
-
-            {!groupedFixture.length ? (
-              <Card>
-                <CardDescription>Todavia no hay partidos generados para este torneo.</CardDescription>
-              </Card>
-            ) : null}
-          </div>
-        </>
-      ) : null}
-
-      {selectedTab === "results" ? (
-        <Card>
-          <CardTitle>Resultados y actas</CardTitle>
-          <CardDescription>Entra a cada partido para cargar o corregir su acta y figura.</CardDescription>
-          <div className="mt-4">
-            <TournamentFixtureTable
-              buildMatchHref={(row) => `/admin/tournaments/${id}/matches/${row.id}`}
-              linkLabel="Acta"
-              rows={details.fixture}
-            />
-          </div>
-        </Card>
-      ) : null}
-
-      {selectedTab === "stats" ? (
-        <div className="space-y-4">
-          <Card>
-            <CardTitle>Tabla de posiciones</CardTitle>
-            <div className="mt-4">
-              <TournamentStandingsTable rows={details.standings} />
-            </div>
-          </Card>
-
-          <section className="grid gap-4 lg:grid-cols-3">
-            <Card>
-              <CardTitle>Goleadores</CardTitle>
-              <div className="mt-4 overflow-x-auto">
-                <Table>
-                  <THead>
-                    <tr>
-                      <TH>Jugador</TH>
-                      <TH>Equipo</TH>
-                      <TH>Goles</TH>
-                    </tr>
-                  </THead>
-                  <TBody>
-                    {details.topScorers.map((row) => (
-                      <tr className="transition-colors hover:bg-slate-800/70" key={`${row.teamId}:${row.playerId ?? row.playerName}`}>
-                        <TD className="font-semibold text-slate-100">{row.playerName}</TD>
-                        <TD>{row.teamName}</TD>
-                        <TD>{row.goals}</TD>
-                      </tr>
-                    ))}
-                    {!details.topScorers.length ? (
-                      <tr>
-                        <TD className="py-6 text-sm text-slate-400" colSpan={3}>
-                          Todavia no hay goles cargados.
-                        </TD>
-                      </tr>
-                    ) : null}
-                  </TBody>
-                </Table>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400">No hay admins cargados para esta liga.</p>
+                )}
               </div>
             </Card>
 
             <Card>
-              <CardTitle>Figuras</CardTitle>
-              <div className="mt-4 overflow-x-auto">
-                <Table>
-                  <THead>
-                    <tr>
-                      <TH>Jugador</TH>
-                      <TH>Equipo</TH>
-                      <TH>Figuras</TH>
-                    </tr>
-                  </THead>
-                  <TBody>
-                    {details.topFigures.map((row) => (
-                      <tr className="transition-colors hover:bg-slate-800/70" key={`${row.teamId}:${row.playerId ?? row.playerName}`}>
-                        <TD className="font-semibold text-slate-100">{row.playerName}</TD>
-                        <TD>{row.teamName}</TD>
-                        <TD>{row.mvpCount}</TD>
-                      </tr>
-                    ))}
-                    {!details.topFigures.length ? (
-                      <tr>
-                        <TD className="py-6 text-sm text-slate-400" colSpan={3}>
-                          Todavia no hay figuras cargadas.
-                        </TD>
-                      </tr>
-                    ) : null}
-                  </TBody>
-                </Table>
-              </div>
-            </Card>
-
-            <Card>
-              <CardTitle>Vallas menos vencidas</CardTitle>
-              <div className="mt-4 overflow-x-auto">
-                <Table>
-                  <THead>
-                    <tr>
-                      <TH>Equipo</TH>
-                      <TH>GC</TH>
-                      <TH>PJ</TH>
-                    </tr>
-                  </THead>
-                  <TBody>
-                    {details.bestDefense.map((row) => (
-                      <tr className="transition-colors hover:bg-slate-800/70" key={row.teamId}>
-                        <TD className="font-semibold text-slate-100">{row.teamName}</TD>
-                        <TD>{row.goalsAgainst}</TD>
-                        <TD>{row.matchesPlayed}</TD>
-                      </tr>
-                    ))}
-                    {!details.bestDefense.length ? (
-                      <tr>
-                        <TD className="py-6 text-sm text-slate-400" colSpan={3}>
-                          Todavia no hay partidos jugados.
-                        </TD>
-                      </tr>
-                    ) : null}
-                  </TBody>
-                </Table>
+              <CardTitle>Invitaciones pendientes</CardTitle>
+              <div className="mt-4 space-y-2">
+                {details.leagueAdmins.pendingInvites.length ? (
+                  details.leagueAdmins.pendingInvites.map((invite) => {
+                    const inviteUrl = buildAdminInviteUrl(invite.inviteToken);
+                    return (
+                      <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm" key={invite.id}>
+                        <p className="font-semibold text-slate-100">{invite.email}</p>
+                        <p className="text-xs text-slate-400">
+                          Enviada {new Date(invite.createdAt).toLocaleDateString("es-AR")}
+                        </p>
+                        <Link
+                          className="mt-2 block break-all text-xs font-semibold text-emerald-300 hover:underline"
+                          href={inviteUrl}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          {inviteUrl}
+                        </Link>
+                        <form action={revokeLeagueAdminInviteAction.bind(null, id)} className="mt-2">
+                          <input name="inviteId" type="hidden" value={invite.id} />
+                          <Button type="submit" variant="ghost">
+                            Cancelar invitación
+                          </Button>
+                        </form>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-sm text-slate-400">No hay invitaciones pendientes.</p>
+                )}
               </div>
             </Card>
           </section>

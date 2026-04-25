@@ -4,17 +4,17 @@ export default function AdminTournamentBillingPage() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardTitle>Facturacion de torneos</CardTitle>
+        <CardTitle>Facturación de ligas</CardTitle>
         <CardDescription>
-          El alta de nuevos torneos vuelve a iniciarse desde Mercado Pago antes de habilitar la competencia.
+          El alta de nuevas ligas se inicia desde Mercado Pago. Crear competencias dentro de una liga no dispara un nuevo checkout.
         </CardDescription>
       </Card>
 
       <Card>
         <CardTitle>Estado actual</CardTitle>
         <CardDescription className="mt-1">
-          El detalle fino de pagos todavia no tiene pantalla propia en este modulo, pero el checkout ya esta activo
-          desde el alta de torneos.
+          El detalle fino de pagos todavía no tiene pantalla propia en este módulo, pero el checkout ya está activo
+          desde el alta de ligas.
         </CardDescription>
       </Card>
     </div>

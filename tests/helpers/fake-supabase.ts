@@ -7,18 +7,20 @@ type TableName =
   | "organization_invites"
   | "organization_billing_payments"
   | "organization_billing_subscriptions"
-  | "tournaments"
-  | "tournament_admins"
-  | "tournament_admin_invites"
-  | "tournament_billing_payments"
-  | "tournament_team_captains"
-  | "tournament_captain_invites"
-  | "tournament_teams"
-  | "tournament_players"
-  | "tournament_rounds"
-  | "tournament_matches"
-  | "tournament_match_results"
-  | "tournament_match_player_stats"
+  | "leagues"
+  | "league_admins"
+  | "league_admin_invites"
+  | "league_billing_payments"
+  | "league_teams"
+  | "competitions"
+  | "competition_teams"
+  | "competition_team_captains"
+  | "competition_captain_invites"
+  | "competition_team_players"
+  | "competition_rounds"
+  | "competition_matches"
+  | "competition_match_results"
+  | "competition_match_player_stats"
   | "players"
   | "matches"
   | "match_players"
@@ -66,18 +68,20 @@ function createEmptyDatabase(): FakeDatabase {
     organization_invites: [],
     organization_billing_payments: [],
     organization_billing_subscriptions: [],
-    tournaments: [],
-    tournament_admins: [],
-    tournament_admin_invites: [],
-    tournament_billing_payments: [],
-    tournament_team_captains: [],
-    tournament_captain_invites: [],
-    tournament_teams: [],
-    tournament_players: [],
-    tournament_rounds: [],
-    tournament_matches: [],
-    tournament_match_results: [],
-    tournament_match_player_stats: [],
+    leagues: [],
+    league_admins: [],
+    league_admin_invites: [],
+    league_billing_payments: [],
+    league_teams: [],
+    competitions: [],
+    competition_teams: [],
+    competition_team_captains: [],
+    competition_captain_invites: [],
+    competition_team_players: [],
+    competition_rounds: [],
+    competition_matches: [],
+    competition_match_results: [],
+    competition_match_player_stats: [],
     players: [],
     matches: [],
     match_players: [],
@@ -123,17 +127,19 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!normalized.updated_at) normalized.updated_at = now;
       if (!("subscription_applied_at" in normalized)) normalized.subscription_applied_at = null;
       break;
-    case "tournaments":
+    case "leagues":
+      if (!("description" in normalized)) normalized.description = null;
+      if (!("venue_name" in normalized)) normalized.venue_name = null;
+      if (!("location_notes" in normalized)) normalized.location_notes = null;
       if (!("is_public" in normalized)) normalized.is_public = true;
-      if (!("parent_tournament_id" in normalized)) normalized.parent_tournament_id = null;
       if (!normalized.status) normalized.status = "draft";
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
-    case "tournament_admins":
+    case "league_admins":
       if (!normalized.role) normalized.role = "editor";
       if (!("created_by" in normalized)) normalized.created_by = null;
       break;
-    case "tournament_admin_invites":
+    case "league_admin_invites":
       if (!normalized.invite_token) normalized.invite_token = nextId();
       if (!normalized.status) normalized.status = "pending";
       if (!("accepted_by" in normalized)) normalized.accepted_by = null;
@@ -142,49 +148,62 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
         normalized.expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
       }
       break;
-    case "tournament_billing_payments":
+    case "league_billing_payments":
       if (!normalized.status) normalized.status = "pending";
       if (!("approved_at" in normalized)) normalized.approved_at = null;
-      if (!("created_tournament_id" in normalized)) normalized.created_tournament_id = null;
+      if (!("created_league_id" in normalized)) normalized.created_league_id = null;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
-    case "tournament_team_captains":
-      if (!("created_by" in normalized)) normalized.created_by = null;
-      break;
-    case "tournament_captain_invites":
-      if (!normalized.expires_at) {
-        normalized.expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
-      }
-      break;
-    case "tournament_teams":
+    case "league_teams":
       if (!("short_name" in normalized)) normalized.short_name = null;
       if (!("notes" in normalized)) normalized.notes = null;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
-    case "tournament_players":
+    case "competitions":
+      if (!("description" in normalized)) normalized.description = null;
+      if (!("venue_override" in normalized)) normalized.venue_override = null;
+      if (!("is_public" in normalized)) normalized.is_public = true;
+      if (!normalized.status) normalized.status = "draft";
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "competition_teams":
+      if (!("short_name" in normalized)) normalized.short_name = null;
+      if (!("notes" in normalized)) normalized.notes = null;
+      break;
+    case "competition_team_captains":
+      if (!("created_by" in normalized)) normalized.created_by = null;
+      break;
+    case "competition_captain_invites":
+      if (!normalized.invite_token) normalized.invite_token = nextId();
+      if (!normalized.expires_at) {
+        normalized.expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
+      }
+      break;
+    case "competition_team_players":
       if (!("shirt_number" in normalized)) normalized.shirt_number = null;
       if (!("position" in normalized)) normalized.position = null;
       if (!("active" in normalized)) normalized.active = true;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
-    case "tournament_rounds":
+    case "competition_rounds":
       if (!("starts_at" in normalized)) normalized.starts_at = null;
       if (!("ends_at" in normalized)) normalized.ends_at = null;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
-    case "tournament_matches":
+    case "competition_matches":
       if (!("round_id" in normalized)) normalized.round_id = null;
       if (!("scheduled_at" in normalized)) normalized.scheduled_at = null;
       if (!("venue" in normalized)) normalized.venue = null;
       if (!normalized.status) normalized.status = "draft";
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
-    case "tournament_match_results":
+    case "competition_match_results":
       if (!("mvp_player_id" in normalized)) normalized.mvp_player_id = null;
+      if (!("mvp_player_name" in normalized)) normalized.mvp_player_name = null;
       if (!("notes" in normalized)) normalized.notes = null;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
-    case "tournament_match_player_stats":
+    case "competition_match_player_stats":
       if (!("player_id" in normalized)) normalized.player_id = null;
       if (!("goals" in normalized)) normalized.goals = 0;
       if (!("yellow_cards" in normalized)) normalized.yellow_cards = 0;
@@ -262,12 +281,27 @@ class FakeSupabaseState {
   }
 
   insertRow(table: TableName, row: Row) {
-    if (table === "tournament_admins") {
-      const tournamentId = String(row.tournament_id ?? "");
+    if (table === "league_admins") {
+      const leagueId = String(row.league_id ?? "");
       const adminId = String(row.admin_id ?? "");
-      const existing = this.db.tournament_admins.find(
+      const existing = this.db.league_admins.find(
+        (candidate) => String(candidate.league_id) === leagueId && String(candidate.admin_id) === adminId
+      );
+
+      if (existing) {
+        Object.assign(existing, cloneRow(row));
+        return existing;
+      }
+    }
+
+    if (table === "competition_team_captains") {
+      const competitionTeamId = String(row.competition_team_id ?? "");
+      const competitionId = String(row.competition_id ?? "");
+      const captainId = String(row.captain_id ?? "");
+      const existing = this.db.competition_team_captains.find(
         (candidate) =>
-          String(candidate.tournament_id) === tournamentId && String(candidate.admin_id) === adminId
+          String(candidate.competition_team_id) === competitionTeamId ||
+          (String(candidate.competition_id) === competitionId && String(candidate.captain_id) === captainId)
       );
 
       if (existing) {
@@ -276,25 +310,13 @@ class FakeSupabaseState {
       }
     }
 
-    if (table === "tournament_team_captains") {
-      const teamId = String(row.team_id ?? "");
-      const existing = this.db.tournament_team_captains.find(
-        (candidate) => String(candidate.team_id) === teamId
-      );
-
-      if (existing) {
-        Object.assign(existing, cloneRow(row));
-        return existing;
-      }
-    }
-
-    if (table === "tournament_admin_invites") {
-      const tournamentId = String(row.tournament_id ?? "");
+    if (table === "league_admin_invites") {
+      const leagueId = String(row.league_id ?? "");
       const email = String(row.email ?? "").toLowerCase();
       const status = String(row.status ?? "pending").toLowerCase();
-      const existing = this.db.tournament_admin_invites.find(
+      const existing = this.db.league_admin_invites.find(
         (candidate) =>
-          String(candidate.tournament_id) === tournamentId &&
+          String(candidate.league_id) === leagueId &&
           String(candidate.email ?? "").toLowerCase() === email &&
           String(candidate.status ?? "pending").toLowerCase() === status
       );
@@ -305,10 +327,25 @@ class FakeSupabaseState {
       }
     }
 
-    if (table === "tournament_captain_invites") {
-      const teamId = String(row.team_id ?? "");
-      const existing = this.db.tournament_captain_invites.find(
-        (candidate) => String(candidate.team_id) === teamId
+    if (table === "competition_captain_invites") {
+      const competitionTeamId = String(row.competition_team_id ?? "");
+      const existing = this.db.competition_captain_invites.find(
+        (candidate) => String(candidate.competition_team_id) === competitionTeamId
+      );
+
+      if (existing) {
+        Object.assign(existing, cloneRow(row));
+        return existing;
+      }
+    }
+
+    if (table === "competition_teams") {
+      const competitionId = String(row.competition_id ?? "");
+      const leagueTeamId = String(row.league_team_id ?? "");
+      const existing = this.db.competition_teams.find(
+        (candidate) =>
+          String(candidate.competition_id) === competitionId &&
+          String(candidate.league_team_id) === leagueTeamId
       );
 
       if (existing) {
@@ -320,16 +357,16 @@ class FakeSupabaseState {
     const normalized = applyDefaults(table, cloneRow(row), () => this.nextId());
     this.db[table].push(normalized);
 
-    if (table === "tournaments" && normalized.created_by) {
-      const ownerLinkExists = this.db.tournament_admins.some(
+    if (table === "leagues" && normalized.created_by) {
+      const ownerLinkExists = this.db.league_admins.some(
         (candidate) =>
-          String(candidate.tournament_id) === String(normalized.id) &&
+          String(candidate.league_id) === String(normalized.id) &&
           String(candidate.admin_id) === String(normalized.created_by)
       );
 
       if (!ownerLinkExists) {
-        this.insertRow("tournament_admins", {
-          tournament_id: normalized.id,
+        this.insertRow("league_admins", {
+          league_id: normalized.id,
           admin_id: normalized.created_by,
           role: "owner",
           created_by: normalized.created_by
@@ -343,49 +380,133 @@ class FakeSupabaseState {
   cascadeDelete(table: TableName, deletedRows: Row[]) {
     if (!deletedRows.length) return;
 
-    if (table === "tournaments") {
-      const deletedTournamentIds = new Set(deletedRows.map((row) => String(row.id)));
-      this.db.tournament_admins = this.db.tournament_admins.filter(
-        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+    if (table === "leagues") {
+      const deletedLeagueIds = new Set(deletedRows.map((row) => String(row.id)));
+      const deletedCompetitionIds = new Set(
+        this.db.competitions
+          .filter((row) => deletedLeagueIds.has(String(row.league_id)))
+          .map((row) => String(row.id))
       );
-      this.db.tournament_admin_invites = this.db.tournament_admin_invites.filter(
-        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      const deletedCompetitionTeamIds = new Set(
+        this.db.competition_teams
+          .filter((row) => deletedCompetitionIds.has(String(row.competition_id)))
+          .map((row) => String(row.id))
       );
-      this.db.tournament_team_captains = this.db.tournament_team_captains.filter(
-        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      const deletedMatchIds = new Set(
+        this.db.competition_matches
+          .filter((row) => deletedCompetitionIds.has(String(row.competition_id)))
+          .map((row) => String(row.id))
       );
-      this.db.tournament_captain_invites = this.db.tournament_captain_invites.filter(
-        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+
+      this.db.league_admins = this.db.league_admins.filter(
+        (row) => !deletedLeagueIds.has(String(row.league_id))
       );
-      this.db.tournament_players = this.db.tournament_players.filter(
-        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      this.db.league_admin_invites = this.db.league_admin_invites.filter(
+        (row) => !deletedLeagueIds.has(String(row.league_id))
       );
-      this.db.tournament_rounds = this.db.tournament_rounds.filter(
-        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      this.db.league_teams = this.db.league_teams.filter(
+        (row) => !deletedLeagueIds.has(String(row.league_id))
       );
-      this.db.tournament_match_results = this.db.tournament_match_results.filter((row) => {
-        const match = this.db.tournament_matches.find((candidate) => String(candidate.id) === String(row.match_id));
-        return !match || !deletedTournamentIds.has(String(match.tournament_id));
-      });
-      this.db.tournament_match_player_stats = this.db.tournament_match_player_stats.filter((row) => {
-        const match = this.db.tournament_matches.find((candidate) => String(candidate.id) === String(row.match_id));
-        return !match || !deletedTournamentIds.has(String(match.tournament_id));
-      });
-      this.db.tournament_matches = this.db.tournament_matches.filter(
-        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      this.db.competition_team_captains = this.db.competition_team_captains.filter(
+        (row) => !deletedCompetitionIds.has(String(row.competition_id))
       );
-      this.db.tournament_teams = this.db.tournament_teams.filter(
-        (row) => !deletedTournamentIds.has(String(row.tournament_id))
+      this.db.competition_captain_invites = this.db.competition_captain_invites.filter(
+        (row) => !deletedCompetitionIds.has(String(row.competition_id))
       );
-      this.db.tournament_billing_payments = this.db.tournament_billing_payments.map((row) =>
-        deletedTournamentIds.has(String(row.created_tournament_id))
-          ? { ...row, created_tournament_id: null, updated_at: new Date().toISOString() }
+      this.db.competition_team_players = this.db.competition_team_players.filter(
+        (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
+      );
+      this.db.competition_rounds = this.db.competition_rounds.filter(
+        (row) => !deletedCompetitionIds.has(String(row.competition_id))
+      );
+      this.db.competition_match_results = this.db.competition_match_results.filter(
+        (row) => !deletedMatchIds.has(String(row.match_id))
+      );
+      this.db.competition_match_player_stats = this.db.competition_match_player_stats.filter(
+        (row) =>
+          !deletedMatchIds.has(String(row.match_id)) &&
+          !deletedCompetitionTeamIds.has(String(row.team_id))
+      );
+      this.db.competition_matches = this.db.competition_matches.filter(
+        (row) => !deletedCompetitionIds.has(String(row.competition_id))
+      );
+      this.db.competition_teams = this.db.competition_teams.filter(
+        (row) => !deletedCompetitionIds.has(String(row.competition_id))
+      );
+      this.db.competitions = this.db.competitions.filter(
+        (row) => !deletedLeagueIds.has(String(row.league_id))
+      );
+      this.db.league_billing_payments = this.db.league_billing_payments.map((row) =>
+        deletedLeagueIds.has(String(row.created_league_id))
+          ? { ...row, created_league_id: null, updated_at: new Date().toISOString() }
           : row
       );
-      this.db.tournaments = this.db.tournaments.map((row) =>
-        deletedTournamentIds.has(String(row.parent_tournament_id))
-          ? { ...row, parent_tournament_id: null, updated_at: new Date().toISOString() }
-          : row
+    }
+
+    if (table === "competitions") {
+      const deletedCompetitionIds = new Set(deletedRows.map((row) => String(row.id)));
+      const deletedCompetitionTeamIds = new Set(
+        this.db.competition_teams
+          .filter((row) => deletedCompetitionIds.has(String(row.competition_id)))
+          .map((row) => String(row.id))
+      );
+      const deletedMatchIds = new Set(
+        this.db.competition_matches
+          .filter((row) => deletedCompetitionIds.has(String(row.competition_id)))
+          .map((row) => String(row.id))
+      );
+
+      this.db.competition_team_captains = this.db.competition_team_captains.filter(
+        (row) => !deletedCompetitionIds.has(String(row.competition_id))
+      );
+      this.db.competition_captain_invites = this.db.competition_captain_invites.filter(
+        (row) => !deletedCompetitionIds.has(String(row.competition_id))
+      );
+      this.db.competition_team_players = this.db.competition_team_players.filter(
+        (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
+      );
+      this.db.competition_rounds = this.db.competition_rounds.filter(
+        (row) => !deletedCompetitionIds.has(String(row.competition_id))
+      );
+      this.db.competition_match_results = this.db.competition_match_results.filter(
+        (row) => !deletedMatchIds.has(String(row.match_id))
+      );
+      this.db.competition_match_player_stats = this.db.competition_match_player_stats.filter(
+        (row) =>
+          !deletedMatchIds.has(String(row.match_id)) &&
+          !deletedCompetitionTeamIds.has(String(row.team_id))
+      );
+      this.db.competition_matches = this.db.competition_matches.filter(
+        (row) => !deletedCompetitionIds.has(String(row.competition_id))
+      );
+      this.db.competition_teams = this.db.competition_teams.filter(
+        (row) => !deletedCompetitionIds.has(String(row.competition_id))
+      );
+    }
+
+    if (table === "competition_matches") {
+      const deletedMatchIds = new Set(deletedRows.map((row) => String(row.id)));
+      this.db.competition_match_results = this.db.competition_match_results.filter(
+        (row) => !deletedMatchIds.has(String(row.match_id))
+      );
+      this.db.competition_match_player_stats = this.db.competition_match_player_stats.filter(
+        (row) => !deletedMatchIds.has(String(row.match_id))
+      );
+    }
+
+    if (table === "competition_teams") {
+      const deletedCompetitionTeamIds = new Set(deletedRows.map((row) => String(row.id)));
+      this.db.competition_team_players = this.db.competition_team_players.filter(
+        (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
+      );
+      this.db.competition_team_captains = this.db.competition_team_captains.filter(
+        (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
+      );
+      this.db.competition_captain_invites = this.db.competition_captain_invites.filter(
+        (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
+      );
+      this.db.competition_match_player_stats = this.db.competition_match_player_stats.filter(
+        (row) => !deletedCompetitionTeamIds.has(String(row.team_id))
       );
     }
 
@@ -396,29 +517,6 @@ class FakeSupabaseState {
       );
       this.db.team_option_guests = this.db.team_option_guests.filter(
         (row) => !deletedOptionIds.has(String(row.team_option_id))
-      );
-    }
-
-    if (table === "tournament_matches") {
-      const deletedMatchIds = new Set(deletedRows.map((row) => String(row.id)));
-      this.db.tournament_match_results = this.db.tournament_match_results.filter(
-        (row) => !deletedMatchIds.has(String(row.match_id))
-      );
-      this.db.tournament_match_player_stats = this.db.tournament_match_player_stats.filter(
-        (row) => !deletedMatchIds.has(String(row.match_id))
-      );
-    }
-
-    if (table === "tournament_teams") {
-      const deletedTeamIds = new Set(deletedRows.map((row) => String(row.id)));
-      this.db.tournament_players = this.db.tournament_players.filter(
-        (row) => !deletedTeamIds.has(String(row.team_id))
-      );
-      this.db.tournament_team_captains = this.db.tournament_team_captains.filter(
-        (row) => !deletedTeamIds.has(String(row.team_id))
-      );
-      this.db.tournament_captain_invites = this.db.tournament_captain_invites.filter(
-        (row) => !deletedTeamIds.has(String(row.team_id))
       );
     }
   }
@@ -529,7 +627,6 @@ class FakeQuery {
   ) {}
 
   select(columns = "*", options?: { head?: boolean }) {
-    void columns;
     if (this.mode === "select") {
       this.selectedColumns = columns;
       this.head = Boolean(options?.head);
@@ -819,7 +916,9 @@ class FakeQuery {
         return Promise.resolve(this.executeDelete(cardinality));
       case "select":
       default:
-        return Promise.resolve(this.formatResult(this.getFilteredRows(), cardinality, this.getBaseRows().length));
+        return Promise.resolve(
+          this.formatResult(this.getFilteredRows(), cardinality, this.getBaseRows().length)
+        );
     }
   }
 }

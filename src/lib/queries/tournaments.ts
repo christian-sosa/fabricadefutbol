@@ -1,7 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 
 import { requireAdminSession } from "@/lib/auth/admin";
-import { getAdminTournaments } from "@/lib/auth/tournaments";
+import { getAdminLeagues } from "@/lib/auth/tournaments";
 import {
   buildTournamentBestDefense,
   buildTournamentFixture,
@@ -17,44 +17,116 @@ import {
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
+  CompetitionListItem,
+  LeagueListItem,
   TournamentBestDefenseRow,
   TournamentFixtureRow,
-  TournamentListItem,
   TournamentTopFigureRow,
   TournamentTopScorerRow
 } from "@/types/domain";
 
-type TournamentRecord = {
+type LeagueRecord = {
   id: string;
   name: string;
   slug: string;
-  season_label: string;
-  parent_tournament_id: string | null;
   description: string | null;
+  venue_name: string | null;
+  location_notes: string | null;
   is_public: boolean;
-  status: TournamentListItem["status"];
+  status: LeagueListItem["status"];
   created_at: string;
 };
 
-type TournamentTeamCaptainRow = {
+type CompetitionRecord = {
   id: string;
-  tournament_id: string;
-  team_id: string;
+  league_id: string;
+  name: string;
+  slug: string;
+  season_label: string;
+  description: string | null;
+  venue_override: string | null;
+  is_public: boolean;
+  status: CompetitionListItem["status"];
+  created_at: string;
+};
+
+type LeagueTeamRecord = {
+  id: string;
+  league_id: string;
+  name: string;
+  short_name: string | null;
+  slug: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type CompetitionTeamRecord = {
+  id: string;
+  competition_id: string;
+  league_team_id: string;
+  display_name: string;
+  short_name: string | null;
+  display_order: number;
+  notes: string | null;
+  created_at: string;
+};
+
+type CompetitionTeamCaptainRow = {
+  id: string;
+  competition_id: string;
+  competition_team_id: string;
   captain_id: string;
   created_at: string;
 };
 
-type TournamentAdminRow = {
+type CompetitionCaptainInviteRow = {
   id: string;
-  tournament_id: string;
+  competition_id: string;
+  competition_team_id: string;
+  email: string;
+  invite_token: string;
+  expires_at: string;
+  created_at: string;
+};
+
+type CompetitionTeamPlayerRow = {
+  id: string;
+  competition_team_id: string;
+  full_name: string;
+  shirt_number: number | null;
+  position: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type CompetitionMatchRow = TournamentMatchReference & {
+  competition_id: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type CompetitionMatchResultRow = TournamentMatchResultReference & {
+  updated_at: string;
+};
+
+type CompetitionMatchPlayerStatRow = TournamentMatchPlayerStatReference & {
+  updated_at: string;
+};
+
+type LeagueAdminRow = {
+  id: string;
+  league_id: string;
   admin_id: string;
   role: "owner" | "editor";
   created_at: string;
 };
 
-type TournamentAdminInviteRow = {
+type LeagueAdminInviteRow = {
   id: string;
-  tournament_id: string;
+  league_id: string;
   email: string;
   invite_token: string;
   expires_at: string;
@@ -62,29 +134,133 @@ type TournamentAdminInviteRow = {
   status: "pending" | "accepted" | "revoked";
 };
 
-type TournamentCaptainInviteRow = {
-  id: string;
-  tournament_id: string;
-  team_id: string;
-  email: string;
-  invite_token: string;
-  expires_at: string;
-  created_at: string;
-};
-
 type AdminProfileRow = {
   id: string;
   display_name: string;
 };
 
-function isMissingSupabaseTableError(error: { code?: string | null; message: string } | null | undefined) {
-  if (!error) return false;
-  const code = error.code?.trim().toUpperCase();
-  const message = error.message.toLowerCase();
-  return (
-    code === "PGRST205" ||
-    (message.includes("could not find the table") && message.includes("schema cache"))
-  );
+type LeagueTeamListItem = {
+  id: string;
+  leagueId: string;
+  name: string;
+  shortName: string | null;
+  slug: string;
+  notes: string | null;
+  createdAt: string;
+};
+
+type CompetitionTeamListItem = {
+  id: string;
+  competitionId: string;
+  leagueTeamId: string;
+  displayName: string;
+  shortName: string | null;
+  displayOrder: number;
+  notes: string | null;
+  createdAt: string;
+};
+
+type CompetitionPlayerListItem = {
+  id: string;
+  competitionTeamId: string;
+  fullName: string;
+  shirtNumber: number | null;
+  position: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type LeagueAdminListItem = {
+  id: string;
+  membershipId: string;
+  displayName: string;
+  email: string | null;
+  role: "owner" | "editor";
+  createdAt: string;
+};
+
+type LeagueAdminInviteListItem = {
+  id: string;
+  leagueId: string;
+  email: string;
+  inviteToken: string;
+  expiresAt: string;
+  createdAt: string;
+  status: "pending" | "accepted" | "revoked";
+};
+
+function normalizeLeagueRecord(record: LeagueRecord, counts?: {
+  teamCount?: number;
+  competitionCount?: number;
+}): LeagueListItem {
+  return {
+    id: record.id,
+    name: record.name,
+    slug: record.slug,
+    description: record.description,
+    venueName: record.venue_name,
+    locationNotes: record.location_notes,
+    isPublic: record.is_public,
+    status: record.status,
+    createdAt: record.created_at,
+    teamCount: counts?.teamCount ?? 0,
+    competitionCount: counts?.competitionCount ?? 0
+  };
+}
+
+function normalizeCompetitionRecord(record: CompetitionRecord, teamCount = 0): CompetitionListItem {
+  return {
+    id: record.id,
+    leagueId: record.league_id,
+    name: record.name,
+    slug: record.slug,
+    seasonLabel: record.season_label,
+    description: record.description,
+    venueOverride: record.venue_override,
+    isPublic: record.is_public,
+    status: record.status,
+    createdAt: record.created_at,
+    teamCount
+  };
+}
+
+function normalizeLeagueTeam(record: LeagueTeamRecord): LeagueTeamListItem {
+  return {
+    id: record.id,
+    leagueId: record.league_id,
+    name: record.name,
+    shortName: record.short_name,
+    slug: record.slug,
+    notes: record.notes,
+    createdAt: record.created_at
+  };
+}
+
+function normalizeCompetitionTeam(record: CompetitionTeamRecord): CompetitionTeamListItem {
+  return {
+    id: record.id,
+    competitionId: record.competition_id,
+    leagueTeamId: record.league_team_id,
+    displayName: record.display_name,
+    shortName: record.short_name,
+    displayOrder: Number(record.display_order),
+    notes: record.notes,
+    createdAt: record.created_at
+  };
+}
+
+function normalizeCompetitionPlayer(record: CompetitionTeamPlayerRow): CompetitionPlayerListItem {
+  return {
+    id: record.id,
+    competitionTeamId: record.competition_team_id,
+    fullName: record.full_name,
+    shirtNumber: record.shirt_number,
+    position: record.position,
+    active: record.active,
+    createdAt: record.created_at,
+    updatedAt: record.updated_at
+  };
 }
 
 async function resolveAdminEmailsById(adminIds: string[]) {
@@ -112,224 +288,155 @@ async function resolveAdminEmailsById(adminIds: string[]) {
   return emailsById;
 }
 
-function normalizeTournamentRecord(record: TournamentRecord): TournamentListItem {
-  return {
-    id: record.id,
-    name: record.name,
-    slug: record.slug,
-    seasonLabel: record.season_label,
-    description: record.description,
-    isPublic: record.is_public,
-    status: record.status,
-    parentTournamentId: record.parent_tournament_id,
-    createdAt: record.created_at
-  };
-}
+async function loadLeagueCounts(leagueIds: string[]) {
+  const teamCounts = new Map<string, number>();
+  const competitionCounts = new Map<string, number>();
+  if (!leagueIds.length) {
+    return {
+      teamCounts,
+      competitionCounts
+    };
+  }
 
-async function loadTournamentBundle(tournamentId: string) {
   const supabase = await createSupabaseServerClient();
-  const { data: tournament, error: tournamentError } = await supabase
-    .from("tournaments")
-    .select("id, name, slug, season_label, parent_tournament_id, description, is_public, status, created_at")
-    .eq("id", tournamentId)
-    .maybeSingle();
+  const [{ data: leagueTeams, error: leagueTeamsError }, { data: competitions, error: competitionsError }] =
+    await Promise.all([
+      supabase.from("league_teams").select("league_id").in("league_id", leagueIds),
+      supabase.from("competitions").select("league_id").in("league_id", leagueIds)
+    ]);
 
-  if (tournamentError) throw new Error(tournamentError.message);
+  if (leagueTeamsError) throw new Error(leagueTeamsError.message);
+  if (competitionsError) throw new Error(competitionsError.message);
 
-  const { data: matches, error: matchesError } = await supabase
-    .from("tournament_matches")
-    .select("id, round_id, home_team_id, away_team_id, scheduled_at, venue, status")
-    .eq("tournament_id", tournamentId);
+  for (const row of leagueTeams ?? []) {
+    const leagueId = String(row.league_id);
+    teamCounts.set(leagueId, (teamCounts.get(leagueId) ?? 0) + 1);
+  }
 
-  if (matchesError) throw new Error(matchesError.message);
-
-  const matchIds = (matches ?? []).map((row) => row.id);
-  const [
-    { data: teams, error: teamsError },
-    { data: rounds, error: roundsError },
-    { data: results, error: resultsError },
-    { data: playerStats, error: playerStatsError },
-    { data: players, error: playersError }
-  ] = await Promise.all([
-    supabase
-      .from("tournament_teams")
-      .select("id, name, short_name, display_order, notes")
-      .eq("tournament_id", tournamentId)
-      .order("display_order", { ascending: true }),
-    supabase
-      .from("tournament_rounds")
-      .select("id, round_number, name, starts_at, ends_at")
-      .eq("tournament_id", tournamentId)
-      .order("round_number", { ascending: true }),
-    matchIds.length
-      ? supabase
-          .from("tournament_match_results")
-          .select("match_id, home_score, away_score, mvp_player_id, mvp_player_name, notes")
-          .in("match_id", matchIds)
-      : Promise.resolve({ data: [], error: null }),
-    matchIds.length
-      ? supabase
-          .from("tournament_match_player_stats")
-          .select("match_id, team_id, player_id, player_name, goals, yellow_cards, red_cards, is_mvp")
-          .in("match_id", matchIds)
-      : Promise.resolve({ data: [], error: null }),
-    supabase
-      .from("tournament_players")
-      .select("id, team_id, full_name, shirt_number, position, active")
-      .eq("tournament_id", tournamentId)
-      .order("full_name", { ascending: true })
-  ]);
-
-  if (teamsError) throw new Error(teamsError.message);
-  if (roundsError) throw new Error(roundsError.message);
-  if (resultsError) throw new Error(resultsError.message);
-  if (playerStatsError) throw new Error(playerStatsError.message);
-  if (playersError) throw new Error(playersError.message);
+  for (const row of competitions ?? []) {
+    const leagueId = String(row.league_id);
+    competitionCounts.set(leagueId, (competitionCounts.get(leagueId) ?? 0) + 1);
+  }
 
   return {
-    tournament,
-    teams: ((teams ?? []) as TournamentTeamReference[]).map((team) => ({
-      ...team,
-      display_order: Number(team.display_order)
-    })),
-    rounds: (rounds ?? []) as TournamentRoundReference[],
-    matches: (matches ?? []) as TournamentMatchReference[],
-    results: (results ?? []) as TournamentMatchResultReference[],
-    playerStats: (playerStats ?? []) as TournamentMatchPlayerStatReference[],
-    players: players ?? []
+    teamCounts,
+    competitionCounts
   };
 }
 
-export async function getPublicTournaments(): Promise<TournamentListItem[]> {
+async function loadCompetitionTeamCounts(competitionIds: string[]) {
+  const counts = new Map<string, number>();
+  if (!competitionIds.length) return counts;
+
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from("tournaments")
-    .select("id, name, slug, season_label, parent_tournament_id, description, is_public, status, created_at")
-    .eq("is_public", true)
-    .order("created_at", { ascending: false });
+    .from("competition_teams")
+    .select("competition_id")
+    .in("competition_id", competitionIds);
 
   if (error) throw new Error(error.message);
-  return ((data ?? []) as TournamentRecord[]).map(normalizeTournamentRecord);
+
+  for (const row of data ?? []) {
+    const competitionId = String(row.competition_id);
+    counts.set(competitionId, (counts.get(competitionId) ?? 0) + 1);
+  }
+
+  return counts;
 }
 
-export async function getPublicTournamentBySlug(slug: string) {
-  noStore();
+async function loadLeagueById(leagueId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from("tournaments")
-    .select("id, name, slug, season_label, parent_tournament_id, description, is_public, status, created_at")
-    .eq("slug", slug)
+    .from("leagues")
+    .select("id, name, slug, description, venue_name, location_notes, is_public, status, created_at")
+    .eq("id", leagueId)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  if (!data) return null;
-
-  const bundle = await loadTournamentBundle(data.id);
-  const fixture = buildTournamentFixture({
-    teams: bundle.teams,
-    rounds: bundle.rounds,
-    matches: bundle.matches,
-    results: bundle.results
-  });
-
-  return {
-    tournament: normalizeTournamentRecord(data as TournamentRecord),
-    teams: bundle.teams,
-    players: bundle.players,
-    standings: buildTournamentStandings({
-      teams: bundle.teams,
-      matches: bundle.matches,
-      results: bundle.results
-    }),
-    fixture,
-    topScorers: buildTournamentTopScorers({
-      teams: bundle.teams,
-      playerStats: bundle.playerStats
-    }),
-    topFigures: buildTournamentTopFigures({
-      teams: bundle.teams,
-      playerStats: bundle.playerStats
-    }),
-    bestDefense: buildTournamentBestDefense({
-      teams: bundle.teams,
-      matches: bundle.matches,
-      results: bundle.results
-    })
-  };
+  return (data ?? null) as LeagueRecord | null;
 }
 
-export async function getPublicTournamentMatchDetails(params: {
-  slug: string;
-  matchId: string;
+async function loadLeagueBySlug(leagueSlug: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("leagues")
+    .select("id, name, slug, description, venue_name, location_notes, is_public, status, created_at")
+    .eq("slug", leagueSlug)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data ?? null) as LeagueRecord | null;
+}
+
+async function loadCompetitionById(params: {
+  competitionId: string;
+  leagueId?: string;
 }) {
-  const { slug, matchId } = params;
-  const tournamentData = await getPublicTournamentBySlug(slug);
-  if (!tournamentData) return null;
-
-  const match = tournamentData.fixture.find((row) => row.id === matchId) ?? null;
-  if (!match) return null;
-
-  const bundle = await loadTournamentBundle(tournamentData.tournament.id);
-  const result = bundle.results.find((row) => row.match_id === matchId) ?? null;
-  const teamById = new Map(bundle.teams.map((team) => [team.id, team]));
-  const stats = bundle.playerStats
-    .filter((row) => row.match_id === matchId)
-    .map((row) => ({
-      ...row,
-      teamName: teamById.get(row.team_id)?.name ?? "Equipo",
-      teamShortName: teamById.get(row.team_id)?.short_name ?? null
-    }));
-
-  return {
-    tournament: tournamentData.tournament,
-    match,
-    result,
-    homeStats: stats.filter((row) => row.team_id === match.homeTeamId),
-    awayStats: stats.filter((row) => row.team_id === match.awayTeamId)
-  };
-}
-
-export async function getAdminTournamentList() {
-  const admin = await requireAdminSession();
-  const tournaments = await getAdminTournaments(admin);
-  return tournaments.map((tournament) => ({
-    id: tournament.id,
-    name: tournament.name,
-    slug: tournament.slug,
-    seasonLabel: tournament.season_label,
-    description: null,
-    isPublic: tournament.is_public,
-    status: tournament.status,
-    parentTournamentId: tournament.parent_tournament_id,
-    createdAt: tournament.created_at
-  }));
-}
-
-async function getTournamentAdminData(tournamentId: string) {
   const supabase = await createSupabaseServerClient();
-  const [{ data: adminRows, error: adminRowsError }, inviteRowsResult] = await Promise.all([
-    supabase
-      .from("tournament_admins")
-      .select("id, tournament_id, admin_id, role, created_at")
-      .eq("tournament_id", tournamentId)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("tournament_admin_invites")
-      .select("id, tournament_id, email, invite_token, expires_at, created_at, status")
-      .eq("tournament_id", tournamentId)
-      .eq("status", "pending")
-      .gt("expires_at", new Date().toISOString())
-      .order("created_at", { ascending: false })
-  ]);
+  let query = supabase
+    .from("competitions")
+    .select("id, league_id, name, slug, season_label, description, venue_override, is_public, status, created_at")
+    .eq("id", params.competitionId);
+
+  if (params.leagueId) {
+    query = query.eq("league_id", params.leagueId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data ?? null) as CompetitionRecord | null;
+}
+
+async function loadCompetitionBySlugs(params: {
+  leagueId: string;
+  competitionSlug: string;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("competitions")
+    .select("id, league_id, name, slug, season_label, description, venue_override, is_public, status, created_at")
+    .eq("league_id", params.leagueId)
+    .eq("slug", params.competitionSlug)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data ?? null) as CompetitionRecord | null;
+}
+
+async function loadLeagueTeams(leagueId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("league_teams")
+    .select("id, league_id, name, short_name, slug, notes, created_at, updated_at")
+    .eq("league_id", leagueId)
+    .order("name", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as LeagueTeamRecord[]).map(normalizeLeagueTeam);
+}
+
+async function loadLeagueAdminData(leagueId: string) {
+  const supabase = await createSupabaseServerClient();
+  const [{ data: adminRows, error: adminRowsError }, { data: inviteRows, error: inviteRowsError }] =
+    await Promise.all([
+      supabase
+        .from("league_admins")
+        .select("id, league_id, admin_id, role, created_at")
+        .eq("league_id", leagueId)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("league_admin_invites")
+        .select("id, league_id, email, invite_token, expires_at, created_at, status")
+        .eq("league_id", leagueId)
+        .eq("status", "pending")
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+    ]);
 
   if (adminRowsError) throw new Error(adminRowsError.message);
-  const supportsTournamentAdminInvites = !isMissingSupabaseTableError(inviteRowsResult.error);
-  if (inviteRowsResult.error && supportsTournamentAdminInvites) {
-    throw new Error(inviteRowsResult.error.message);
-  }
-  const inviteRows = supportsTournamentAdminInvites ? inviteRowsResult.data ?? [] : [];
+  if (inviteRowsError) throw new Error(inviteRowsError.message);
 
-  const uniqueAdminIds = Array.from(new Set((adminRows ?? []).map((row) => row.admin_id)));
+  const uniqueAdminIds = Array.from(new Set((adminRows ?? []).map((row) => String(row.admin_id))));
   const [{ data: profiles, error: profilesError }, emailsById] = await Promise.all([
     uniqueAdminIds.length
       ? supabase.from("admins").select("id, display_name").in("id", uniqueAdminIds)
@@ -342,7 +449,7 @@ async function getTournamentAdminData(tournamentId: string) {
   const profilesById = new Map(((profiles ?? []) as AdminProfileRow[]).map((profile) => [profile.id, profile]));
 
   return {
-    admins: ((adminRows ?? []) as TournamentAdminRow[]).map((row) => ({
+    admins: ((adminRows ?? []) as LeagueAdminRow[]).map<LeagueAdminListItem>((row) => ({
       id: row.admin_id,
       membershipId: row.id,
       displayName: profilesById.get(row.admin_id)?.display_name ?? "Admin",
@@ -350,219 +457,452 @@ async function getTournamentAdminData(tournamentId: string) {
       role: row.role,
       createdAt: row.created_at
     })),
-    pendingInvites: ((inviteRows ?? []) as TournamentAdminInviteRow[]).map((row) => ({
+    pendingInvites: ((inviteRows ?? []) as LeagueAdminInviteRow[]).map<LeagueAdminInviteListItem>((row) => ({
       id: row.id,
-      tournamentId: row.tournament_id,
+      leagueId: row.league_id,
       email: row.email,
       inviteToken: row.invite_token,
       expiresAt: row.expires_at,
       createdAt: row.created_at,
       status: row.status
-    })),
-    schemaSupport: {
-      tournamentAdminInvites: supportsTournamentAdminInvites
-    }
+    }))
   };
 }
 
-export async function getAdminTournamentDetails(tournamentId: string) {
-  noStore();
-  const bundle = await loadTournamentBundle(tournamentId);
-  if (!bundle.tournament) return null;
-
+async function loadCompetitionBundle(params: {
+  competition: CompetitionRecord;
+  league: LeagueRecord;
+}) {
+  const { competition, league } = params;
   const supabase = await createSupabaseServerClient();
+  const [{ data: competitionTeams, error: competitionTeamsError }, { data: rounds, error: roundsError }, { data: matches, error: matchesError }, { data: captainRows, error: captainRowsError }, { data: captainInviteRows, error: captainInviteRowsError }] =
+    await Promise.all([
+      supabase
+        .from("competition_teams")
+        .select("id, competition_id, league_team_id, display_name, short_name, display_order, notes, created_at")
+        .eq("competition_id", competition.id)
+        .order("display_order", { ascending: true }),
+      supabase
+        .from("competition_rounds")
+        .select("id, competition_id, round_number, name, starts_at, ends_at, created_at, updated_at")
+        .eq("competition_id", competition.id)
+        .order("round_number", { ascending: true }),
+      supabase
+        .from("competition_matches")
+        .select("id, competition_id, round_id, home_team_id, away_team_id, scheduled_at, venue, status, created_by, created_at, updated_at")
+        .eq("competition_id", competition.id),
+      supabase
+        .from("competition_team_captains")
+        .select("id, competition_id, competition_team_id, captain_id, created_at")
+        .eq("competition_id", competition.id),
+      supabase
+        .from("competition_captain_invites")
+        .select("id, competition_id, competition_team_id, email, invite_token, expires_at, created_at")
+        .eq("competition_id", competition.id)
+        .order("created_at", { ascending: false })
+    ]);
+
+  if (competitionTeamsError) throw new Error(competitionTeamsError.message);
+  if (roundsError) throw new Error(roundsError.message);
+  if (matchesError) throw new Error(matchesError.message);
+  if (captainRowsError) throw new Error(captainRowsError.message);
+  if (captainInviteRowsError) throw new Error(captainInviteRowsError.message);
+
+  const normalizedCompetitionTeams = ((competitionTeams ?? []) as CompetitionTeamRecord[]).map(normalizeCompetitionTeam);
+  const competitionTeamIds = normalizedCompetitionTeams.map((team) => team.id);
+  const matchIds = ((matches ?? []) as CompetitionMatchRow[]).map((match) => match.id);
+  const captainIds = Array.from(new Set(((captainRows ?? []) as CompetitionTeamCaptainRow[]).map((row) => row.captain_id)));
+
   const [
-    teamCaptainRowsResult,
-    captainInviteRowsResult,
-    tournamentAdminData
+    { data: players, error: playersError },
+    { data: results, error: resultsError },
+    { data: playerStats, error: playerStatsError },
+    { data: captainProfiles, error: captainProfilesError },
+    leagueTeams
   ] = await Promise.all([
-    supabase
-      .from("tournament_team_captains")
-      .select("id, tournament_id, team_id, captain_id, created_at")
-      .eq("tournament_id", tournamentId),
-    supabase
-      .from("tournament_captain_invites")
-      .select("id, tournament_id, team_id, email, invite_token, expires_at, created_at")
-      .eq("tournament_id", tournamentId)
-      .order("created_at", { ascending: false }),
-    getTournamentAdminData(tournamentId)
+    competitionTeamIds.length
+      ? supabase
+          .from("competition_team_players")
+          .select("id, competition_team_id, full_name, shirt_number, position, active, created_at, updated_at")
+          .in("competition_team_id", competitionTeamIds)
+          .order("full_name", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    matchIds.length
+      ? supabase
+          .from("competition_match_results")
+          .select("match_id, home_score, away_score, mvp_player_id, mvp_player_name, notes, updated_at")
+          .in("match_id", matchIds)
+      : Promise.resolve({ data: [], error: null }),
+    matchIds.length
+      ? supabase
+          .from("competition_match_player_stats")
+          .select("match_id, team_id, player_id, player_name, goals, yellow_cards, red_cards, is_mvp, updated_at")
+          .in("match_id", matchIds)
+      : Promise.resolve({ data: [], error: null }),
+    captainIds.length
+      ? supabase.from("admins").select("id, display_name").in("id", captainIds)
+      : Promise.resolve({ data: [], error: null }),
+    loadLeagueTeams(league.id)
   ]);
 
-  const supportsTournamentTeamCaptains = !isMissingSupabaseTableError(teamCaptainRowsResult.error);
-  const supportsTournamentCaptainInvites = !isMissingSupabaseTableError(captainInviteRowsResult.error);
-  if (teamCaptainRowsResult.error && supportsTournamentTeamCaptains) {
-    throw new Error(teamCaptainRowsResult.error.message);
-  }
-  if (captainInviteRowsResult.error && supportsTournamentCaptainInvites) {
-    throw new Error(captainInviteRowsResult.error.message);
-  }
-
-  const teamCaptainRows = supportsTournamentTeamCaptains ? teamCaptainRowsResult.data ?? [] : [];
-  const captainInviteRows = supportsTournamentCaptainInvites ? captainInviteRowsResult.data ?? [] : [];
-
-  const captainIds = Array.from(new Set(teamCaptainRows.map((row) => row.captain_id)));
-  const { data: captainProfiles, error: captainProfilesError } = captainIds.length
-    ? await supabase.from("admins").select("id, display_name").in("id", captainIds)
-    : { data: [], error: null };
-
+  if (playersError) throw new Error(playersError.message);
+  if (resultsError) throw new Error(resultsError.message);
+  if (playerStatsError) throw new Error(playerStatsError.message);
   if (captainProfilesError) throw new Error(captainProfilesError.message);
 
+  const teamReferences: TournamentTeamReference[] = normalizedCompetitionTeams.map((team) => ({
+    id: team.id,
+    name: team.displayName,
+    short_name: team.shortName,
+    display_order: team.displayOrder,
+    notes: team.notes
+  }));
+  const roundReferences = (rounds ?? []) as TournamentRoundReference[];
+  const matchReferences = (matches ?? []) as TournamentMatchReference[];
+  const resultReferences = (results ?? []) as TournamentMatchResultReference[];
+  const playerStatReferences = (playerStats ?? []) as TournamentMatchPlayerStatReference[];
+
   const standings = buildTournamentStandings({
-    teams: bundle.teams,
-    matches: bundle.matches,
-    results: bundle.results
+    teams: teamReferences,
+    matches: matchReferences,
+    results: resultReferences
   });
   const fixture = buildTournamentFixture({
-    teams: bundle.teams,
-    rounds: bundle.rounds,
-    matches: bundle.matches,
-    results: bundle.results
+    teams: teamReferences,
+    rounds: roundReferences,
+    matches: matchReferences,
+    results: resultReferences
   });
+  const normalizedPlayers = ((players ?? []) as CompetitionTeamPlayerRow[]).map(normalizeCompetitionPlayer);
+  const playersByTeam = new Map<string, CompetitionPlayerListItem[]>();
 
-  const playersByTeam = new Map<string, typeof bundle.players>();
-  for (const player of bundle.players) {
-    const current = playersByTeam.get(player.team_id) ?? [];
+  for (const player of normalizedPlayers) {
+    const current = playersByTeam.get(player.competitionTeamId) ?? [];
     current.push(player);
-    playersByTeam.set(player.team_id, current);
+    playersByTeam.set(player.competitionTeamId, current);
   }
 
   const captainProfilesById = new Map(
     ((captainProfiles ?? []) as AdminProfileRow[]).map((profile) => [profile.id, profile])
   );
   const teamCaptainsByTeam = new Map(
-    ((teamCaptainRows ?? []) as TournamentTeamCaptainRow[]).map((captainRow) => [
-      captainRow.team_id,
+    ((captainRows ?? []) as CompetitionTeamCaptainRow[]).map((row) => [
+      row.competition_team_id,
       {
-        id: captainRow.id,
-        tournamentId: captainRow.tournament_id,
-        teamId: captainRow.team_id,
-        captainId: captainRow.captain_id,
-        displayName: captainProfilesById.get(captainRow.captain_id)?.display_name ?? "Capitan",
-        createdAt: captainRow.created_at
+        id: row.id,
+        competitionId: row.competition_id,
+        competitionTeamId: row.competition_team_id,
+        captainId: row.captain_id,
+        displayName: captainProfilesById.get(row.captain_id)?.display_name ?? "Capitan",
+        createdAt: row.created_at
       }
     ])
   );
   const captainInvitesByTeam = new Map(
-    ((captainInviteRows ?? []) as TournamentCaptainInviteRow[]).map((inviteRow) => [
-      inviteRow.team_id,
+    ((captainInviteRows ?? []) as CompetitionCaptainInviteRow[]).map((row) => [
+      row.competition_team_id,
       {
-        id: inviteRow.id,
-        tournamentId: inviteRow.tournament_id,
-        teamId: inviteRow.team_id,
-        email: inviteRow.email,
-        inviteToken: inviteRow.invite_token,
-        expiresAt: inviteRow.expires_at,
-        createdAt: inviteRow.created_at
+        id: row.id,
+        competitionId: row.competition_id,
+        competitionTeamId: row.competition_team_id,
+        email: row.email,
+        inviteToken: row.invite_token,
+        expiresAt: row.expires_at,
+        createdAt: row.created_at
       }
     ])
   );
 
   return {
-    tournament: normalizeTournamentRecord(bundle.tournament as TournamentRecord),
-    teams: bundle.teams,
-    rounds: bundle.rounds,
-    players: bundle.players,
+    league: normalizeLeagueRecord(league),
+    competition: normalizeCompetitionRecord(competition, normalizedCompetitionTeams.length),
+    leagueTeams,
+    competitionTeams: normalizedCompetitionTeams,
+    rounds: roundReferences,
+    matches: matchReferences,
+    results: (results ?? []) as CompetitionMatchResultRow[],
+    playerStats: (playerStats ?? []) as CompetitionMatchPlayerStatRow[],
+    players: normalizedPlayers,
     playersByTeam,
-    tournamentAdmins: tournamentAdminData,
     teamCaptainsByTeam,
     captainInvitesByTeam,
-    schemaSupport: {
-      tournamentAdminInvites: tournamentAdminData.schemaSupport.tournamentAdminInvites,
-      tournamentTeamCaptains: supportsTournamentTeamCaptains,
-      tournamentCaptainInvites: supportsTournamentCaptainInvites
-    },
-    matches: bundle.matches,
-    results: bundle.results,
-    playerStats: bundle.playerStats,
-    fixture,
     standings,
+    fixture,
     topScorers: buildTournamentTopScorers({
-      teams: bundle.teams,
-      playerStats: bundle.playerStats
+      teams: teamReferences,
+      playerStats: playerStatReferences
     }),
     topFigures: buildTournamentTopFigures({
-      teams: bundle.teams,
-      playerStats: bundle.playerStats
+      teams: teamReferences,
+      playerStats: playerStatReferences
     }),
     bestDefense: buildTournamentBestDefense({
-      teams: bundle.teams,
-      matches: bundle.matches,
-      results: bundle.results
+      teams: teamReferences,
+      matches: matchReferences,
+      results: resultReferences
     })
   };
 }
 
-export async function getCaptainTournamentTeamPanelData(params: {
-  tournamentId: string;
-  teamId: string;
+export async function getPublicLeagues(): Promise<LeagueListItem[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("leagues")
+    .select("id, name, slug, description, venue_name, location_notes, is_public, status, created_at")
+    .eq("is_public", true)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  const leagues = (data ?? []) as LeagueRecord[];
+  const leagueIds = leagues.map((league) => league.id);
+  const { teamCounts, competitionCounts } = await loadLeagueCounts(leagueIds);
+
+  return leagues.map((league) =>
+    normalizeLeagueRecord(league, {
+      teamCount: teamCounts.get(league.id) ?? 0,
+      competitionCount: competitionCounts.get(league.id) ?? 0
+    })
+  );
+}
+
+export async function getPublicLeagueBySlug(leagueSlug: string) {
+  noStore();
+
+  const league = await loadLeagueBySlug(leagueSlug);
+  if (!league || !league.is_public) return null;
+
+  const supabase = await createSupabaseServerClient();
+  const [{ data: competitions, error: competitionsError }, leagueTeams] = await Promise.all([
+    supabase
+      .from("competitions")
+      .select("id, league_id, name, slug, season_label, description, venue_override, is_public, status, created_at")
+      .eq("league_id", league.id)
+      .eq("is_public", true)
+      .order("created_at", { ascending: false }),
+    loadLeagueTeams(league.id)
+  ]);
+
+  if (competitionsError) throw new Error(competitionsError.message);
+
+  const competitionRows = (competitions ?? []) as CompetitionRecord[];
+  const competitionCounts = await loadCompetitionTeamCounts(competitionRows.map((row) => row.id));
+
+  return {
+    league: normalizeLeagueRecord(league, {
+      teamCount: leagueTeams.length,
+      competitionCount: competitionRows.length
+    }),
+    leagueTeams,
+    competitions: competitionRows.map((competition) =>
+      normalizeCompetitionRecord(competition, competitionCounts.get(competition.id) ?? 0)
+    )
+  };
+}
+
+export async function getPublicCompetitionBySlugs(params: {
+  leagueSlug: string;
+  competitionSlug: string;
 }) {
   noStore();
 
-  const { tournamentId, teamId } = params;
-  const bundle = await loadTournamentBundle(tournamentId);
-  if (!bundle.tournament) return null;
+  const league = await loadLeagueBySlug(params.leagueSlug);
+  if (!league || !league.is_public) return null;
 
-  const team = bundle.teams.find((row) => row.id === teamId) ?? null;
-  if (!team) return null;
+  const competition = await loadCompetitionBySlugs({
+    leagueId: league.id,
+    competitionSlug: params.competitionSlug
+  });
 
-  const standings = buildTournamentStandings({
-    teams: bundle.teams,
-    matches: bundle.matches,
-    results: bundle.results
-  });
-  const fixture = buildTournamentFixture({
-    teams: bundle.teams,
-    rounds: bundle.rounds,
-    matches: bundle.matches,
-    results: bundle.results
-  });
-  const teamMatches = fixture.filter((match) => match.homeTeamId === teamId || match.awayTeamId === teamId);
-  const roster = bundle.players
-    .filter((player) => player.team_id === teamId)
-    .sort((left, right) => left.full_name.localeCompare(right.full_name, "es"));
+  if (!competition || !competition.is_public) return null;
+
+  return loadCompetitionBundle({ competition, league });
+}
+
+export async function getPublicCompetitionMatchDetails(params: {
+  leagueSlug: string;
+  competitionSlug: string;
+  matchId: string;
+}) {
+  const competitionData = await getPublicCompetitionBySlugs(params);
+  if (!competitionData) return null;
+
+  const match = competitionData.fixture.find((row) => row.id === params.matchId) ?? null;
+  if (!match) return null;
+
+  const result = competitionData.results.find((row) => row.match_id === params.matchId) ?? null;
+  const teamById = new Map(
+    competitionData.competitionTeams.map((team) => [
+      team.id,
+      {
+        name: team.displayName,
+        shortName: team.shortName
+      }
+    ])
+  );
+  const stats = competitionData.playerStats
+    .filter((row) => row.match_id === params.matchId)
+    .map((row) => ({
+      ...row,
+      teamName: teamById.get(row.team_id)?.name ?? "Equipo",
+      teamShortName: teamById.get(row.team_id)?.shortName ?? null
+    }));
 
   return {
-    tournament: normalizeTournamentRecord(bundle.tournament as TournamentRecord),
+    league: competitionData.league,
+    competition: competitionData.competition,
+    match,
+    result,
+    homeStats: stats.filter((row) => row.team_id === match.homeTeamId),
+    awayStats: stats.filter((row) => row.team_id === match.awayTeamId)
+  };
+}
+
+export async function getAdminLeagueList() {
+  const admin = await requireAdminSession();
+  const leagues = await getAdminLeagues(admin);
+  const { teamCounts, competitionCounts } = await loadLeagueCounts(leagues.map((league) => league.id));
+
+  return leagues.map((league) =>
+    normalizeLeagueRecord(
+      {
+        ...league,
+        description: null
+      },
+      {
+        teamCount: teamCounts.get(league.id) ?? 0,
+        competitionCount: competitionCounts.get(league.id) ?? 0
+      }
+    )
+  );
+}
+
+export async function getAdminLeagueDetails(leagueId: string) {
+  noStore();
+
+  const league = await loadLeagueById(leagueId);
+  if (!league) return null;
+
+  const supabase = await createSupabaseServerClient();
+  const [{ data: competitions, error: competitionsError }, leagueTeams, leagueAdminData] = await Promise.all([
+    supabase
+      .from("competitions")
+      .select("id, league_id, name, slug, season_label, description, venue_override, is_public, status, created_at")
+      .eq("league_id", leagueId)
+      .order("created_at", { ascending: false }),
+    loadLeagueTeams(leagueId),
+    loadLeagueAdminData(leagueId)
+  ]);
+
+  if (competitionsError) throw new Error(competitionsError.message);
+
+  const competitionRows = (competitions ?? []) as CompetitionRecord[];
+  const teamCounts = await loadCompetitionTeamCounts(competitionRows.map((row) => row.id));
+
+  return {
+    league: normalizeLeagueRecord(league, {
+      teamCount: leagueTeams.length,
+      competitionCount: competitionRows.length
+    }),
+    leagueTeams,
+    competitions: competitionRows.map((competition) =>
+      normalizeCompetitionRecord(competition, teamCounts.get(competition.id) ?? 0)
+    ),
+    leagueAdmins: leagueAdminData
+  };
+}
+
+export async function getAdminCompetitionDetails(params: {
+  leagueId: string;
+  competitionId: string;
+}) {
+  noStore();
+
+  const [league, competition] = await Promise.all([
+    loadLeagueById(params.leagueId),
+    loadCompetitionById({
+      competitionId: params.competitionId,
+      leagueId: params.leagueId
+    })
+  ]);
+
+  if (!league || !competition) return null;
+  return loadCompetitionBundle({ competition, league });
+}
+
+export async function getCaptainCompetitionTeamPanelData(params: {
+  competitionId: string;
+  competitionTeamId: string;
+}) {
+  noStore();
+
+  const competition = await loadCompetitionById({
+    competitionId: params.competitionId
+  });
+  if (!competition) return null;
+
+  const league = await loadLeagueById(competition.league_id);
+  if (!league) return null;
+
+  const bundle = await loadCompetitionBundle({ competition, league });
+  const team = bundle.competitionTeams.find((row) => row.id === params.competitionTeamId) ?? null;
+  if (!team) return null;
+
+  const roster = (bundle.playersByTeam.get(team.id) ?? []).sort((left, right) =>
+    left.fullName.localeCompare(right.fullName, "es")
+  );
+  const teamMatches = bundle.fixture.filter(
+    (match) => match.homeTeamId === team.id || match.awayTeamId === team.id
+  );
+
+  return {
+    league: bundle.league,
+    competition: bundle.competition,
     team,
     roster,
-    standings,
-    standingRow: standings.find((row) => row.teamId === teamId) ?? null,
+    standings: bundle.standings,
+    standingRow: bundle.standings.find((row) => row.teamId === team.id) ?? null,
     teamMatches
   };
 }
 
-export async function getAdminTournamentMatchSheetData(params: {
-  tournamentId: string;
+export async function getAdminCompetitionMatchSheetData(params: {
+  leagueId: string;
+  competitionId: string;
   matchId: string;
 }) {
-  const { tournamentId, matchId } = params;
-  const details = await getAdminTournamentDetails(tournamentId);
+  const details = await getAdminCompetitionDetails({
+    leagueId: params.leagueId,
+    competitionId: params.competitionId
+  });
   if (!details) return null;
 
-  const match = details.fixture.find((row) => row.id === matchId) ?? null;
+  const match = details.fixture.find((row) => row.id === params.matchId) ?? null;
   if (!match) return null;
 
   const teamPlayers = details.players.filter(
-    (player) => player.team_id === match.homeTeamId || player.team_id === match.awayTeamId
+    (player) =>
+      player.competitionTeamId === match.homeTeamId || player.competitionTeamId === match.awayTeamId
   );
-  const result = details.results.find((row) => row.match_id === matchId) ?? null;
-  const stats = details.playerStats.filter((row) => row.match_id === matchId);
+  const result = details.results.find((row) => row.match_id === params.matchId) ?? null;
+  const stats = details.playerStats.filter((row) => row.match_id === params.matchId);
   const statsByKey = new Map(
     stats.map((row) => [`${row.team_id}:${row.player_id ?? row.player_name.toLowerCase()}`, row])
   );
 
   return {
-    tournament: details.tournament,
+    league: details.league,
+    competition: details.competition,
     match,
     result,
     registeredPlayers: teamPlayers.map((player) => {
-      const key = `${player.team_id}:${player.id}`;
+      const key = `${player.competitionTeamId}:${player.id}`;
       const stat = statsByKey.get(key) ?? null;
       return {
         id: player.id,
-        teamId: player.team_id,
-        fullName: player.full_name,
-        shirtNumber: player.shirt_number,
+        teamId: player.competitionTeamId,
+        fullName: player.fullName,
+        shirtNumber: player.shirtNumber,
         position: player.position,
         active: player.active,
         goals: stat?.goals ?? 0,
@@ -625,3 +965,127 @@ export function findBestDefenseRows(rows: TournamentBestDefenseRow[]) {
   const bestValue = rows[0]?.goalsAgainst ?? 0;
   return rows.filter((row) => row.goalsAgainst === bestValue);
 }
+
+export const getPublicTournaments = getPublicLeagues;
+
+export async function getPublicTournamentBySlug(slug: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: competition, error: competitionError } = await supabase
+    .from("competitions")
+    .select("id, league_id, name, slug, season_label, description, venue_override, is_public, status, created_at")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (competitionError) throw new Error(competitionError.message);
+  if (!competition || !competition.is_public) return null;
+
+  const league = await loadLeagueById(String(competition.league_id));
+  if (!league || !league.is_public) return null;
+
+  return loadCompetitionBundle({
+    competition: competition as CompetitionRecord,
+    league
+  });
+}
+
+export async function getPublicTournamentMatchDetails(params: {
+  slug: string;
+  matchId: string;
+}) {
+  const competitionData = await getPublicTournamentBySlug(params.slug);
+  if (!competitionData) return null;
+
+  const match = competitionData.fixture.find((row) => row.id === params.matchId) ?? null;
+  if (!match) return null;
+
+  const result = competitionData.results.find((row) => row.match_id === params.matchId) ?? null;
+  const teamById = new Map(
+    competitionData.competitionTeams.map((team) => [
+      team.id,
+      {
+        name: team.displayName,
+        shortName: team.shortName
+      }
+    ])
+  );
+  const stats = competitionData.playerStats
+    .filter((row) => row.match_id === params.matchId)
+    .map((row) => ({
+      ...row,
+      teamName: teamById.get(row.team_id)?.name ?? "Equipo",
+      teamShortName: teamById.get(row.team_id)?.shortName ?? null
+    }));
+
+  return {
+    tournament: competitionData.competition,
+    match,
+    result,
+    homeStats: stats.filter((row) => row.team_id === match.homeTeamId),
+    awayStats: stats.filter((row) => row.team_id === match.awayTeamId)
+  };
+}
+
+export async function getAdminTournamentDetails(tournamentId: string) {
+  const competition = await loadCompetitionById({ competitionId: tournamentId });
+  if (!competition) return null;
+
+  const league = await loadLeagueById(competition.league_id);
+  if (!league) return null;
+
+  const details = await loadCompetitionBundle({ competition, league });
+  return {
+    ...details,
+    tournament: details.competition,
+    tournamentAdmins: {
+      admins: [] as LeagueAdminListItem[],
+      pendingInvites: [] as LeagueAdminInviteListItem[]
+    },
+    schemaSupport: {
+      tournamentAdminInvites: true,
+      tournamentTeamCaptains: true,
+      tournamentCaptainInvites: true
+    },
+    teamCaptainsByTeam: new Map(
+      [...details.teamCaptainsByTeam.entries()].map(([teamId, value]) => [
+        teamId,
+        {
+          ...value,
+          teamId
+        }
+      ])
+    ),
+    captainInvitesByTeam: new Map(
+      [...details.captainInvitesByTeam.entries()].map(([teamId, value]) => [
+        teamId,
+        {
+          ...value,
+          teamId
+        }
+      ])
+    )
+  };
+}
+
+export async function getCaptainTournamentTeamPanelData(params: {
+  tournamentId: string;
+  teamId: string;
+}) {
+  const data = await getCaptainCompetitionTeamPanelData({
+    competitionId: params.tournamentId,
+    competitionTeamId: params.teamId
+  });
+
+  if (!data) return null;
+
+  return {
+    ...data,
+    tournament: data.competition,
+    team: {
+      id: data.team.id,
+      name: data.team.displayName,
+      shortName: data.team.shortName
+    }
+  };
+}
+
+export const getAdminTournamentMatchSheetData = getAdminCompetitionMatchSheetData;

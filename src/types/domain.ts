@@ -5,6 +5,8 @@ export type WinnerTeam = TeamSide | "DRAW";
 export type ResultAssignmentTeam = TeamSide | "OUT";
 export type TournamentStatus = "draft" | "active" | "finished" | "archived";
 export type TournamentMatchStatus = "draft" | "scheduled" | "played" | "cancelled";
+export type LeagueStatus = TournamentStatus;
+export type CompetitionStatus = TournamentStatus;
 
 export type PlayerRatingInput = {
   id: string;
@@ -54,16 +56,32 @@ export type MatchResultInput = {
   };
 };
 
-export type TournamentListItem = {
+export type LeagueListItem = {
   id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  venueName: string | null;
+  locationNotes: string | null;
+  isPublic: boolean;
+  status: LeagueStatus;
+  createdAt: string;
+  teamCount: number;
+  competitionCount: number;
+};
+
+export type CompetitionListItem = {
+  id: string;
+  leagueId: string;
   name: string;
   slug: string;
   seasonLabel: string;
   description: string | null;
+  venueOverride: string | null;
   isPublic: boolean;
-  status: TournamentStatus;
-  parentTournamentId: string | null;
+  status: CompetitionStatus;
   createdAt: string;
+  teamCount: number;
 };
 
 export type TournamentStandingRow = {
@@ -128,7 +146,7 @@ export type TournamentMatchSheetInput = {
   homeScore: number;
   awayScore: number;
   notes?: string;
-  mvpEntryKey: string;
+  mvpEntryKey?: string | null;
   stats: Array<{
     entryKey: string;
     teamId: string;

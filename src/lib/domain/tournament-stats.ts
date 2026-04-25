@@ -37,7 +37,7 @@ export type TournamentMatchResultReference = {
   home_score: number;
   away_score: number;
   mvp_player_id: string | null;
-  mvp_player_name: string;
+  mvp_player_name: string | null;
   notes: string | null;
 };
 
@@ -63,6 +63,14 @@ function compareMaybeDates(left: string | null, right: string | null) {
   if (!left) return 1;
   if (!right) return -1;
   return new Date(left).getTime() - new Date(right).getTime();
+}
+
+function resolveTeamMeta(teamById: Map<string, TournamentTeamReference>, teamId: string) {
+  const team = teamById.get(teamId);
+  return {
+    teamName: team?.name ?? "Equipo",
+    teamShortName: team?.short_name ?? null
+  };
 }
 
 export function buildTournamentStandings(params: {
@@ -92,6 +100,7 @@ export function buildTournamentStandings(params: {
 
   for (const match of matches) {
     if (match.status !== "played") continue;
+
     const result = resultByMatchId.get(match.id);
     if (!result) continue;
 
@@ -108,12 +117,12 @@ export function buildTournamentStandings(params: {
 
     if (result.home_score > result.away_score) {
       homeRow.wins += 1;
-      homeRow.points += 3;
       awayRow.losses += 1;
+      homeRow.points += 3;
     } else if (result.home_score < result.away_score) {
       awayRow.wins += 1;
-      awayRow.points += 3;
       homeRow.losses += 1;
+      awayRow.points += 3;
     } else {
       homeRow.draws += 1;
       awayRow.draws += 1;
@@ -182,14 +191,6 @@ export function buildTournamentFixture(params: {
     });
 }
 
-function buildTeamNameForStat(teamById: Map<string, TournamentTeamReference>, teamId: string) {
-  const team = teamById.get(teamId);
-  return {
-    teamName: team?.name ?? "Equipo",
-    teamShortName: team?.short_name ?? null
-  };
-}
-
 export function buildTournamentTopScorers(params: {
   teams: TournamentTeamReference[];
   playerStats: TournamentMatchPlayerStatReference[];
@@ -206,7 +207,9 @@ export function buildTournamentTopScorers(params: {
 
   for (const row of playerStats) {
     if (row.goals <= 0) continue;
-    const key = `${row.team_id}:${row.player_id ?? row.player_name.toLowerCase()}`;
+
+    const key = `${row.team_id}:${row.player_id ?? row.player_name.trim().toLowerCase()}`;
+    const teamMeta = resolveTeamMeta(teamById, row.team_id);
     const current =
       scorers.get(key) ??
       {
@@ -214,8 +217,8 @@ export function buildTournamentTopScorers(params: {
         playerName: row.player_name,
         goals: 0,
         teamId: row.team_id,
-        teamName: buildTeamNameForStat(teamById, row.team_id).teamName,
-        teamShortName: buildTeamNameForStat(teamById, row.team_id).teamShortName,
+        teamName: teamMeta.teamName,
+        teamShortName: teamMeta.teamShortName,
         yellowCards: 0,
         redCards: 0
       };
@@ -231,7 +234,14 @@ export function buildTournamentTopScorers(params: {
       if (right.goals !== left.goals) return right.goals - left.goals;
       return left.playerName.localeCompare(right.playerName, "es");
     })
-    .map<TournamentTopScorerRow>(({ ...row }) => row);
+    .map<TournamentTopScorerRow>(({ playerId, playerName, goals, teamId, teamName, teamShortName }) => ({
+      playerId,
+      playerName,
+      goals,
+      teamId,
+      teamName,
+      teamShortName
+    }));
 }
 
 export function buildTournamentTopFigures(params: {
@@ -244,15 +254,17 @@ export function buildTournamentTopFigures(params: {
 
   for (const row of playerStats) {
     if (!row.is_mvp) continue;
-    const key = `${row.team_id}:${row.player_id ?? row.player_name.toLowerCase()}`;
+
+    const key = `${row.team_id}:${row.player_id ?? row.player_name.trim().toLowerCase()}`;
+    const teamMeta = resolveTeamMeta(teamById, row.team_id);
     const current =
       mvps.get(key) ??
       {
         playerId: row.player_id,
         playerName: row.player_name,
         teamId: row.team_id,
-        teamName: buildTeamNameForStat(teamById, row.team_id).teamName,
-        teamShortName: buildTeamNameForStat(teamById, row.team_id).teamShortName,
+        teamName: teamMeta.teamName,
+        teamShortName: teamMeta.teamShortName,
         mvpCount: 0
       };
 

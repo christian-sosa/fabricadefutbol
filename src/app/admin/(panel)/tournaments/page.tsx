@@ -2,19 +2,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import {
-  archiveTournamentAction,
-  createTournamentAction,
-  deleteTournamentAction
+  archiveLeagueAction,
+  createLeagueAction,
+  deleteLeagueAction
 } from "@/app/admin/(panel)/tournaments/actions";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
-import { requireAdminSession } from "@/lib/auth/admin";
-import { getAdminTournaments } from "@/lib/auth/tournaments";
 import { TEMP_SKIP_TOURNAMENT_CHECKOUT } from "@/lib/constants";
 import { syncTournamentBillingPaymentFromMercadoPago } from "@/lib/domain/tournament-billing-workflow";
+import { getAdminLeagueList } from "@/lib/queries/tournaments";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export default async function AdminTournamentsPage({
@@ -27,7 +26,6 @@ export default async function AdminTournamentsPage({
     success?: string;
   }>;
 }) {
-  const admin = await requireAdminSession();
   const resolvedSearchParams = await searchParams;
 
   let checkoutMessage: { tone: "danger" | "success" | "info"; text: string } | null = null;
@@ -36,7 +34,7 @@ export default async function AdminTournamentsPage({
     if (!supabaseAdmin) {
       checkoutMessage = {
         tone: "danger",
-        text: "Falta SUPABASE_SERVICE_ROLE_KEY para confirmar el pago del torneo."
+        text: "Falta SUPABASE_SERVICE_ROLE_KEY para confirmar el pago de la liga."
       };
     } else {
       try {
@@ -45,26 +43,26 @@ export default async function AdminTournamentsPage({
           mercadopagoPaymentId: resolvedSearchParams.payment_id
         });
 
-        if (resolvedSearchParams.checkout === "success" && syncResult.updated && syncResult.createdTournamentId) {
+        if (resolvedSearchParams.checkout === "success" && syncResult.updated && syncResult.createdLeagueId) {
           redirect(
-            `/admin/tournaments/${syncResult.createdTournamentId}?success=${encodeURIComponent("Torneo creado despues de confirmar el pago.")}`
+            `/admin/tournaments/${syncResult.createdLeagueId}?success=${encodeURIComponent("Liga creada despues de confirmar el pago.")}`
           );
         }
 
         if (resolvedSearchParams.checkout === "failure") {
           checkoutMessage = {
             tone: "danger",
-            text: "El pago no se completo. Puedes intentarlo de nuevo cuando quieras."
+            text: "El pago no se completó. Puedes intentarlo de nuevo cuando quieras."
           };
         } else if (resolvedSearchParams.checkout === "pending") {
           checkoutMessage = {
             tone: "info",
-            text: "El pago quedo pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear el torneo."
+            text: "El pago quedó pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear la liga."
           };
         } else if (syncResult.updated && syncResult.status === "approved") {
           checkoutMessage = {
             tone: "success",
-            text: "Pago aprobado. Estamos terminando de preparar el torneo."
+            text: "Pago aprobado. Estamos terminando de preparar la liga."
           };
         } else if (!syncResult.updated && "reason" in syncResult && syncResult.reason) {
           checkoutMessage = {
@@ -75,32 +73,23 @@ export default async function AdminTournamentsPage({
       } catch (error) {
         checkoutMessage = {
           tone: "danger",
-          text: error instanceof Error ? error.message : "No se pudo confirmar el pago del torneo."
+          text: error instanceof Error ? error.message : "No se pudo confirmar el pago de la liga."
         };
       }
     }
   } else if (resolvedSearchParams.checkout === "failure") {
     checkoutMessage = {
       tone: "danger",
-      text: "El pago no se completo. Puedes intentarlo de nuevo cuando quieras."
+      text: "El pago no se completó. Puedes intentarlo de nuevo cuando quieras."
     };
   } else if (resolvedSearchParams.checkout === "pending") {
     checkoutMessage = {
       tone: "info",
-      text: "El pago quedo pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear el torneo."
+      text: "El pago quedó pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear la liga."
     };
   }
 
-  const tournaments = await getAdminTournaments(admin);
-  const tournamentById = new Map(tournaments.map((tournament) => [tournament.id, tournament]));
-  const rootTournaments = tournaments.filter((tournament) => !tournament.parent_tournament_id);
-  const subtournamentsByParent = new Map<string, typeof tournaments>();
-  for (const tournament of tournaments) {
-    if (!tournament.parent_tournament_id) continue;
-    const current = subtournamentsByParent.get(tournament.parent_tournament_id) ?? [];
-    current.push(tournament);
-    subtournamentsByParent.set(tournament.parent_tournament_id, current);
-  }
+  const leagues = await getAdminLeagueList();
   const feedbackMessage = resolvedSearchParams.error
     ? { tone: "danger" as const, text: resolvedSearchParams.error }
     : resolvedSearchParams.success
@@ -110,9 +99,9 @@ export default async function AdminTournamentsPage({
   return (
     <div className="space-y-4">
       <Card>
-        <CardTitle>Torneos</CardTitle>
+        <CardTitle>Ligas</CardTitle>
         <CardDescription>
-          Crea y administra ligas, torneos o subtorneos independientes del flujo actual de grupos.
+          Crea y administra ligas con sus equipos maestros, competencias y admins sin mezclar este flujo con Grupos.
         </CardDescription>
         {feedbackMessage ? (
           <p
@@ -130,142 +119,91 @@ export default async function AdminTournamentsPage({
       </Card>
 
       <Card>
-        <CardTitle>Nuevo torneo base</CardTitle>
+        <CardTitle>Nueva liga</CardTitle>
         <CardDescription className="mt-2">
           {TEMP_SKIP_TOURNAMENT_CHECKOUT
-            ? "Ingresa un nombre unico y lo creamos directo. Ese torneo base despues puede tener varios subtorneos."
-            : "Ingresa un nombre unico y te llevamos a Mercado Pago para confirmar el alta del torneo base antes de habilitar sus subtorneos."}
+            ? "Carga el nombre de la liga y la creamos al instante. Luego podrás cargar equipos, competencias y capitanes opcionales."
+            : "Carga el nombre de la liga y te llevamos a Mercado Pago para confirmar el alta antes de habilitar equipos y competencias."}
         </CardDescription>
-        <form action={createTournamentAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+        <form action={createLeagueAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="name">
-              Nombre
+              Nombre de la liga
             </label>
-            <Input id="name" name="name" placeholder="Viernes A1" required />
+            <Input id="name" name="name" placeholder="Ej: LAFAB" required />
           </div>
           <div className="md:self-end">
-            <Button type="submit">{TEMP_SKIP_TOURNAMENT_CHECKOUT ? "Crear torneo" : "Continuar a Mercado Pago"}</Button>
+            <Button type="submit">{TEMP_SKIP_TOURNAMENT_CHECKOUT ? "Crear liga" : "Continuar a Mercado Pago"}</Button>
           </div>
         </form>
       </Card>
 
       <Card>
-        <CardTitle>Mis torneos</CardTitle>
+        <CardTitle>Mis ligas</CardTitle>
         <CardDescription>
-          Cada torneo base puede agrupar varios subtorneos. Entra a cada uno para cargar equipos, planteles, fixture y resultados.
+          Cada liga concentra equipos maestros y una o varias competencias como Viernes A, Viernes B o Copa Clausura.
         </CardDescription>
 
         <div className="mt-4 space-y-3">
-          {rootTournaments.length ? (
-            rootTournaments.map((tournament) => {
-              const subtournaments = (subtournamentsByParent.get(tournament.id) ?? []).sort((left, right) =>
-                left.name.localeCompare(right.name, "es")
-              );
-              return (
+          {leagues.length ? (
+            leagues.map((league) => (
               <div
                 className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 md:flex-row md:items-center md:justify-between"
-                key={tournament.id}
+                key={league.id}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-base font-semibold text-slate-100">{tournament.name}</p>
-                    <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-200">
-                      Torneo base
-                    </span>
-                    <TournamentStatusBadge status={tournament.status} />
+                    <p className="text-base font-semibold text-slate-100">{league.name}</p>
+                    <TournamentStatusBadge status={league.status} />
                   </div>
-                  <p className="mt-1 text-sm text-slate-400">/{tournament.slug}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {tournament.is_public ? "Visible publicamente" : "Solo admin"} - {subtournaments.length} subtorneo(s)
+                  <p className="mt-1 text-sm text-slate-400">/{league.slug}</p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {league.isPublic ? "Visible públicamente" : "Solo admin"} · {league.teamCount} equipos ·{" "}
+                    {league.competitionCount} competencias
                   </p>
-
-                  {subtournaments.length ? (
-                    <div className="mt-4 space-y-2 border-t border-slate-800/80 pt-4">
-                      {subtournaments.map((subtournament) => (
-                        <div
-                          className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-3 md:flex-row md:items-center md:justify-between"
-                          key={subtournament.id}
-                        >
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-semibold text-slate-100">{subtournament.name}</p>
-                              <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-200">
-                                Subtorneo
-                              </span>
-                              <TournamentStatusBadge status={subtournament.status} />
-                            </div>
-                            <p className="mt-1 text-xs text-slate-500">/{subtournament.slug}</p>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-3">
-                            <Link
-                              className="text-sm font-semibold text-emerald-300 hover:underline"
-                              href={`/admin/tournaments/${subtournament.id}`}
-                            >
-                              Gestionar
-                            </Link>
-                            <Link
-                              className="text-sm font-semibold text-sky-300 hover:underline"
-                              href={`/tournaments/${subtournament.slug}`}
-                            >
-                              Ver publico
-                            </Link>
-                            <form action={deleteTournamentAction}>
-                              <input name="tournamentId" type="hidden" value={subtournament.id} />
-                              <ConfirmSubmitButton
-                                className="h-8 px-3 text-xs"
-                                confirmMessage={`Estas seguro de borrar el subtorneo ${subtournament.name}?`}
-                                label="Borrar"
-                                variant="ghost"
-                              />
-                            </form>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  {league.venueName || league.locationNotes ? (
+                    <p className="mt-1 text-xs text-slate-400">
+                      {league.venueName ?? "Sede sin nombre"}
+                      {league.locationNotes ? ` · ${league.locationNotes}` : ""}
+                    </p>
                   ) : null}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
                   <Link
                     className="text-sm font-semibold text-emerald-300 hover:underline"
-                    href={`/admin/tournaments/${tournament.id}`}
+                    href={`/admin/tournaments/${league.id}`}
                   >
                     Gestionar
                   </Link>
                   <Link
                     className="text-sm font-semibold text-sky-300 hover:underline"
-                    href={`/tournaments/${tournament.slug}`}
+                    href={`/tournaments/${league.slug}`}
                   >
-                    Ver publico
+                    Ver pública
                   </Link>
-                  {tournament.status !== "archived" ? (
-                    <form action={archiveTournamentAction}>
-                      <input name="tournamentId" type="hidden" value={tournament.id} />
+                  {league.status !== "archived" ? (
+                    <form action={archiveLeagueAction}>
+                      <input name="leagueId" type="hidden" value={league.id} />
                       <Button type="submit" variant="ghost">
                         Archivar
                       </Button>
                     </form>
                   ) : null}
-                  <form action={deleteTournamentAction}>
-                    <input name="tournamentId" type="hidden" value={tournament.id} />
+                  <form action={deleteLeagueAction}>
+                    <input name="leagueId" type="hidden" value={league.id} />
                     <ConfirmSubmitButton
                       className="h-8 px-3 text-xs"
-                      confirmMessage={`Estas seguro de borrar el torneo ${tournament.name}? Si tiene subtorneos primero deberas borrarlos.`}
+                      confirmMessage={`¿Seguro que quieres borrar la liga ${league.name}? Antes debe estar sin competencias.`}
                       label="Borrar"
                       variant="ghost"
                     />
                   </form>
                 </div>
               </div>
-            );
-            })
+            ))
           ) : (
-            <p className="text-sm text-slate-400">
-              {tournaments.length
-                ? `Tus torneos actuales dependen de ${tournamentById.get(tournaments[0]?.parent_tournament_id ?? "")?.name ?? "otro torneo base"}.`
-                : "Todavia no administras ningun torneo."}
-            </p>
+            <p className="text-sm text-slate-400">Todavía no administras ninguna liga.</p>
           )}
         </div>
       </Card>

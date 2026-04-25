@@ -10,20 +10,19 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type InviteRow = {
   id: string;
-  tournament_id: string;
+  league_id: string;
   email: string;
-  invited_by: string;
   status: "pending" | "accepted" | "revoked";
   expires_at: string;
 };
 
-function buildTournamentAdminPanelHref(tournamentId: string) {
+function buildLeagueAdminPanelHref(leagueId: string) {
   const searchParams = new URLSearchParams({
-    tab: "summary",
-    success: "Ya tienes acceso como admin del torneo."
+    tab: "admins",
+    success: "Ya tienes acceso como admin de la liga."
   });
 
-  return `/admin/tournaments/${tournamentId}?${searchParams.toString()}`;
+  return `/admin/tournaments/${leagueId}?${searchParams.toString()}`;
 }
 
 export default async function TournamentAdminInvitePage({
@@ -37,8 +36,8 @@ export default async function TournamentAdminInvitePage({
   const privilegedSupabase = createSupabaseAdminClient() ?? supabase;
 
   const { data: invite, error: inviteError } = await privilegedSupabase
-    .from("tournament_admin_invites")
-    .select("id, tournament_id, email, invited_by, status, expires_at")
+    .from("league_admin_invites")
+    .select("id, league_id, email, status, expires_at")
     .eq("invite_token", token)
     .eq("status", "pending")
     .maybeSingle();
@@ -52,7 +51,7 @@ export default async function TournamentAdminInvitePage({
     return (
       <div className="py-6">
         <Card>
-          <CardTitle>Invitacion invalida</CardTitle>
+          <CardTitle>Invitación inválida</CardTitle>
           <CardDescription>Este link no existe, ya fue usado o fue cancelado.</CardDescription>
           <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href={loginHref}>
             Ir a login
@@ -67,8 +66,8 @@ export default async function TournamentAdminInvitePage({
     return (
       <div className="py-6">
         <Card>
-          <CardTitle>Invitacion vencida</CardTitle>
-          <CardDescription>Este link ya expiro. Pide una nueva invitacion al admin del torneo.</CardDescription>
+          <CardTitle>Invitación vencida</CardTitle>
+          <CardDescription>Este link ya expiró. Pide una nueva invitación al admin de la liga.</CardDescription>
           <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href={loginHref}>
             Ir a login
           </Link>
@@ -93,7 +92,7 @@ export default async function TournamentAdminInvitePage({
         <Card>
           <CardTitle>Email no coincide</CardTitle>
           <CardDescription>
-            Esta invitacion corresponde a <strong>{pendingInvite.email}</strong>, pero estas logueado con{" "}
+            Esta invitación corresponde a <strong>{pendingInvite.email}</strong>, pero estás logueado con{" "}
             <strong>{user.email}</strong>.
           </CardDescription>
           <Link className="mt-3 inline-flex text-sm font-semibold text-emerald-300 hover:underline" href={loginHref}>
@@ -116,11 +115,11 @@ export default async function TournamentAdminInvitePage({
     throw new Error(ensureAdminError.message);
   }
 
-  const { error: insertMembershipError } = await privilegedSupabase.from("tournament_admins").insert({
-    tournament_id: pendingInvite.tournament_id,
+  const { error: insertMembershipError } = await privilegedSupabase.from("league_admins").insert({
+    league_id: pendingInvite.league_id,
     admin_id: user.id,
     role: "editor",
-    created_by: pendingInvite.invited_by
+    created_by: user.id
   });
 
   if (insertMembershipError && insertMembershipError.code !== "23505") {
@@ -128,7 +127,7 @@ export default async function TournamentAdminInvitePage({
   }
 
   const { error: deleteInviteError } = await privilegedSupabase
-    .from("tournament_admin_invites")
+    .from("league_admin_invites")
     .delete()
     .eq("id", pendingInvite.id)
     .eq("status", "pending")
@@ -138,5 +137,5 @@ export default async function TournamentAdminInvitePage({
     throw new Error(deleteInviteError.message);
   }
 
-  redirect(buildTournamentAdminPanelHref(pendingInvite.tournament_id));
+  redirect(buildLeagueAdminPanelHref(pendingInvite.league_id));
 }

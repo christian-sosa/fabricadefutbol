@@ -35,12 +35,13 @@ export default function PricingPage() {
       price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS)} / mes`,
       badge: "Competencia completa",
       description:
-        "Pensado para ligas y organizadores que necesitan crear y administrar varios torneos o subtorneos. El alta se inicia desde Mercado Pago antes de habilitar cada nuevo torneo.",
+        "Pensado para ligas y organizadores que necesitan crear una liga y administrar varias competencias dentro de ella. El alta se inicia desde Mercado Pago antes de habilitar cada nueva liga.",
       items: [
-        "Varios torneos o subtorneos por organizador",
+        "Una liga con multiples competencias",
+        "Equipos maestros reutilizables entre competencias",
         "Fixture automatico o armado manual fecha por fecha",
         "Capitanes opcionales segun cada admin",
-        "Hasta 4 administradores por torneo",
+        "Hasta 4 administradores por liga",
         "Tabla, fixture y estadisticas publicas para compartir"
       ]
     }
@@ -100,8 +101,8 @@ export default function PricingPage() {
         <Card>
           <CardTitle>Que incluye el pack Torneos</CardTitle>
           <CardDescription className="mt-3">
-            El pack cubre la operacion de una competicion: varios subtorneos, fixture automatico o manual,
-            capitanes opcionales, hasta 4 admins y estadisticas publicas.
+            El pack cubre la operacion de una liga con sus competencias: equipos maestros, fixture automatico o
+            manual, capitanes opcionales, hasta 4 admins y estadisticas publicas.
           </CardDescription>
         </Card>
       </section>

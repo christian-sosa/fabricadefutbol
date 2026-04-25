@@ -4,38 +4,33 @@ import { redirect } from "next/navigation";
 import { getAdminSession, type AdminSession } from "@/lib/auth/admin";
 import { buildAdminLoginPath } from "@/lib/auth/redirects";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { TournamentStatus } from "@/types/domain";
+import type { CompetitionStatus } from "@/types/domain";
 
 export type CaptainAssignment = {
   assignmentId: string;
-  tournamentId: string;
-  teamId: string;
-  tournamentName: string;
-  tournamentSlug: string;
-  tournamentStatus: TournamentStatus;
-  tournamentIsPublic: boolean;
+  leagueId: string;
+  leagueName: string;
+  leagueSlug: string;
+  competitionId: string;
+  competitionName: string;
+  competitionSlug: string;
+  competitionStatus: CompetitionStatus;
+  competitionIsPublic: boolean;
   seasonLabel: string;
+  competitionTeamId: string;
+  leagueTeamId: string;
   teamName: string;
   teamShortName: string | null;
   createdAt: string;
+  tournamentId: string;
+  tournamentName: string;
+  tournamentSlug: string;
+  teamId: string;
 };
 
-function isMissingCaptainTableError(error: { message?: string | null } | null | undefined) {
-  const message = String(error?.message ?? "").toLowerCase();
-  if (!message) return false;
-
-  return (
-    (message.includes("tournament_team_captains") &&
-      (message.includes("schema cache") ||
-        message.includes("could not find the table") ||
-        message.includes("does not exist"))) ||
-    message.includes("relation \"public.tournament_team_captains\" does not exist")
-  );
-}
-
-function buildCaptainSelectionPath(params: { tournamentId?: string | null; teamId?: string | null }) {
+function buildCaptainSelectionPath(params: { competitionId?: string | null; teamId?: string | null }) {
   const searchParams = new URLSearchParams();
-  if (params.tournamentId) searchParams.set("tournament", params.tournamentId);
+  if (params.competitionId) searchParams.set("competition", params.competitionId);
   if (params.teamId) searchParams.set("team", params.teamId);
   const query = searchParams.toString();
   return query ? `/captain?${query}` : "/captain";
@@ -53,15 +48,12 @@ export async function requireCaptainSession(nextPath = "/captain"): Promise<Admi
 export async function getCaptainAssignments(userId: string): Promise<CaptainAssignment[]> {
   const supabase = await createSupabaseServerClient();
   const { data: captainRows, error: captainError } = await supabase
-    .from("tournament_team_captains")
-    .select("id, tournament_id, team_id, created_at")
+    .from("competition_team_captains")
+    .select("id, competition_id, competition_team_id, created_at")
     .eq("captain_id", userId)
     .order("created_at", { ascending: true });
 
   if (captainError) {
-    if (isMissingCaptainTableError(captainError)) {
-      return [];
-    }
     throw new Error(captainError.message);
   }
 
@@ -69,99 +61,123 @@ export async function getCaptainAssignments(userId: string): Promise<CaptainAssi
     return [];
   }
 
-  const tournamentIds = Array.from(new Set(captainRows.map((row) => row.tournament_id)));
-  const teamIds = Array.from(new Set(captainRows.map((row) => row.team_id)));
+  const competitionIds = Array.from(new Set(captainRows.map((row) => String(row.competition_id))));
+  const competitionTeamIds = Array.from(new Set(captainRows.map((row) => String(row.competition_team_id))));
 
-  const [{ data: tournaments, error: tournamentsError }, { data: teams, error: teamsError }] = await Promise.all([
-    supabase
-      .from("tournaments")
-      .select("id, name, slug, season_label, status, is_public")
-      .in("id", tournamentIds),
-    supabase.from("tournament_teams").select("id, tournament_id, name, short_name").in("id", teamIds)
-  ]);
+  const [{ data: competitions, error: competitionsError }, { data: competitionTeams, error: competitionTeamsError }] =
+    await Promise.all([
+      supabase
+        .from("competitions")
+        .select("id, league_id, name, slug, season_label, status, is_public")
+        .in("id", competitionIds),
+      supabase
+        .from("competition_teams")
+        .select("id, competition_id, league_team_id, display_name, short_name")
+        .in("id", competitionTeamIds)
+    ]);
 
-  if (tournamentsError) {
-    throw new Error(tournamentsError.message);
+  if (competitionsError) {
+    throw new Error(competitionsError.message);
   }
-  if (teamsError) {
-    throw new Error(teamsError.message);
+  if (competitionTeamsError) {
+    throw new Error(competitionTeamsError.message);
   }
 
-  const tournamentsById = new Map((tournaments ?? []).map((row) => [row.id, row]));
-  const teamsById = new Map((teams ?? []).map((row) => [row.id, row]));
+  const leagueIds = Array.from(
+    new Set((competitions ?? []).map((row) => String(row.league_id)).filter(Boolean))
+  );
+  const { data: leagues, error: leaguesError } = await supabase
+    .from("leagues")
+    .select("id, name, slug")
+    .in("id", leagueIds);
 
-  return captainRows
+  if (leaguesError) {
+    throw new Error(leaguesError.message);
+  }
+
+  const competitionsById = new Map((competitions ?? []).map((row) => [String(row.id), row]));
+  const competitionTeamsById = new Map((competitionTeams ?? []).map((row) => [String(row.id), row]));
+  const leaguesById = new Map((leagues ?? []).map((row) => [String(row.id), row]));
+
+  return (captainRows ?? [])
     .flatMap((row) => {
-      const tournament = tournamentsById.get(row.tournament_id);
-      const team = teamsById.get(row.team_id);
+      const competition = competitionsById.get(String(row.competition_id));
+      const competitionTeam = competitionTeamsById.get(String(row.competition_team_id));
+      const league = competition ? leaguesById.get(String(competition.league_id)) : null;
 
-      if (!tournament || !team) {
+      if (!competition || !competitionTeam || !league) {
         return [];
       }
 
       return [
         {
-          assignmentId: row.id,
-          tournamentId: tournament.id,
-          teamId: team.id,
-          tournamentName: tournament.name,
-          tournamentSlug: tournament.slug,
-          tournamentStatus: tournament.status,
-          tournamentIsPublic: tournament.is_public,
-          seasonLabel: tournament.season_label,
-          teamName: team.name,
-          teamShortName: team.short_name,
-          createdAt: row.created_at
+          assignmentId: String(row.id),
+          leagueId: String(league.id),
+          leagueName: String(league.name),
+          leagueSlug: String(league.slug),
+          competitionId: String(competition.id),
+          competitionName: String(competition.name),
+          competitionSlug: String(competition.slug),
+          competitionStatus: competition.status as CompetitionStatus,
+          competitionIsPublic: Boolean(competition.is_public),
+          seasonLabel: String(competition.season_label),
+          competitionTeamId: String(competitionTeam.id),
+          leagueTeamId: String(competitionTeam.league_team_id),
+          teamName: String(competitionTeam.display_name),
+          teamShortName: competitionTeam.short_name ? String(competitionTeam.short_name) : null,
+          createdAt: String(row.created_at),
+          tournamentId: String(competition.id),
+          tournamentName: String(competition.name),
+          tournamentSlug: String(competition.slug),
+          teamId: String(competitionTeam.id)
         } satisfies CaptainAssignment
       ];
     })
     .sort((left, right) => {
-      const tournamentComparison = left.tournamentName.localeCompare(right.tournamentName, "es");
-      if (tournamentComparison !== 0) return tournamentComparison;
+      const leagueComparison = left.leagueName.localeCompare(right.leagueName, "es");
+      if (leagueComparison !== 0) return leagueComparison;
+      const competitionComparison = left.competitionName.localeCompare(right.competitionName, "es");
+      if (competitionComparison !== 0) return competitionComparison;
       return left.teamName.localeCompare(right.teamName, "es");
     });
 }
 
-export async function hasCaptainAssignments(userId: string) {
-  const assignments = await getCaptainAssignments(userId);
-  return assignments.length > 0;
-}
-
 function findSelectedAssignment(params: {
   assignments: CaptainAssignment[];
-  tournamentId?: string | null;
+  competitionId?: string | null;
   teamId?: string | null;
 }) {
-  const { assignments, tournamentId, teamId } = params;
+  const { assignments, competitionId, teamId } = params;
   if (!assignments.length) return null;
 
   if (teamId) {
-    const byTeam = assignments.find((assignment) => assignment.teamId === teamId);
+    const byTeam = assignments.find((assignment) => assignment.competitionTeamId === teamId);
     if (byTeam) return byTeam;
   }
 
-  if (tournamentId) {
-    const byTournament = assignments.find((assignment) => assignment.tournamentId === tournamentId);
-    if (byTournament) return byTournament;
+  if (competitionId) {
+    const byCompetition = assignments.find((assignment) => assignment.competitionId === competitionId);
+    if (byCompetition) return byCompetition;
   }
 
   return assignments[0] ?? null;
 }
 
 export async function getCaptainContext(params?: {
-  tournamentId?: string | null;
+  competitionId?: string | null;
   teamId?: string | null;
   nextPath?: string;
 }) {
   noStore();
 
   const nextPath =
-    params?.nextPath ?? buildCaptainSelectionPath({ tournamentId: params?.tournamentId, teamId: params?.teamId });
+    params?.nextPath ??
+    buildCaptainSelectionPath({ competitionId: params?.competitionId, teamId: params?.teamId });
   const captain = await requireCaptainSession(nextPath);
   const assignments = await getCaptainAssignments(captain.userId);
   const selectedAssignment = findSelectedAssignment({
     assignments,
-    tournamentId: params?.tournamentId,
+    competitionId: params?.competitionId,
     teamId: params?.teamId
   });
 
@@ -172,20 +188,23 @@ export async function getCaptainContext(params?: {
   };
 }
 
-export async function assertCaptainTeamAction(params: { tournamentId: string; teamId: string }) {
+export async function assertCaptainTeamAction(params: {
+  competitionId: string;
+  competitionTeamId: string;
+}) {
   const captain = await requireCaptainSession(
     buildCaptainSelectionPath({
-      tournamentId: params.tournamentId,
-      teamId: params.teamId
+      competitionId: params.competitionId,
+      teamId: params.competitionTeamId
     })
   );
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from("tournament_team_captains")
+    .from("competition_team_captains")
     .select("id")
     .eq("captain_id", captain.userId)
-    .eq("tournament_id", params.tournamentId)
-    .eq("team_id", params.teamId)
+    .eq("competition_id", params.competitionId)
+    .eq("competition_team_id", params.competitionTeamId)
     .maybeSingle();
 
   if (error) {
