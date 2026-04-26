@@ -118,7 +118,13 @@ export function AdminSubnav() {
   const currentTab = searchParams.get("tab");
   const tournamentId = getTournamentIdFromPath(pathname);
 
-  if (!pathname.startsWith("/admin") || pathname.startsWith("/admin/super")) {
+  if (
+    !pathname.startsWith("/admin") ||
+    pathname.startsWith("/admin/super") ||
+    pathname === "/admin/new" ||
+    pathname === "/admin/tournaments/new" ||
+    (pathname === "/admin" && !organizationKey)
+  ) {
     return null;
   }
 
@@ -134,12 +140,14 @@ export function AdminSubnav() {
       <div className="space-y-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-400">
-            {isTournamentArea ? "Contexto torneos" : "Contexto grupos"}
+            {isTournamentArea ? (tournamentId ? "Liga actual" : "Torneos") : "Grupo actual"}
           </p>
           <p className="mt-1 text-sm text-slate-400">
             {isTournamentArea
-              ? "Gestiona ligas, competencias, inscriptos, resultados y facturacion sin mezclarte con grupos."
-              : "Gestiona jugadores, partidos, historial y billing del grupo activo desde un subpanel dedicado."}
+              ? tournamentId
+                ? "Estas trabajando dentro de una liga. Las competencias, equipos y resultados quedan separados de Grupos."
+                : "Elige una liga para administrar sus equipos, competencias, resultados y facturacion."
+              : "Estas trabajando dentro de un grupo. Jugadores, partidos, historial y facturacion quedan en este espacio."}
           </p>
         </div>
 

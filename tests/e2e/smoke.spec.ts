@@ -40,7 +40,8 @@ test("login admin, crea partido, carga resultado y lo ve en publico", async ({ p
   await loginForm.getByLabel("Contrasena", { exact: true }).fill(ADMIN_PASSWORD);
   await loginForm.getByRole("button", { name: "Ingresar", exact: true }).click();
   await page.waitForURL("**/admin");
-  await expect(page.getByText("Cuenta administradora")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Que queres administrar?" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Entrar al grupo" }).first()).toBeVisible();
 
   await page.goto(`/admin/matches/new?org=${ORG_SLUG}`);
 
