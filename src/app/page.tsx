@@ -100,7 +100,7 @@ export default async function HomePage({
               Con Fábrica de Fútbol cargás jugadores, organizás partidos, medís rendimiento y publicás ranking, historial y próximas fechas para todos.
             </p>
             <p className="mt-4 max-w-2xl rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100">
-              Probá 1 mes gratis. Después, {monthlyGroupPrice}/mes por organización para seguir creando partidos y cargando resultados.
+              Probá 1 mes gratis. Después, {monthlyGroupPrice}/mes por grupo para seguir creando partidos y cargando resultados.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">

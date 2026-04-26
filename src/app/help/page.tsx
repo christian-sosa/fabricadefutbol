@@ -68,7 +68,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
     title: "Organizá tu grupo sin discusiones",
     description:
       "Armá partidos parejos, cargá resultados y mantené un ranking real de tu grupo. Fábrica de Fútbol te ayuda a llevar el historial, los jugadores y los próximos partidos en un solo lugar.",
-    priceDescription: `Probá 1 mes gratis. Después, ${groupMonthlyPrice}/mes por organización para seguir creando partidos y cargando resultados.`,
+    priceDescription: `Probá 1 mes gratis. Después, ${groupMonthlyPrice}/mes por grupo para seguir creando partidos y cargando resultados.`,
     primaryCtaLabel: "Crear mi grupo gratis",
     listingCtaLabel: "Ver grupo de ejemplo",
     capabilitiesLabel: "Qué podés hacer con Grupos",

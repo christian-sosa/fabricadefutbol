@@ -55,8 +55,8 @@ export default async function NewOrganizationPage({
       <Card className="p-5 sm:p-6">
         <CardTitle>Datos del grupo</CardTitle>
         <CardDescription className="mt-2">
-          1 mes de prueba gratis por organizacion. Despues, $
-          {formatAmountArs(ORGANIZATION_MONTHLY_PRICE_ARS)}/mes para seguir creando.
+          Probá 1 mes gratis. Después, ${formatAmountArs(ORGANIZATION_MONTHLY_PRICE_ARS)} ARS/mes por grupo
+          para seguir creando partidos y cargando resultados.
         </CardDescription>
 
         {!creationAccess.canCreateOrganization && organizations.length > 1 ? (
