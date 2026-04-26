@@ -13,7 +13,7 @@ export default async function AdminPanelLayout({ children }: { children: React.R
         <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-xl font-black text-slate-100">Hola, {admin.displayName}</h1>
-            <p className="text-sm text-slate-400">Gestiona tu cuenta y entra al modulo que necesites.</p>
+            <p className="text-sm text-slate-400">{admin.email}</p>
           </div>
           <SignOutButton />
         </div>

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import { formatRendimiento } from "@/lib/utils";
 
 type OptionPlayer = {
   id: string;
@@ -38,8 +39,8 @@ export function TeamOptionCard({
         <div>
           <CardTitle>Opcion {optionNumber}</CardTitle>
           <CardDescription>
-            Suma A: {ratingSumA.toFixed(2)} | Suma B: {ratingSumB.toFixed(2)} | Diferencia:{" "}
-            <span className="font-semibold text-emerald-300">{ratingDiff.toFixed(2)}</span>
+            Balance A: {formatRendimiento(ratingSumA)} | Balance B: {formatRendimiento(ratingSumB)} | Diferencia:{" "}
+            <span className="font-semibold text-emerald-300">{formatRendimiento(ratingDiff)}</span>
           </CardDescription>
         </div>
         {isConfirmed ? (
@@ -64,7 +65,7 @@ export function TeamOptionCard({
                     </span>
                   ) : null}
                 </span>
-                {!player.is_guest ? <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span> : null}
+                {!player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
               </li>
             ))}
           </ul>
@@ -83,7 +84,7 @@ export function TeamOptionCard({
                     </span>
                   ) : null}
                 </span>
-                {!player.is_guest ? <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span> : null}
+                {!player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
               </li>
             ))}
           </ul>

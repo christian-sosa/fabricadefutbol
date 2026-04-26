@@ -655,7 +655,7 @@ async function rollbackPreviousRatingHistory(supabase: DbClient, matchId: string
     .select("id, player_id, delta")
     .eq("match_id", matchId);
 
-  if (historyError) throw new Error(`No se pudo leer historial de ratings: ${historyError.message}`);
+  if (historyError) throw new Error(`No se pudo leer historial de rendimiento: ${historyError.message}`);
   if (!previousHistory?.length) return;
 
   for (const row of previousHistory) {
@@ -665,22 +665,22 @@ async function rollbackPreviousRatingHistory(supabase: DbClient, matchId: string
       .eq("id", row.player_id)
       .single();
     if (playerError || !playerRow) {
-      throw new Error("No se pudo restaurar rating anterior.");
+      throw new Error("No se pudo restaurar rendimiento anterior.");
     }
 
-    const reverted = Number((Number(playerRow.current_rating) - Number(row.delta)).toFixed(2));
+    const reverted = Math.round(Number(playerRow.current_rating) - Number(row.delta));
     const { error: revertError } = await supabase
       .from("players")
       .update({ current_rating: reverted })
       .eq("id", row.player_id);
     if (revertError) {
-      throw new Error(`No se pudo revertir rating de jugador: ${revertError.message}`);
+      throw new Error(`No se pudo revertir rendimiento de jugador: ${revertError.message}`);
     }
   }
 
   const { error: deleteHistoryError } = await supabase.from("rating_history").delete().eq("match_id", matchId);
   if (deleteHistoryError) {
-    throw new Error(`No se pudo limpiar historial previo de ratings: ${deleteHistoryError.message}`);
+    throw new Error(`No se pudo limpiar historial previo de rendimiento: ${deleteHistoryError.message}`);
   }
 }
 
@@ -728,13 +728,13 @@ async function loadConfirmedTeams(
   ]);
 
   if (playersError) {
-    throw new Error(`No se pudieron leer ratings de jugadores: ${playersError.message}`);
+    throw new Error(`No se pudieron leer rendimientos de jugadores: ${playersError.message}`);
   }
   if (guestsError) {
     if (isGuestSchemaMissing(guestsError.message)) {
-      throw new Error(buildGuestSchemaErrorMessage("No se pudieron leer ratings de invitados."));
+        throw new Error(buildGuestSchemaErrorMessage("No se pudieron leer rendimientos de invitados."));
     }
-    throw new Error(`No se pudieron leer ratings de invitados: ${guestsError.message}`);
+    throw new Error(`No se pudieron leer rendimientos de invitados: ${guestsError.message}`);
   }
 
   const playersById = new Map((players ?? []).map((player) => [player.id, player]));
@@ -798,12 +798,12 @@ function normalizeLineupGuests(rawGuests: NewGuestLineupInput[] | undefined) {
       throw new Error("Los invitados agregados deben tener nombre.");
     }
     if (!Number.isFinite(normalizedRating) || normalizedRating <= 0) {
-      throw new Error(`El invitado ${normalizedName} tiene un rating invalido.`);
+      throw new Error(`El invitado ${normalizedName} tiene un rendimiento invalido.`);
     }
 
     return {
       name: normalizedName,
-      rating: Number(normalizedRating.toFixed(2)),
+      rating: Math.round(normalizedRating),
       team: guest.team
     };
   });
@@ -1116,7 +1116,7 @@ export async function saveMatchResult(params: {
       .eq("id", adjustment.playerId);
 
     if (updatePlayerError) {
-      throw new Error(`No se pudo actualizar rating de un jugador: ${updatePlayerError.message}`);
+      throw new Error(`No se pudo actualizar rendimiento de un jugador: ${updatePlayerError.message}`);
     }
   }
 
@@ -1132,7 +1132,7 @@ export async function saveMatchResult(params: {
 
     const { error: historyInsertError } = await supabase.from("rating_history").insert(historyRows);
     if (historyInsertError) {
-      throw new Error(`No se pudo guardar historial de ratings: ${historyInsertError.message}`);
+      throw new Error(`No se pudo guardar historial de rendimiento: ${historyInsertError.message}`);
     }
   }
 

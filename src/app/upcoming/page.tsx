@@ -7,6 +7,7 @@ import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { getUpcomingConfirmedMatches, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
+import { formatRendimiento } from "@/lib/utils";
 
 export default async function UpcomingPage({
   searchParams
@@ -61,7 +62,7 @@ export default async function UpcomingPage({
                             ) : null}
                           </span>
                         </div>
-                        {!player.is_guest ? <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span> : null}
+                        {!player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
                       </li>
                     ))}
                   </ul>
@@ -82,7 +83,7 @@ export default async function UpcomingPage({
                             ) : null}
                           </span>
                         </div>
-                        {!player.is_guest ? <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span> : null}
+                        {!player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
                       </li>
                     ))}
                   </ul>

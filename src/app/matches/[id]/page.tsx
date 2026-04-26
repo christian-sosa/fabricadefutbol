@@ -8,6 +8,7 @@ import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { getMatchDetails } from "@/lib/queries/public";
+import { formatRendimiento } from "@/lib/utils";
 
 export async function generateMetadata({
   params,
@@ -73,7 +74,7 @@ export default async function MatchDetailPage({
                       </span>
                     ) : null}
                   </span>
-                  {!player.is_guest ? <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span> : null}
+                  {!player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
                 </li>
               ))}
             </ul>
@@ -92,7 +93,7 @@ export default async function MatchDetailPage({
                       </span>
                     ) : null}
                   </span>
-                  {!player.is_guest ? <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span> : null}
+                  {!player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
                 </li>
               ))}
             </ul>

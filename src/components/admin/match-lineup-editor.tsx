@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { formatRendimiento } from "@/lib/utils";
 import type { TeamSide } from "@/types/domain";
 
 type ExistingParticipant = {
@@ -158,7 +159,7 @@ export function MatchLineupEditor({
               <div className="text-sm text-slate-200">
                 {participant.fullName}
                 <span className="ml-2 text-xs text-slate-400">
-                  {participant.source === "guest" ? "Invitado" : participant.rating.toFixed(2)}
+                  {participant.source === "guest" ? "Invitado" : `Rendimiento ${formatRendimiento(participant.rating)}`}
                 </span>
               </div>
               <Select
@@ -192,7 +193,7 @@ export function MatchLineupEditor({
             ) : null}
             {availableReplacementPlayers.map((player) => (
               <option key={player.id} value={player.id}>
-                {player.fullName} ({player.rating.toFixed(2)})
+                {player.fullName} ({formatRendimiento(player.rating)})
               </option>
             ))}
           </Select>
@@ -229,7 +230,7 @@ export function MatchLineupEditor({
                 <div className="text-sm text-slate-200">
                   {playerData?.fullName ?? "Jugador"}
                   <span className="ml-2 text-xs text-slate-400">
-                    {playerData ? playerData.rating.toFixed(2) : "-"}
+                    {playerData ? formatRendimiento(playerData.rating) : "-"}
                   </span>
                 </div>
                 <Select
@@ -277,7 +278,7 @@ export function MatchLineupEditor({
                 {
                   id: guestSequence,
                   name: "",
-                  rating: "10",
+                  rating: "1000",
                   team: "A"
                 }
               ]);
@@ -307,7 +308,7 @@ export function MatchLineupEditor({
                 value={guest.name}
               />
               <Input
-                min={0.01}
+                min={1}
                 onChange={(event) =>
                   setNewGuests((current) =>
                     current.map((item) =>
@@ -315,8 +316,8 @@ export function MatchLineupEditor({
                     )
                   )
                 }
-                placeholder="Rating"
-                step={0.01}
+                placeholder="Rendimiento"
+                step={1}
                 type="number"
                 value={guest.rating}
               />

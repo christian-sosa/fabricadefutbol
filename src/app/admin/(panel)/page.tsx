@@ -76,16 +76,6 @@ export default async function AdminDashboardPage({
   return (
     <div className="space-y-4">
       <Card>
-        <CardTitle>Cuenta administradora</CardTitle>
-        <CardDescription>
-          {admin.displayName} ({admin.email})
-        </CardDescription>
-        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-emerald-300">
-          Rol: {admin.isSuperAdmin ? "Super Admin" : "Admin de grupos"}
-        </p>
-      </Card>
-
-      <Card>
         <CardTitle>Crear grupo</CardTitle>
         <CardDescription>
           1 mes de prueba gratis por organización. Después, $

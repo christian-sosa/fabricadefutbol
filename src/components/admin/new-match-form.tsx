@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { cn, formatRendimiento } from "@/lib/utils";
 import type { MatchModality, TeamSide } from "@/types/domain";
 
 type SelectablePlayer = {
@@ -306,7 +306,7 @@ export function NewMatchForm({
                 </span>
               </span>
               <span className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span>
+                <span className="text-xs font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span>
                 <span className="flex items-center gap-1 rounded border border-slate-700 px-2 py-1">
                   <span className="text-[11px] font-semibold uppercase text-slate-300">Juega</span>
                   <input
@@ -427,7 +427,7 @@ export function NewMatchForm({
                       <span className="ml-2 text-xs text-slate-400">
                         {participant.source === "guest"
                           ? `Invitado | Nivel ${participant.rating}`
-                          : `Jugador | rating ${participant.rating.toFixed(2)}`}
+                          : `Jugador | rendimiento ${formatRendimiento(participant.rating)}`}
                       </span>
                     </div>
                     <Select

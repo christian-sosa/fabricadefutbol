@@ -134,7 +134,7 @@ export function calculatePlayerStats(params: {
       return {
         playerId: stats.playerId,
         playerName: stats.playerName,
-        currentRating: Number(stats.currentRating.toFixed(2)),
+        currentRating: Math.round(stats.currentRating),
         initialRank: stats.initialRank,
         currentRank,
         matchesPlayed: stats.matchesPlayed,

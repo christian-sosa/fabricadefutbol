@@ -10,6 +10,7 @@ import { formatMatchDateTime } from "@/lib/match-datetime";
 import { getOrganizationImageUrl } from "@/lib/organization-images";
 import { withOrgQuery } from "@/lib/org";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
+import { formatRendimiento } from "@/lib/utils";
 
 export default async function GroupsPage({
   searchParams
@@ -107,7 +108,7 @@ export default async function GroupsPage({
                           #{index + 1} {player.full_name}
                         </span>
                       </div>
-                      <span className="font-semibold text-emerald-300">{Number(player.current_rating).toFixed(2)}</span>
+                      <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span>
                     </div>
                   ))
                 ) : (

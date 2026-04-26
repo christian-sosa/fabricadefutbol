@@ -10,6 +10,7 @@ import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery, withPublicQuery } from "@/lib/org";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
 import { getPublicLeagues } from "@/lib/queries/tournaments";
+import { formatRendimiento } from "@/lib/utils";
 
 const problemItems = [
   "Equipos desbalanceados",
@@ -37,7 +38,7 @@ const howItWorksSteps = [
   {
     title: "Paso 3",
     heading: "Armar partidos",
-    description: "Convocas jugadores y la app combina nivel manual con rating actual para equilibrar equipos."
+    description: "Convocas jugadores y la app combina nivel manual con rendimiento actual para equilibrar equipos."
   },
   {
     title: "Paso 4",
@@ -231,7 +232,7 @@ export default async function HomePage({
             </CardDescription>
           </Card>
           <Card>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Rating competitivo</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Rendimiento competitivo</p>
             <CardTitle className="mt-2">El ranking que aprende con los partidos</CardTitle>
             <CardDescription className="mt-3 text-base">
               Sube o baja cuando se cargan resultados. Es lo que ordena el ranking publico y ayuda a ajustar el armado
@@ -274,7 +275,7 @@ export default async function HomePage({
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Lectura rapida</p>
               <CardTitle className="mt-2">Que ves en el ranking</CardTitle>
               <CardDescription className="mt-3 text-base">
-                Cada fila te muestra puesto actual, jugador, rating y rendimiento para leer el momento del grupo en segundos.
+                Cada fila te muestra puesto actual, jugador, rendimiento y estadisticas para leer el momento del grupo en segundos.
               </CardDescription>
             </div>
             <Link
@@ -299,9 +300,9 @@ export default async function HomePage({
               </p>
             </div>
             <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-              <p className="text-sm font-semibold text-white">Rating</p>
+              <p className="text-sm font-semibold text-white">Rendimiento</p>
               <p className="mt-2 text-sm text-slate-300">
-                El rating se actualiza automaticamente despues de cada resultado cargado.
+                El rendimiento se actualiza automaticamente despues de cada resultado cargado.
               </p>
             </div>
           </div>
@@ -402,7 +403,7 @@ export default async function HomePage({
                     <span className="truncate text-sm font-semibold text-white">{player.full_name}</span>
                   </div>
                   <span className="text-sm font-semibold text-emerald-200">
-                    {Math.round(Number(player.current_rating))} pts
+                    {formatRendimiento(player.current_rating)} pts
                   </span>
                 </div>
               ))

@@ -213,7 +213,7 @@ export default async function AdminMatchDetailPage({
         <Card>
           <CardTitle>{details.result ? "Corregir resultado" : "Cargar resultado"}</CardTitle>
           <CardDescription>
-            El partido puede quedar confirmado sin resultado. Cargalo cuando se juegue para finalizar y actualizar ratings.
+            El partido puede quedar confirmado sin resultado. Cargalo cuando se juegue para finalizar y actualizar rendimientos.
           </CardDescription>
           {editableParticipants.length ? (
             <MatchResultEditorQuery

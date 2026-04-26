@@ -9,6 +9,7 @@ import {
   isIsoDateExpired,
   resolveLeagueWriteWindow,
   resolveNextLeagueBillingPeriod,
+  resolveOrganizationVisibleAccessValidUntil,
   resolveOrganizationWriteWindow,
   resolveNextOrganizationBillingPeriod,
   toShortDate
@@ -121,6 +122,42 @@ describe("billing helpers", () => {
     expect(window.writeLockedAt).toBe("2026-04-10T00:00:00.000Z");
     expect(window.playerPhotosPurgeAt).toBe("2026-07-09T00:00:00.000Z");
     expect(window.playerPhotosRetentionExpired).toBe(false);
+  });
+
+  it("muestra el periodo de suscripcion aunque el acceso tecnico no tenga fecha", () => {
+    expect(
+      resolveOrganizationVisibleAccessValidUntil({
+        subscription: {
+          status: "active",
+          current_period_end: "2026-05-20T00:00:00.000Z"
+        },
+        payments: [],
+        fallbackAccessValidUntil: null
+      })
+    ).toBe("2026-05-20T00:00:00.000Z");
+  });
+
+  it("usa el ultimo pago aprobado como fallback visual del periodo", () => {
+    expect(
+      resolveOrganizationVisibleAccessValidUntil({
+        subscription: null,
+        payments: [
+          {
+            status: "pending",
+            period_end: "2026-07-01T00:00:00.000Z"
+          },
+          {
+            status: "approved",
+            period_end: "2026-06-01T00:00:00.000Z"
+          },
+          {
+            status: "approved",
+            period_end: "2026-06-15T00:00:00.000Z"
+          }
+        ],
+        fallbackAccessValidUntil: "2026-05-01T00:00:00.000Z"
+      })
+    ).toBe("2026-06-15T00:00:00.000Z");
   });
 
   it("detecta una suscripcion activa de liga solo si esta vigente", () => {
