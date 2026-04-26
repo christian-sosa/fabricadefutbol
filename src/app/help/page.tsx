@@ -46,7 +46,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
     ],
     focusTitle: "En que conviene enfocarse al principio",
     focusDescription:
-      "Lo ideal es construir primero una buena base de jugadores, luego crear los primeros partidos y finalmente empezar a cargar resultados para que el ranking gane valor con el tiempo.",
+      "Lo ideal es construir primero una buena base de jugadores, asignar niveles simples y luego cargar resultados para que el rating competitivo gane valor con el tiempo.",
     gettingStartedLabel: "Primeros pasos",
     gettingStarted: [
       {
@@ -57,7 +57,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "2. Carga tu plantel base",
         description:
-          "En la seccion Jugadores agrega a cada integrante del equipo. El nombre es obligatorio y el nivel de habilidad te sirve como referencia manual desde el primer dia."
+          "En la seccion Jugadores agrega a cada integrante del equipo y asigna un nivel de habilidad. Nivel 1 es el mas fuerte y Nivel 5 el mas bajo."
       },
       {
         title: "3. Crea tu primer partido",
@@ -93,7 +93,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "Nivel de habilidad",
         description:
-          "Es una referencia manual definida por el administrador para estimar la fuerza base de cada jugador. No cambia automaticamente por ganar o perder partidos."
+          "Es una referencia manual definida por el administrador para estimar la fuerza base de cada jugador. No cambia automaticamente por ganar o perder partidos; solo cambia si el admin lo edita."
       },
       {
         title: "Punto de partida del rating",
@@ -115,7 +115,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "Como interpretar el ranking",
         description:
-          "Hay dos referencias distintas dentro de la plataforma: el nivel de habilidad, que es manual, y el ranking competitivo, que se calcula con el rating actual de cada jugador."
+          "Hay dos referencias distintas: el nivel de habilidad es manual y ayuda a armar equipos; el ranking competitivo se ordena por rating actual y muestra lo que vienen demostrando los resultados."
       },
       {
         title: "Consejo practico",

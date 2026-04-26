@@ -37,7 +37,6 @@ export function OrganizationSwitcher({
 }) {
   const [query, setQuery] = useState("");
 
-  const visibleOrganizations = useMemo(() => filterOrganizations(organizations, query), [organizations, query]);
   const safeQuickOrganizations = useMemo(() => {
     if (!quickOrganizations.length) return [];
 
@@ -50,6 +49,16 @@ export function OrganizationSwitcher({
       return true;
     });
   }, [organizations, quickOrganizations]);
+  const browsableOrganizations = useMemo(() => {
+    if (!safeQuickOrganizations.length) return organizations;
+
+    const quickIds = new Set(safeQuickOrganizations.map((organization) => organization.id));
+    return organizations.filter((organization) => !quickIds.has(organization.id));
+  }, [organizations, safeQuickOrganizations]);
+  const visibleOrganizations = useMemo(
+    () => filterOrganizations(browsableOrganizations, query),
+    [browsableOrganizations, query]
+  );
 
   if (!organizations.length) {
     return (
@@ -119,6 +128,9 @@ export function OrganizationSwitcher({
 
         {query.trim() && !visibleOrganizations.length ? (
           <p className="text-sm text-slate-400">No encontramos grupos con ese termino.</p>
+        ) : null}
+        {!query.trim() && safeQuickOrganizations.length > 0 && !visibleOrganizations.length ? (
+          <p className="text-sm text-slate-400">No hay otros grupos publicos por ahora.</p>
         ) : null}
       </div>
     </div>

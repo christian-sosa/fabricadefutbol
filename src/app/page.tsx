@@ -31,13 +31,13 @@ const howItWorksSteps = [
   },
   {
     title: "Paso 2",
-    heading: "Invitar jugadores",
-    description: "Sumas a todo el plantel y ordenas el grupo para que cada partido tenga contexto real."
+    heading: "Cargar niveles",
+    description: "Sumas a todo el plantel y defines un nivel simple: 1 para los mas fuertes, 5 para los mas bajos."
   },
   {
     title: "Paso 3",
     heading: "Armar partidos",
-    description: "Convocas, equilibras equipos y dejas el partido listo sin discusiones eternas."
+    description: "Convocas jugadores y la app combina nivel manual con rating actual para equilibrar equipos."
   },
   {
     title: "Paso 4",
@@ -219,6 +219,25 @@ export default async function HomePage({
               <CardDescription className="mt-3">{step.description}</CardDescription>
             </Card>
           ))}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Nivel de habilidad</p>
+            <CardTitle className="mt-2">La referencia que carga el admin</CardTitle>
+            <CardDescription className="mt-3 text-base">
+              Sirve para empezar a ordenar el grupo y armar equipos parejos. No cambia solo por ganar o perder:
+              solo lo edita el admin cuando cree que un jugador cambio de nivel.
+            </CardDescription>
+          </Card>
+          <Card>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Rating competitivo</p>
+            <CardTitle className="mt-2">El ranking que aprende con los partidos</CardTitle>
+            <CardDescription className="mt-3 text-base">
+              Sube o baja cuando se cargan resultados. Es lo que ordena el ranking publico y ayuda a ajustar el armado
+              automatico sin complicarle la vida al admin.
+            </CardDescription>
+          </Card>
         </div>
       </section>
 
