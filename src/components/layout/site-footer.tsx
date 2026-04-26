@@ -12,21 +12,15 @@ import { cn } from "@/lib/utils";
 const COMPANY_LINKS = [{ href: "/about", label: "Sobre nosotros" }] as const;
 
 const LEGAL_LINKS = [
-  { href: "/terms", label: "Terminos" },
+  { href: "/terms", label: "Términos" },
   { href: "/privacy", label: "Privacidad" }
 ] as const;
 
 const CONTACT_METHODS = [
   {
-    title: "WhatsApp",
-    value: "En configuracion",
-    description: "El numero oficial se publicara aqui.",
-    href: null
-  },
-  {
     title: "Mail",
     value: "info@fabricadefutbol.com.ar",
-    description: "Soporte y consultas comerciales.",
+    description: "Soporte para admins, grupos y organizadores.",
     href: "mailto:info@fabricadefutbol.com.ar"
   }
 ] as const;
@@ -64,23 +58,23 @@ export function SiteFooter() {
           <section className="rounded-3xl border border-slate-800 bg-slate-900/75 p-5 shadow-[0_22px_50px_-32px_rgba(16,185,129,0.55)]">
             <div className="flex items-center gap-3">
               <Image
-                alt="Logo de Fabrica de Futbol"
+                alt="Logo de Fábrica de Fútbol"
                 className="h-14 w-14 object-contain"
                 height={56}
                 src="/logo.png"
                 width={56}
               />
               <div>
-                <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-slate-100">Fabrica de Futbol</p>
+                <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-slate-100">Fábrica de Fútbol</p>
                 <p className="mt-1 text-xs text-slate-400">
-                  Organiza partidos equilibrados, ranking real e historial sin romper la dinamica de tu grupo.
+                  Organizá partidos con equipos parejos, ranking real e historial sin romper la dinámica de tu grupo.
                 </p>
               </div>
             </div>
           </section>
 
           <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
-            <FooterSectionTitle>Navegacion</FooterSectionTitle>
+            <FooterSectionTitle>Navegación</FooterSectionTitle>
             <nav className="mt-4 space-y-2">
               {PRIMARY_PUBLIC_NAV_ITEMS.map((item) => (
                 <Link
@@ -163,7 +157,7 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/55 px-4 py-4 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
-          <p>Copyright {year} Fabrica de Futbol. Todos los derechos reservados.</p>
+          <p>Copyright {year} Fábrica de Fútbol. Todos los derechos reservados.</p>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
             {tournamentsEnabled ? "Ranking real para grupos y torneos" : "Ranking real para grupos"}
           </p>
