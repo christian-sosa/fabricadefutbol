@@ -173,11 +173,7 @@ export default async function AdminCompetitionDetailPage({
               <p>Formato: {getCompetitionTypeLabel(details.competition.type)}</p>
               <p>Carga: {getCompetitionCoverageModeLabel(details.competition.coverageMode)}</p>
               {details.competition.playoffSize ? <p>Playoff: top {details.competition.playoffSize}</p> : null}
-              <p>
-                {details.competition.isPublic
-                  ? "Marcada como publica. Se muestra afuera solo si esta activa o finalizada."
-                  : "Solo visible en admin por ahora."}
-              </p>
+              <p>Publica para visitantes cuando la liga y la competencia estan activas o finalizadas.</p>
             </div>
           </div>
 
@@ -284,12 +280,6 @@ export default async function AdminCompetitionDetailPage({
               <div className="md:col-span-2">
                 <label className="mb-1 block text-sm font-semibold text-slate-200">Descripcion</label>
                 <Textarea defaultValue={details.competition.description ?? ""} name="description" rows={4} />
-              </div>
-              <div className="flex items-end">
-                <label className="flex items-center gap-2 text-sm text-slate-200">
-                  <input className="h-4 w-4 accent-emerald-400" defaultChecked={details.competition.isPublic} name="isPublic" type="checkbox" />
-                  Competencia publica
-                </label>
               </div>
               <div className="md:col-span-2 space-y-3">
                 {!canEditFormat ? (

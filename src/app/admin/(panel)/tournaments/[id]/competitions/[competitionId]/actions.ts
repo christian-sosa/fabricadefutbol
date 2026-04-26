@@ -44,7 +44,6 @@ const updateCompetitionSchema = z.object({
     (value) => (typeof value === "string" && value.trim() ? Number(value) : null),
     z.union([z.literal(4), z.literal(8), z.null()])
   ),
-  isPublic: z.boolean().default(false),
   status: z.enum(["draft", "active", "finished", "archived"])
 }).superRefine((value, ctx) => {
   if (value.type === "league_and_cup" && value.playoffSize === null) {
@@ -349,7 +348,6 @@ export async function updateCompetitionAction(
       type: formData.get("type"),
       coverageMode: formData.get("coverageMode"),
       playoffSize: formData.get("playoffSize"),
-      isPublic: formData.get("isPublic") === "on",
       status: formData.get("status")
     });
 
@@ -420,7 +418,7 @@ export async function updateCompetitionAction(
         type: parsed.data.type,
         coverage_mode: parsed.data.coverageMode,
         playoff_size: parsed.data.type === "league_and_cup" ? parsed.data.playoffSize : null,
-        is_public: parsed.data.isPublic,
+        is_public: true,
         status: parsed.data.status
       })
       .eq("id", competitionId)

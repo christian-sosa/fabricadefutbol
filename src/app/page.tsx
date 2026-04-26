@@ -12,70 +12,74 @@ import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization 
 import { getPublicLeagues } from "@/lib/queries/tournaments";
 import { formatRendimiento } from "@/lib/utils";
 
-const problemItems = [
-  "Equipos desbalanceados",
-  "Discusiones constantes",
-  "No hay historial"
+const heroHighlights = [
+  "Equipos parejos",
+  "Rendimiento automatico",
+  "Historial publico",
+  "Torneos y competencias"
 ] as const;
 
-const solutionItems = [
-  "Equipos parejos automaticamente",
-  "Ranking real",
-  "Historial completo"
-] as const;
-
-const howItWorksSteps = [
+const groupFeatures = [
   {
-    title: "Paso 1",
-    heading: "Crear grupo",
-    description: "Abres tu grupo en minutos y dejas lista la base para organizar cada fecha."
+    title: "Niveles simples",
+    description:
+      "El admin define un nivel base del 1 al 5. No hace falta mantener formulas raras ni rankings manuales."
   },
   {
-    title: "Paso 2",
-    heading: "Cargar niveles",
-    description: "Sumas a todo el plantel y defines un nivel simple: 1 para los mas fuertes, 5 para los mas bajos."
+    title: "Equipos equilibrados",
+    description:
+      "La app combina nivel, rendimiento actual, invitados y arqueros para proponer equipos mas justos."
   },
   {
-    title: "Paso 3",
-    heading: "Armar partidos",
-    description: "Convocas jugadores y la app combina nivel manual con rendimiento actual para equilibrar equipos."
-  },
-  {
-    title: "Paso 4",
-    heading: "Ranking automatico",
-    description: "Cargas el resultado y la plataforma actualiza posiciones, puntos e historial."
+    title: "Historial vivo",
+    description:
+      "Cada resultado actualiza rendimiento, ranking, estadisticas y detalle del partido para que nada dependa de la memoria."
   }
 ] as const;
 
-const testimonials = [
+const tournamentFeatures = [
   {
-    quote: "Desde que usamos Fabrica no discutimos mas los equipos. Los armamos antes de jugar, llegamos y jugamos.",
-    author: "Equipo La Quinta"
+    title: "Liga como base",
+    description:
+      "La liga guarda equipos maestros, admins, sede, logo y foto publica. Desde ahi nacen las competencias."
   },
   {
-    quote: "Desde que arrancamos, todo el mundo quiere jugar y sumar puntos para estar arriba en el ranking. Ahora todos los partidos se viven como una final.",
-    author: "Equipo La Quinta"
+    title: "Competencias publicas",
+    description:
+      "Cada competencia queda visible para visitantes cuando esta activa o finalizada, con tabla, fixture y resultados."
   },
   {
-    quote: "Tener historial y partidos guardados nos ordeno todo. Ya no dependemos de la memoria del admin.",
-    author: "Club del Martes"
+    title: "Operacion flexible",
+    description:
+      "Puedes usar fixture automatico o manual, capitanes opcionales y carga completa o simplificada de actas."
+  }
+] as const;
+
+const workflowCards = [
+  {
+    title: "1. Cargas la base",
+    description:
+      "En Grupos cargas jugadores y niveles. En Torneos cargas liga, equipos maestros y competencias."
+  },
+  {
+    title: "2. Organizas la fecha",
+    description:
+      "Armas partido, fixture o cruce. La app ordena la informacion y deja links claros para compartir."
+  },
+  {
+    title: "3. Publicas resultados",
+    description:
+      "Cargas marcador y datos del partido. El ranking, tablas, historial y estadisticas se actualizan solos."
   }
 ] as const;
 
 const fallbackRankingPreview = [
-  { name: "Juan", points: 1180 },
-  { name: "Mati", points: 1170 },
-  { name: "Nico", points: 1160 },
-  { name: "Fede", points: 1150 },
-  { name: "Tomi", points: 1140 }
-] as const satisfies ReadonlyArray<{
-  name: string;
-  points: number;
-}>;
-
-const rankingPreviewDescription = "Ejemplo con datos ficticios de como se ve un ranking dentro de la plataforma.";
-const rankingPreviewMatchCount = 150;
-
+  { name: "Juan", rendimiento: 1180 },
+  { name: "Mati", rendimiento: 1170 },
+  { name: "Nico", rendimiento: 1160 },
+  { name: "Fede", rendimiento: 1150 },
+  { name: "Tomi", rendimiento: 1140 }
+] as const;
 
 export default async function HomePage({
   searchParams
@@ -92,21 +96,27 @@ export default async function HomePage({
   const summary = await getHomeSummary(selectedOrganization?.id ?? null);
   const selectedOrganizationSlug = selectedOrganization?.slug ?? null;
   const featuredLeagues = leagues.slice(0, 3);
-  const rankingPreviewRows = fallbackRankingPreview;
+  const rankingRows = summary.topPlayers.length
+    ? summary.topPlayers.map((player) => ({
+        id: player.id,
+        name: player.full_name,
+        rendimiento: player.current_rating
+      }))
+    : fallbackRankingPreview;
 
   return (
     <div className="space-y-8">
       <section className="overflow-hidden rounded-[2rem] border border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.2),transparent_34%),radial-gradient(circle_at_top_right,rgba(56,189,248,0.18),transparent_28%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-6 shadow-[0_28px_70px_-38px_rgba(16,185,129,0.7)] md:p-8 lg:p-10">
-        <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
+        <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
-              Futbol entre amigos sin discusiones
+              Futbol amateur, ordenado de verdad
             </p>
             <h1 className="mt-3 max-w-4xl text-4xl font-black leading-tight text-white md:text-5xl lg:text-6xl">
-              Deja de discutir equipos. Arma partidos parejos y lleva el ranking real de tu grupo.
+              Organiza grupos, partidos y torneos sin planillas eternas.
             </h1>
             <p className="mt-4 max-w-2xl text-base text-slate-300 md:text-lg">
-              Organiza partidos, genera estadisticas y conoce quien es realmente el mejor.
+              Fabrica de Futbol arma equipos parejos, mide rendimiento, guarda historial y publica la informacion que jugadores, capitanes y visitantes necesitan consultar.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -114,23 +124,18 @@ export default async function HomePage({
                 className="rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_-18px_rgba(16,185,129,0.95)] transition hover:brightness-110"
                 href="/admin/login"
               >
-                Crear mi grupo gratis
+                Crear mi espacio
               </Link>
               <Link
                 className="rounded-xl border border-slate-700 bg-slate-950/70 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
-                href="#ranking-preview"
+                href={withPublicQuery("/pricing", { organizationKey: selectedOrganizationSlug })}
               >
-                Ver como funciona el ranking
+                Ver planes
               </Link>
             </div>
 
             <div className="mt-6 flex flex-wrap gap-2">
-              {[
-                "Equipos parejos",
-                "Ranking automatico",
-                "Historial de partidos",
-                "30 dias gratis"
-              ].map((item) => (
+              {heroHighlights.map((item) => (
                 <span
                   className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-xs font-semibold text-slate-200"
                   key={item}
@@ -141,62 +146,68 @@ export default async function HomePage({
             </div>
           </div>
 
-          <div>
-            <Card className="border-emerald-400/20 bg-slate-950/70 p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="text-2xl">Ranking del grupo</CardTitle>
-                  <CardDescription className="mt-2">{rankingPreviewDescription}</CardDescription>
-                </div>
-                <div className="rounded-2xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-right">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Partidos</p>
-                  <p className="mt-1 text-2xl font-black text-white">{rankingPreviewMatchCount}</p>
-                </div>
+          <Card className="border-emerald-400/20 bg-slate-950/70 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-2xl">Rendimiento del grupo</CardTitle>
+                <CardDescription className="mt-2">
+                  El ranking se actualiza cuando cargas resultados. El nivel sirve como base; el rendimiento muestra lo que pasa en la cancha.
+                </CardDescription>
               </div>
+              <div className="rounded-2xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-right">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Partidos</p>
+                <p className="mt-1 text-2xl font-black text-white">
+                  {summary.totalFinishedMatches || 150}
+                </p>
+              </div>
+            </div>
 
-              <div className="mt-5 space-y-2">
-                {rankingPreviewRows.map((player, index) => (
-                  <div
-                    className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 px-3 py-3"
-                    key={`${player.name}-${index}`}
-                  >
-                    <span className="text-lg font-black text-slate-400">#{index + 1}</span>
-                    <span className="truncate text-sm font-semibold text-slate-100">{player.name}</span>
-                    <span className="text-sm font-semibold text-emerald-200">{player.points} pts</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
+            <div className="mt-5 space-y-2">
+              {rankingRows.slice(0, 5).map((player, index) => (
+                <div
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 px-3 py-3"
+                  key={`${player.name}-${index}`}
+                >
+                  <span className="text-lg font-black text-slate-400">#{index + 1}</span>
+                  <span className="truncate text-sm font-semibold text-slate-100">{player.name}</span>
+                  <span className="text-sm font-semibold text-emerald-200">
+                    {formatRendimiento(player.rendimiento)} pts
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
-        <Card className="border-rose-400/15 bg-rose-500/5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-200">Problema</p>
-          <CardTitle className="mt-2">Lo que pasa en casi todos los grupos</CardTitle>
-          <div className="mt-4 space-y-3">
-            {problemItems.map((item) => (
-              <div className="flex items-center gap-3 rounded-2xl border border-rose-400/10 bg-slate-950/60 px-4 py-3" key={item}>
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-400/30 bg-rose-500/10 text-sm font-black text-rose-200">
-                  !
-                </span>
-                <span className="text-sm font-semibold text-slate-100">{item}</span>
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Grupos</p>
+          <CardTitle className="mt-2 text-3xl">Para los partidos de cada semana</CardTitle>
+          <CardDescription className="mt-3 text-base">
+            Ideal para amigos, equipos recurrentes y grupos que quieren dejar de discutir equipos y empezar a tener historial real.
+          </CardDescription>
+          <div className="mt-5 grid gap-3">
+            {groupFeatures.map((feature) => (
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4" key={feature.title}>
+                <p className="text-sm font-semibold text-white">{feature.title}</p>
+                <p className="mt-2 text-sm text-slate-300">{feature.description}</p>
               </div>
             ))}
           </div>
         </Card>
 
-        <Card className="border-emerald-400/15 bg-emerald-500/5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Solucion</p>
-          <CardTitle className="mt-2">Lo que resuelve Fabrica de Futbol</CardTitle>
-          <div className="mt-4 space-y-3">
-            {solutionItems.map((item) => (
-              <div className="flex items-center gap-3 rounded-2xl border border-emerald-400/10 bg-slate-950/60 px-4 py-3" key={item}>
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-500/10 text-sm font-black text-emerald-200">
-                  +
-                </span>
-                <span className="text-sm font-semibold text-slate-100">{item}</span>
+        <Card>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Torneos</p>
+          <CardTitle className="mt-2 text-3xl">Para ligas con varias competencias</CardTitle>
+          <CardDescription className="mt-3 text-base">
+            Pensado para organizadores que necesitan tabla, fixture, equipos inscriptos, capitanes y estadisticas publicas.
+          </CardDescription>
+          <div className="mt-5 grid gap-3">
+            {tournamentFeatures.map((feature) => (
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4" key={feature.title}>
+                <p className="text-sm font-semibold text-white">{feature.title}</p>
+                <p className="mt-2 text-sm text-slate-300">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -204,116 +215,46 @@ export default async function HomePage({
       </section>
 
       <section className="space-y-4">
-        <div className="max-w-2xl">
+        <div className="max-w-3xl">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Como funciona</p>
-          <h2 className="mt-2 text-3xl font-black text-white">Empieza rapido y sin friccion</h2>
+          <h2 className="mt-2 text-3xl font-black text-white">Simple para cargar, claro para consultar</h2>
           <p className="mt-3 text-sm text-slate-300">
-            El flujo esta pensado para que cualquier admin pueda arrancar hoy y que el grupo entienda el sistema desde el primer partido.
+            La app separa lo que el admin decide manualmente de lo que los resultados van demostrando. Asi el sistema se siente justo sin volverse dificil de usar.
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {howItWorksSteps.map((step) => (
-            <Card key={step.heading}>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">{step.title}</p>
-              <CardTitle className="mt-2">{step.heading}</CardTitle>
-              <CardDescription className="mt-3">{step.description}</CardDescription>
+        <div className="grid gap-4 md:grid-cols-3">
+          {workflowCards.map((card) => (
+            <Card key={card.title}>
+              <CardTitle>{card.title}</CardTitle>
+              <CardDescription className="mt-2">{card.description}</CardDescription>
             </Card>
           ))}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           <Card>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Nivel de habilidad</p>
-            <CardTitle className="mt-2">La referencia que carga el admin</CardTitle>
-            <CardDescription className="mt-3 text-base">
-              Sirve para empezar a ordenar el grupo y armar equipos parejos. No cambia solo por ganar o perder:
-              solo lo edita el admin cuando cree que un jugador cambio de nivel.
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Nivel</p>
+            <CardTitle className="mt-2">La mirada del admin</CardTitle>
+            <CardDescription className="mt-3">
+              El nivel de habilidad es estable y facil de entender. Sirve para arrancar y solo cambia cuando el admin lo edita.
             </CardDescription>
           </Card>
           <Card>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Rendimiento competitivo</p>
-            <CardTitle className="mt-2">El ranking que aprende con los partidos</CardTitle>
-            <CardDescription className="mt-3 text-base">
-              Sube o baja cuando se cargan resultados. Es lo que ordena el ranking publico y ayuda a ajustar el armado
-              automatico sin complicarle la vida al admin.
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Rendimiento</p>
+            <CardTitle className="mt-2">Lo que aprende la cancha</CardTitle>
+            <CardDescription className="mt-3">
+              El rendimiento sube o baja con los resultados y ordena el ranking publico de forma automatica.
+            </CardDescription>
+          </Card>
+          <Card>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Balance</p>
+            <CardTitle className="mt-2">Equipos con mas contexto</CardTitle>
+            <CardDescription className="mt-3">
+              Para armar equipos, la app mira nivel, rendimiento, invitados y arqueros. Menos opinion, mas criterio.
             </CardDescription>
           </Card>
         </div>
-      </section>
-
-        <section className="grid gap-4 lg:grid-cols-[0.92fr_1.08fr]" id="ranking-preview">
-          <Card>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Ranking real</p>
-            <CardTitle className="mt-2 text-3xl">Sistema de puntos simple, claro y automatico</CardTitle>
-            <CardDescription className="mt-3 text-base">
-              Despues de cada partido, los jugadores ganan o pierden puntos segun el resultado.
-            </CardDescription>
-          <div className="mt-5 space-y-3">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-              <p className="text-sm font-semibold text-white">Si ganas</p>
-              <p className="mt-2 text-sm text-emerald-200">
-                Sumas puntos y mejoras tu ubicacion en la tabla.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-              <p className="text-sm font-semibold text-white">Si pierdes</p>
-              <p className="mt-2 text-sm text-rose-200">
-                Pierdes puntos y el ranking se recalcula automaticamente.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-              <p className="text-sm font-semibold text-white">Si empatas</p>
-              <p className="mt-2 text-sm text-slate-300">El sistema mantiene el equilibrio y deja todo registrado en el historial.</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Lectura rapida</p>
-              <CardTitle className="mt-2">Que ves en el ranking</CardTitle>
-              <CardDescription className="mt-3 text-base">
-                Cada fila te muestra puesto actual, jugador, rendimiento y estadisticas para leer el momento del grupo en segundos.
-              </CardDescription>
-            </div>
-            <Link
-              className="text-sm font-semibold text-emerald-300 hover:underline"
-              href={withOrgQuery("/ranking", selectedOrganizationSlug)}
-            >
-              Ver ranking publico
-            </Link>
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-              <p className="text-sm font-semibold text-white">Puesto actual</p>
-              <p className="mt-2 text-sm text-slate-300">
-                Te muestra quien esta arriba hoy y como viene ordenado el grupo.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-              <p className="text-sm font-semibold text-white">Rendimiento</p>
-              <p className="mt-2 text-sm text-slate-300">
-                Ves rapido como viene cada jugador con sus partidos, victorias, empates y derrotas.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-              <p className="text-sm font-semibold text-white">Rendimiento</p>
-              <p className="mt-2 text-sm text-slate-300">
-                El rendimiento se actualiza automaticamente despues de cada resultado cargado.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-emerald-400/15 bg-emerald-500/5 p-4">
-            <p className="text-sm font-semibold text-white">Lo importante</p>
-            <p className="mt-2 text-sm text-slate-300">
-              Cuando ya tienes varios partidos cargados, el ranking deja de ser una opinion y empieza a mostrar lo que realmente pasa en la cancha.
-            </p>
-          </div>
-        </Card>
       </section>
 
       <AdPlaceholder slot="home-top-banner" />
@@ -322,10 +263,10 @@ export default async function HomePage({
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Prueba real</p>
-              <CardTitle className="mt-2">Explora un grupo publico</CardTitle>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Grupos publicos</p>
+              <CardTitle className="mt-2">Explora ranking, historial y proximos partidos</CardTitle>
               <CardDescription className="mt-2">
-                Mira como se ve un grupo real con jugadores, ranking, historial y proximos partidos.
+                Los visitantes pueden consultar la informacion sin iniciar sesion. La gestion queda reservada para admins.
               </CardDescription>
             </div>
           </div>
@@ -344,11 +285,11 @@ export default async function HomePage({
             <>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Jugadores activos</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Jugadores</p>
                   <p className="mt-2 text-2xl font-black text-white">{summary.totalPlayers}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Partidos jugados</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Partidos</p>
                   <p className="mt-2 text-2xl font-black text-white">{summary.totalFinishedMatches}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
@@ -374,7 +315,7 @@ export default async function HomePage({
                   className="rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
                   href={withOrgQuery("/upcoming", selectedOrganization.slug)}
                 >
-                  Ver proximos partidos
+                  Ver proximos
                 </Link>
               </div>
             </>
@@ -388,46 +329,24 @@ export default async function HomePage({
         <Card>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Top actual</p>
           <CardTitle className="mt-2">
-            {selectedOrganization ? `Los que marcan el ritmo en ${selectedOrganization.name}` : "Ranking destacado"}
+            {selectedOrganization ? `Rendimiento en ${selectedOrganization.name}` : "Ranking destacado"}
           </CardTitle>
           <div className="mt-4 space-y-2">
-            {summary.topPlayers.length ? (
-              summary.topPlayers.map((player, index) => (
-                <div
-                  className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-3"
-                  key={player.id}
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="text-sm font-black text-slate-500">#{index + 1}</span>
-                    <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
-                    <span className="truncate text-sm font-semibold text-white">{player.full_name}</span>
-                  </div>
-                  <span className="text-sm font-semibold text-emerald-200">
-                    {formatRendimiento(player.current_rating)} pts
-                  </span>
+            {rankingRows.slice(0, 5).map((player, index) => (
+              <div
+                className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-3"
+                key={`${player.name}-public-${index}`}
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="text-sm font-black text-slate-500">#{index + 1}</span>
+                  {"id" in player ? <PlayerAvatar name={player.name} playerId={player.id} size="sm" /> : null}
+                  <span className="truncate text-sm font-semibold text-white">{player.name}</span>
                 </div>
-              ))
-            ) : (
-              rankingPreviewRows.map((player, index) => (
-                <div
-                  className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-3"
-                  key={`${player.name}-fallback`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-black text-slate-500">#{index + 1}</span>
-                    <span className="text-sm font-semibold text-white">{player.name}</span>
-                  </div>
-                  <span className="text-sm font-semibold text-emerald-200">{player.points} pts</span>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-            <p className="text-sm font-semibold text-white">Lo que gana tu grupo</p>
-            <p className="mt-2 text-sm text-slate-300">
-              Menos discusiones, mejor orden y una referencia objetiva para ver quien sube y quien baja fecha a fecha.
-            </p>
+                <span className="text-sm font-semibold text-emerald-200">
+                  {formatRendimiento(player.rendimiento)} pts
+                </span>
+              </div>
+            ))}
           </div>
         </Card>
       </section>
@@ -435,10 +354,10 @@ export default async function HomePage({
       {summary.upcomingMatches.length ? (
         <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
           <Card>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Proximo partido</p>
-            <CardTitle className="mt-2">Tu grupo tambien queda ordenado fecha a fecha</CardTitle>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Proxima fecha</p>
+            <CardTitle className="mt-2">La convocatoria tambien queda ordenada</CardTitle>
             <CardDescription className="mt-3">
-              Cada convocatoria y cada resultado quedan registrados para que no se pierda el hilo del grupo.
+              Cada partido puede compartirse con horario, modalidad, equipos y detalle publico.
             </CardDescription>
           </Card>
           <Card>
@@ -460,30 +379,12 @@ export default async function HomePage({
         </section>
       ) : null}
 
-      <section className="space-y-4">
-        <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Testimonios</p>
-          <h2 className="mt-2 text-3xl font-black text-white">Lo que pasa cuando el grupo se ordena</h2>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {testimonials.map((testimonial) => (
-            <Card key={`${testimonial.author}-${testimonial.quote}`}>
-              <p className="text-base leading-7 text-slate-200">
-                &ldquo;{testimonial.quote}&rdquo;
-              </p>
-              <p className="mt-4 text-sm font-semibold text-emerald-300">{testimonial.author}</p>
-            </Card>
-          ))}
-        </div>
-      </section>
-
       <section className="grid gap-4 lg:grid-cols-[1.02fr_0.98fr]">
         <Card>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Tambien para ligas</p>
-          <CardTitle className="mt-2">Cuando tu grupo crece, tambien puedes lanzar torneos</CardTitle>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Torneos publicos</p>
+          <CardTitle className="mt-2">Ligas y competencias listas para compartir</CardTitle>
           <CardDescription className="mt-3">
-            Cargas la liga, defines los equipos maestros y luego creas las competencias que necesites con los equipos
-            inscriptos en cada una.
+            Los visitantes pueden entrar a la liga, elegir una competencia y ver tabla, fixture, resultados y estadisticas.
           </CardDescription>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link
@@ -502,7 +403,7 @@ export default async function HomePage({
                 module: "tournaments"
               })}
             >
-              Ver precios del modulo
+              Ver precios
             </Link>
           </div>
         </Card>
@@ -532,77 +433,35 @@ export default async function HomePage({
           ) : (
             <Card>
               <CardDescription>
-                El modulo Torneos ya esta listo para mostrar ligas publicas y las competencias activas dentro de cada
-                una.
+                El modulo Torneos ya esta listo para mostrar ligas publicas y las competencias activas dentro de cada una.
               </CardDescription>
             </Card>
           )}
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-        <Card>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Soporte</p>
-          <CardTitle className="mt-2 text-3xl">Necesitas ayuda?</CardTitle>
-          <CardDescription className="mt-3">
-            Te acompanamos para que pongas tu grupo en marcha sin perder tiempo ni datos.
-          </CardDescription>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link
-              className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
-              href={withPublicQuery("/feedback", {
-                organizationKey: selectedOrganizationSlug
-              })}
-            >
-              Ir a contacto
-            </Link>
-            <Link
-              className="rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
-              href="mailto:info@fabricadefutbol.com.ar"
-            >
-              Escribir por mail
-            </Link>
-          </div>
-        </Card>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardTitle className="text-base">WhatsApp</CardTitle>
-            <CardDescription className="mt-2">
-              Canal en configuracion. Mientras tanto, respondemos rapido por mail y formulario.
-            </CardDescription>
-          </Card>
-          <Card>
-            <CardTitle className="text-base">Mail</CardTitle>
-            <CardDescription className="mt-2">
-              info@fabricadefutbol.com.ar
-            </CardDescription>
-          </Card>
-          <Card>
-            <CardTitle className="text-base">Sugerencias</CardTitle>
-            <CardDescription className="mt-2">
-              Si tienes una idea para mejorar Fabrica de Futbol, puedes escribirnos por mail o formulario. Las sugerencias son bienvenidas.
-            </CardDescription>
-          </Card>
-        </div>
-      </section>
-
-      <AdPlaceholder slot="home-bottom-banner" />
-
       <section className="rounded-[2rem] border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.14),rgba(15,23,42,0.98))] p-6 text-center shadow-[0_24px_60px_-38px_rgba(16,185,129,0.75)] md:p-8">
-        <h2 className="text-3xl font-black text-white md:text-4xl">Empeza gratis</h2>
+        <h2 className="text-3xl font-black text-white md:text-4xl">Arranca con un grupo y escala cuando lo necesites</h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm text-slate-200 md:text-base">
-          Crea tu grupo, arma partidos parejos y empieza a construir un ranking que de verdad represente lo que pasa en la cancha.
+          Crea tu grupo, arma partidos parejos y, si el proyecto crece, suma ligas y competencias sin mezclar los flujos.
         </p>
-        <div className="mt-6 flex justify-center">
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link
             className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-95"
             href="/admin/login"
           >
-            Empeza gratis
+            Empezar
+          </Link>
+          <Link
+            className="rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
+            href={withPublicQuery("/help", { organizationKey: selectedOrganizationSlug })}
+          >
+            Leer ayuda
           </Link>
         </div>
       </section>
+
+      <AdPlaceholder slot="home-bottom-banner" />
     </div>
   );
 }

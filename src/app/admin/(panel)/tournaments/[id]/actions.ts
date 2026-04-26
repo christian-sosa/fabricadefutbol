@@ -77,8 +77,7 @@ const createCompetitionSchema = z.object({
   playoffSize: z.preprocess(
     (value) => (typeof value === "string" && value.trim() ? Number(value) : null),
     z.union([z.literal(4), z.literal(8), z.null()])
-  ),
-  isPublic: z.boolean().default(false)
+  )
 }).superRefine((value, ctx) => {
   if (value.type === "league_and_cup" && value.playoffSize === null) {
     ctx.addIssue({
@@ -850,8 +849,7 @@ export async function createCompetitionAction(leagueId: string, formData: FormDa
       venueOverride: formData.get("venueOverride"),
       type: formData.get("type"),
       coverageMode: formData.get("coverageMode"),
-      playoffSize: formData.get("playoffSize"),
-      isPublic: formData.get("isPublic") === "on"
+      playoffSize: formData.get("playoffSize")
     });
 
     if (!parsed.success) {
@@ -882,7 +880,7 @@ export async function createCompetitionAction(leagueId: string, formData: FormDa
         type: parsed.data.type,
         coverage_mode: parsed.data.coverageMode,
         playoff_size: parsed.data.type === "league_and_cup" ? parsed.data.playoffSize : null,
-        is_public: parsed.data.isPublic,
+        is_public: true,
         status: "active"
       })
       .select("id")
