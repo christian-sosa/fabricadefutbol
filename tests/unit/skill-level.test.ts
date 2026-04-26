@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateEffectiveSkillLevel,
   calculateEffectiveSkillScore,
+  formatSkillLevelLabel,
   mapInitialRankToSkillLevel,
   normalizeSkillLevel
 } from "@/lib/domain/skill-level";
@@ -41,5 +42,11 @@ describe("skill level helpers", () => {
     expect(normalizeSkillLevel(0)).toBe(1);
     expect(normalizeSkillLevel(9)).toBe(5);
     expect(normalizeSkillLevel(Number.NaN)).toBe(5);
+  });
+
+  it("formatea etiquetas humanas para los selectores de nivel", () => {
+    expect(formatSkillLevelLabel(1)).toBe("Nivel 1 - Figura");
+    expect(formatSkillLevelLabel(3)).toBe("Nivel 3 - Intermedio");
+    expect(formatSkillLevelLabel(5)).toBe("Nivel 5 - Principiante");
   });
 });

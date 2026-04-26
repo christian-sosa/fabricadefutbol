@@ -10,9 +10,10 @@ const MAX_PHOTO_SIZE_BYTES = MAX_PHOTO_SIZE_MB * 1024 * 1024;
 type PhotoUploadInputProps = {
   compact?: boolean;
   hint?: string;
+  required?: boolean;
 };
 
-export function PhotoUploadInput({ compact = false, hint }: PhotoUploadInputProps) {
+export function PhotoUploadInput({ compact = false, hint, required = true }: PhotoUploadInputProps) {
   const [error, setError] = useState<string | null>(null);
   const helperText = hint ?? `Formato recomendado: JPG/PNG. Se optimiza a WEBP (${MAX_PHOTO_SIZE_MB} MB max).`;
 
@@ -37,7 +38,7 @@ export function PhotoUploadInput({ compact = false, hint }: PhotoUploadInputProp
 
           setError(null);
         }}
-        required
+        required={required}
         type="file"
       />
       <p className={`mt-1 text-xs ${compact ? "leading-4" : ""} ${error ? "text-danger" : "text-slate-500"}`}>

@@ -39,6 +39,21 @@ type OrganizationEntry = {
 
 type LeagueEntry = Awaited<ReturnType<typeof getAdminLeagueList>>[number];
 
+const secondaryActionLinkClass =
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-slate-700 bg-slate-900 px-3.5 py-2 text-sm font-semibold text-slate-100 transition hover:border-slate-500 hover:bg-slate-800";
+
+const groupActionLinkClass =
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-emerald-400/45 bg-emerald-500/10 px-3.5 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/15";
+
+const leagueActionLinkClass =
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-sky-400/45 bg-sky-500/10 px-3.5 py-2 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/15";
+
+const enterGroupLinkClass =
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-accent px-3.5 py-2 text-sm font-semibold text-white transition hover:brightness-110";
+
+const enterLeagueLinkClass =
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-sky-500 px-3.5 py-2 text-sm font-semibold text-white transition hover:brightness-110";
+
 function findOrganizationByKey(organizations: OrganizationEntry[], organizationKey?: string | null) {
   if (!organizationKey) return null;
   const normalizedKey = organizationKey.trim().toLowerCase();
@@ -94,10 +109,7 @@ function AdminHomeHub({
       <AdminFeedback checkout={checkout} error={error} />
 
       <Card className="p-5 sm:p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-400">
-          Panel de administracion
-        </p>
-        <CardTitle className="mt-2 text-3xl">Que queres administrar?</CardTitle>
+        <CardTitle className="text-3xl">Que queres administrar?</CardTitle>
         <CardDescription className="mt-3 max-w-3xl text-base">
           Elegi un grupo o una liga antes de cargar datos. Asi cada flujo mantiene sus jugadores,
           partidos, competencias y facturacion en el lugar correcto.
@@ -115,10 +127,10 @@ function AdminHomeHub({
             </div>
             {hasOrganizations ? (
               <Link
-                className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
+                className={groupActionLinkClass}
                 href={withOrgQuery("/admin/new", referenceOrganization?.slug)}
               >
-                Crear grupo
+                Nuevo grupo
               </Link>
             ) : null}
           </div>
@@ -137,7 +149,7 @@ function AdminHomeHub({
                     </p>
                   </div>
                   <Link
-                    className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                    className={enterGroupLinkClass}
                     href={withOrgQuery("/admin", organization.slug)}
                   >
                     Entrar al grupo
@@ -182,10 +194,10 @@ function AdminHomeHub({
               </CardDescription>
             </div>
             <Link
-              className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-sky-400/60 hover:text-sky-300"
+              className={leagueActionLinkClass}
               href="/admin/tournaments/new"
             >
-              Crear liga
+              Nueva liga
             </Link>
           </div>
 
@@ -206,7 +218,7 @@ function AdminHomeHub({
                     </p>
                   </div>
                   <Link
-                    className="inline-flex items-center justify-center rounded-md bg-sky-500 px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                    className={enterLeagueLinkClass}
                     href={`/admin/tournaments/${league.id}`}
                   >
                     Entrar a la liga
@@ -220,7 +232,7 @@ function AdminHomeHub({
                   Crea una liga cuando necesites competencias, equipos inscriptos y tabla publica.
                 </p>
                 <Link
-                  className="mt-4 inline-flex items-center justify-center rounded-md bg-sky-500 px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                  className={`${enterLeagueLinkClass} mt-4`}
                   href="/admin/tournaments/new"
                 >
                   Crear liga
@@ -300,16 +312,16 @@ export default async function AdminDashboardPage({
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
-              className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-slate-500 hover:bg-slate-800"
+              className={secondaryActionLinkClass}
               href="/admin"
             >
               Cambiar espacio
             </Link>
             <Link
-              className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
+              className={groupActionLinkClass}
               href={withOrgQuery("/admin/new", selectedOrganization.slug)}
             >
-              Crear grupo
+              Nuevo grupo
             </Link>
           </div>
         </div>

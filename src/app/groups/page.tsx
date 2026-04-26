@@ -58,6 +58,15 @@ export default async function GroupsPage({
             </div>
           </section>
 
+          <section className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-400">
+              Grupo seleccionado
+            </p>
+            <h2 className="text-3xl font-black text-slate-100 md:text-5xl">
+              {selectedOrganization.name}
+            </h2>
+          </section>
+
           <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
             <Card className="overflow-hidden p-0">
               <OrganizationImage

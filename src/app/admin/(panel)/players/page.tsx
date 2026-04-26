@@ -15,11 +15,10 @@ import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
+import { formatSkillLevelLabel, SKILL_LEVEL_OPTIONS } from "@/lib/domain/skill-level";
 import { getAdminPlayers } from "@/lib/queries/admin";
 import { withOrgQuery } from "@/lib/org";
 import { formatRendimiento } from "@/lib/utils";
-
-const SKILL_LEVEL_OPTIONS = [1, 2, 3, 4, 5] as const;
 
 export default async function AdminPlayersPage({
   searchParams
@@ -57,21 +56,23 @@ export default async function AdminPlayersPage({
       <Card>
         <CardTitle>Alta de jugador</CardTitle>
         <CardDescription>
-          Carga jugadores nuevos para el grupo seleccionado. Nivel 1 es el mas fuerte y Nivel 5 el mas bajo.
-          El nivel es la base manual; el rendimiento aprende con los partidos y ayuda a armar equipos mas parejos.
+          Carga jugadores nuevos para el grupo seleccionado. El nivel es la base manual; el rendimiento aprende con
+          los partidos y ayuda a armar equipos mas parejos.
         </CardDescription>
-        <form action={createPlayerAction} className="mt-4 grid gap-3 md:grid-cols-4">
+        <form action={createPlayerAction} className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_220px_1.2fr_auto] lg:items-start">
           <input name="organizationId" type="hidden" value={selectedOrganization.id} />
           <Input name="fullName" placeholder="Nombre completo" required />
           <Select aria-label="Nivel de habilidad" defaultValue="3" name="skillLevel" required>
             {SKILL_LEVEL_OPTIONS.map((level) => (
               <option key={level} value={level}>
-                Nivel {level}
+                {formatSkillLevelLabel(level)}
               </option>
             ))}
           </Select>
-          <Input disabled value="1000 (automatico)" />
-          <Button type="submit">Crear jugador</Button>
+          <PhotoUploadInput hint="Foto opcional. JPG, PNG o WEBP." required={false} />
+          <Button className="lg:self-start" type="submit">
+            Crear jugador
+          </Button>
         </form>
       </Card>
 
@@ -122,7 +123,7 @@ export default async function AdminPlayersPage({
               >
                 {SKILL_LEVEL_OPTIONS.map((level) => (
                   <option key={level} value={level}>
-                    Nivel {level}
+                    {formatSkillLevelLabel(level)}
                   </option>
                 ))}
               </Select>

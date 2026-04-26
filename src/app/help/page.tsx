@@ -57,7 +57,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "2. Carga jugadores y niveles",
         description:
-          "El nivel va del 1 al 5. Nivel 1 es el mas fuerte. Varios jugadores pueden tener el mismo nivel, porque la habilidad real no siempre entra en una lista unica."
+          "El nivel va del 1 al 5: Figura, Muy bueno, Intermedio, Recreativo y Principiante. Varios jugadores pueden tener el mismo nivel, porque la habilidad real no siempre entra en una lista unica."
       },
       {
         title: "3. Arma el partido",

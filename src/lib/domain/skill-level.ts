@@ -3,6 +3,14 @@ export const MAX_SKILL_LEVEL = 5;
 export const RATING_UP_THRESHOLD = 1050;
 export const RATING_DOWN_THRESHOLD = 950;
 export const EDGE_RATING_BONUS = 25;
+export const SKILL_LEVEL_OPTIONS = [1, 2, 3, 4, 5] as const;
+export const SKILL_LEVEL_LABELS: Record<(typeof SKILL_LEVEL_OPTIONS)[number], string> = {
+  1: "Figura",
+  2: "Muy bueno",
+  3: "Intermedio",
+  4: "Recreativo",
+  5: "Principiante"
+};
 
 export type EffectiveSkillScoreInput = {
   skillLevel: number | null | undefined;
@@ -13,6 +21,11 @@ export function normalizeSkillLevel(value: number | null | undefined) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return MAX_SKILL_LEVEL;
   return Math.min(MAX_SKILL_LEVEL, Math.max(MIN_SKILL_LEVEL, Math.trunc(parsed)));
+}
+
+export function formatSkillLevelLabel(value: number | null | undefined) {
+  const level = normalizeSkillLevel(value) as (typeof SKILL_LEVEL_OPTIONS)[number];
+  return `Nivel ${level} - ${SKILL_LEVEL_LABELS[level]}`;
 }
 
 export function mapInitialRankToSkillLevel(params: {

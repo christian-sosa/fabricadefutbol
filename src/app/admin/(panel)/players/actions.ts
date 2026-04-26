@@ -69,6 +69,92 @@ function withSuccess(organizationId: string, success: string | null) {
   return `${basePath}${separator}success=${encodeURIComponent(success)}&refresh=${Date.now()}`;
 }
 
+function getOptionalPhotoFile(formData: FormData) {
+  const file = formData.get("photo");
+  return file instanceof File && file.size > 0 ? file : null;
+}
+
+function validatePlayerPhotoFile(file: File, organizationQueryKey: string) {
+  const sizeLimitBytes = MAX_PLAYER_PHOTO_SIZE_MB * 1024 * 1024;
+  if (file.size > sizeLimitBytes) {
+    redirect(withMessage(organizationQueryKey, `La imagen no puede superar ${MAX_PLAYER_PHOTO_SIZE_MB} MB.`));
+  }
+
+  const extension = inferPlayerPhotoExtension(file);
+  if (!extension) {
+    redirect(withMessage(organizationQueryKey, "Formato no soportado. Usa JPG, JPEG, PNG o WEBP."));
+  }
+}
+
+async function savePlayerPhotoForAdmin({
+  supabase,
+  adminUserId,
+  organizationId,
+  organizationQueryKey,
+  playerId,
+  file,
+  validatePlayer = true
+}: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  adminUserId: string;
+  organizationId: string;
+  organizationQueryKey: string;
+  playerId: string;
+  file: File;
+  validatePlayer?: boolean;
+}) {
+  validatePlayerPhotoFile(file, organizationQueryKey);
+
+  if (validatePlayer) {
+    const { data: player, error: playerError } = await supabase
+      .from("players")
+      .select("id")
+      .eq("id", playerId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+
+    if (playerError || !player) {
+      redirect(withMessage(organizationQueryKey, "No se encontro el jugador en el grupo seleccionado."));
+    }
+  }
+
+  await assertPlayerPhotoUploadAllowed({
+    supabase: supabase as never,
+    uploaderId: adminUserId,
+    uploaderRole: "organization_admin",
+    targetPlayerId: playerId,
+    targetType: "organization_player"
+  });
+
+  const optimizedBuffer = await optimizePlayerAvatarImage(file);
+  const objectPath = getOrganizationPlayerPhotoObjectPath(getSupabaseDbSchema(), organizationId, playerId);
+  const bucketName = getPlayerPhotosBucket();
+  const { error: uploadError } = await supabase.storage
+    .from(bucketName)
+    .upload(objectPath, optimizedBuffer, {
+      upsert: true,
+      contentType: "image/webp",
+      cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
+    });
+
+  if (uploadError) {
+    console.error("[players] storage upload failed", {
+      organizationId,
+      playerId,
+      message: uploadError.message
+    });
+    redirect(withMessage(organizationQueryKey, "No se pudo guardar la foto en Storage. Intenta nuevamente."));
+  }
+
+  await registerPlayerPhotoUploadEvent({
+    supabase: supabase as never,
+    uploaderId: adminUserId,
+    uploaderRole: "organization_admin",
+    targetPlayerId: playerId,
+    targetType: "organization_player"
+  });
+}
+
 export async function createPlayerAction(formData: FormData) {
   try {
     const parsed = createSchema.safeParse({
@@ -86,8 +172,12 @@ export async function createPlayerAction(formData: FormData) {
       );
     }
 
-    await assertOrganizationAdminAction(parsed.data.organizationId);
+    const admin = await assertOrganizationAdminAction(parsed.data.organizationId);
     const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
+    const photoFile = getOptionalPhotoFile(formData);
+    if (photoFile) {
+      validatePlayerPhotoFile(photoFile, organizationQueryKey);
+    }
     const supabase = await createSupabaseServerClient();
 
     const { data: players, error: playersError } = await supabase
@@ -109,15 +199,31 @@ export async function createPlayerAction(formData: FormData) {
         ...existingPlayers.map((player) => Number(player.display_order ?? player.initial_rank) || 0)
       ) + 1;
 
-    const { error } = await supabase.from("players").insert({
-      organization_id: parsed.data.organizationId,
-      full_name: parsed.data.fullName,
-      initial_rank: nextInitialRank,
-      skill_level: normalizeSkillLevel(parsed.data.skillLevel),
-      display_order: nextDisplayOrder
-    });
-    if (error) {
+    const { data: createdPlayer, error } = await supabase
+      .from("players")
+      .insert({
+        organization_id: parsed.data.organizationId,
+        full_name: parsed.data.fullName,
+        initial_rank: nextInitialRank,
+        skill_level: normalizeSkillLevel(parsed.data.skillLevel),
+        display_order: nextDisplayOrder
+      })
+      .select("id")
+      .single();
+    if (error || !createdPlayer) {
       redirect(withMessage(organizationQueryKey, toUserMessage(error, "No se pudo crear al jugador.")));
+    }
+
+    if (photoFile) {
+      await savePlayerPhotoForAdmin({
+        supabase,
+        adminUserId: admin.userId,
+        organizationId: parsed.data.organizationId,
+        organizationQueryKey,
+        playerId: createdPlayer.id,
+        file: photoFile,
+        validatePlayer: false
+      });
     }
 
     await refreshOrganizationPublicSnapshotSafe(parsed.data.organizationId);
@@ -125,7 +231,11 @@ export async function createPlayerAction(formData: FormData) {
     revalidatePath("/players");
     revalidatePath("/ranking");
     revalidatePath("/");
-    redirect(withSuccess(organizationQueryKey, "Jugador creado correctamente."));
+    if (photoFile) {
+      revalidatePath(`/players/${createdPlayer.id}`);
+      revalidatePath(`/api/player-photo/${createdPlayer.id}`);
+    }
+    redirect(withSuccess(organizationQueryKey, photoFile ? "Jugador creado correctamente con foto." : "Jugador creado correctamente."));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(withMessage(String(formData.get("organizationId") ?? ""), toUserMessage(error, "Error inesperado al crear jugador.")));
@@ -315,66 +425,14 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
       redirect(withMessage(organizationQueryKey, "Selecciona una imagen para subir."));
     }
 
-    const sizeLimitBytes = MAX_PLAYER_PHOTO_SIZE_MB * 1024 * 1024;
-    if (file.size > sizeLimitBytes) {
-      redirect(withMessage(organizationQueryKey, `La imagen no puede superar ${MAX_PLAYER_PHOTO_SIZE_MB} MB.`));
-    }
-
-    const extension = inferPlayerPhotoExtension(file);
-    if (!extension) {
-      redirect(withMessage(organizationQueryKey, "Formato no soportado. Usa JPG, JPEG, PNG o WEBP."));
-    }
-
     const supabase = await createSupabaseServerClient();
-    const { data: player, error: playerError } = await supabase
-      .from("players")
-      .select("id")
-      .eq("id", parsed.data.playerId)
-      .eq("organization_id", parsed.data.organizationId)
-      .maybeSingle();
-
-    if (playerError || !player) {
-      redirect(withMessage(organizationQueryKey, "No se encontro el jugador en el grupo seleccionado."));
-    }
-
-    await assertPlayerPhotoUploadAllowed({
-      supabase: supabase as never,
-      uploaderId: admin.userId,
-      uploaderRole: "organization_admin",
-      targetPlayerId: parsed.data.playerId,
-      targetType: "organization_player"
-    });
-
-    const optimizedBuffer = await optimizePlayerAvatarImage(file);
-    const objectPath = getOrganizationPlayerPhotoObjectPath(
-      getSupabaseDbSchema(),
-      parsed.data.organizationId,
-      parsed.data.playerId
-    );
-    const bucketName = getPlayerPhotosBucket();
-    const { error: uploadError } = await supabase.storage
-      .from(bucketName)
-      .upload(objectPath, optimizedBuffer, {
-        upsert: true,
-        contentType: "image/webp",
-        cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
-      });
-
-    if (uploadError) {
-      console.error("[players] storage upload failed", {
-        organizationId: parsed.data.organizationId,
-        playerId: parsed.data.playerId,
-        message: uploadError.message
-      });
-      redirect(withMessage(organizationQueryKey, "No se pudo guardar la foto en Storage. Intenta nuevamente."));
-    }
-
-    await registerPlayerPhotoUploadEvent({
-      supabase: supabase as never,
-      uploaderId: admin.userId,
-      uploaderRole: "organization_admin",
-      targetPlayerId: parsed.data.playerId,
-      targetType: "organization_player"
+    await savePlayerPhotoForAdmin({
+      supabase,
+      adminUserId: admin.userId,
+      organizationId: parsed.data.organizationId,
+      organizationQueryKey,
+      playerId: parsed.data.playerId,
+      file
     });
 
     revalidatePath("/admin/players");
