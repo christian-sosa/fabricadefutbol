@@ -91,6 +91,7 @@ export default async function AdminTournamentsPage({
   }
 
   const leagues = await getAdminLeagueList();
+  const hasLeagues = leagues.length > 0;
   const feedbackMessage = resolvedSearchParams.error
     ? { tone: "danger" as const, text: resolvedSearchParams.error }
     : resolvedSearchParams.success
@@ -99,51 +100,61 @@ export default async function AdminTournamentsPage({
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle>Ligas</CardTitle>
-        <CardDescription>
-          Crea y administra ligas con sus equipos maestros, competencias y admins sin mezclar este flujo con Grupos.
-        </CardDescription>
-        {feedbackMessage ? (
+      {feedbackMessage ? (
+        <Card>
           <p
             className={
               feedbackMessage.tone === "danger"
-                ? "mt-3 text-sm font-semibold text-danger"
+                ? "text-sm font-semibold text-danger"
                 : feedbackMessage.tone === "success"
-                  ? "mt-3 text-sm font-semibold text-emerald-300"
-                  : "mt-3 text-sm font-semibold text-sky-300"
+                  ? "text-sm font-semibold text-emerald-300"
+                  : "text-sm font-semibold text-sky-300"
             }
           >
             {feedbackMessage.text}
           </p>
-        ) : null}
-      </Card>
+        </Card>
+      ) : null}
+
+      {!hasLeagues ? (
+        <Card className="p-5 sm:p-6">
+          <CardTitle>Nueva liga</CardTitle>
+          <CardDescription className="mt-2">
+            {TEMP_SKIP_TOURNAMENT_CHECKOUT
+              ? "Carga el nombre de la liga y la creamos al instante. Luego podras cargar equipos, competencias y capitanes opcionales."
+              : "Carga el nombre de la liga y te llevamos a Mercado Pago para confirmar el alta antes de habilitar equipos y competencias."}
+          </CardDescription>
+          <form action={createLeagueAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="name">
+                Nombre de la liga
+              </label>
+              <Input id="name" name="name" placeholder="Ej: LAFAB" required />
+            </div>
+            <div className="md:self-end">
+              <Button type="submit">{TEMP_SKIP_TOURNAMENT_CHECKOUT ? "Crear liga" : "Continuar a Mercado Pago"}</Button>
+            </div>
+          </form>
+        </Card>
+      ) : null}
 
       <Card>
-        <CardTitle>Nueva liga</CardTitle>
-        <CardDescription className="mt-2">
-          {TEMP_SKIP_TOURNAMENT_CHECKOUT
-            ? "Carga el nombre de la liga y la creamos al instante. Luego podras cargar equipos, competencias y capitanes opcionales."
-            : "Carga el nombre de la liga y te llevamos a Mercado Pago para confirmar el alta antes de habilitar equipos y competencias."}
-        </CardDescription>
-        <form action={createLeagueAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="name">
-              Nombre de la liga
-            </label>
-            <Input id="name" name="name" placeholder="Ej: LAFAB" required />
+            <CardTitle>Mis ligas</CardTitle>
+            <CardDescription className="mt-2">
+              Cada liga concentra equipos maestros y una o varias competencias como Viernes A, Viernes B o Copa Clausura.
+            </CardDescription>
           </div>
-          <div className="md:self-end">
-            <Button type="submit">{TEMP_SKIP_TOURNAMENT_CHECKOUT ? "Crear liga" : "Continuar a Mercado Pago"}</Button>
-          </div>
-        </form>
-      </Card>
-
-      <Card>
-        <CardTitle>Mis ligas</CardTitle>
-        <CardDescription>
-          Cada liga concentra equipos maestros y una o varias competencias como Viernes A, Viernes B o Copa Clausura.
-        </CardDescription>
+          {hasLeagues ? (
+            <Link
+              className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
+              href="/admin/tournaments/new"
+            >
+              Nueva liga
+            </Link>
+          ) : null}
+        </div>
 
         <div className="mt-4 space-y-3">
           {leagues.length ? (
