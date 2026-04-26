@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { ORGANIZATION_PUBLIC_NAV_ITEMS, PRIMARY_PUBLIC_NAV_ITEMS } from "@/lib/constants";
+import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
+import { PRIMARY_PUBLIC_NAV_ITEMS } from "@/lib/constants";
 import { parsePublicModule, withPublicQuery } from "@/lib/org";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -84,6 +85,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
 
   const isOrganizationSection = isOrganizationSectionPath(safePathname);
   const shouldShowOrganizationSubnav = mounted && isOrganizationSection;
+  const shouldShowMobileOrganizationSubnav = shouldShowOrganizationSubnav && !isActivePath(safePathname, "/groups");
   const organizationHubHref = withPublicQuery("/groups", {
     organizationKey,
     module: publicModule
@@ -295,28 +297,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
                 )}
               </div>
 
-              <nav className="flex flex-wrap items-center gap-2">
-                {ORGANIZATION_PUBLIC_NAV_ITEMS.map((item) => {
-                  const active = mounted && isActivePath(safePathname, item.href);
-                  return (
-                    <Link
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
-                        active
-                          ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
-                          : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
-                      )}
-                      href={withPublicQuery(item.href, {
-                        organizationKey,
-                        module: publicModule
-                      })}
-                      key={item.href}
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </nav>
+              <OrganizationPublicNav currentPath={safePathname} module={publicModule} organizationKey={organizationKey} />
             </div>
           </div>
         ) : null}
@@ -361,38 +342,24 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
               </nav>
             </div>
 
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Submenu de Grupos
-              </p>
-              {currentOrganizationLabel ? (
-                <p className="text-sm font-semibold text-slate-200">{currentOrganizationLabel}</p>
-              ) : (
-                <p className="text-sm text-slate-400">Explora un grupo para ver el contenido publico.</p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                {ORGANIZATION_PUBLIC_NAV_ITEMS.map((item) => {
-                  const active = mounted && isActivePath(safePathname, item.href);
-                  return (
-                    <Link
-                      className={cn(
-                        "rounded-full border px-3 py-2 text-xs font-semibold transition",
-                        active
-                          ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
-                          : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
-                      )}
-                      href={withPublicQuery(item.href, {
-                        organizationKey,
-                        module: publicModule
-                      })}
-                      key={item.href}
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
+            {shouldShowMobileOrganizationSubnav ? (
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Submenu de Grupos
+                </p>
+                {currentOrganizationLabel ? (
+                  <p className="text-sm font-semibold text-slate-200">{currentOrganizationLabel}</p>
+                ) : (
+                  <p className="text-sm text-slate-400">Explora un grupo para ver el contenido publico.</p>
+                )}
+                <OrganizationPublicNav
+                  currentPath={safePathname}
+                  itemClassName="px-3 py-2"
+                  module={publicModule}
+                  organizationKey={organizationKey}
+                />
               </div>
-            </div>
+            ) : null}
 
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Cuenta</p>
