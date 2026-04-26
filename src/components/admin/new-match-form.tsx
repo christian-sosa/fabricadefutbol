@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
+import { formatSkillLevelLabel, SKILL_LEVEL_OPTIONS } from "@/lib/domain/skill-level";
 import { cn, formatRendimiento } from "@/lib/utils";
 import type { MatchModality, TeamSide } from "@/types/domain";
 
@@ -39,8 +40,6 @@ type ManualParticipant = {
 const EXPECTED_PLAYERS: Record<MatchModality, number> = Object.fromEntries(
   Object.entries(TEAM_SIZE_BY_MODALITY).map(([modality, teamSize]) => [modality, teamSize * 2])
 ) as Record<MatchModality, number>;
-
-const SKILL_LEVEL_OPTIONS = [1, 2, 3, 4, 5] as const;
 
 function parseGuestSkillLevel(rawValue: string) {
   const parsed = Number(rawValue);
@@ -302,7 +301,8 @@ export function NewMatchForm({
               <span className="flex items-center gap-3">
                 <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
                 <span>
-                  {player.full_name} <span className="text-xs text-slate-500">(Nivel {player.skill_level})</span>
+                  {player.full_name}{" "}
+                  <span className="text-xs text-slate-500">({formatSkillLevelLabel(player.skill_level)})</span>
                 </span>
               </span>
               <span className="flex items-center gap-2">
@@ -384,7 +384,7 @@ export function NewMatchForm({
                   <option value="">Nivel equivalente</option>
                   {SKILL_LEVEL_OPTIONS.map((level) => (
                     <option key={level} value={level}>
-                      Nivel {level}
+                      {formatSkillLevelLabel(level)}
                     </option>
                   ))}
                 </Select>
@@ -426,7 +426,7 @@ export function NewMatchForm({
                       <span>{participant.fullName}</span>
                       <span className="ml-2 text-xs text-slate-400">
                         {participant.source === "guest"
-                          ? `Invitado | Nivel ${participant.rating}`
+                          ? `Invitado | ${formatSkillLevelLabel(participant.rating)}`
                           : `Jugador | rendimiento ${formatRendimiento(participant.rating)}`}
                       </span>
                     </div>

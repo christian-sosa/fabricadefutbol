@@ -27,12 +27,12 @@ describe("AdminSubnav", () => {
     expect(screen.queryByText("Grupo actual")).not.toBeInTheDocument();
   });
 
-  it("muestra navegacion de grupo despues de elegir un grupo", () => {
+  it("muestra navegacion de grupo sin repetir el encabezado de grupo actual", () => {
     navigationState.searchParams = new URLSearchParams({ org: "grupo-a" });
 
     render(<AdminSubnav />);
 
-    expect(screen.getByText("Grupo actual")).toBeInTheDocument();
+    expect(screen.queryByText("Grupo actual")).not.toBeInTheDocument();
     expect(screen.queryByText("Contexto grupos")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Jugadores" })).toHaveAttribute(
       "href",
