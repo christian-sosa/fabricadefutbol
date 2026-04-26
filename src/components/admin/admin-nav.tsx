@@ -36,7 +36,7 @@ export function AdminNav({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     <nav className="flex flex-wrap items-center gap-2">
       {navItems.map((item) => {
         const active = isItemActive(item.href);
-        const href = withOrgQuery(item.href, organizationId);
+        const href = item.href === "/admin" ? withOrgQuery(item.href, organizationId) : item.href;
         return (
           <Link
             className={cn(

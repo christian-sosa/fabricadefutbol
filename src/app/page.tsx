@@ -5,7 +5,6 @@ import { OrganizationSwitcher } from "@/components/layout/organization-switcher"
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery, withPublicQuery } from "@/lib/org";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
@@ -73,12 +72,12 @@ const workflowCards = [
   }
 ] as const;
 
-const fallbackRankingPreview = [
-  { name: "Juan", rendimiento: 1180 },
-  { name: "Mati", rendimiento: 1170 },
-  { name: "Nico", rendimiento: 1160 },
-  { name: "Fede", rendimiento: 1150 },
-  { name: "Tomi", rendimiento: 1140 }
+const exampleRankingPreview = [
+  { name: "Jugador 1", rendimiento: 1030 },
+  { name: "Jugador 2", rendimiento: 1030 },
+  { name: "Jugador 3", rendimiento: 1030 },
+  { name: "Jugador 4", rendimiento: 1030 },
+  { name: "Jugador 5", rendimiento: 1030 }
 ] as const;
 
 export default async function HomePage({
@@ -96,13 +95,6 @@ export default async function HomePage({
   const summary = await getHomeSummary(selectedOrganization?.id ?? null);
   const selectedOrganizationSlug = selectedOrganization?.slug ?? null;
   const featuredLeagues = leagues.slice(0, 3);
-  const rankingRows = summary.topPlayers.length
-    ? summary.topPlayers.map((player) => ({
-        id: player.id,
-        name: player.full_name,
-        rendimiento: player.current_rating
-      }))
-    : fallbackRankingPreview;
 
   return (
     <div className="space-y-8">
@@ -157,13 +149,13 @@ export default async function HomePage({
               <div className="rounded-2xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-right">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Partidos</p>
                 <p className="mt-1 text-2xl font-black text-white">
-                  {summary.totalFinishedMatches || 150}
+                  150
                 </p>
               </div>
             </div>
 
             <div className="mt-5 space-y-2">
-              {rankingRows.slice(0, 5).map((player, index) => (
+              {exampleRankingPreview.map((player, index) => (
                 <div
                   className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 px-3 py-3"
                   key={`${player.name}-${index}`}
@@ -327,19 +319,16 @@ export default async function HomePage({
         </Card>
 
         <Card>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Top actual</p>
-          <CardTitle className="mt-2">
-            {selectedOrganization ? `Rendimiento en ${selectedOrganization.name}` : "Ranking destacado"}
-          </CardTitle>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Ejemplo</p>
+          <CardTitle className="mt-2">Tabla de rendimiento</CardTitle>
           <div className="mt-4 space-y-2">
-            {rankingRows.slice(0, 5).map((player, index) => (
+            {exampleRankingPreview.map((player, index) => (
               <div
                 className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-3"
                 key={`${player.name}-public-${index}`}
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="text-sm font-black text-slate-500">#{index + 1}</span>
-                  {"id" in player ? <PlayerAvatar name={player.name} playerId={player.id} size="sm" /> : null}
                   <span className="truncate text-sm font-semibold text-white">{player.name}</span>
                 </div>
                 <span className="text-sm font-semibold text-emerald-200">

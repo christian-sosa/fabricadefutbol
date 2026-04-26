@@ -60,17 +60,12 @@ export default async function GroupsPage({
 
           <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
             <Card className="overflow-hidden p-0">
-              <div className="relative">
-                <OrganizationImage
-                  alt={`Imagen de ${selectedOrganization.name}`}
-                  className="aspect-[16/9] min-h-[260px] rounded-none border-0"
-                  priority
-                  src={getOrganizationImageUrl(selectedOrganization.id)}
-                />
-                <div className="absolute inset-x-0 bottom-0 p-5 md:p-6">
-                  <h2 className="text-2xl font-black text-white md:text-4xl">{selectedOrganization.name}</h2>
-                </div>
-              </div>
+              <OrganizationImage
+                alt={`Imagen de ${selectedOrganization.name}`}
+                className="aspect-[16/9] min-h-[260px] rounded-none border-0"
+                priority
+                src={getOrganizationImageUrl(selectedOrganization.id)}
+              />
             </Card>
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
@@ -84,10 +79,6 @@ export default async function GroupsPage({
               </Card>
             </div>
           </section>
-
-          <p className="max-w-3xl text-sm text-slate-300 md:text-base">
-            Un vistazo rapido para entrar al grupo, ver quienes vienen arriba y seguir las fechas que ya quedaron confirmadas.
-          </p>
 
           <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
             <Card>
@@ -129,9 +120,9 @@ export default async function GroupsPage({
                       className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm transition hover:border-slate-600 hover:bg-slate-800"
                       href={withOrgQuery(`/matches/${match.id}`, selectedOrganization.slug)}
                       key={match.id}
-                      >
-                        <span>
-                          {match.modality} - {formatMatchDateTime(match.scheduled_at)}
+                    >
+                      <span>
+                        {match.modality} - {formatMatchDateTime(match.scheduled_at)}
                       </span>
                       <span className="font-semibold text-emerald-300">Ver detalle</span>
                     </Link>
