@@ -200,8 +200,9 @@ export async function getAdminPlayers(organizationId: string) {
     .from("players")
     .select("*")
     .eq("organization_id", organizationId)
+    .order("skill_level", { ascending: true })
     .order("display_order", { ascending: true })
-    .order("initial_rank", { ascending: true });
+    .order("full_name", { ascending: true });
   if (error) throw new Error(error.message);
   return data ?? [];
 }
@@ -213,8 +214,9 @@ export async function getSelectablePlayers(organizationId: string) {
     .select("id, full_name, current_rating, initial_rank, skill_level, display_order")
     .eq("organization_id", organizationId)
     .eq("active", true)
+    .order("skill_level", { ascending: true })
     .order("display_order", { ascending: true })
-    .order("initial_rank", { ascending: true });
+    .order("full_name", { ascending: true });
   if (error) throw new Error(error.message);
   return data ?? [];
 }

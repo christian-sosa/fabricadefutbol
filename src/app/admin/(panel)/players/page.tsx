@@ -56,8 +56,8 @@ export default async function AdminPlayersPage({
       <Card>
         <CardTitle>Alta de jugador</CardTitle>
         <CardDescription>
-          Carga jugadores nuevos para el grupo seleccionado. El nivel sirve como base manual; el rating aprende con los
-          partidos y ayuda a armar equipos mas parejos.
+          Carga jugadores nuevos para el grupo seleccionado. Nivel 1 es el mas fuerte y Nivel 5 el mas bajo.
+          El nivel es la base manual; el rating aprende con los partidos y ayuda a armar equipos mas parejos.
         </CardDescription>
         <form action={createPlayerAction} className="mt-4 grid gap-3 md:grid-cols-4">
           <input name="organizationId" type="hidden" value={selectedOrganization.id} />
@@ -77,7 +77,8 @@ export default async function AdminPlayersPage({
       <Card>
         <CardTitle>Editar planilla de jugadores</CardTitle>
         <CardDescription>
-          Modifica la planilla y guarda una sola vez. La foto ahora se actualiza en la fila de cada jugador.
+          Modifica la planilla y guarda una sola vez. La lista se ordena por nivel despues de guardar, de Nivel 1 a Nivel 5.
+          La foto se actualiza en la fila de cada jugador.
         </CardDescription>
 
         {error ? <p className="mt-3 text-sm font-semibold text-danger">{error}</p> : null}
