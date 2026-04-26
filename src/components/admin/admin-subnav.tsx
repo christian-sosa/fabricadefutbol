@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
+import { isTournamentsEnabled } from "@/lib/features";
 import { cn } from "@/lib/utils";
 import { withOrgQuery } from "@/lib/org";
 
@@ -117,10 +118,12 @@ export function AdminSubnav() {
   const organizationKey = searchParams.get("org");
   const currentTab = searchParams.get("tab");
   const tournamentId = getTournamentIdFromPath(pathname);
+  const isTournamentArea = pathname.startsWith("/admin/tournaments");
 
   if (
     !pathname.startsWith("/admin") ||
     pathname.startsWith("/admin/super") ||
+    (isTournamentArea && !isTournamentsEnabled()) ||
     pathname === "/admin/new" ||
     pathname === "/admin/tournaments/new" ||
     (pathname === "/admin" && !organizationKey)
@@ -128,7 +131,6 @@ export function AdminSubnav() {
     return null;
   }
 
-  const isTournamentArea = pathname.startsWith("/admin/tournaments");
   const showHeader = isTournamentArea;
   const items = isTournamentArea
     ? buildTournamentItems(pathname, tournamentId, currentTab)

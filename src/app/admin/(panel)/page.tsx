@@ -23,6 +23,7 @@ import {
   getOrganizationWriteAccess
 } from "@/lib/auth/admin";
 import { syncOrganizationBillingPaymentFromMercadoPago } from "@/lib/domain/billing-workflow";
+import { isTournamentsEnabled } from "@/lib/features";
 import { getOrganizationImageUrl } from "@/lib/organization-images";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminDashboardData, getOrganizationAdminData } from "@/lib/queries/admin";
@@ -92,13 +93,15 @@ function AdminHomeHub({
   checkout,
   error,
   leagues,
-  organizations
+  organizations,
+  tournamentsEnabled
 }: {
   creationAccess: Awaited<ReturnType<typeof getAdminOrganizationCreationAccess>>;
   checkout?: string;
   error?: string;
   leagues: LeagueEntry[];
   organizations: OrganizationEntry[];
+  tournamentsEnabled: boolean;
 }) {
   const hasOrganizations = organizations.length > 0;
   const hasLeagues = leagues.length > 0;
@@ -111,12 +114,13 @@ function AdminHomeHub({
       <Card className="p-5 sm:p-6">
         <CardTitle className="text-3xl">Que queres administrar?</CardTitle>
         <CardDescription className="mt-3 max-w-3xl text-base">
-          Elegi un grupo o una liga antes de cargar datos. Asi cada flujo mantiene sus jugadores,
-          partidos, competencias y facturacion en el lugar correcto.
+          {tournamentsEnabled
+            ? "Elegi un grupo o una liga antes de cargar datos. Asi cada flujo mantiene sus jugadores, partidos, competencias y facturacion en el lugar correcto."
+            : "Elegi un grupo antes de cargar datos. Asi jugadores, partidos, rendimiento y facturacion quedan en el lugar correcto."}
         </CardDescription>
       </Card>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className={`grid gap-4 ${tournamentsEnabled ? "lg:grid-cols-2" : ""}`}>
         <Card>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -185,6 +189,7 @@ function AdminHomeHub({
           </div>
         </Card>
 
+        {tournamentsEnabled ? (
         <Card>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -241,6 +246,7 @@ function AdminHomeHub({
             )}
           </div>
         </Card>
+        ) : null}
       </section>
     </div>
   );
@@ -275,9 +281,10 @@ export default async function AdminDashboardPage({
 
   const creationAccess = await getAdminOrganizationCreationAccess(admin);
   const selectedOrganization = findOrganizationByKey(organizations, resolvedSearchParams.org);
+  const tournamentsEnabled = isTournamentsEnabled();
 
   if (!selectedOrganization) {
-    const leagues = await getAdminLeagueList();
+    const leagues = tournamentsEnabled ? await getAdminLeagueList() : [];
 
     return (
       <AdminHomeHub
@@ -286,6 +293,7 @@ export default async function AdminDashboardPage({
         error={resolvedSearchParams.error}
         leagues={leagues}
         organizations={organizations}
+        tournamentsEnabled={tournamentsEnabled}
       />
     );
   }

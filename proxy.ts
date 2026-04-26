@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { ACTIVE_ORG_COOKIE, ACTIVE_ORG_COOKIE_MAX_AGE } from "@/lib/active-org";
+import { isTournamentsEnabled, TOURNAMENTS_DISABLED_ADMIN_MESSAGE } from "@/lib/features";
 import { createSupabaseMiddlewareClient } from "@/lib/supabase/middleware";
 
 function redirectToLogin(request: NextRequest) {
@@ -25,8 +26,43 @@ function persistActiveOrgCookieIfPresent(request: NextRequest, response: NextRes
   });
 }
 
+function isTournamentAssetApiPath(pathname: string) {
+  return (
+    pathname.startsWith("/api/league-logo") ||
+    pathname.startsWith("/api/league-photo") ||
+    pathname.startsWith("/api/league-team-logo")
+  );
+}
+
+function blockDisabledTournamentRoutes(request: NextRequest) {
+  if (isTournamentsEnabled()) return null;
+
+  const { pathname } = request.nextUrl;
+  if (
+    pathname.startsWith("/tournaments") ||
+    pathname.startsWith("/captain") ||
+    pathname.startsWith("/admin/tournaments/invite") ||
+    isTournamentAssetApiPath(pathname)
+  ) {
+    return new NextResponse(null, { status: 404 });
+  }
+
+  if (pathname.startsWith("/admin/tournaments")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/admin";
+    url.search = "";
+    url.searchParams.set("error", TOURNAMENTS_DISABLED_ADMIN_MESSAGE);
+    return NextResponse.redirect(url);
+  }
+
+  return null;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const disabledTournamentResponse = blockDisabledTournamentRoutes(request);
+  if (disabledTournamentResponse) return disabledTournamentResponse;
+
   const isAdminArea = pathname.startsWith("/admin");
 
   if (!isAdminArea) {
@@ -67,6 +103,11 @@ export const config = {
     "/players/:path*",
     "/matches/:path*",
     "/upcoming/:path*",
-    "/pricing/:path*"
+    "/pricing/:path*",
+    "/tournaments/:path*",
+    "/captain/:path*",
+    "/api/league-logo/:path*",
+    "/api/league-photo/:path*",
+    "/api/league-team-logo/:path*"
   ]
 };

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { PRIMARY_PUBLIC_NAV_ITEMS } from "@/lib/constants";
+import { isTournamentsEnabled } from "@/lib/features";
 import { parsePublicModule, withPublicQuery } from "@/lib/org";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +50,7 @@ export function SiteFooter() {
   const organizationId = searchParams.get("org");
   const publicModule = parsePublicModule(searchParams.get("module"));
   const year = new Date().getFullYear();
+  const tournamentsEnabled = isTournamentsEnabled();
 
   return (
     <footer className="relative mt-10 border-t border-slate-800/90 bg-slate-950/95">
@@ -163,7 +165,7 @@ export function SiteFooter() {
         <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/55 px-4 py-4 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
           <p>Copyright {year} Fabrica de Futbol. Todos los derechos reservados.</p>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Ranking real para grupos y torneos
+            {tournamentsEnabled ? "Ranking real para grupos y torneos" : "Ranking real para grupos"}
           </p>
         </div>
       </div>

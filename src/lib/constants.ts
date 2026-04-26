@@ -1,5 +1,7 @@
 ﻿import type { MatchModality, MatchStatus } from "@/types/domain";
 
+import { isTournamentsEnabled, shouldSkipTournamentCheckoutForDebug } from "@/lib/features";
+
 export const MATCH_MODALITIES: MatchModality[] = ["5v5", "6v6", "7v7", "9v9", "11v11"];
 export const MATCH_STATUSES: MatchStatus[] = ["draft", "confirmed", "finished", "cancelled"];
 
@@ -43,10 +45,9 @@ export const MAX_TOURNAMENT_PLAYERS_PER_TEAM = 20;
 // Referencia comercial publica mientras la activacion de torneos siga en modo debug.
 export const TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS = 50000;
 export const ORGANIZATION_BILLING_CURRENCY = "ARS";
-// Atajo temporal para debug en produccion: mantiene el flujo local de cobro
-// de torneos, pero saltea el checkout externo. Volver a `false` reactiva
-// Mercado Pago sin tocar la estructura del workflow.
-export const TEMP_SKIP_TOURNAMENT_CHECKOUT = true;
+// Atajo temporal solo para desarrollo local: mantiene el flujo de torneos
+// testeable sin checkout externo. En produccion Mercado Pago queda activo.
+export const TEMP_SKIP_TOURNAMENT_CHECKOUT = shouldSkipTournamentCheckoutForDebug();
 
 export const TEAM_SIZE_BY_MODALITY: Record<MatchModality, number> = {
   "5v5": 5,
@@ -56,7 +57,7 @@ export const TEAM_SIZE_BY_MODALITY: Record<MatchModality, number> = {
   "11v11": 11
 };
 
-export const PUBLIC_NAV_ITEMS = [
+const BASE_PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
   { href: "/groups", label: "Grupos" },
   { href: "/tournaments", label: "Torneos" },
@@ -66,16 +67,16 @@ export const PUBLIC_NAV_ITEMS = [
   { href: "/pricing", label: "Precios" },
   { href: "/feedback", label: "Contacto" },
   { href: "/help", label: "Ayuda" }
-];
+] as const;
 
-export const PRIMARY_PUBLIC_NAV_ITEMS = [
+const BASE_PRIMARY_PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
   { href: "/groups", label: "Grupos" },
   { href: "/tournaments", label: "Torneos" },
   { href: "/pricing", label: "Precios" },
   { href: "/feedback", label: "Contacto" },
   { href: "/help", label: "Ayuda" }
-];
+] as const;
 
 export const ORGANIZATION_PUBLIC_NAV_ITEMS = [
   { href: "/ranking", label: "Ranking" },
@@ -83,7 +84,16 @@ export const ORGANIZATION_PUBLIC_NAV_ITEMS = [
   { href: "/upcoming", label: "Proximos" }
 ];
 
-export const ADMIN_NAV_ITEMS = [
+const BASE_ADMIN_NAV_ITEMS = [
   { href: "/admin", label: "Grupos" },
   { href: "/admin/tournaments", label: "Torneos" }
-];
+] as const;
+
+function filterTournamentNavItems<T extends ReadonlyArray<{ href: string; label: string }>>(items: T) {
+  if (isTournamentsEnabled()) return [...items];
+  return items.filter((item) => item.href !== "/tournaments" && item.href !== "/admin/tournaments");
+}
+
+export const PUBLIC_NAV_ITEMS = filterTournamentNavItems(BASE_PUBLIC_NAV_ITEMS);
+export const PRIMARY_PUBLIC_NAV_ITEMS = filterTournamentNavItems(BASE_PRIMARY_PUBLIC_NAV_ITEMS);
+export const ADMIN_NAV_ITEMS = filterTournamentNavItems(BASE_ADMIN_NAV_ITEMS);

@@ -2,20 +2,17 @@ import Link from "next/link";
 
 import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
-import { LeagueLogo } from "@/components/tournaments/league-logo";
-import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery, withPublicQuery } from "@/lib/org";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
-import { getPublicLeagues } from "@/lib/queries/tournaments";
 import { formatRendimiento } from "@/lib/utils";
 
 const heroHighlights = [
   "Equipos parejos",
   "Rendimiento automatico",
   "Historial publico",
-  "Torneos y competencias"
+  "Convocatorias claras"
 ] as const;
 
 const groupFeatures = [
@@ -36,48 +33,30 @@ const groupFeatures = [
   }
 ] as const;
 
-const tournamentFeatures = [
-  {
-    title: "Liga como base",
-    description:
-      "La liga guarda equipos maestros, admins, sede, logo y foto publica. Desde ahi nacen las competencias."
-  },
-  {
-    title: "Competencias publicas",
-    description:
-      "Cada competencia queda visible para visitantes cuando esta activa o finalizada, con tabla, fixture y resultados."
-  },
-  {
-    title: "Operacion flexible",
-    description:
-      "Puedes usar fixture automatico o manual, capitanes opcionales y carga completa o simplificada de actas."
-  }
-] as const;
-
 const workflowCards = [
   {
     title: "1. Cargas la base",
     description:
-      "En Grupos cargas jugadores y niveles. En Torneos cargas liga, equipos maestros y competencias."
+      "Cargas jugadores, niveles y una foto del grupo para que el espacio quede listo para compartir."
   },
   {
     title: "2. Organizas la fecha",
     description:
-      "Armas partido, fixture o cruce. La app ordena la informacion y deja links claros para compartir."
+      "Eliges fecha, modalidad, convocados, invitados y arqueros. La app propone equipos balanceados."
   },
   {
     title: "3. Publicas resultados",
     description:
-      "Cargas marcador y datos del partido. El ranking, tablas, historial y estadisticas se actualizan solos."
+      "Cargas marcador y datos del partido. El ranking, historial y estadisticas se actualizan solos."
   }
 ] as const;
 
 const exampleRankingPreview = [
-  { name: "Jugador 1", rendimiento: 1030 },
-  { name: "Jugador 2", rendimiento: 1030 },
-  { name: "Jugador 3", rendimiento: 1030 },
-  { name: "Jugador 4", rendimiento: 1030 },
-  { name: "Jugador 5", rendimiento: 1030 }
+  { name: "Juan", rendimiento: 1110, matchesPlayed: 92 },
+  { name: "Manuel", rendimiento: 1050, matchesPlayed: 87 },
+  { name: "Nicolas", rendimiento: 1020, matchesPlayed: 76 },
+  { name: "Lucas", rendimiento: 990, matchesPlayed: 68 },
+  { name: "Diego", rendimiento: 960, matchesPlayed: 54 }
 ] as const;
 
 export default async function HomePage({
@@ -86,15 +65,13 @@ export default async function HomePage({
   searchParams: Promise<{ org?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const [{ organizations, selectedOrganization }, viewerAdminOrganizations, leagues] = await Promise.all([
+  const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
     resolvePublicOrganization(resolvedSearchParams.org, { defaultContext: "home" }),
-    getViewerAdminOrganizations(),
-    getPublicLeagues()
+    getViewerAdminOrganizations()
   ]);
 
   const summary = await getHomeSummary(selectedOrganization?.id ?? null);
   const selectedOrganizationSlug = selectedOrganization?.slug ?? null;
-  const featuredLeagues = leagues.slice(0, 3);
 
   return (
     <div className="space-y-8">
@@ -105,10 +82,10 @@ export default async function HomePage({
               Futbol amateur, ordenado de verdad
             </p>
             <h1 className="mt-3 max-w-4xl text-4xl font-black leading-tight text-white md:text-5xl lg:text-6xl">
-              Organiza grupos, partidos y torneos sin planillas eternas.
+              Organiza tu grupo y arma partidos parejos sin planillas eternas.
             </h1>
             <p className="mt-4 max-w-2xl text-base text-slate-300 md:text-lg">
-              Fabrica de Futbol arma equipos parejos, mide rendimiento, guarda historial y publica la informacion que jugadores, capitanes y visitantes necesitan consultar.
+              Fabrica de Futbol arma equipos parejos, mide rendimiento, guarda historial y publica la informacion que tus jugadores necesitan consultar.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -161,10 +138,11 @@ export default async function HomePage({
                   key={`${player.name}-${index}`}
                 >
                   <span className="text-lg font-black text-slate-400">#{index + 1}</span>
-                  <span className="truncate text-sm font-semibold text-slate-100">{player.name}</span>
-                  <span className="text-sm font-semibold text-emerald-200">
-                    {formatRendimiento(player.rendimiento)} pts
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-slate-100">{player.name}</span>
+                    <span className="text-xs text-slate-500">{player.matchesPlayed} partidos</span>
                   </span>
+                  <span className="text-sm font-semibold text-emerald-200">{formatRendimiento(player.rendimiento)} pts</span>
                 </div>
               ))}
             </div>
@@ -172,31 +150,15 @@ export default async function HomePage({
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section>
         <Card>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Grupos</p>
           <CardTitle className="mt-2 text-3xl">Para los partidos de cada semana</CardTitle>
           <CardDescription className="mt-3 text-base">
             Ideal para amigos, equipos recurrentes y grupos que quieren dejar de discutir equipos y empezar a tener historial real.
           </CardDescription>
-          <div className="mt-5 grid gap-3">
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
             {groupFeatures.map((feature) => (
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4" key={feature.title}>
-                <p className="text-sm font-semibold text-white">{feature.title}</p>
-                <p className="mt-2 text-sm text-slate-300">{feature.description}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Torneos</p>
-          <CardTitle className="mt-2 text-3xl">Para ligas con varias competencias</CardTitle>
-          <CardDescription className="mt-3 text-base">
-            Pensado para organizadores que necesitan tabla, fixture, equipos inscriptos, capitanes y estadisticas publicas.
-          </CardDescription>
-          <div className="mt-5 grid gap-3">
-            {tournamentFeatures.map((feature) => (
               <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4" key={feature.title}>
                 <p className="text-sm font-semibold text-white">{feature.title}</p>
                 <p className="mt-2 text-sm text-slate-300">{feature.description}</p>
@@ -322,18 +284,21 @@ export default async function HomePage({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Ejemplo</p>
           <CardTitle className="mt-2">Tabla de rendimiento</CardTitle>
           <div className="mt-4 space-y-2">
+            <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 px-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <span>#</span>
+              <span>Jugador</span>
+              <span className="text-right">PJ</span>
+              <span className="text-right">Pts</span>
+            </div>
             {exampleRankingPreview.map((player, index) => (
               <div
-                className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-3"
+                className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-3"
                 key={`${player.name}-public-${index}`}
               >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="text-sm font-black text-slate-500">#{index + 1}</span>
-                  <span className="truncate text-sm font-semibold text-white">{player.name}</span>
-                </div>
-                <span className="text-sm font-semibold text-emerald-200">
-                  {formatRendimiento(player.rendimiento)} pts
-                </span>
+                <span className="text-sm font-black text-slate-500">#{index + 1}</span>
+                <span className="truncate text-sm font-semibold text-white">{player.name}</span>
+                <span className="text-right text-sm text-slate-300">{player.matchesPlayed}</span>
+                <span className="text-right text-sm font-semibold text-emerald-200">{formatRendimiento(player.rendimiento)}</span>
               </div>
             ))}
           </div>
@@ -368,71 +333,10 @@ export default async function HomePage({
         </section>
       ) : null}
 
-      <section className="grid gap-4 lg:grid-cols-[1.02fr_0.98fr]">
-        <Card>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Torneos publicos</p>
-          <CardTitle className="mt-2">Ligas y competencias listas para compartir</CardTitle>
-          <CardDescription className="mt-3">
-            Los visitantes pueden entrar a la liga, elegir una competencia y ver tabla, fixture, resultados y estadisticas.
-          </CardDescription>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link
-              className="rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
-              href={withPublicQuery("/tournaments", {
-                organizationKey: selectedOrganizationSlug,
-                module: "tournaments"
-              })}
-            >
-              Ver torneos
-            </Link>
-            <Link
-              className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
-              href={withPublicQuery("/pricing", {
-                organizationKey: selectedOrganizationSlug,
-                module: "tournaments"
-              })}
-            >
-              Ver precios
-            </Link>
-          </div>
-        </Card>
-
-        <div className="space-y-3">
-          {featuredLeagues.length ? (
-            featuredLeagues.map((league) => (
-              <Link
-                className="block rounded-2xl border border-slate-800 bg-slate-900/80 p-4 transition hover:border-slate-600 hover:bg-slate-900"
-                href={`/tournaments/${league.slug}`}
-                key={league.id}
-              >
-                <div className="flex items-start gap-3">
-                  <LeagueLogo alt={`Logo de ${league.name}`} size={52} src={league.logoUrl} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <CardTitle className="text-base">{league.name}</CardTitle>
-                      <TournamentStatusBadge status={league.status} />
-                    </div>
-                    <CardDescription className="mt-2">
-                      {league.description || league.venueName || "Liga publica disponible para consultar sus competencias."}
-                    </CardDescription>
-                  </div>
-                </div>
-              </Link>
-            ))
-          ) : (
-            <Card>
-              <CardDescription>
-                El modulo Torneos ya esta listo para mostrar ligas publicas y las competencias activas dentro de cada una.
-              </CardDescription>
-            </Card>
-          )}
-        </div>
-      </section>
-
       <section className="rounded-[2rem] border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.14),rgba(15,23,42,0.98))] p-6 text-center shadow-[0_24px_60px_-38px_rgba(16,185,129,0.75)] md:p-8">
-        <h2 className="text-3xl font-black text-white md:text-4xl">Arranca con un grupo y escala cuando lo necesites</h2>
+        <h2 className="text-3xl font-black text-white md:text-4xl">Tu grupo, mas facil de sostener semana a semana</h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm text-slate-200 md:text-base">
-          Crea tu grupo, arma partidos parejos y, si el proyecto crece, suma ligas y competencias sin mezclar los flujos.
+          Crea tu grupo, arma partidos parejos y deja ranking, historial y proximas fechas claros para todos.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link
