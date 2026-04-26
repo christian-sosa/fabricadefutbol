@@ -6,6 +6,7 @@ import {
   ORGANIZATION_MONTHLY_PRICE_ARS,
   TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS
 } from "@/lib/constants";
+import { isTournamentsEnabled } from "@/lib/features";
 
 function formatArs(amount: number) {
   return new Intl.NumberFormat("es-AR", {
@@ -14,61 +15,68 @@ function formatArs(amount: number) {
   }).format(amount);
 }
 
-const pricingNotes = [
-  "Grupos y Torneos se facturan por separado porque resuelven necesidades distintas.",
-  "La informacion publica sigue visible para jugadores y visitantes.",
-  "Cuando un periodo vence, el espacio queda protegido en modo lectura hasta reactivar el plan."
-] as const;
-
 export default function PricingPage() {
-  const plans = [
-    {
-      title: "Grupos",
-      eyebrow: "Para partidos recurrentes",
-      price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(ORGANIZATION_MONTHLY_PRICE_ARS)} / mes`,
-      badge: "30 dias gratis para empezar",
-      description:
-        "Para amigos, equipos y grupos que juegan seguido y quieren ordenar convocatorias, equipos, rendimiento e historial.",
-      cta: "Crear mi grupo",
-      href: "/admin/login",
-      items: [
-        "Jugadores con nivel de habilidad simple",
-        "Armado automatico de equipos parejos",
-        "Invitados y arqueros contemplados en el balance",
-        "Rendimiento competitivo actualizado por resultados",
-        "Ranking, historial y proximos partidos publicos",
-        "Hasta 4 administradores por grupo"
+  const tournamentsEnabled = isTournamentsEnabled();
+  const groupPlan = {
+    title: "Grupos",
+    eyebrow: "Para partidos recurrentes",
+    price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(ORGANIZATION_MONTHLY_PRICE_ARS)} / mes`,
+    badge: "30 dias gratis para empezar",
+    description:
+      "Para amigos, equipos y grupos que juegan seguido y quieren ordenar convocatorias, equipos, rendimiento e historial.",
+    cta: "Crear mi grupo",
+    href: "/admin/login",
+    items: [
+      "Jugadores con nivel de habilidad simple",
+      "Armado automatico de equipos parejos",
+      "Invitados y arqueros contemplados en el balance",
+      "Rendimiento competitivo actualizado por resultados",
+      "Ranking, historial y proximos partidos publicos",
+      "Hasta 4 administradores por grupo"
+    ]
+  };
+  const tournamentPlan = {
+    title: "Torneos",
+    eyebrow: "Para ligas y competencias",
+    price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS)} / mes`,
+    badge: "Por liga activa",
+    description:
+      "Para organizadores que necesitan publicar ligas con equipos, competencias, fixture, tablas y estadisticas.",
+    cta: "Crear liga",
+    href: "/admin/tournaments",
+    items: [
+      "Una liga con multiples competencias",
+      "Equipos maestros reutilizables",
+      "Competencias publicas para visitantes",
+      "Fixture automatico o manual",
+      "Capitanes opcionales por equipo",
+      "Tabla, resultados, goleadores y figuras"
+    ]
+  };
+  const plans = tournamentsEnabled ? [groupPlan, tournamentPlan] : [groupPlan];
+  const pricingNotes = tournamentsEnabled
+    ? [
+        "Grupos y Torneos se facturan por separado porque resuelven necesidades distintas.",
+        "La informacion publica sigue visible para jugadores y visitantes.",
+        "Cuando un periodo vence, el espacio queda protegido en modo lectura hasta reactivar el plan."
       ]
-    },
-    {
-      title: "Torneos",
-      eyebrow: "Para ligas y competencias",
-      price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS)} / mes`,
-      badge: "Por liga activa",
-      description:
-        "Para organizadores que necesitan publicar ligas con equipos, competencias, fixture, tablas y estadisticas.",
-      cta: "Crear liga",
-      href: "/admin/tournaments",
-      items: [
-        "Una liga con multiples competencias",
-        "Equipos maestros reutilizables",
-        "Competencias publicas para visitantes",
-        "Fixture automatico o manual",
-        "Capitanes opcionales por equipo",
-        "Tabla, resultados, goleadores y figuras"
-      ]
-    }
-  ] as const;
+    : [
+        "La informacion publica sigue visible para jugadores y visitantes.",
+        "Cuando un periodo vence, el grupo queda protegido en modo lectura hasta reactivar el plan.",
+        "Puedes empezar con un grupo y ordenar la operacion sin mezclar herramientas externas."
+      ];
 
   return (
     <div className="space-y-6">
       <section className="rounded-[2rem] border border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.18),transparent_32%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-6 shadow-[0_28px_60px_-34px_rgba(16,185,129,0.7)] md:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Precios</p>
         <h1 className="mt-2 text-3xl font-black text-white md:text-5xl">
-          Elige el pack segun como organizas tu futbol.
+          {tournamentsEnabled ? "Elige el pack segun como organizas tu futbol." : "Un plan simple para ordenar tu grupo."}
         </h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-          Puedes empezar con un grupo, sumar una liga cuando el proyecto crezca o usar ambos modulos sin mezclar datos ni flujos.
+          {tournamentsEnabled
+            ? "Puedes empezar con un grupo, sumar una liga cuando el proyecto crezca o usar ambos modulos sin mezclar datos ni flujos."
+            : "Empieza con jugadores, partidos, rendimiento, ranking publico e historial claro para todos."}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
@@ -86,7 +94,7 @@ export default function PricingPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className={`grid gap-4 ${tournamentsEnabled ? "lg:grid-cols-2" : ""}`}>
         {plans.map((plan) => (
           <Card className="p-5" key={plan.title}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -146,7 +154,9 @@ export default function PricingPage() {
         <Card>
           <CardTitle>Necesitas algo mas grande?</CardTitle>
           <CardDescription className="mt-3">
-            Si organizas varias ligas, muchos grupos o necesitas una configuracion especial, escribenos y lo revisamos contigo antes de que la operacion crezca sin control.
+            {tournamentsEnabled
+              ? "Si organizas varias ligas, muchos grupos o necesitas una configuracion especial, escribenos y lo revisamos contigo antes de que la operacion crezca sin control."
+              : "Si organizas muchos grupos o necesitas una configuracion especial, escribenos y lo revisamos contigo antes de que la operacion crezca sin control."}
           </CardDescription>
           <div className="mt-4">
             <Link

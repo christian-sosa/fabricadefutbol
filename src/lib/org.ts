@@ -1,8 +1,10 @@
+import { isTournamentsEnabled } from "@/lib/features";
+
 export type PublicModuleContext = "organizations" | "tournaments";
 
 export function parsePublicModule(value: string | null | undefined): PublicModuleContext | null {
   if (value === "organizations" || value === "groups") return "organizations";
-  if (value === "tournaments") return value;
+  if (value === "tournaments" && isTournamentsEnabled()) return value;
   return null;
 }
 
@@ -23,8 +25,10 @@ export function withPublicQuery(
     query.set("org", params.organizationKey);
   }
 
-  if (params?.module) {
-    query.set("module", params.module === "organizations" ? "groups" : params.module);
+  const publicModule = params?.module === "tournaments" && !isTournamentsEnabled() ? "organizations" : params?.module;
+
+  if (publicModule) {
+    query.set("module", publicModule === "organizations" ? "groups" : publicModule);
   }
 
   const queryString = query.toString().replace(/\+/g, "%20");

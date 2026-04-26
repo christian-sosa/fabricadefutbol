@@ -91,7 +91,7 @@ export default async function AdminPlayersPage({
         </form>
 
         <div className="mt-4 space-y-3">
-          <div className="hidden grid-cols-[2.3fr_0.75fr_0.95fr_1.8fr_auto] gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 md:grid">
+          <div className="hidden grid-cols-[minmax(220px,2fr)_minmax(170px,0.9fr)_minmax(120px,0.75fr)_minmax(260px,1.6fr)_auto] gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 lg:grid">
             <span>Jugador</span>
             <span>Nivel</span>
             <span>Rendimiento</span>
@@ -101,7 +101,7 @@ export default async function AdminPlayersPage({
 
           {players.map((player) => (
             <div
-              className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3 md:grid-cols-[2.3fr_0.75fr_0.95fr_1.8fr_auto] md:items-start"
+              className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3 lg:grid-cols-[minmax(220px,2fr)_minmax(170px,0.9fr)_minmax(120px,0.75fr)_minmax(260px,1.6fr)_auto] lg:items-start"
               key={player.id}
             >
               <input form={bulkFormId} name="playerId" type="hidden" value={player.id} />
@@ -116,6 +116,7 @@ export default async function AdminPlayersPage({
               </div>
               <Select
                 aria-label={`Nivel de habilidad de ${player.full_name}`}
+                className="min-w-[170px]"
                 defaultValue={String(player.skill_level)}
                 form={bulkFormId}
                 name="skillLevel"
@@ -136,7 +137,7 @@ export default async function AdminPlayersPage({
                 required
                 type="text"
               />
-              <form action={uploadPlayerPhotoAction} className="space-y-2 md:self-start">
+              <form action={uploadPlayerPhotoAction} className="space-y-2 lg:self-start">
                 <input name="organizationId" type="hidden" value={selectedOrganization.id} />
                 <input name="playerId" type="hidden" value={player.id} />
                 <PhotoUploadInput compact hint="JPG, PNG o WEBP. Reemplaza la foto actual." />
@@ -144,7 +145,7 @@ export default async function AdminPlayersPage({
                   Subir foto
                 </Button>
               </form>
-              <form action={deletePlayerAction} className="md:self-start md:justify-self-end">
+              <form action={deletePlayerAction} className="lg:self-start lg:justify-self-end">
                 <input name="organizationId" type="hidden" value={selectedOrganization.id} />
                 <input name="deletePlayerId" type="hidden" value={player.id} />
                 <ConfirmSubmitButton

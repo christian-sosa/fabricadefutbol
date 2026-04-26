@@ -368,7 +368,10 @@ export function NewMatchForm({
         {guestRows.length ? (
           <div className="mt-3 space-y-2">
             {guestRows.map((guest, index) => (
-              <div className="grid gap-2 rounded-lg border border-slate-800 bg-slate-950 p-3 md:grid-cols-[1.2fr_0.6fr_auto]" key={guest.key}>
+              <div
+                className="grid gap-2 rounded-lg border border-slate-800 bg-slate-950 p-3 md:grid-cols-[minmax(180px,1.2fr)_minmax(180px,0.8fr)_auto]"
+                key={guest.key}
+              >
                 <input name="guestKeys" type="hidden" value={String(guest.key)} />
                 <Input
                   name="guestNames"

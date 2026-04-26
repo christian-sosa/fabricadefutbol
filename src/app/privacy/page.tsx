@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { isTournamentsEnabled } from "@/lib/features";
 import { resolvePublicModule, withPublicQuery } from "@/lib/org";
 
 export default async function PrivacyPage({
@@ -11,6 +12,7 @@ export default async function PrivacyPage({
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
   const currentModule = resolvePublicModule(resolvedSearchParams.module);
+  const tournamentsEnabled = isTournamentsEnabled();
 
   return (
     <div className="space-y-4">
@@ -18,7 +20,9 @@ export default async function PrivacyPage({
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Privacidad</p>
         <CardTitle className="mt-2 text-3xl">Politica de privacidad</CardTitle>
         <CardDescription className="mt-3 text-base">
-          Cuidamos la informacion de admins, jugadores y organizadores. Esta pagina resume el enfoque actual mientras dejamos publicada la version legal completa.
+          {tournamentsEnabled
+            ? "Cuidamos la informacion de admins, jugadores y organizadores. Esta pagina resume el enfoque actual mientras dejamos publicada la version legal completa."
+            : "Cuidamos la informacion de admins y jugadores. Esta pagina resume el enfoque actual mientras dejamos publicada la version legal completa."}
         </CardDescription>
       </Card>
 
@@ -26,13 +30,17 @@ export default async function PrivacyPage({
         <Card>
           <CardTitle>Datos que usamos</CardTitle>
           <CardDescription className="mt-3">
-            Cuenta de acceso, informacion del grupo o torneo y los datos necesarios para que el producto funcione y publique lo que el admin decida mostrar.
+            {tournamentsEnabled
+              ? "Cuenta de acceso, informacion del grupo o torneo y los datos necesarios para que el producto funcione y publique lo que el admin decida mostrar."
+              : "Cuenta de acceso, informacion del grupo y los datos necesarios para que el producto funcione y publique lo que el admin decida mostrar."}
           </CardDescription>
         </Card>
         <Card>
           <CardTitle>Como lo tratamos</CardTitle>
           <CardDescription className="mt-3">
-            Limitamos el acceso segun permisos del sistema y evitamos mezclar dominios para no comprometer el flujo actual de grupos y torneos.
+            {tournamentsEnabled
+              ? "Limitamos el acceso segun permisos del sistema y evitamos mezclar dominios para no comprometer el flujo actual de grupos y torneos."
+              : "Limitamos el acceso segun permisos del sistema para proteger el flujo actual de grupos."}
           </CardDescription>
         </Card>
       </section>

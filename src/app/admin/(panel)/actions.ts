@@ -15,7 +15,8 @@ import {
   getOrganizationQueryKeyById
 } from "@/lib/auth/admin";
 import {
-  ORGANIZATION_BILLING_CURRENCY
+  ORGANIZATION_BILLING_CURRENCY,
+  ORGANIZATION_MONTHLY_PRICE_ARS
 } from "@/lib/constants";
 import {
   cleanupStalePendingOrganizationBillingPayments,
@@ -92,7 +93,6 @@ const uploadOrganizationImageSchema = z.object({
   organizationId: z.string().uuid()
 });
 
-const MERCADOPAGO_TEST_CHARGE_ARS = 100;
 const MERCADOPAGO_PREFERENCE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function buildAdminPath(organizationKey?: string, error?: string) {
@@ -331,7 +331,7 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
       .insert({
         organization_id: parsed.data.organizationId,
         created_by: admin.userId,
-        amount: MERCADOPAGO_TEST_CHARGE_ARS,
+        amount: ORGANIZATION_MONTHLY_PRICE_ARS,
         currency_id: ORGANIZATION_BILLING_CURRENCY,
         status: "pending",
         mp_external_reference: externalReference,
@@ -354,7 +354,7 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
 
     const preference = await createCheckoutProPreference({
       title: `Crear nuevo grupo (${normalizedOrgName})`,
-      unitPrice: MERCADOPAGO_TEST_CHARGE_ARS,
+      unitPrice: ORGANIZATION_MONTHLY_PRICE_ARS,
       currencyId: ORGANIZATION_BILLING_CURRENCY,
       quantity: 1,
       externalReference,
@@ -460,7 +460,7 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
       .insert({
         organization_id: organization.id,
         created_by: admin.userId,
-        amount: MERCADOPAGO_TEST_CHARGE_ARS,
+        amount: ORGANIZATION_MONTHLY_PRICE_ARS,
         currency_id: ORGANIZATION_BILLING_CURRENCY,
         status: "pending",
         mp_external_reference: externalReference,
@@ -480,7 +480,7 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
 
     const preference = await createCheckoutProPreference({
       title: `Plan mensual ${organization.name}`,
-      unitPrice: MERCADOPAGO_TEST_CHARGE_ARS,
+      unitPrice: ORGANIZATION_MONTHLY_PRICE_ARS,
       currencyId: ORGANIZATION_BILLING_CURRENCY,
       quantity: 1,
       externalReference,

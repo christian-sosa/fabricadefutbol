@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   normalizeEmail,
@@ -35,6 +35,16 @@ describe("org helpers", () => {
       "/pricing?from=home&module=groups"
     );
     expect(withPublicQuery("/feedback")).toBe("/feedback");
+  });
+
+  it("degrada torneos a grupos cuando el modulo esta apagado", () => {
+    vi.stubEnv("NEXT_PUBLIC_TOURNAMENTS_ENABLED", "false");
+
+    expect(parsePublicModule("tournaments")).toBeNull();
+    expect(resolvePublicModule("tournaments")).toBe("organizations");
+    expect(withPublicQuery("/help", { organizationKey: "liga a", module: "tournaments" })).toBe(
+      "/help?org=liga%20a&module=groups"
+    );
   });
 
   it("normaliza emails", () => {

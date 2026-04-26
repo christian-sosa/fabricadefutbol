@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { isTournamentsEnabled } from "@/lib/features";
 import { type PublicModuleContext, withPublicQuery } from "@/lib/org";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,10 @@ export function PublicModuleToggle({
   organizationKey,
   className
 }: PublicModuleToggleProps) {
+  const moduleOptions = isTournamentsEnabled()
+    ? MODULE_OPTIONS
+    : MODULE_OPTIONS.filter((option) => option.value !== "tournaments");
+
   return (
     <div
       className={cn(
@@ -40,7 +45,7 @@ export function PublicModuleToggle({
         className
       )}
     >
-      {MODULE_OPTIONS.map((option) => {
+      {moduleOptions.map((option) => {
         const active = option.value === currentModule;
 
         return (

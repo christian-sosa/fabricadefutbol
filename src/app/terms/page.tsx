@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { isTournamentsEnabled } from "@/lib/features";
 import { resolvePublicModule, withPublicQuery } from "@/lib/org";
 
 export default async function TermsPage({
@@ -11,6 +12,7 @@ export default async function TermsPage({
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
   const currentModule = resolvePublicModule(resolvedSearchParams.module);
+  const tournamentsEnabled = isTournamentsEnabled();
 
   return (
     <div className="space-y-4">
@@ -25,7 +27,9 @@ export default async function TermsPage({
       <Card>
         <CardTitle>Estado actual</CardTitle>
         <CardDescription className="mt-3">
-          Estamos preparando el documento final con condiciones de uso, suscripciones, facturacion y responsabilidades de administradores, capitanes y usuarios.
+          {tournamentsEnabled
+            ? "Estamos preparando el documento final con condiciones de uso, suscripciones, facturacion y responsabilidades de administradores, capitanes y usuarios."
+            : "Estamos preparando el documento final con condiciones de uso, suscripciones, facturacion y responsabilidades de administradores y usuarios."}
         </CardDescription>
       </Card>
 
