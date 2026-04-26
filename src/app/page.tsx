@@ -3,6 +3,10 @@ import Link from "next/link";
 import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import {
+  ORGANIZATION_BILLING_CURRENCY,
+  ORGANIZATION_MONTHLY_PRICE_ARS
+} from "@/lib/constants";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery, withPublicQuery } from "@/lib/org";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
@@ -10,54 +14,62 @@ import { formatRendimiento } from "@/lib/utils";
 
 const heroHighlights = [
   "Equipos parejos",
-  "Rendimiento automatico",
-  "Historial publico",
-  "Convocatorias claras"
+  "Rendimiento automático",
+  "Historial público",
+  "Jugadores sin registro"
 ] as const;
 
 const groupFeatures = [
   {
     title: "Niveles simples",
     description:
-      "El admin define un nivel base del 1 al 5. No hace falta mantener formulas raras ni rankings manuales."
+      "Definí una base clara para cada jugador: Figura, Muy bueno, Intermedio, Recreativo o Principiante."
   },
   {
-    title: "Equipos equilibrados",
+    title: "Equipos parejos",
     description:
-      "La app combina nivel, rendimiento actual, invitados y arqueros para proponer equipos mas justos."
+      "La app combina nivel, rendimiento, invitados y arqueros para proponerte equipos más parejos."
   },
   {
-    title: "Historial vivo",
+    title: "Historial real",
     description:
-      "Cada resultado actualiza rendimiento, ranking, estadisticas y detalle del partido para que nada dependa de la memoria."
+      "Cada resultado actualiza rendimiento, ranking, estadísticas y detalle del partido para que nada dependa de la memoria."
   }
 ] as const;
 
 const workflowCards = [
   {
-    title: "1. Cargas la base",
-    description:
-      "Cargas jugadores, niveles y una foto del grupo para que el espacio quede listo para compartir."
+    title: "1. Cargás jugadores",
+    description: "Definís el nivel inicial de cada jugador y dejás listo el grupo."
   },
   {
-    title: "2. Organizas la fecha",
+    title: "2. Armás el partido",
     description:
-      "Eliges fecha, modalidad, convocados, invitados y arqueros. La app propone equipos balanceados."
+      "Elegís fecha, modalidad, convocados, invitados y arqueros. La app propone equipos parejos."
   },
   {
-    title: "3. Publicas resultados",
+    title: "3. Cargás el resultado",
     description:
-      "Cargas marcador y datos del partido. El ranking, historial y estadisticas se actualizan solos."
+      "El ranking, el rendimiento y el historial se actualizan automáticamente."
   }
 ] as const;
 
 const exampleRankingPreview = [
   { name: "Juan", rendimiento: 1110, matchesPlayed: 92 },
   { name: "Manuel", rendimiento: 1050, matchesPlayed: 87 },
-  { name: "Nicolas", rendimiento: 1020, matchesPlayed: 76 },
+  { name: "Nicolás", rendimiento: 1020, matchesPlayed: 76 },
   { name: "Lucas", rendimiento: 990, matchesPlayed: 68 },
   { name: "Diego", rendimiento: 960, matchesPlayed: 54 }
 ] as const;
+
+function formatAmountArs(amount: number) {
+  return `$${new Intl.NumberFormat("es-AR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount)} ${ORGANIZATION_BILLING_CURRENCY}`;
+}
+
+const monthlyGroupPrice = formatAmountArs(ORGANIZATION_MONTHLY_PRICE_ARS);
 
 export default async function HomePage({
   searchParams
@@ -79,13 +91,16 @@ export default async function HomePage({
         <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
-              Futbol amateur, ordenado de verdad
+              Fútbol amateur, ordenado de verdad
             </p>
             <h1 className="mt-3 max-w-4xl text-4xl font-black leading-tight text-white md:text-5xl lg:text-6xl">
-              Organiza tu grupo y arma partidos parejos sin planillas eternas.
+              Armá equipos parejos sin discusiones y llevá el historial de tu grupo
             </h1>
             <p className="mt-4 max-w-2xl text-base text-slate-300 md:text-lg">
-              Fabrica de Futbol arma equipos parejos, mide rendimiento, guarda historial y publica la informacion que tus jugadores necesitan consultar.
+              Con Fábrica de Fútbol cargás jugadores, organizás partidos, medís rendimiento y publicás ranking, historial y próximas fechas para todos.
+            </p>
+            <p className="mt-4 max-w-2xl rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100">
+              Probá 1 mes gratis. Después, {monthlyGroupPrice}/mes por organización para seguir creando partidos y cargando resultados.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -93,7 +108,7 @@ export default async function HomePage({
                 className="rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_-18px_rgba(16,185,129,0.95)] transition hover:brightness-110"
                 href="/admin/login"
               >
-                Crear mi espacio
+                Crear mi grupo gratis
               </Link>
               <Link
                 className="rounded-xl border border-slate-700 bg-slate-950/70 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
@@ -120,13 +135,13 @@ export default async function HomePage({
               <div>
                 <CardTitle className="text-2xl">Rendimiento del grupo</CardTitle>
                 <CardDescription className="mt-2">
-                  El ranking se actualiza cuando cargas resultados. El nivel sirve como base; el rendimiento muestra lo que pasa en la cancha.
+                  Cargás resultados y el ranking se actualiza solo. El nivel sirve como base; el rendimiento muestra quién viene jugando mejor.
                 </CardDescription>
               </div>
               <div className="rounded-2xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-right">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Partidos</p>
                 <p className="mt-1 text-2xl font-black text-white">
-                  150
+                  112
                 </p>
               </div>
             </div>
@@ -153,9 +168,9 @@ export default async function HomePage({
       <section>
         <Card>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Grupos</p>
-          <CardTitle className="mt-2 text-3xl">Para los partidos de cada semana</CardTitle>
+          <CardTitle className="mt-2 text-3xl">Para grupos que juegan todas las semanas</CardTitle>
           <CardDescription className="mt-3 text-base">
-            Ideal para amigos, equipos recurrentes y grupos que quieren dejar de discutir equipos y empezar a tener historial real.
+            Dejá de armar equipos a ojo. Cargá jugadores, definí niveles, armá partidos parejos y guardá cada resultado en un historial real.
           </CardDescription>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             {groupFeatures.map((feature) => (
@@ -168,12 +183,20 @@ export default async function HomePage({
         </Card>
       </section>
 
+      <section className="rounded-[2rem] border border-emerald-400/20 bg-emerald-500/10 p-5 md:p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Menos discusiones, más fútbol</p>
+        <h2 className="mt-2 text-3xl font-black text-white">Todo el grupo, ordenado en un solo lugar</h2>
+        <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-300 md:text-base">
+          Si siempre terminan discutiendo si los equipos quedaron desparejos, perdiendo resultados o armando todo en planillas eternas, Fábrica de Fútbol te ayuda a ordenar el grupo sin cambiar la dinámica de siempre.
+        </p>
+      </section>
+
       <section className="space-y-4">
         <div className="max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Como funciona</p>
-          <h2 className="mt-2 text-3xl font-black text-white">Simple para cargar, claro para consultar</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Cómo funciona</p>
+          <h2 className="mt-2 text-3xl font-black text-white">Tres pasos y el partido queda listo</h2>
           <p className="mt-3 text-sm text-slate-300">
-            La app separa lo que el admin decide manualmente de lo que los resultados van demostrando. Asi el sistema se siente justo sin volverse dificil de usar.
+            El admin carga lo necesario, la app propone equipos parejos y después el resultado alimenta ranking, rendimiento e historial.
           </p>
         </div>
 
@@ -186,41 +209,56 @@ export default async function HomePage({
           ))}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Nivel</p>
-            <CardTitle className="mt-2">La mirada del admin</CardTitle>
-            <CardDescription className="mt-3">
-              El nivel de habilidad es estable y facil de entender. Sirve para arrancar y solo cambia cuando el admin lo edita.
-            </CardDescription>
-          </Card>
-          <Card>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Rendimiento</p>
-            <CardTitle className="mt-2">Lo que aprende la cancha</CardTitle>
-            <CardDescription className="mt-3">
-              El rendimiento sube o baja con los resultados y ordena el ranking publico de forma automatica.
-            </CardDescription>
-          </Card>
-          <Card>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Balance</p>
-            <CardTitle className="mt-2">Equipos con mas contexto</CardTitle>
-            <CardDescription className="mt-3">
-              Para armar equipos, la app mira nivel, rendimiento, invitados y arqueros. Menos opinion, mas criterio.
-            </CardDescription>
-          </Card>
-        </div>
+        <Card className="p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Ranking y rendimiento</p>
+          <CardTitle className="mt-2 text-2xl">Ranking que se actualiza solo</CardTitle>
+          <CardDescription className="mt-3 max-w-3xl text-base">
+            Cargás el resultado del partido y la app actualiza el rendimiento de cada jugador. El nivel lo define el admin; el rendimiento muestra quién viene jugando mejor en la cancha.
+          </CardDescription>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <p className="text-sm font-semibold text-white">Nivel</p>
+              <p className="mt-2 text-sm text-slate-300">Es la base definida por el admin para armar partidos con criterio desde el primer día.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <p className="text-sm font-semibold text-white">Rendimiento</p>
+              <p className="mt-2 text-sm text-slate-300">Se mueve según los resultados y ayuda a detectar quién viene jugando mejor.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <p className="text-sm font-semibold text-white">Ranking</p>
+              <p className="mt-2 text-sm text-slate-300">Muestra la tabla del grupo para que todos puedan seguir la evolución sin pedirle nada al admin.</p>
+            </div>
+          </div>
+        </Card>
       </section>
 
       <AdPlaceholder slot="home-top-banner" />
+
+      <section className="grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
+        <Card className="p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Sin fricción para jugar</p>
+          <CardTitle className="mt-2 text-2xl">Tus jugadores no necesitan registrarse</CardTitle>
+          <CardDescription className="mt-3 text-base">
+            El admin gestiona el grupo. Los jugadores solo entran al link público para ver ranking, historial y próximos partidos.
+          </CardDescription>
+        </Card>
+        <Card className="p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Pensado para grupos reales</p>
+          <CardTitle className="mt-2">Amigos, equipos recurrentes y canchas de todos los días</CardTitle>
+          <CardDescription className="mt-3">
+            La app ordena lo que ya hacen cada semana: convocar, separar equipos, jugar, cargar resultado y dejar todo publicado para consultar.
+          </CardDescription>
+        </Card>
+      </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.08fr_0.92fr]">
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Grupos publicos</p>
-              <CardTitle className="mt-2">Explora ranking, historial y proximos partidos</CardTitle>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Grupos públicos</p>
+              <CardTitle className="mt-2">Mirá cómo se ve un grupo real</CardTitle>
               <CardDescription className="mt-2">
-                Los visitantes pueden consultar la informacion sin iniciar sesion. La gestion queda reservada para admins.
+                Explorá ranking, historial y próximos partidos de grupos públicos para entender cómo funciona la app.
               </CardDescription>
             </div>
           </div>
@@ -229,7 +267,7 @@ export default async function HomePage({
             <OrganizationSwitcher
               basePath="/"
               currentOrganizationSlug={selectedOrganization?.slug}
-              label="Grupos publicos"
+              label="Grupos públicos"
               organizations={organizations}
               quickOrganizations={viewerAdminOrganizations}
             />
@@ -247,7 +285,7 @@ export default async function HomePage({
                   <p className="mt-2 text-2xl font-black text-white">{summary.totalFinishedMatches}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Proximos</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Próximos</p>
                   <p className="mt-2 text-2xl font-black text-white">{summary.upcomingMatches.length}</p>
                 </div>
               </div>
@@ -257,25 +295,25 @@ export default async function HomePage({
                   className="rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
                   href={withOrgQuery("/ranking", selectedOrganization.slug)}
                 >
-                  Ver ranking
+                  Ver ranking de ejemplo
                 </Link>
                 <Link
                   className="rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
                   href={withOrgQuery("/matches", selectedOrganization.slug)}
                 >
-                  Ver historial
+                  Ver historial de ejemplo
                 </Link>
                 <Link
                   className="rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
                   href={withOrgQuery("/upcoming", selectedOrganization.slug)}
                 >
-                  Ver proximos
+                  Ver próximos partidos
                 </Link>
               </div>
             </>
           ) : (
             <CardDescription className="mt-4">
-              Todavia no hay grupos publicos cargados. Cuando aparezcan, vas a poder explorarlos desde aqui.
+              Todavía no hay grupos públicos cargados. Cuando aparezcan, vas a poder explorarlos desde acá.
             </CardDescription>
           )}
         </Card>
@@ -308,10 +346,10 @@ export default async function HomePage({
       {summary.upcomingMatches.length ? (
         <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
           <Card>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Proxima fecha</p>
-            <CardTitle className="mt-2">La convocatoria tambien queda ordenada</CardTitle>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Próxima fecha</p>
+            <CardTitle className="mt-2">La convocatoria también queda ordenada</CardTitle>
             <CardDescription className="mt-3">
-              Cada partido puede compartirse con horario, modalidad, equipos y detalle publico.
+              Cada partido puede compartirse con horario, modalidad, equipos y detalle público.
             </CardDescription>
           </Card>
           <Card>
@@ -334,16 +372,22 @@ export default async function HomePage({
       ) : null}
 
       <section className="rounded-[2rem] border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.14),rgba(15,23,42,0.98))] p-6 text-center shadow-[0_24px_60px_-38px_rgba(16,185,129,0.75)] md:p-8">
-        <h2 className="text-3xl font-black text-white md:text-4xl">Tu grupo, mas facil de sostener semana a semana</h2>
+        <h2 className="text-3xl font-black text-white md:text-4xl">Tu grupo puede estar ordenado desde el próximo partido</h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm text-slate-200 md:text-base">
-          Crea tu grupo, arma partidos parejos y deja ranking, historial y proximas fechas claros para todos.
+          Probá Fábrica de Fútbol gratis durante 1 mes. Armá equipos parejos, cargá resultados y dejá ranking e historial disponibles para todos.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link
             className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-95"
             href="/admin/login"
           >
-            Empezar
+            Crear mi grupo gratis
+          </Link>
+          <Link
+            className="rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
+            href={withPublicQuery("/pricing", { organizationKey: selectedOrganizationSlug })}
+          >
+            Ver precios
           </Link>
           <Link
             className="rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
