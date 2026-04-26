@@ -226,10 +226,10 @@ export default async function AdminLeagueDetailPage({
                 <CardDescription className="mt-2">
                   Es opcional. Si la cargas, se muestra en la ficha publica de la liga; si no, esa zona queda igual que ahora.
                 </CardDescription>
-                <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+                <div className="mt-4 space-y-4">
                   <LeaguePhoto
                     alt={`Foto de ${details.league.name}`}
-                    className="aspect-[16/9] min-h-[220px]"
+                    className="aspect-[16/9] min-h-[180px] sm:min-h-[220px]"
                     src={details.league.photoUrl}
                   />
                   <form

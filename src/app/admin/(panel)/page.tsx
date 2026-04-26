@@ -72,52 +72,78 @@ export default async function AdminDashboardPage({
   const organizationAdmins = selectedOrganization
     ? await getOrganizationAdminData(selectedOrganization.id)
     : { admins: [], pendingInvites: [] };
+  const hasOrganizations = organizations.length > 0;
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle>Crear grupo</CardTitle>
-        <CardDescription>
-          1 mes de prueba gratis por organización. Después, $
-          {formatAmountArs(ORGANIZATION_MONTHLY_PRICE_ARS)}/mes para seguir creando.
-        </CardDescription>
-        <form
-          action={creationAccess.canCreateOrganization ? createOrganizationAction : startOrganizationCreationCheckoutAction}
-          className="mt-4 flex flex-col gap-3 md:flex-row"
-        >
-          {selectedOrganization ? (
-            <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+      {!hasOrganizations ? (
+        <Card className="p-5 sm:p-6">
+          <CardTitle>Crear grupo</CardTitle>
+          <CardDescription>
+            1 mes de prueba gratis por organización. Después, $
+            {formatAmountArs(ORGANIZATION_MONTHLY_PRICE_ARS)}/mes para seguir creando.
+          </CardDescription>
+          <form
+            action={creationAccess.canCreateOrganization ? createOrganizationAction : startOrganizationCreationCheckoutAction}
+            className="mt-4 flex flex-col gap-3 md:flex-row"
+          >
+            {selectedOrganization ? (
+              <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+            ) : null}
+            <Input name="name" placeholder="Nombre del grupo" required />
+            <Button disabled={!creationAccess.canCreateOrganization && !selectedOrganization} type="submit">
+              {creationAccess.canCreateOrganization ? "Crear grupo" : "Pagar y crear grupo"}
+            </Button>
+          </form>
+          {!creationAccess.canCreateOrganization ? (
+            <p className="mt-2 text-xs font-semibold text-amber-300">
+              {creationAccess.reason ?? "Para crear un nuevo grupo necesitas activar el plan pago."}{" "}
+              El alta se realiza automaticamente cuando Mercado Pago confirma el pago.
+            </p>
           ) : null}
-          <Input name="name" placeholder="Nombre del grupo" required />
-          <Button disabled={!creationAccess.canCreateOrganization && !selectedOrganization} type="submit">
-            {creationAccess.canCreateOrganization ? "Crear grupo" : "Pagar y crear grupo"}
-          </Button>
-        </form>
-        {!creationAccess.canCreateOrganization ? (
-          <p className="mt-2 text-xs font-semibold text-amber-300">
-            {creationAccess.reason ?? "Para crear un nuevo grupo necesitas activar el plan pago."}{" "}
-            El alta se realiza automaticamente cuando Mercado Pago confirma el pago.
-          </p>
-        ) : null}
-        {resolvedSearchParams.checkout === "created-org" ? (
-          <p className="mt-2 text-xs font-semibold text-emerald-300">
-            Pago confirmado. El nuevo grupo ya fue creado y seleccionado.
-          </p>
-        ) : null}
-        {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
-      </Card>
+          {resolvedSearchParams.checkout === "created-org" ? (
+            <p className="mt-2 text-xs font-semibold text-emerald-300">
+              Pago confirmado. El nuevo grupo ya fue creado y seleccionado.
+            </p>
+          ) : null}
+          {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
+        </Card>
+      ) : null}
 
-      <Card>
-        <CardTitle>Grupos disponibles</CardTitle>
-        <div className="mt-3">
-          <OrganizationSwitcher
-            basePath="/admin"
-            currentOrganizationSlug={selectedOrganization?.slug}
-            label="Seleccion de grupo"
-            organizations={organizations}
-          />
-        </div>
-      </Card>
+      {hasOrganizations && (resolvedSearchParams.checkout === "created-org" || resolvedSearchParams.error) ? (
+        <Card>
+          {resolvedSearchParams.checkout === "created-org" ? (
+            <p className="text-sm font-semibold text-emerald-300">
+              Pago confirmado. El nuevo grupo ya fue creado y seleccionado.
+            </p>
+          ) : null}
+          {resolvedSearchParams.error ? (
+            <p className="text-sm font-semibold text-danger">{resolvedSearchParams.error}</p>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {hasOrganizations ? (
+        <Card>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>Grupos disponibles</CardTitle>
+            <Link
+              className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
+              href={withOrgQuery("/admin/new", selectedOrganization?.slug)}
+            >
+              Crear grupo
+            </Link>
+          </div>
+          <div className="mt-3">
+            <OrganizationSwitcher
+              basePath="/admin"
+              currentOrganizationSlug={selectedOrganization?.slug}
+              label="Seleccion de grupo"
+              organizations={organizations}
+            />
+          </div>
+        </Card>
+      ) : null}
 
       {selectedOrganization ? (
         <>

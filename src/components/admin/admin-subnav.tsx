@@ -16,7 +16,7 @@ function getTournamentIdFromPath(pathname: string) {
   const segments = pathname.split("/").filter(Boolean);
   if (segments[0] !== "admin" || segments[1] !== "tournaments") return null;
   const candidate = segments[2];
-  if (!candidate || candidate === "billing") return null;
+  if (!candidate || candidate === "billing" || candidate === "new") return null;
   return candidate;
 }
 
