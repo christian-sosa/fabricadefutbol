@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { deleteLeagueAction } from "@/app/admin/(panel)/tournaments/actions";
 import {
   addLeagueTeamAction,
-  createCompetitionAction,
   deleteLeagueTeamAction,
   inviteLeagueAdminAction,
   removeLeagueAdminAction,
@@ -14,6 +13,7 @@ import {
   uploadLeagueLogoAction,
   uploadLeaguePhotoAction
 } from "@/app/admin/(panel)/tournaments/[id]/actions";
+import { CreateCompetitionCard } from "@/components/admin/create-competition-card";
 import { LeaguePhoto } from "@/components/tournaments/league-photo";
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { TOURNAMENT_STATUS_LABELS, TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
@@ -48,6 +48,21 @@ function getCompetitionCoverageModeLabel(coverageMode: "full_stats" | "results_o
   return coverageMode === "results_only" ? "Solo resultados" : "Toda la info";
 }
 
+function getCompetitionStatusOrder(status: string) {
+  switch (status) {
+    case "active":
+      return 0;
+    case "draft":
+      return 1;
+    case "finished":
+      return 2;
+    case "archived":
+      return 3;
+    default:
+      return 4;
+  }
+}
+
 export default async function AdminLeagueDetailPage({
   params,
   searchParams
@@ -62,6 +77,12 @@ export default async function AdminLeagueDetailPage({
   if (!details) notFound();
 
   const selectedTab = resolvedSearchParams.tab ?? "summary";
+  const competitions = [...details.competitions].sort((left, right) => {
+    const statusDiff = getCompetitionStatusOrder(left.status) - getCompetitionStatusOrder(right.status);
+    if (statusDiff !== 0) return statusDiff;
+    return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+  });
+  const hasCompetitions = competitions.length > 0;
 
   return (
     <div className="space-y-4">
@@ -360,92 +381,30 @@ export default async function AdminLeagueDetailPage({
 
       {selectedTab === "competitions" ? (
         <div className="space-y-4">
-          <Card>
-            <CardTitle>Nueva competencia</CardTitle>
-            <CardDescription className="mt-2">
-              Crea una competencia con sus datos base, el formato y los equipos inscriptos iniciales. Luego podras sumar planteles, capitanes y fixture.
-            </CardDescription>
-            <form action={createCompetitionAction.bind(null, id)} className="mt-4 space-y-4">
-              <div className="grid gap-3 md:grid-cols-2">
+          {!hasCompetitions ? (
+            <CreateCompetitionCard leagueId={id} leagueTeams={details.leagueTeams} />
+          ) : (
+            <Card>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
-                  <Input name="name" placeholder="Ej: Viernes A" required />
+                  <CardTitle>Competencias</CardTitle>
+                  <CardDescription className="mt-2">
+                    Primero ves las competencias activas. Todas se publican para que visitantes y capitanes puedan consultar la informacion.
+                  </CardDescription>
                 </div>
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-200">Temporada</label>
-                  <Input defaultValue={String(new Date().getFullYear())} name="seasonLabel" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-200">Formato</label>
-                  <Select defaultValue="league" name="type">
-                    <option value="league">Liga</option>
-                    <option value="cup">Copa</option>
-                    <option value="league_and_cup">Liga + copa</option>
-                  </Select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-200">Carga de datos</label>
-                  <Select defaultValue="full_stats" name="coverageMode">
-                    <option value="full_stats">Toda la info</option>
-                    <option value="results_only">Solo resultados</option>
-                  </Select>
-                  <p className="mt-1 text-xs text-slate-500">
-                    En solo resultados se muestran tabla y fixture, sin goleadores, figuras ni vallas.
-                  </p>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-200">Playoff</label>
-                  <Select defaultValue="" name="playoffSize">
-                    <option value="">No aplica</option>
-                    <option value="4">Top 4</option>
-                    <option value="8">Top 8</option>
-                  </Select>
-                  <p className="mt-1 text-xs text-slate-500">Solo se usa en competencias Liga + copa.</p>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-200">Sede especifica</label>
-                  <Input name="venueOverride" placeholder="Opcional" />
-                </div>
-                <div className="flex items-end">
-                  <label className="flex items-center gap-2 text-sm text-slate-200">
-                    <input className="h-4 w-4 accent-emerald-400" name="isPublic" type="checkbox" />
-                    Competencia publica
-                  </label>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm font-semibold text-slate-200">Descripcion</label>
-                  <Textarea name="description" rows={3} />
-                </div>
+                <Link
+                  className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
+                  href={`/admin/tournaments/${id}/competitions/new`}
+                >
+                  Nueva competencia
+                </Link>
               </div>
+            </Card>
+          )}
 
-              <div>
-                <p className="text-sm font-semibold text-slate-200">Equipos inscriptos</p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Selecciona los equipos que arrancan esta competencia. Si prefieres, puedes dejarla vacia y definirlos despues.
-                </p>
-                <div className="mt-3 grid gap-2 md:grid-cols-2">
-                  {details.leagueTeams.map((team) => (
-                    <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-3 text-sm text-slate-200" key={team.id}>
-                      <input className="h-4 w-4 accent-emerald-400" name="leagueTeamIds" type="checkbox" value={team.id} />
-                      <span>
-                        {team.name}
-                        {team.shortName ? ` (${team.shortName})` : ""}
-                      </span>
-                    </label>
-                  ))}
-                  {!details.leagueTeams.length ? (
-                    <p className="text-sm text-slate-400">Primero necesitas cargar equipos maestros en la liga.</p>
-                  ) : null}
-                </div>
-              </div>
-
-              <Button type="submit">Crear competencia</Button>
-            </form>
-          </Card>
-
-          <div className="space-y-3">
-            {details.competitions.length ? (
-              details.competitions.map((competition) => (
+          {hasCompetitions ? (
+            <div className="space-y-3">
+              {competitions.map((competition) => (
                 <Card key={competition.id}>
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
@@ -477,13 +436,9 @@ export default async function AdminLeagueDetailPage({
                     </div>
                   </div>
                 </Card>
-              ))
-            ) : (
-              <Card>
-                <CardDescription>Todavia no hay competencias creadas dentro de esta liga.</CardDescription>
-              </Card>
-            )}
-          </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

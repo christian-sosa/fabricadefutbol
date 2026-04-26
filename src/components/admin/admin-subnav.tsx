@@ -78,9 +78,14 @@ function buildTournamentItems(pathname: string, tournamentId: string | null, cur
   }
 
   const segments = pathname.split("/").filter(Boolean);
-  const competitionId = segments[3] === "competitions" ? segments[4] ?? null : null;
+  const isNewCompetitionPath = segments[3] === "competitions" && segments[4] === "new";
+  const competitionId = segments[3] === "competitions" && !isNewCompetitionPath ? segments[4] ?? null : null;
 
-  const activeTab = pathname.includes("/matches/") ? "results" : currentTab ?? "summary";
+  const activeTab = isNewCompetitionPath
+    ? "competitions"
+    : pathname.includes("/matches/")
+      ? "results"
+      : currentTab ?? "summary";
   const tabItems = competitionId
     ? [
         { key: "summary", label: "Resumen" },

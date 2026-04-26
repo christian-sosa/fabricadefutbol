@@ -34,248 +34,238 @@ type HelpContent = {
 
 const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
   organizations: {
-    eyebrow: "Centro de ayuda",
-    title: "Como funciona el modulo Grupos",
+    eyebrow: "Ayuda para Grupos",
+    title: "Todo lo que necesitas para organizar partidos entre amigos",
     description:
-      "Grupos esta pensado para grupos de futbol amateur que quieren ordenar su plantel, convocar jugadores, generar equipos balanceados, registrar resultados y mantener un ranking competitivo actualizado.",
+      "Grupos esta pensado para el futbol de todos los dias: cargas jugadores, defines niveles, armas partidos parejos, guardas resultados y dejas ranking e historial listos para consultar.",
     capabilities: [
-      "Administrar uno o varios grupos desde la misma cuenta.",
-      "Cargar jugadores, ordenar el plantel y sumar invitados puntuales.",
-      "Crear partidos, convocar participantes y generar equipos.",
-      "Registrar resultados y actualizar automaticamente el ranking."
+      "Crear y administrar uno o varios grupos desde la misma cuenta.",
+      "Cargar jugadores con nivel de habilidad simple, repetible y editable.",
+      "Generar equipos equilibrados usando nivel, rendimiento, invitados y arqueros.",
+      "Publicar ranking, historial y proximos partidos para que cualquiera pueda verlos."
     ],
-    focusTitle: "En que conviene enfocarse al principio",
+    focusTitle: "Que conviene hacer primero",
     focusDescription:
-      "Lo ideal es construir primero una buena base de jugadores, asignar niveles simples y luego cargar resultados para que el rendimiento competitivo gane valor con el tiempo.",
+      "Carga el plantel base, asigna niveles con sentido comun y empieza a registrar resultados. Al principio el nivel ayuda a equilibrar; con el tiempo, el rendimiento vuelve el ranking cada vez mas representativo.",
     gettingStartedLabel: "Primeros pasos",
     gettingStarted: [
       {
-        title: "1. Crea tu cuenta y activa tu grupo",
+        title: "1. Crea tu grupo",
         description:
-          "Ingresa al panel, registrate con tu email y crea el grupo que vas a administrar. Desde ese momento ya puedes empezar a cargar tu plantel y trabajar sobre tus partidos."
+          "Desde el panel admin creas el grupo y cargas una imagen representativa. Si ya tienes uno, la opcion para crear otro queda en una pantalla aparte para no invadir tu flujo diario."
       },
       {
-        title: "2. Carga tu plantel base",
+        title: "2. Carga jugadores y niveles",
         description:
-          "En la seccion Jugadores agrega a cada integrante del equipo y asigna un nivel de habilidad. Nivel 1 es el mas fuerte y Nivel 5 el mas bajo."
+          "El nivel va del 1 al 5. Nivel 1 es el mas fuerte. Varios jugadores pueden tener el mismo nivel, porque la habilidad real no siempre entra en una lista unica."
       },
       {
-        title: "3. Crea tu primer partido",
+        title: "3. Arma el partido",
         description:
-          "En Nuevo Partido eliges modalidad, fecha y convocatoria. Puedes trabajar solo con jugadores registrados o sumar invitados puntuales con un nivel equivalente."
+          "Elige modalidad, fecha, convocados, invitados y arqueros. La app propone equipos balanceados para que el admin elija la opcion que mejor calza con la cancha."
       },
       {
-        title: "4. Confirma equipos y carga el resultado",
+        title: "4. Carga el resultado",
         description:
-          "La app genera opciones equilibradas para que elijas una formacion final. Cuando el partido se juega, cargas el resultado y el sistema actualiza automaticamente el ranking competitivo."
+          "Al cerrar el partido, el rendimiento se actualiza y el historial queda guardado. El grupo puede ver ranking, detalle del partido y evolucion sin pedirle nada al admin."
       }
     ],
-    workflowLabel: "Como se gestiona el dia a dia",
+    workflowLabel: "Como se usa semana a semana",
     workflow: [
       {
-        title: "Convocatoria clara",
+        title: "Convocatoria real",
         description:
-          "El sistema arma los equipos a partir de la lista de convocados del partido. Eso te permite trabajar con la disponibilidad real de cada fecha."
+          "Solo entran al armado los jugadores disponibles para esa fecha. Si aparece un invitado, puedes asignarle un nivel equivalente sin cargarlo como jugador fijo."
       },
       {
-        title: "Equipos balanceados",
+        title: "Balance automatico",
         description:
-          "Las opciones automaticas buscan reducir la diferencia entre ambos lados usando como referencia el nivel manual, el rendimiento competitivo y el nivel equivalente de los invitados."
+          "El armado mira el nivel base y el rendimiento actual. Si alguien viene rindiendo muy alto, el sistema lo considera mas fuerte para balancear mejor."
       },
       {
-        title: "Flexibilidad para la cancha real",
+        title: "Historial consultable",
         description:
-          "Si hubo ausencias, reemplazos o invitados de ultimo momento, puedes ajustar la formacion antes de cargar el resultado final para que el historial quede fiel a lo que paso."
+          "Los partidos terminados quedan publicados con marcador, equipos y estadisticas. La informacion se mueve poco y esta pensada para consultarse facil."
       }
     ],
-    detailLabel: "Ranking de jugadores",
+    detailLabel: "Nivel, rendimiento y ranking",
     detail: [
       {
         title: "Nivel de habilidad",
         description:
-          "Es una referencia manual definida por el administrador para estimar la fuerza base de cada jugador. No cambia automaticamente por ganar o perder partidos; solo cambia si el admin lo edita."
+          "Es la referencia manual del admin. Sirve para arrancar y no cambia automaticamente por ganar o perder."
       },
       {
-        title: "Punto de partida del rendimiento",
+        title: "Rendimiento",
         description:
-          "Cada jugador registrado comienza con un rendimiento competitivo de 1000 puntos. Ese valor es dinamico y funciona como base para medir su evolucion."
+          "Es el puntaje competitivo que aprende con los resultados. Se muestra como numero entero para que sea facil de leer."
       },
       {
-        title: "Como se actualiza",
+        title: "Ranking publico",
         description:
-          "Cuando cargas un resultado, una victoria suma 10 puntos a los jugadores del equipo ganador y una derrota resta 10 al equipo que pierde. Si empatan, el rendimiento no se modifica."
+          "El ranking se ordena principalmente por rendimiento. El nivel puede ayudar como contexto, pero no reemplaza lo que muestran los partidos."
       },
       {
-        title: "Partidos en inferioridad",
+        title: "Emparejamiento",
         description:
-          "Si un equipo juega con menos jugadores, el ajuste se adapta para no medir igual una desventaja numerica. Una victoria en inferioridad se premia mas."
+          "Para crear equipos, la app calcula una fuerza efectiva combinando nivel y rendimiento. Ese calculo queda por detras para no complicar al usuario."
       }
     ],
     highlightCards: [
       {
-        title: "Como interpretar el ranking",
+        title: "Lo que ve el visitante",
         description:
-          "Hay dos referencias distintas: el nivel de habilidad es manual y ayuda a armar equipos; el ranking competitivo se ordena por rendimiento actual y muestra lo que vienen demostrando los resultados."
+          "Ranking, jugadores, historial y proximos partidos. No necesita iniciar sesion para consultar la informacion publica del grupo."
       },
       {
-        title: "Consejo practico",
+        title: "Lo que controla el admin",
         description:
-          "Si el grupo es nuevo o todavia no tiene historial, empieza cargando a todos los jugadores y juega algunos partidos con normalidad. A medida que se sumen resultados, el ranking competitivo va a reflejar mejor la realidad."
+          "Jugadores, niveles, partidos, resultados, imagen del grupo, admins invitados y facturacion."
       }
     ],
     faq: [
       {
-        question: "Que informacion es publica?",
+        question: "Puedo tener dos jugadores con el mismo nivel?",
         answer:
-          "Los grupos publicos muestran ranking, jugadores, historial de partidos y proximos encuentros. La gestion y edicion quedan reservadas para los administradores."
+          "Si. Esa es la idea: el nivel representa una categoria de habilidad, no una posicion unica dentro del grupo."
       },
       {
-        question: "Cuantos administradores puede tener un grupo?",
+        question: "El nivel cambia solo?",
         answer:
-          "Cada grupo admite hasta 4 administradores activos o pendientes de invitacion. Eso permite repartir la gestion sin perder control."
+          "No. El nivel lo edita el admin. Lo que cambia con cada resultado es el rendimiento competitivo."
       },
       {
-        question: "La plataforma tiene costo?",
+        question: "Que pasa si no pago?",
         answer:
-          "El modulo ya esta preparado para facturacion, pero el valor publico final se esta terminando de definir. En Precios veras el esquema placeholder con XXX mientras cerramos ese dato."
+          "El grupo queda en modo lectura hasta reactivar el plan. La informacion deportiva se conserva y las fotos de jugadores tienen una ventana de retencion."
       },
       {
-        question: "Que pasa cuando termina el periodo contratado?",
+        question: "Cuantos admins puede tener un grupo?",
         answer:
-          "La idea es mantener la informacion visible y dejar el grupo en modo lectura hasta reactivar el plan. Esa politica comercial fina tambien se mostrara en la pagina de precios."
+          "Hasta 4 administradores activos o pendientes de invitacion por grupo."
       },
       {
-        question: "Donde puedo hacer consultas o reportar un problema?",
+        question: "Donde pido ayuda?",
         answer:
-          "En la seccion Contacto puedes enviar sugerencias, consultas o reportes de error para que el equipo los revise."
+          "Desde Contacto puedes escribirnos por formulario o mail. Tambien puedes mandar sugerencias de producto."
       }
     ]
   },
   tournaments: {
-    eyebrow: "Centro de ayuda",
-    title: "Como funciona el modulo Torneos",
+    eyebrow: "Ayuda para Torneos",
+    title: "Como administrar ligas y competencias sin mezclarlo con Grupos",
     description:
-      "Torneos esta pensado para ligas y competencias. Permite cargar equipos maestros en la liga, inscribirlos en cada competencia, definir admins, elegir si usas capitanes, armar fixture y publicar tabla y estadisticas.",
+      "Torneos esta pensado para organizadores: una liga contiene equipos maestros, admins y una o varias competencias publicas con fixture, tabla, resultados y estadisticas.",
     capabilities: [
-      "Crear varias competencias dentro de una misma liga, separadas del modulo Grupos.",
-      "Cargar equipos maestros en la liga y planteles propios dentro de cada competencia.",
-      "Definir hasta 4 administradores por liga.",
-      "Elegir entre fixture automatico o armado manual fecha por fecha."
+      "Crear una liga como contenedor principal.",
+      "Cargar equipos maestros y reutilizarlos en distintas competencias.",
+      "Crear competencias publicas para que visitantes consulten la informacion.",
+      "Elegir fixture automatico o manual, con capitanes opcionales por equipo."
     ],
-    focusTitle: "En que conviene enfocarse al principio",
+    focusTitle: "Que conviene hacer primero",
     focusDescription:
-      "Primero conviene crear la liga, cargar los equipos maestros y dejar claras las responsabilidades. Despues puedes definir cada competencia, decidir si usaras capitanes o si toda la carga quedara en admins, y avanzar con el fixture para ordenar la operacion.",
+      "Primero crea la liga, carga los equipos maestros y define si vas a usar capitanes. Despues crea las competencias necesarias e inscribe solo los equipos que participan en cada una.",
     gettingStartedLabel: "Primeros pasos",
     gettingStarted: [
       {
         title: "1. Crea la liga",
         description:
-          "Desde el panel de Torneos cargas el nombre de la liga y arrancas el alta desde Mercado Pago. Despues, dentro de esa liga, puedes crear competencias como Viernes A, Viernes B o Clausura."
+          "La liga guarda nombre, logo, foto publica, sede, admins y facturacion. Crear nuevas competencias dentro de esa liga no dispara un checkout nuevo."
       },
       {
-        title: "2. Carga los equipos maestros",
+        title: "2. Carga equipos maestros",
         description:
-          "Agrega los equipos participantes con nombre, nombre corto y notas. Ese catalogo queda disponible para inscribir los equipos que correspondan en cada competencia."
+          "El catalogo de equipos vive en la liga. Luego eliges cuales se inscriben en cada competencia."
       },
       {
-        title: "3. Crea una competencia e inscribe los equipos",
+        title: "3. Crea una competencia",
         description:
-          "Cada competencia toma un subconjunto de equipos de la liga. Asi puedes reutilizar el mismo equipo maestro en distintas competencias sin duplicar la base."
+          "La competencia define formato, temporada, cobertura de datos y equipos inscriptos. Todas las competencias quedan publicas por defecto."
       },
       {
-        title: "4. Invita capitanes o carga el plantel tu mismo",
+        title: "4. Gestiona fixture y resultados",
         description:
-          "Puedes asignar un capitan por equipo inscripto para que complete jugadores y fotos, pero es opcional. Si prefieres, todo el plantel puede quedar administrado solo por el equipo admin de la liga."
-      },
-      {
-        title: "5. Genera el fixture y publica la competencia",
-        description:
-          "Cuando ya tienes al menos dos equipos, puedes crear el fixture tipo round robin o armarlo manualmente fecha por fecha con horario, sede y cruces definidos por ti."
+          "Puedes generar fechas automaticamente o cargar cruces manuales. Luego registras resultados y, si corresponde, estadisticas del acta."
       }
     ],
-    workflowLabel: "Como se gestiona el dia a dia",
+    workflowLabel: "Como se opera una competencia",
     workflow: [
       {
-        title: "Fixture flexible",
+        title: "Competencias claras",
         description:
-          "Puedes generar todas las fechas en forma automatica o armar y editar el fixture manualmente partido por partido para ajustar cruces, horarios, sedes y estados."
+          "En el admin se listan primero las competencias activas. La creacion queda en una pantalla aparte para no ocupar espacio cuando ya estas trabajando."
       },
       {
-        title: "Capitanes con acceso acotado",
+        title: "Visibilidad para visitantes",
         description:
-          "Si decides usar capitanes, cada uno solo ve su equipo dentro del torneo y puede completar jugadores y fotos sin tocar la configuracion general de la competencia."
+          "La informacion publica aparece cuando la liga y la competencia estan activas o finalizadas. Asi quien no esta logueado puede consultar tabla, fixture y resultados."
       },
       {
-        title: "Carga de actas simple",
+        title: "Capitanes opcionales",
         description:
-          "En cada partido puedes registrar marcador, figura, goles y tarjetas. Si falta un jugador en el plantel, el acta permite cargar nombre libre para no frenar la carga."
+          "Puedes invitar capitanes para completar planteles y fotos, o manejar todo desde el equipo admin de la liga."
       }
     ],
-    detailLabel: "Tabla y estadisticas",
+    detailLabel: "Tabla, fixture y estadisticas",
     detail: [
       {
         title: "Tabla de posiciones",
         description:
-          "La tabla se calcula automaticamente con 3 puntos por victoria, 1 por empate y 0 por derrota. Los desempates usan diferencia de gol, goles a favor y nombre del equipo."
+          "Se calcula automaticamente con puntos, diferencia de gol, goles a favor y desempates consistentes."
       },
       {
-        title: "Goleadores y figuras",
+        title: "Fixture",
         description:
-          "Los leaderboards se construyen a partir de las actas cargadas. No necesitas mantener tablas manuales de goleadores ni MVPs."
+          "Round robin, copa o liga mas copa. Si hay cantidad impar, se contempla fecha libre o pase de ronda cuando corresponde."
       },
       {
-        title: "Vallas menos vencidas",
+        title: "Resultados",
         description:
-          "En esta primera version se muestran por equipo, calculando los goles recibidos por cada club a lo largo del torneo."
+          "Puedes cerrar un partido solo con marcador. Si quieres mas detalle, agregas goles, figuras y tarjetas."
       },
       {
-        title: "Partidos jugados",
+        title: "Competencias publicas",
         description:
-          "Una vez que un partido queda como jugado, se bloquean los cambios estructurales de equipos o localia. A partir de ahi solo editas el acta y los datos del resultado."
+          "No hay checkbox para ocultarlas. Si la competencia no debe verse todavia, usa estado draft; si ya termino, usa finished."
       }
     ],
     highlightCards: [
       {
-        title: "Que se publica",
+        title: "Liga no es competencia",
         description:
-          "El publico puede ver listado de torneos, tabla, fixture, detalle de partidos, goleadores, figuras y vallas menos vencidas cuando el torneo esta marcado como publico."
+          "La liga es el contenedor. La competencia es lo que se juega. Esto permite tener Viernes A, Viernes B o Copa dentro de la misma liga."
       },
       {
-        title: "Consejo practico",
+        title: "Que ve el publico",
         description:
-          "Si vas a trabajar con capitanes, define los equipos primero y enviales la invitacion antes de empezar a cargar resultados. Si no, puedes resolver todo desde admins y simplificar el arranque."
+          "Listado de ligas, ficha publica, competencias activas, tabla, fixture, detalle de partidos y estadisticas cargadas."
       }
     ],
     faq: [
       {
-        question: "Los torneos usan los mismos jugadores que grupos?",
+        question: "Crear una competencia nueva cobra otro mes?",
         answer:
-          "No. El modulo Torneos tiene su propia tabla de jugadores para mantener completamente separado ese dominio del flujo actual de grupos."
+          "No. La facturacion de Torneos esta asociada al alta de la liga. Dentro de una liga puedes crear las competencias que necesites."
+      },
+      {
+        question: "Puedo ocultar una competencia?",
+        answer:
+          "La competencia es publica por defecto. Para que no aparezca publicamente, mantenla en draft o archiva lo que ya no corresponda mostrar."
+      },
+      {
+        question: "Los torneos usan los mismos jugadores que Grupos?",
+        answer:
+          "No. Son flujos separados para no mezclar historial, planteles ni permisos."
+      },
+      {
+        question: "Cuantos admins puede tener una liga?",
+        answer:
+          "Hasta 4 administradores por liga."
       },
       {
         question: "Que puede hacer un capitan?",
         answer:
-          "El capitan inicia sesion con su cuenta y solo accede al equipo que el admin le asigno dentro del torneo. Desde ahi puede cargar o editar jugadores y sus fotos, pero usar capitanes es opcional."
-      },
-      {
-        question: "Se puede regenerar el fixture despues de empezarlo?",
-        answer:
-          "En V1 no. El fixture automatico solo se genera cuando todavia no existen partidos. Una vez creado, los ajustes pasan a ser manuales."
-      },
-      {
-        question: "La plataforma tiene costo?",
-        answer:
-          "Si. El pack Torneos se inicia desde Mercado Pago y su referencia comercial publica esta en la seccion Precios."
-      },
-      {
-        question: "Cuantos admins puede tener un torneo?",
-        answer:
-          "Cada liga puede tener hasta 4 administradores. Asi puedes repartir la gestion sin perder control de la estructura general y sus competencias."
-      },
-      {
-        question: "Que pasa si falta un jugador en el plantel al cargar un partido?",
-        answer:
-          "El acta permite registrar estadisticas con nombre libre sin exigir que ese jugador exista previamente en el plantel, asi no se rompe el flujo operativo."
+          "Solo accede al equipo que el admin le asigno dentro de la competencia. Puede completar plantel y fotos, pero no administra la liga."
       }
     ]
   }
@@ -355,7 +345,7 @@ export default async function HelpPage({
 
       <section className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardTitle>Que puedes hacer en este modulo</CardTitle>
+          <CardTitle>Que puedes hacer</CardTitle>
           <div className="mt-3 space-y-2 text-sm text-slate-300">
             {content.capabilities.map((item) => (
               <p key={item}>{item}</p>
