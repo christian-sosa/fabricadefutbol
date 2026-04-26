@@ -17,6 +17,7 @@ import { Select } from "@/components/ui/select";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { getAdminPlayers } from "@/lib/queries/admin";
 import { withOrgQuery } from "@/lib/org";
+import { formatRendimiento } from "@/lib/utils";
 
 const SKILL_LEVEL_OPTIONS = [1, 2, 3, 4, 5] as const;
 
@@ -57,7 +58,7 @@ export default async function AdminPlayersPage({
         <CardTitle>Alta de jugador</CardTitle>
         <CardDescription>
           Carga jugadores nuevos para el grupo seleccionado. Nivel 1 es el mas fuerte y Nivel 5 el mas bajo.
-          El nivel es la base manual; el rating aprende con los partidos y ayuda a armar equipos mas parejos.
+          El nivel es la base manual; el rendimiento aprende con los partidos y ayuda a armar equipos mas parejos.
         </CardDescription>
         <form action={createPlayerAction} className="mt-4 grid gap-3 md:grid-cols-4">
           <input name="organizationId" type="hidden" value={selectedOrganization.id} />
@@ -92,7 +93,7 @@ export default async function AdminPlayersPage({
           <div className="hidden grid-cols-[2.3fr_0.75fr_0.95fr_1.8fr_auto] gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 md:grid">
             <span>Jugador</span>
             <span>Nivel</span>
-            <span>Rating</span>
+            <span>Rendimiento</span>
             <span>Foto</span>
             <span>Acciones</span>
           </div>
@@ -126,9 +127,9 @@ export default async function AdminPlayersPage({
                 ))}
               </Select>
               <Input
-                defaultValue={String(Number(player.current_rating))}
+                defaultValue={formatRendimiento(player.current_rating)}
                 form={bulkFormId}
-                inputMode="decimal"
+                inputMode="numeric"
                 name="currentRating"
                 placeholder="1000"
                 required

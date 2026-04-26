@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { PlayerPhotoModalTrigger } from "@/components/ui/player-photo-modal-trigger";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { useOrganizationStandingsQuery } from "@/lib/query/hooks";
-import { cn, formatPercent } from "@/lib/utils";
+import { cn, formatPercent, formatRendimiento } from "@/lib/utils";
 import type { PlayerComputedStats } from "@/types/domain";
 
 const PODIUM_RANK_STYLES: Record<number, string> = {
@@ -85,8 +85,8 @@ export function RankingTableQuery({ organizationId, initialPlayers }: RankingTab
                   <PlayerPhotoModalTrigger avatarSize="md" playerId={player.playerId} playerName={player.playerName} />
                 </div>
                 <div className="text-right">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Rating</p>
-                  <p className="text-2xl font-black text-emerald-300">{player.currentRating.toFixed(2)}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Rendimiento</p>
+                  <p className="text-2xl font-black text-emerald-300">{formatRendimiento(player.currentRating)}</p>
                 </div>
               </div>
 
@@ -121,7 +121,7 @@ export function RankingTableQuery({ organizationId, initialPlayers }: RankingTab
             <tr>
               <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm"># Actual</TH>
               <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm">Jugador</TH>
-              <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm">Rating</TH>
+              <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm">Rendimiento</TH>
               <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm">PJ</TH>
               <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm">PG</TH>
               <TH className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm">PE</TH>
@@ -150,7 +150,7 @@ export function RankingTableQuery({ organizationId, initialPlayers }: RankingTab
                     <PlayerPhotoModalTrigger avatarSize="md" playerId={player.playerId} playerName={player.playerName} />
                   </TD>
                   <TD className="px-6 py-5 text-lg font-semibold text-emerald-300 md:text-xl">
-                    {player.currentRating.toFixed(2)}
+                    {formatRendimiento(player.currentRating)}
                   </TD>
                   <TD className="px-6 py-5 text-lg font-medium text-slate-300 md:text-xl">{player.matchesPlayed}</TD>
                   <TD className="px-6 py-5 text-lg font-medium text-slate-300 md:text-xl">{player.wins}</TD>

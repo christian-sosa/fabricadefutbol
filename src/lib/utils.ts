@@ -16,6 +16,19 @@ export function formatPercent(value: number) {
   return `${value.toFixed(1)}%`;
 }
 
+export function formatRendimiento(value: number | string | null | undefined) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "-";
+  return String(Math.round(numeric));
+}
+
+export function formatRendimientoDelta(value: number | string | null | undefined) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "-";
+  const rounded = Math.round(numeric);
+  return `${rounded > 0 ? "+" : ""}${rounded}`;
+}
+
 export function toNumber(value: FormDataEntryValue | null, fallback = 0) {
   if (typeof value !== "string") return fallback;
   const parsed = Number(value);

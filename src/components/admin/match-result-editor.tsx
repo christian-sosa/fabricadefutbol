@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { formatRendimiento } from "@/lib/utils";
 import type { TeamSide } from "@/types/domain";
 
 type ExistingParticipant = {
@@ -184,7 +185,7 @@ export function MatchResultEditor({
               <div className="text-sm text-slate-200">
                 {participant.fullName}
                 <span className="ml-2 text-xs text-slate-400">
-                  {participant.source === "guest" ? "Invitado" : participant.rating.toFixed(2)}
+                  {participant.source === "guest" ? "Invitado" : `Rendimiento ${formatRendimiento(participant.rating)}`}
                 </span>
               </div>
               <Select
@@ -215,7 +216,7 @@ export function MatchResultEditor({
                 {
                   id: guestSequence,
                   name: "",
-                  rating: "10",
+                  rating: "1000",
                   team: "A"
                 }
               ]);
@@ -240,14 +241,14 @@ export function MatchResultEditor({
                 value={guest.name}
               />
               <Input
-                min={0.01}
+                min={1}
                 onChange={(event) =>
                   setNewGuests((current) =>
                     current.map((item) => (item.id === guest.id ? { ...item, rating: event.target.value } : item))
                   )
                 }
-                placeholder="Rating"
-                step={0.01}
+                placeholder="Rendimiento"
+                step={1}
                 type="number"
                 value={guest.rating}
               />

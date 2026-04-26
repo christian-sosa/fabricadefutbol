@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { PlayerPhotoModalTrigger } from "@/components/ui/player-photo-modal-trigger";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
-import { cn, formatPercent } from "@/lib/utils";
+import { cn, formatPercent, formatRendimiento } from "@/lib/utils";
 
 type PlayerStatsRow = {
   playerId: string;
@@ -21,7 +21,7 @@ type SortKey = "rating" | "pj" | "pg" | "pe" | "pp" | "winRate";
 type SortDirection = "asc" | "desc";
 
 const columnConfig: Array<{ key: SortKey; label: string }> = [
-  { key: "rating", label: "Rating" },
+  { key: "rating", label: "Rendimiento" },
   { key: "pj", label: "PJ" },
   { key: "pg", label: "PG" },
   { key: "pe", label: "PE" },
@@ -104,8 +104,8 @@ export function PlayersStatsTable({ players }: { players: PlayerStatsRow[] }) {
             <div className="flex items-start justify-between gap-3">
               <PlayerPhotoModalTrigger playerId={player.playerId} playerName={player.playerName} />
               <div className="text-right">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Rating</p>
-                <p className="text-xl font-black text-emerald-300">{player.currentRating.toFixed(2)}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Rendimiento</p>
+                <p className="text-xl font-black text-emerald-300">{formatRendimiento(player.currentRating)}</p>
               </div>
             </div>
 
@@ -172,7 +172,7 @@ export function PlayersStatsTable({ players }: { players: PlayerStatsRow[] }) {
                 <TD>
                   <PlayerPhotoModalTrigger playerId={player.playerId} playerName={player.playerName} />
                 </TD>
-                <TD className="font-semibold text-slate-100">{player.currentRating.toFixed(2)}</TD>
+                <TD className="font-semibold text-slate-100">{formatRendimiento(player.currentRating)}</TD>
                 <TD>{player.matchesPlayed}</TD>
                 <TD>{player.wins}</TD>
                 <TD>{player.draws}</TD>

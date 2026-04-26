@@ -44,7 +44,7 @@ const rowSchema = z.object({
   id: z.string().uuid(),
   fullName: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
   skillLevel: z.number().int().min(1, "El nivel debe estar entre 1 y 5.").max(5, "El nivel debe estar entre 1 y 5."),
-  currentRating: z.number().positive("El rating debe ser un numero positivo.")
+  currentRating: z.number().positive("El rendimiento debe ser un numero positivo.")
 });
 
 function parseDecimalField(value: FormDataEntryValue | null) {
@@ -208,7 +208,7 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
         .update({
           full_name: row.fullName,
           skill_level: normalizeSkillLevel(row.skillLevel),
-          current_rating: Number(row.currentRating.toFixed(2))
+          current_rating: Math.round(row.currentRating)
         })
         .eq("id", row.id)
         .eq("organization_id", organizationId);

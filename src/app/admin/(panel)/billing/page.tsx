@@ -10,6 +10,7 @@ import {
   requireAdminOrganization
 } from "@/lib/auth/admin";
 import { syncOrganizationBillingPaymentFromMercadoPago } from "@/lib/domain/billing-workflow";
+import { resolveOrganizationVisibleAccessValidUntil } from "@/lib/domain/billing";
 import {
   ORGANIZATION_BILLING_CURRENCY,
   ORGANIZATION_MONTHLY_PRICE_ARS
@@ -89,7 +90,11 @@ export default async function AdminBillingPage({
   const billingData = await getOrganizationBillingData(selectedOrganization.id);
   const subscription = billingData.subscription;
   const isSubscriptionActive = writeAccess.subscriptionActive;
-  const accessValidUntil = writeAccess.accessValidUntil;
+  const accessValidUntil = resolveOrganizationVisibleAccessValidUntil({
+    subscription,
+    payments: billingData.payments,
+    fallbackAccessValidUntil: writeAccess.accessValidUntil
+  });
   const subscriptionStatusLabel = subscription?.status
     ? normalizePaymentStatusLabel(subscription.status)
     : writeAccess.organizationTrialExpired
@@ -166,7 +171,7 @@ export default async function AdminBillingPage({
             Grupo: <span className="font-semibold">{selectedOrganization.name}</span>
           </p>
           <p>
-            Suscripcion valida hasta:{" "}
+            Periodo valido hasta:{" "}
             <span className="font-semibold">
               {accessValidUntil
                 ? new Date(accessValidUntil).toLocaleDateString("es-AR")

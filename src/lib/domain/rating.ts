@@ -55,7 +55,7 @@ export function calculateMatchRatingAdjustments(input: CalculateRatingInput): Ra
     shortHandedTeam = null
   } = input;
   if (!teamA.length || !teamB.length) {
-    throw new Error("No se pueden calcular ratings sin ambos equipos.");
+    throw new Error("No se pueden calcular rendimientos sin ambos equipos.");
   }
 
   const teamADelta = resolveDelta("A", winnerTeam, deltaPerMatch, shortHandedTeam);
@@ -66,7 +66,7 @@ export function calculateMatchRatingAdjustments(input: CalculateRatingInput): Ra
     team: "A",
     ratingBefore: player.rating,
     delta: teamADelta,
-    ratingAfter: Number((player.rating + teamADelta).toFixed(2))
+    ratingAfter: Math.round(player.rating + teamADelta)
   }));
 
   const mappedB = teamB.map<RatingAdjustment>((player) => ({
@@ -74,7 +74,7 @@ export function calculateMatchRatingAdjustments(input: CalculateRatingInput): Ra
     team: "B",
     ratingBefore: player.rating,
     delta: teamBDelta,
-    ratingAfter: Number((player.rating + teamBDelta).toFixed(2))
+    ratingAfter: Math.round(player.rating + teamBDelta)
   }));
 
   return [...mappedA, ...mappedB];

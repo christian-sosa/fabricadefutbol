@@ -46,7 +46,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
     ],
     focusTitle: "En que conviene enfocarse al principio",
     focusDescription:
-      "Lo ideal es construir primero una buena base de jugadores, asignar niveles simples y luego cargar resultados para que el rating competitivo gane valor con el tiempo.",
+      "Lo ideal es construir primero una buena base de jugadores, asignar niveles simples y luego cargar resultados para que el rendimiento competitivo gane valor con el tiempo.",
     gettingStartedLabel: "Primeros pasos",
     gettingStarted: [
       {
@@ -80,7 +80,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "Equipos balanceados",
         description:
-          "Las opciones automaticas buscan reducir la diferencia entre ambos lados usando como referencia el nivel manual, el rating competitivo y el nivel equivalente de los invitados."
+          "Las opciones automaticas buscan reducir la diferencia entre ambos lados usando como referencia el nivel manual, el rendimiento competitivo y el nivel equivalente de los invitados."
       },
       {
         title: "Flexibilidad para la cancha real",
@@ -96,14 +96,14 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
           "Es una referencia manual definida por el administrador para estimar la fuerza base de cada jugador. No cambia automaticamente por ganar o perder partidos; solo cambia si el admin lo edita."
       },
       {
-        title: "Punto de partida del rating",
+        title: "Punto de partida del rendimiento",
         description:
-          "Cada jugador registrado comienza con un rating competitivo de 1000 puntos. Ese valor es dinamico y funciona como base para medir su evolucion."
+          "Cada jugador registrado comienza con un rendimiento competitivo de 1000 puntos. Ese valor es dinamico y funciona como base para medir su evolucion."
       },
       {
         title: "Como se actualiza",
         description:
-          "Cuando cargas un resultado, una victoria suma 10 puntos a los jugadores del equipo ganador y una derrota resta 10 al equipo que pierde. Si empatan, el rating no se modifica."
+          "Cuando cargas un resultado, una victoria suma 10 puntos a los jugadores del equipo ganador y una derrota resta 10 al equipo que pierde. Si empatan, el rendimiento no se modifica."
       },
       {
         title: "Partidos en inferioridad",
@@ -115,7 +115,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "Como interpretar el ranking",
         description:
-          "Hay dos referencias distintas: el nivel de habilidad es manual y ayuda a armar equipos; el ranking competitivo se ordena por rating actual y muestra lo que vienen demostrando los resultados."
+          "Hay dos referencias distintas: el nivel de habilidad es manual y ayuda a armar equipos; el ranking competitivo se ordena por rendimiento actual y muestra lo que vienen demostrando los resultados."
       },
       {
         title: "Consejo practico",

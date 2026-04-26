@@ -55,8 +55,8 @@ describe("MatchResultEditor", () => {
     await user.click(screen.getByLabelText("Aplicar regla de desventaja numerica"));
     await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
     await user.type(screen.getByPlaceholderText("Nombre invitado"), "Invitado B");
-    await user.clear(screen.getByPlaceholderText("Rating"));
-    await user.type(screen.getByPlaceholderText("Rating"), "8");
+    await user.clear(screen.getByPlaceholderText("Rendimiento"));
+    await user.type(screen.getByPlaceholderText("Rendimiento"), "8");
     const guestAndHandicapSelects = container.querySelectorAll("select");
     await user.selectOptions(guestAndHandicapSelects[3] as HTMLSelectElement, "B");
 
@@ -93,8 +93,8 @@ describe("MatchResultEditor", () => {
     await user.selectOptions(selects[1] as HTMLSelectElement, "OUT");
     await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
     await user.type(screen.getByPlaceholderText("Nombre invitado"), "Refuerzo");
-    await user.clear(screen.getByPlaceholderText("Rating"));
-    await user.type(screen.getByPlaceholderText("Rating"), "7");
+    await user.clear(screen.getByPlaceholderText("Rendimiento"));
+    await user.type(screen.getByPlaceholderText("Rendimiento"), "7");
     await user.click(screen.getByLabelText("Aplicar regla de desventaja numerica"));
     const guestAndHandicapSelects = container.querySelectorAll("select");
     await user.selectOptions(guestAndHandicapSelects[3] as HTMLSelectElement, "B");

@@ -10,6 +10,11 @@ export type LeagueSubscriptionSnapshot = {
   current_period_end: string | null;
 };
 
+export type BillingPaymentPeriodSnapshot = {
+  status: string | null;
+  period_end: string | null;
+};
+
 export type OrganizationWriteWindow = {
   canWrite: boolean;
   organizationTrialEndsAt: string;
@@ -88,6 +93,36 @@ export function resolveOrganizationWriteWindow(params: {
     playerPhotosPurgeAt,
     playerPhotosRetentionExpired: playerPhotosPurgeAt ? isIsoDateExpired(playerPhotosPurgeAt) : false
   };
+}
+
+function getLatestIsoDate(values: Array<string | null | undefined>) {
+  return values.reduce<string | null>((latest, value) => {
+    if (!value) return latest;
+
+    const candidateTime = new Date(value).getTime();
+    if (!Number.isFinite(candidateTime)) return latest;
+
+    if (!latest) return value;
+
+    const latestTime = new Date(latest).getTime();
+    return candidateTime > latestTime ? value : latest;
+  }, null);
+}
+
+export function resolveOrganizationVisibleAccessValidUntil(params: {
+  subscription: OrganizationSubscriptionSnapshot | null | undefined;
+  payments: BillingPaymentPeriodSnapshot[];
+  fallbackAccessValidUntil?: string | null | undefined;
+}) {
+  const approvedPaymentEnds = params.payments
+    .filter((payment) => (payment.status ?? "").toLowerCase() === "approved")
+    .map((payment) => payment.period_end);
+
+  return getLatestIsoDate([
+    params.fallbackAccessValidUntil,
+    params.subscription?.current_period_end,
+    ...approvedPaymentEnds
+  ]);
 }
 
 export function resolveNextOrganizationBillingPeriod(
