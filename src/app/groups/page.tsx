@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { OrganizationImage } from "@/components/groups/organization-image";
 import { AdPlaceholder } from "@/components/layout/ad-placeholder";
+import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
@@ -45,6 +46,17 @@ export default async function GroupsPage({
 
       {selectedOrganization ? (
         <>
+          <section className="lg:hidden">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
+              <OrganizationPublicNav
+                className="grid grid-cols-3 gap-2"
+                currentPath="/groups"
+                itemClassName="flex min-h-10 items-center justify-center px-2 py-2 text-center"
+                organizationKey={selectedOrganization.slug}
+              />
+            </div>
+          </section>
+
           <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
             <Card className="overflow-hidden p-0">
               <div className="relative">
