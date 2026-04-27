@@ -50,7 +50,7 @@ export default async function GroupsPage({
           <section className="lg:hidden">
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
               <OrganizationPublicNav
-                className="grid grid-cols-3 gap-2"
+                className="grid grid-cols-2 gap-2 sm:grid-cols-4"
                 currentPath="/groups"
                 itemClassName="flex min-h-10 items-center justify-center px-2 py-2 text-center"
                 organizationKey={selectedOrganization.slug}
@@ -91,15 +91,27 @@ export default async function GroupsPage({
 
           <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
             <Card>
-              <CardTitle>Top jugadores</CardTitle>
-              <CardDescription className="mt-2">
-                Vista rapida del rendimiento actual de {selectedOrganization.name}.
-              </CardDescription>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle>Top jugadores</CardTitle>
+                  <CardDescription className="mt-2">
+                    Vista rapida del rendimiento actual de {selectedOrganization.name}.
+                  </CardDescription>
+                </div>
+                <Link
+                  className="text-sm font-semibold text-emerald-300 hover:underline"
+                  href={withOrgQuery("/ranking", selectedOrganization.slug)}
+                >
+                  Ver ranking
+                </Link>
+              </div>
               <div className="mt-4 space-y-2">
                 {summary.topPlayers.length ? (
                   summary.topPlayers.map((player, index) => (
-                    <div
-                      className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm"
+                    <Link
+                      aria-label={`Ver ranking de ${player.full_name}`}
+                      className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm transition hover:border-slate-600 hover:bg-slate-800"
+                      href={withOrgQuery("/ranking", selectedOrganization.slug)}
                       key={player.id}
                     >
                       <div className="flex items-center gap-3">
@@ -109,7 +121,7 @@ export default async function GroupsPage({
                         </span>
                       </div>
                       <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span>
-                    </div>
+                    </Link>
                   ))
                 ) : (
                   <p className="text-sm text-slate-400">Todavia no hay jugadores activos cargados.</p>

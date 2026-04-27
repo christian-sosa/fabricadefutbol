@@ -7,6 +7,7 @@ describe("OrganizationPublicNav", () => {
   it("conserva el grupo seleccionado en los accesos publicos", () => {
     render(<OrganizationPublicNav organizationKey="grupo-a" />);
 
+    expect(screen.getByRole("link", { name: "Grupo" })).toHaveAttribute("href", "/groups?org=grupo-a");
     expect(screen.getByRole("link", { name: "Ranking" })).toHaveAttribute("href", "/ranking?org=grupo-a");
     expect(screen.getByRole("link", { name: "Historial" })).toHaveAttribute("href", "/matches?org=grupo-a");
     expect(screen.getByRole("link", { name: "Proximos" })).toHaveAttribute("href", "/upcoming?org=grupo-a");

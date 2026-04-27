@@ -1,4 +1,5 @@
 import { AdPlaceholder } from "@/components/layout/ad-placeholder";
+import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { MatchesHistoryQueryTable } from "@/components/matches/matches-history-query-table";
 import { getMatchHistoryCardsPage, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
@@ -31,6 +32,19 @@ export default async function MatchesPage({
         organizations={organizations}
         quickOrganizations={viewerAdminOrganizations}
       />
+
+      {selectedOrganization ? (
+        <section className="lg:hidden">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
+            <OrganizationPublicNav
+              className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+              currentPath="/matches"
+              itemClassName="flex min-h-10 items-center justify-center px-2 py-2 text-center"
+              organizationKey={selectedOrganization.slug}
+            />
+          </div>
+        </section>
+      ) : null}
 
       <AdPlaceholder slot="matches-top" />
 

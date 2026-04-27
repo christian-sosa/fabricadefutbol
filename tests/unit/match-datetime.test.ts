@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   datetimeLocalToMatchIso,
   formatMatchDateTime,
+  getCurrentMatchDateTimeIso,
   matchIsoToDatetimeLocal
 } from "@/lib/match-datetime";
 
@@ -20,5 +21,9 @@ describe("match datetime helpers", () => {
   it("prepara valores para datetime-local sin restar horas", () => {
     expect(matchIsoToDatetimeLocal("2026-04-30T20:00:00.000Z")).toBe("2026-04-30T20:00");
     expect(matchIsoToDatetimeLocal(null)).toBe("");
+  });
+
+  it("calcula el ahora contra el horario de cancha de Argentina", () => {
+    expect(getCurrentMatchDateTimeIso(new Date("2026-04-27T21:00:00.000Z"))).toBe("2026-04-27T18:00:00.000Z");
   });
 });

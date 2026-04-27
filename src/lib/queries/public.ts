@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { cookies } from "next/headers";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -14,11 +15,13 @@ import {
 } from "@/lib/domain/organization-public-snapshot";
 import { calculateGuestDisplayRating } from "@/lib/domain/skill-level";
 import { calculatePlayerStats, type MatchWithTeams } from "@/lib/domain/stats";
+import { getCurrentMatchDateTimeIso } from "@/lib/match-datetime";
 import { normalizeEmail } from "@/lib/org";
 import type { MatchHistoryItem, OrganizationMatchesResponse } from "@/lib/query/types";
 import type { Database } from "@/types/database";
 
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
+type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
 type PublicOrganization = {
   id: string;
@@ -62,6 +65,23 @@ type MatchParticipantDisplay = {
 
 function sortParticipantsByRating(players: MatchParticipantDisplay[]) {
   return [...players].sort((a, b) => Number(b.current_rating) - Number(a.current_rating));
+}
+
+function sortConfirmedMatchesForPublic<T extends { scheduled_at: string | null }>(matches: T[]) {
+  const now = Date.parse(getCurrentMatchDateTimeIso());
+
+  return [...matches].sort((left, right) => {
+    const leftTime = Date.parse(left.scheduled_at ?? "");
+    const rightTime = Date.parse(right.scheduled_at ?? "");
+    const leftIsFuture = Number.isFinite(leftTime) && leftTime >= now;
+    const rightIsFuture = Number.isFinite(rightTime) && rightTime >= now;
+
+    if (leftIsFuture !== rightIsFuture) return leftIsFuture ? -1 : 1;
+    if (!Number.isFinite(leftTime)) return 1;
+    if (!Number.isFinite(rightTime)) return -1;
+
+    return leftIsFuture ? leftTime - rightTime : rightTime - leftTime;
+  });
 }
 
 function hashString(input: string) {
@@ -175,6 +195,42 @@ async function resolvePublicOrganizationId(organizationKey?: string | null) {
   return findOrganizationByKey(organizations, organizationKey)?.id ?? null;
 }
 
+async function getConfirmedMatchSummariesLive(
+  supabase: SupabaseServerClient,
+  organizationId: string,
+  limit = 5
+): Promise<OrganizationPublicSummary["upcomingMatches"]> {
+  const now = getCurrentMatchDateTimeIso();
+  const [futureRes, overdueRes] = await Promise.all([
+    supabase
+      .from("matches")
+      .select("id, scheduled_at, modality, status")
+      .eq("organization_id", organizationId)
+      .eq("status", "confirmed")
+      .gt("scheduled_at", now)
+      .order("scheduled_at", { ascending: true })
+      .limit(limit),
+    supabase
+      .from("matches")
+      .select("id, scheduled_at, modality, status")
+      .eq("organization_id", organizationId)
+      .eq("status", "confirmed")
+      .lte("scheduled_at", now)
+      .order("scheduled_at", { ascending: false })
+      .limit(limit)
+  ]);
+
+  if (futureRes.error) throw new Error(futureRes.error.message);
+  if (overdueRes.error) throw new Error(overdueRes.error.message);
+
+  const matches = [...(futureRes.data ?? []), ...(overdueRes.data ?? [])].filter(
+    (match): match is { id: string; scheduled_at: string; modality: string; status: string } =>
+      typeof match.scheduled_at === "string"
+  );
+
+  return matches.slice(0, limit);
+}
+
 async function fetchMatchTeams(matchIds: string[]) {
   if (!matchIds.length) return [] as MatchWithTeams[];
 
@@ -253,20 +309,13 @@ async function getHomeSummaryLive(organizationId: string | null): Promise<Organi
 
   const supabase = await createSupabaseServerClient();
 
-  const [playersRes, upcomingRes, finishedRes] = await Promise.all([
+  const [playersRes, upcomingMatches, finishedRes] = await Promise.all([
     supabase
       .from("players")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .eq("active", true),
-    supabase
-      .from("matches")
-      .select("id, scheduled_at, modality, status")
-      .eq("organization_id", organizationId)
-      .eq("status", "confirmed")
-      .gt("scheduled_at", new Date().toISOString())
-      .order("scheduled_at", { ascending: true })
-      .limit(5),
+    getConfirmedMatchSummariesLive(supabase, organizationId),
     supabase
       .from("matches")
       .select("id", { count: "exact", head: true })
@@ -275,7 +324,6 @@ async function getHomeSummaryLive(organizationId: string | null): Promise<Organi
   ]);
 
   if (playersRes.error) throw new Error(playersRes.error.message);
-  if (upcomingRes.error) throw new Error(upcomingRes.error.message);
   if (finishedRes.error) throw new Error(finishedRes.error.message);
 
   const { data: topPlayers, error: topPlayersError } = await supabase
@@ -293,20 +341,23 @@ async function getHomeSummaryLive(organizationId: string | null): Promise<Organi
   return {
     totalPlayers: playersRes.count ?? 0,
     totalFinishedMatches: finishedRes.count ?? 0,
-    upcomingMatches: (upcomingRes.data ?? []).filter(
-      (match): match is { id: string; scheduled_at: string; modality: string; status: string } =>
-        typeof match.scheduled_at === "string"
-    ),
+    upcomingMatches,
     topPlayers: topPlayers ?? []
   };
 }
 
 export async function getHomeSummary(organizationId: string | null) {
+  noStore();
   if (!organizationId) return getHomeSummaryLive(null);
 
   const supabase = await createSupabaseServerClient();
   const summary = await readOrganizationPublicSummarySnapshot(supabase, organizationId);
-  if (summary) return summary;
+  if (summary) {
+    return {
+      ...summary,
+      upcomingMatches: await getConfirmedMatchSummariesLive(supabase, organizationId)
+    };
+  }
 
   return getHomeSummaryLive(organizationId);
 }
@@ -579,6 +630,7 @@ export async function refreshOrganizationPublicSnapshotSafe(organizationId: stri
 }
 
 export async function getUpcomingConfirmedMatches(organizationId: string | null) {
+  noStore();
   if (!organizationId) return [];
 
   const supabase = await createSupabaseServerClient();
@@ -641,23 +693,29 @@ export async function getUpcomingConfirmedMatches(organizationId: string | null)
     ])
   );
 
-  return matchesWithTeams.map((item) => ({
-    ...item,
-    teamAPlayers: sortParticipantsByRating([
-      ...item.teamAPlayerIds.map((id) => playersById.get(id)).filter(notNull),
-      ...safeOptionGuests
-        .filter((guest) => guest.team_option_id === item.match.confirmed_option_id && guest.team === "A")
-        .map((guest) => guestsById.get(guest.guest_id))
-        .filter(notNull)
-    ]),
-    teamBPlayers: sortParticipantsByRating([
-      ...item.teamBPlayerIds.map((id) => playersById.get(id)).filter(notNull),
-      ...safeOptionGuests
-        .filter((guest) => guest.team_option_id === item.match.confirmed_option_id && guest.team === "B")
-        .map((guest) => guestsById.get(guest.guest_id))
-        .filter(notNull)
-    ])
-  }));
+  const matchItemsById = new Map(matchesWithTeams.map((item) => [item.match.id, item]));
+
+  return sortConfirmedMatchesForPublic(matchesWithTeams.map((item) => item.match)).map((match) => {
+    const item = matchItemsById.get(match.id);
+    if (!item) throw new Error("No se encontro el partido confirmado al ordenar la agenda publica.");
+    return {
+      ...item,
+      teamAPlayers: sortParticipantsByRating([
+        ...item.teamAPlayerIds.map((id) => playersById.get(id)).filter(notNull),
+        ...safeOptionGuests
+          .filter((guest) => guest.team_option_id === item.match.confirmed_option_id && guest.team === "A")
+          .map((guest) => guestsById.get(guest.guest_id))
+          .filter(notNull)
+      ]),
+      teamBPlayers: sortParticipantsByRating([
+        ...item.teamBPlayerIds.map((id) => playersById.get(id)).filter(notNull),
+        ...safeOptionGuests
+          .filter((guest) => guest.team_option_id === item.match.confirmed_option_id && guest.team === "B")
+          .map((guest) => guestsById.get(guest.guest_id))
+          .filter(notNull)
+      ])
+    };
+  });
 }
 
 export async function getMatchDetails(matchId: string, organizationKey?: string | null) {
