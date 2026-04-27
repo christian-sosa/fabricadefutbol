@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { syncOrganizationBillingPaymentFromMercadoPago } from "@/lib/domain/billing-workflow";
 import { syncTournamentBillingPaymentFromMercadoPago } from "@/lib/domain/tournament-billing-workflow";
 import { getMercadoPagoWebhookSecret } from "@/lib/env";
+import { logError, logInfo, logWarn } from "@/lib/observability/log";
 import { verifyMercadoPagoWebhookSignature } from "@/lib/payments/mercadopago";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -59,8 +60,13 @@ function isMissingLocalOrder(result: unknown) {
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   const supabaseAdmin = createSupabaseAdminClient();
   if (!supabaseAdmin) {
+    logError(
+      "mercadopago.webhook.missing_service_role",
+      new Error("SUPABASE_SERVICE_ROLE_KEY no configurada")
+    );
     return NextResponse.json(
       {
         error:
@@ -77,14 +83,32 @@ export async function POST(request: Request) {
     const topic = getTopic(url.searchParams, payload);
     const dataId = getDataId(url.searchParams, payload);
     const xRequestId = request.headers.get("x-request-id");
+    const vercelRequestId = request.headers.get("x-vercel-id");
     const xSignature = request.headers.get("x-signature");
     const webhookSecret = getMercadoPagoWebhookSecret();
 
+    logInfo("mercadopago.webhook.received", {
+      topic,
+      dataId,
+      xRequestId,
+      vercelRequestId
+    });
+
     if (!topic || topic.toLowerCase() !== "payment") {
+      logInfo("mercadopago.webhook.skipped", {
+        reason: "topic_not_supported",
+        topic,
+        durationMs: Date.now() - startedAt
+      });
       return NextResponse.json({ ok: true, skipped: true, reason: "topic_not_supported" });
     }
 
     if (!dataId) {
+      logWarn("mercadopago.webhook.skipped", {
+        reason: "missing_payment_id",
+        topic,
+        durationMs: Date.now() - startedAt
+      });
       return NextResponse.json({ ok: true, skipped: true, reason: "missing_payment_id" });
     }
 
@@ -95,6 +119,14 @@ export async function POST(request: Request) {
       // procesamiento de webhooks no autenticados. En dev/local se permite sin
       // secret para facilitar pruebas (mismo comportamiento previo).
       if (isProduction) {
+        logError(
+          "mercadopago.webhook.missing_secret",
+          new Error("MERCADOPAGO_WEBHOOK_SECRET no configurado en produccion."),
+          {
+            dataId,
+            durationMs: Date.now() - startedAt
+          }
+        );
         return NextResponse.json(
           { error: "MERCADOPAGO_WEBHOOK_SECRET no configurado en produccion." },
           { status: 503 }
@@ -105,6 +137,12 @@ export async function POST(request: Request) {
       // Devolvemos 401 (en lugar de 200 skipped) para que Mercado Pago
       // reintente y no marque el evento como entregado.
       if (!xRequestId || !xSignature) {
+        logWarn("mercadopago.webhook.missing_signature_headers", {
+          dataId,
+          xRequestId,
+          hasSignature: Boolean(xSignature),
+          durationMs: Date.now() - startedAt
+        });
         return NextResponse.json(
           { error: "Faltan headers de firma en el webhook." },
           { status: 401 }
@@ -119,6 +157,11 @@ export async function POST(request: Request) {
       });
 
       if (!isSignatureValid) {
+        logWarn("mercadopago.webhook.invalid_signature", {
+          dataId,
+          xRequestId,
+          durationMs: Date.now() - startedAt
+        });
         return NextResponse.json({ error: "Firma de webhook invalida." }, { status: 401 });
       }
     }
@@ -132,11 +175,21 @@ export async function POST(request: Request) {
     });
 
     if (isMissingLocalOrder(syncResult)) {
+      logInfo("mercadopago.webhook.organization_order_missing", {
+        dataId,
+        durationMs: Date.now() - startedAt
+      });
       syncResult = await syncTournamentBillingPaymentFromMercadoPago({
         supabase: supabaseAdmin,
         mercadopagoPaymentId: dataId
       });
     }
+
+    logInfo("mercadopago.webhook.synced", {
+      dataId,
+      updated: "updated" in syncResult ? syncResult.updated : undefined,
+      durationMs: Date.now() - startedAt
+    });
 
     return NextResponse.json({
       ok: true,
@@ -147,6 +200,9 @@ export async function POST(request: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "No se pudo procesar webhook de Mercado Pago.";
+    logError("mercadopago.webhook.failed", error, {
+      durationMs: Date.now() - startedAt
+    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

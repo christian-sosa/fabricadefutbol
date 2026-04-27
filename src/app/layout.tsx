@@ -18,22 +18,22 @@ const APP_URL =
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: "Fabrica de Futbol",
-    template: "%s — Fabrica de Futbol"
+    default: "Fábrica de Fútbol",
+    template: "%s — Fábrica de Fútbol"
   },
   description:
-    "Organiza partidos de futbol entre amigos: convocatoria, equipos balanceados, ranking y estadisticas.",
-  applicationName: "Fabrica de Futbol",
+    "Organizá partidos de fútbol entre amigos: equipos parejos, rendimiento, ranking, historial y próximas fechas.",
+  applicationName: "Fábrica de Fútbol",
   keywords: [
-    "futbol",
+    "fútbol",
     "amigos",
     "partidos",
     "equipos",
     "ranking",
-    "estadisticas",
+    "estadísticas",
     "convocatoria"
   ],
-  authors: [{ name: "Fabrica de Futbol" }],
+  authors: [{ name: "Fábrica de Fútbol" }],
   robots: {
     index: true,
     follow: true
@@ -42,16 +42,16 @@ export const metadata: Metadata = {
     type: "website",
     locale: "es_AR",
     url: APP_URL,
-    siteName: "Fabrica de Futbol",
-    title: "Fabrica de Futbol",
+    siteName: "Fábrica de Fútbol",
+    title: "Fábrica de Fútbol",
     description:
-      "Organiza partidos de futbol entre amigos: convocatoria, equipos balanceados, ranking y estadisticas."
+      "Organizá partidos de fútbol entre amigos: equipos parejos, rendimiento, ranking, historial y próximas fechas."
   },
   twitter: {
     card: "summary_large_image",
-    title: "Fabrica de Futbol",
+    title: "Fábrica de Fútbol",
     description:
-      "Organiza partidos de futbol entre amigos: convocatoria, equipos balanceados, ranking y estadisticas."
+      "Organizá partidos de fútbol entre amigos: equipos parejos, rendimiento, ranking, historial y próximas fechas."
   },
   icons: {
     icon: [

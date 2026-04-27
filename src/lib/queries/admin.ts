@@ -80,6 +80,7 @@ export async function getAdminDashboardData(organizationId: string) {
     { count: draftsCount, error: draftsError },
     { count: confirmedCount, error: confirmedError },
     { count: finishedCount, error: finishedError },
+    { count: playersCount, error: playersError },
     { data: latestMatches, error: latestMatchesError }
   ] = await Promise.all([
     supabase
@@ -98,6 +99,11 @@ export async function getAdminDashboardData(organizationId: string) {
       .eq("organization_id", organizationId)
       .eq("status", "finished"),
     supabase
+      .from("players")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("active", true),
+    supabase
       .from("matches")
       .select("id, scheduled_at, modality, status")
       .eq("organization_id", organizationId)
@@ -108,12 +114,14 @@ export async function getAdminDashboardData(organizationId: string) {
   if (draftsError) throw new Error(draftsError.message);
   if (confirmedError) throw new Error(confirmedError.message);
   if (finishedError) throw new Error(finishedError.message);
+  if (playersError) throw new Error(playersError.message);
   if (latestMatchesError) throw new Error(latestMatchesError.message);
 
   return {
     draftsCount: draftsCount ?? 0,
     confirmedCount: confirmedCount ?? 0,
     finishedCount: finishedCount ?? 0,
+    playersCount: playersCount ?? 0,
     latestMatches: latestMatches ?? []
   };
 }

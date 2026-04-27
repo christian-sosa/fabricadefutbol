@@ -8,6 +8,7 @@ import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/li
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
 import { isNextRedirectError } from "@/lib/next-redirect";
+import { logError, logInfo } from "@/lib/observability/log";
 import { withOrgQuery } from "@/lib/org";
 import {
   assertPlayerPhotoUploadAllowed,
@@ -138,10 +139,9 @@ async function savePlayerPhotoForAdmin({
     });
 
   if (uploadError) {
-    console.error("[players] storage upload failed", {
+    logError("players.photo.upload.failed", uploadError, {
       organizationId,
-      playerId,
-      message: uploadError.message
+      playerId
     });
     redirect(withMessage(organizationQueryKey, "No se pudo guardar la foto en Storage. Intenta nuevamente."));
   }
@@ -402,6 +402,7 @@ export async function deletePlayerAction(formData: FormData) {
 }
 
 export async function uploadPlayerPhotoAction(formData: FormData) {
+  const startedAt = Date.now();
   try {
     const parsed = photoSchema.safeParse({
       organizationId: formData.get("organizationId"),
@@ -440,9 +441,20 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
     revalidatePath("/ranking");
     revalidatePath(`/players/${parsed.data.playerId}`);
     revalidatePath(`/api/player-photo/${parsed.data.playerId}`);
+    logInfo("players.photo.upload.succeeded", {
+      organizationId: parsed.data.organizationId,
+      playerId: parsed.data.playerId,
+      adminId: admin.userId,
+      durationMs: Date.now() - startedAt
+    });
     redirect(withSuccess(organizationQueryKey, "Foto subida correctamente."));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
+    logError("players.photo.upload.failed", error, {
+      organizationId: String(formData.get("organizationId") ?? ""),
+      playerId: String(formData.get("playerId") ?? ""),
+      durationMs: Date.now() - startedAt
+    });
     redirect(withMessage(String(formData.get("organizationId") ?? ""), toUserMessage(error, "No se pudo subir la foto.")));
   }
 }

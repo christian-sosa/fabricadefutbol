@@ -33,6 +33,7 @@ import {
   shouldUseMercadoPagoSandboxCheckout
 } from "@/lib/env";
 import { isNextRedirectError } from "@/lib/next-redirect";
+import { logError, logInfo } from "@/lib/observability/log";
 import { normalizeEmail, slugifyOrganizationName, withOrgQuery } from "@/lib/org";
 import {
   getOrganizationImageObjectPath,
@@ -191,6 +192,7 @@ function parseNextSlug(baseSlug: string, existingSlugs: string[]) {
 }
 
 export async function createOrganizationAction(formData: FormData) {
+  const startedAt = Date.now();
   try {
     const admin = await assertAdminAction();
     await assertCanCreateOrganization(admin);
@@ -248,9 +250,17 @@ export async function createOrganizationAction(formData: FormData) {
     revalidatePath("/players");
     revalidatePath("/matches");
     revalidatePath("/upcoming");
+    logInfo("organizations.create.succeeded", {
+      organizationId: organization.id,
+      adminId: admin.userId,
+      durationMs: Date.now() - startedAt
+    });
     redirect(withOrgQuery("/admin", slug));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
+    logError("organizations.create.failed", error, {
+      durationMs: Date.now() - startedAt
+    });
     redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo crear el grupo.")));
   }
 }
@@ -786,6 +796,7 @@ export async function deleteOrganizationAction(formData: FormData) {
 }
 
 export async function uploadOrganizationImageAction(formData: FormData) {
+  const startedAt = Date.now();
   try {
     const parsed = uploadOrganizationImageSchema.safeParse({
       organizationId: formData.get("organizationId")
@@ -800,7 +811,7 @@ export async function uploadOrganizationImageAction(formData: FormData) {
       );
     }
 
-    await assertOrganizationAdminAction(parsed.data.organizationId);
+    const admin = await assertOrganizationAdminAction(parsed.data.organizationId);
     const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
     const file = formData.get("image");
 
@@ -876,9 +887,18 @@ export async function uploadOrganizationImageAction(formData: FormData) {
     revalidatePath("/groups");
     revalidatePath("/");
     revalidatePath(`/api/organization-image/${parsed.data.organizationId}`);
+    logInfo("organizations.image.upload.succeeded", {
+      organizationId: parsed.data.organizationId,
+      adminId: admin.userId,
+      durationMs: Date.now() - startedAt
+    });
     redirect(buildAdminPath(organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
+    logError("organizations.image.upload.failed", error, {
+      organizationId: String(formData.get("organizationId") ?? ""),
+      durationMs: Date.now() - startedAt
+    });
     redirect(
       buildAdminPath(
         String(formData.get("organizationId") ?? ""),
