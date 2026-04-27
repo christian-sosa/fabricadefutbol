@@ -150,6 +150,33 @@ describe("match workflow", () => {
     }
   });
 
+  it("guarda etiquetas opcionales de equipos en el partido", async () => {
+    const players = buildPlayers(10);
+    const fake = createFakeSupabase({
+      organizations: [{ id: ORG_ID, name: "Liga A", slug: "liga-a" }],
+      players
+    });
+
+    const matchId = await createDraftMatchWithOptions({
+      supabase: fake.client as never,
+      adminId: ADMIN_ID,
+      organizationId: ORG_ID,
+      scheduledAt: SCHEDULED_AT,
+      modality: "5v5",
+      teamALabel: "Los Pibes",
+      teamBLabel: "La Banda",
+      selectedPlayerIds: players.map((player) => String(player.id)),
+      invitedGuests: []
+    });
+
+    expect(fake.find("matches", (row) => row.id === matchId)).toEqual(
+      expect.objectContaining({
+        team_a_label: "Los Pibes",
+        team_b_label: "La Banda"
+      })
+    );
+  });
+
   it("balancea con skill_level repetible y current_rating sin cambiar ratings al crear draft", async () => {
     const players = buildPlayers(8).map((player, index) => ({
       ...player,

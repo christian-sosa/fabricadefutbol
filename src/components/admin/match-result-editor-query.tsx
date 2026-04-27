@@ -22,6 +22,8 @@ type MatchResultEditorQueryProps = {
   defaultScoreB: number;
   defaultNotes?: string | null;
   submitLabel: string;
+  teamALabel?: string;
+  teamBLabel?: string;
 };
 
 export function MatchResultEditorQuery(props: MatchResultEditorQueryProps) {

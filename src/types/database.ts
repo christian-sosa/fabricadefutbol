@@ -104,6 +104,8 @@ export type Database = {
           modality: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           scheduled_at: string;
           status: "draft" | "confirmed" | "finished" | "cancelled";
+          team_a_label: string | null;
+          team_b_label: string | null;
           updated_at: string;
         };
         Insert: {
@@ -116,6 +118,8 @@ export type Database = {
           modality: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           scheduled_at: string;
           status?: "draft" | "confirmed" | "finished" | "cancelled";
+          team_a_label?: string | null;
+          team_b_label?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -128,6 +132,8 @@ export type Database = {
           modality?: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           scheduled_at?: string;
           status?: "draft" | "confirmed" | "finished" | "cancelled";
+          team_a_label?: string | null;
+          team_b_label?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -824,6 +830,8 @@ export type Database = {
           modality: "5v5" | "6v6" | "7v7" | "9v9" | "11v11" | null;
           scheduled_at: string | null;
           status: "draft" | "confirmed" | "finished" | "cancelled" | null;
+          team_a_label: string | null;
+          team_b_label: string | null;
           team_a_players: string[] | null;
           team_b_players: string[] | null;
           score_a: number | null;
@@ -835,6 +843,8 @@ export type Database = {
           modality?: "5v5" | "6v6" | "7v7" | "9v9" | "11v11" | null;
           scheduled_at?: string | null;
           status?: "draft" | "confirmed" | "finished" | "cancelled" | null;
+          team_a_label?: string | null;
+          team_b_label?: string | null;
           team_a_players?: string[] | null;
           team_b_players?: string[] | null;
           score_a?: number | null;
@@ -846,6 +856,8 @@ export type Database = {
           modality?: "5v5" | "6v6" | "7v7" | "9v9" | "11v11" | null;
           scheduled_at?: string | null;
           status?: "draft" | "confirmed" | "finished" | "cancelled" | null;
+          team_a_label?: string | null;
+          team_b_label?: string | null;
           team_a_players?: string[] | null;
           team_b_players?: string[] | null;
           score_a?: number | null;

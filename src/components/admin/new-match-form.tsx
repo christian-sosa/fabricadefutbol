@@ -10,6 +10,7 @@ import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { formatSkillLevelLabel, SKILL_LEVEL_OPTIONS } from "@/lib/domain/skill-level";
+import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL, TEAM_LABEL_MAX_LENGTH } from "@/lib/team-labels";
 import { cn, formatRendimiento } from "@/lib/utils";
 import type { MatchModality, TeamSide } from "@/types/domain";
 
@@ -62,9 +63,13 @@ export function NewMatchForm({
   const [guestRows, setGuestRows] = useState<GuestRow[]>([]);
   const [showManualBuilder, setShowManualBuilder] = useState(false);
   const [manualAssignments, setManualAssignments] = useState<Record<string, TeamSide>>({});
+  const [teamALabel, setTeamALabel] = useState("");
+  const [teamBLabel, setTeamBLabel] = useState("");
 
   const expected = EXPECTED_PLAYERS[modality];
   const teamSize = expected / 2;
+  const teamADisplayLabel = teamALabel.trim() || DEFAULT_TEAM_A_LABEL;
+  const teamBDisplayLabel = teamBLabel.trim() || DEFAULT_TEAM_B_LABEL;
 
   const selectedRosterPlayers = useMemo(
     () => players.filter((player) => Boolean(selectedPlayers[player.id])),
@@ -272,6 +277,32 @@ export function NewMatchForm({
           </label>
           <Input id="location" name="location" placeholder="Cancha / barrio" />
         </div>
+        <div>
+          <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="teamALabel">
+            Nombre del primer equipo
+          </label>
+          <Input
+            id="teamALabel"
+            maxLength={TEAM_LABEL_MAX_LENGTH}
+            name="teamALabel"
+            onChange={(event) => setTeamALabel(event.target.value)}
+            placeholder={DEFAULT_TEAM_A_LABEL}
+            value={teamALabel}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="teamBLabel">
+            Nombre del segundo equipo
+          </label>
+          <Input
+            id="teamBLabel"
+            maxLength={TEAM_LABEL_MAX_LENGTH}
+            name="teamBLabel"
+            onChange={(event) => setTeamBLabel(event.target.value)}
+            placeholder={DEFAULT_TEAM_B_LABEL}
+            value={teamBLabel}
+          />
+        </div>
       </div>
 
       <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
@@ -408,11 +439,11 @@ export function NewMatchForm({
             <div>
               <p className="text-sm font-semibold text-slate-100">Armado manual de equipos</p>
               <p className="text-xs text-slate-400">
-                Asigna cada convocado al equipo A o B. Deben quedar {teamSize} por lado.
+                Asigna cada convocado a {teamADisplayLabel} o {teamBDisplayLabel}. Deben quedar {teamSize} por lado.
               </p>
             </div>
             <p className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-300">
-              Equipo A: {manualTeamACount}/{teamSize} | Equipo B: {manualTeamBCount}/{teamSize}
+              {teamADisplayLabel}: {manualTeamACount}/{teamSize} | {teamBDisplayLabel}: {manualTeamBCount}/{teamSize}
             </p>
           </div>
 
@@ -443,8 +474,8 @@ export function NewMatchForm({
                       }
                       value={assignedTeam}
                     >
-                      <option value="A">Equipo A</option>
-                      <option value="B">Equipo B</option>
+                      <option value="A">{teamADisplayLabel}</option>
+                      <option value="B">{teamBDisplayLabel}</option>
                     </Select>
                   </div>
                 );

@@ -23,6 +23,7 @@ import { formatMatchDateTime, matchIsoToDatetimeLocal } from "@/lib/match-dateti
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getAdminMatchDetails, getSelectablePlayers } from "@/lib/queries/admin";
+import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL, TEAM_LABEL_MAX_LENGTH, resolveMatchTeamLabels } from "@/lib/team-labels";
 
 type OptionMember = {
   id: string;
@@ -61,6 +62,7 @@ export default async function AdminMatchDetailPage({
   const confirmedOption = details.options.find((option) => option.is_confirmed) ?? null;
   const visibleOptions = confirmedOption ? [confirmedOption] : details.options;
   const publicMatchUrl = buildAbsolutePublicUrl(withOrgQuery(`/matches/${id}`, selectedOrganization.slug));
+  const teamLabels = resolveMatchTeamLabels(details.match);
   const editableParticipants = confirmedOption
     ? [
         ...confirmedOption.teamA.map((member: OptionMember) => ({
@@ -112,7 +114,7 @@ export default async function AdminMatchDetailPage({
 
       <Card>
         <CardTitle>Editar partido</CardTitle>
-        <form action={matchUpdateAction} className="mt-4 grid gap-3 md:grid-cols-4">
+        <form action={matchUpdateAction} className="mt-4 grid gap-3 md:grid-cols-3">
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="scheduledAt">
               Fecha y hora
@@ -124,6 +126,30 @@ export default async function AdminMatchDetailPage({
               Ubicacion
             </label>
             <Input defaultValue={details.match.location ?? ""} id="location" name="location" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="teamALabel">
+              Nombre del primer equipo
+            </label>
+            <Input
+              defaultValue={details.match.team_a_label ?? ""}
+              id="teamALabel"
+              maxLength={TEAM_LABEL_MAX_LENGTH}
+              name="teamALabel"
+              placeholder={DEFAULT_TEAM_A_LABEL}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="teamBLabel">
+              Nombre del segundo equipo
+            </label>
+            <Input
+              defaultValue={details.match.team_b_label ?? ""}
+              id="teamBLabel"
+              maxLength={TEAM_LABEL_MAX_LENGTH}
+              name="teamBLabel"
+              placeholder={DEFAULT_TEAM_B_LABEL}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="status">
@@ -170,7 +196,12 @@ export default async function AdminMatchDetailPage({
             </CardDescription>
           </div>
           {details.match.status === "confirmed" && confirmedOption ? (
-            <WhatsAppShareButton className="w-full shrink-0 sm:w-auto" matchUrl={publicMatchUrl} />
+            <WhatsAppShareButton
+              className="w-full shrink-0 sm:w-auto"
+              matchUrl={publicMatchUrl}
+              teamAName={teamLabels.teamA}
+              teamBName={teamLabels.teamB}
+            />
           ) : null}
           {details.match.status === "draft" ? (
             <form action={regenerateAction}>
@@ -191,6 +222,8 @@ export default async function AdminMatchDetailPage({
               ratingDiff={Number(option.rating_diff)}
               ratingSumA={Number(option.rating_sum_a)}
               ratingSumB={Number(option.rating_sum_b)}
+              teamALabel={teamLabels.teamA}
+              teamBLabel={teamLabels.teamB}
               teamA={option.teamA}
               teamB={option.teamB}
             />
@@ -211,6 +244,8 @@ export default async function AdminMatchDetailPage({
             availablePlayers={availableReplacementPlayers}
             existingParticipants={editableParticipants}
             submitLabel="Guardar formacion final (sin resultado)"
+            teamALabel={teamLabels.teamA}
+            teamBLabel={teamLabels.teamB}
           />
         </Card>
       ) : null}
@@ -230,6 +265,8 @@ export default async function AdminMatchDetailPage({
               matchId={id}
               organizationId={selectedOrganization.id}
               submitLabel={details.result ? "Guardar correccion" : "Guardar resultado y finalizar"}
+              teamALabel={teamLabels.teamA}
+              teamBLabel={teamLabels.teamB}
             />
           ) : (
             <p className="mt-3 text-sm text-slate-400">
