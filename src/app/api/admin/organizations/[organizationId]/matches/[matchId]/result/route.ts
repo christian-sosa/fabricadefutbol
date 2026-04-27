@@ -31,6 +31,14 @@ const requestSchema = z.object({
           })
         )
         .optional(),
+      newPlayers: z
+        .array(
+          z.object({
+            playerId: z.string().uuid(),
+            team: z.enum(["A", "B"])
+          })
+        )
+        .optional(),
       handicapTeam: z.union([z.enum(["A", "B"]), z.null()]).optional()
     })
     .optional()

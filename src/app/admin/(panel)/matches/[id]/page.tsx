@@ -5,11 +5,9 @@ import {
   confirmOptionAction,
   deleteMatchAction,
   regenerateOptionsAction,
-  saveLineupBeforeResultAction,
   updateMatchAction,
   updateMatchTeamLabelsAction
 } from "@/app/admin/(panel)/matches/[id]/actions";
-import { MatchLineupEditor } from "@/components/admin/match-lineup-editor";
 import { MatchResultEditorQuery } from "@/components/admin/match-result-editor-query";
 import { MatchTeamLabelsShareForm } from "@/components/admin/match-team-labels-share-form";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
@@ -56,7 +54,6 @@ export default async function AdminMatchDetailPage({
   const matchUpdateAction = updateMatchAction.bind(null, id, selectedOrganization.id);
   const teamLabelsUpdateAction = updateMatchTeamLabelsAction.bind(null, id, selectedOrganization.id);
   const deleteAction = deleteMatchAction.bind(null, id, selectedOrganization.id);
-  const saveLineupAction = saveLineupBeforeResultAction.bind(null, id, selectedOrganization.id);
   const canDeleteMatch =
     details.match.status === "draft" ||
     (details.match.status === "confirmed" && !details.result);
@@ -83,8 +80,6 @@ export default async function AdminMatchDetailPage({
         }))
       ]
     : [];
-  const canAdjustLineupBeforeResult =
-    details.match.status === "confirmed" && !details.result && editableParticipants.length > 0;
   const selectablePlayers = await getSelectablePlayers(selectedOrganization.id);
   const availableReplacementPlayers = selectablePlayers.map((player) => ({
     id: player.id,
@@ -218,32 +213,15 @@ export default async function AdminMatchDetailPage({
         </Card>
       ) : null}
 
-      {canAdjustLineupBeforeResult ? (
-        <Card>
-          <CardTitle>Ajustar formacion antes del resultado</CardTitle>
-          <CardDescription>
-            Si hubo ausencias, puedes bajar jugadores, subir reemplazos de plantilla o agregar invitados
-            antes de cargar el resultado.
-          </CardDescription>
-          <MatchLineupEditor
-            action={saveLineupAction}
-            availablePlayers={availableReplacementPlayers}
-            existingParticipants={editableParticipants}
-            submitLabel="Guardar formacion final (sin resultado)"
-            teamALabel={teamLabels.teamA}
-            teamBLabel={teamLabels.teamB}
-          />
-        </Card>
-      ) : null}
-
       {canManageResult ? (
         <Card>
           <CardTitle>{details.result ? "Corregir resultado" : "Cargar resultado"}</CardTitle>
           <CardDescription>
-            El partido puede quedar confirmado sin resultado. Cargalo cuando se juegue para finalizar y actualizar rendimientos.
+            Carga marcador, ausencias y reemplazos en una sola accion.
           </CardDescription>
           {editableParticipants.length ? (
             <MatchResultEditorQuery
+              availablePlayers={availableReplacementPlayers}
               defaultNotes={details.result?.notes ?? ""}
               defaultScoreA={details.result?.score_a ?? 0}
               defaultScoreB={details.result?.score_b ?? 0}

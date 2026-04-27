@@ -18,6 +18,17 @@ type ExistingParticipant = {
   initialTeam: TeamSide;
 };
 
+type ReplacementPlayerOption = {
+  id: string;
+  fullName: string;
+  rating: number;
+};
+
+type ReplacementPlayerDraft = {
+  playerId: string;
+  team: TeamSide;
+};
+
 type GuestDraft = {
   id: number;
   name: string;
@@ -41,10 +52,15 @@ type MatchResultEditorProps = {
         rating: number;
         team: "A" | "B";
       }>;
+      newPlayers?: Array<{
+        playerId: string;
+        team: "A" | "B";
+      }>;
       handicapTeam?: TeamSide | null;
     };
   }) => Promise<void>;
   existingParticipants: ExistingParticipant[];
+  availablePlayers?: ReplacementPlayerOption[];
   defaultScoreA: number;
   defaultScoreB: number;
   defaultNotes?: string | null;
@@ -62,6 +78,7 @@ export function MatchResultEditor({
   action,
   onSubmit,
   existingParticipants,
+  availablePlayers = [],
   defaultScoreA,
   defaultScoreB,
   defaultNotes,
@@ -78,22 +95,65 @@ export function MatchResultEditor({
   });
   const [guestSequence, setGuestSequence] = useState(1);
   const [newGuests, setNewGuests] = useState<GuestDraft[]>([]);
+  const [replacementPlayers, setReplacementPlayers] = useState<ReplacementPlayerDraft[]>([]);
+  const [selectedReplacementPlayerId, setSelectedReplacementPlayerId] = useState("");
+  const [selectedReplacementTeam, setSelectedReplacementTeam] = useState<TeamSide>("A");
   const [handicapEnabled, setHandicapEnabled] = useState(false);
   const [handicapTeam, setHandicapTeam] = useState<TeamSide>("A");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const existingPlayerIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const participant of existingParticipants) {
+      if (participant.source !== "player") continue;
+      if (!participant.participantId.startsWith("player:")) continue;
+      ids.add(participant.participantId.slice("player:".length));
+    }
+    return ids;
+  }, [existingParticipants]);
+
+  const replacementPlayerIds = useMemo(
+    () => new Set(replacementPlayers.map((player) => player.playerId)),
+    [replacementPlayers]
+  );
+
+  const availableReplacementPlayers = useMemo(
+    () =>
+      availablePlayers.filter(
+        (player) => !existingPlayerIds.has(player.id) && !replacementPlayerIds.has(player.id)
+      ),
+    [availablePlayers, existingPlayerIds, replacementPlayerIds]
+  );
+
+  useEffect(() => {
+    if (
+      selectedReplacementPlayerId &&
+      availableReplacementPlayers.some((player) => player.id === selectedReplacementPlayerId)
+    ) {
+      return;
+    }
+    setSelectedReplacementPlayerId(availableReplacementPlayers[0]?.id ?? "");
+  }, [availableReplacementPlayers, selectedReplacementPlayerId]);
+
+  const playersById = useMemo(
+    () => new Map(availablePlayers.map((player) => [player.id, player])),
+    [availablePlayers]
+  );
+
   const validNewGuests = useMemo(() => newGuests.filter((guest) => isValidGuest(guest)), [newGuests]);
   const teamACount = useMemo(() => {
     const fromParticipants = existingParticipants.filter((participant) => assignments[participant.participantId] === "A").length;
+    const fromReplacementPlayers = replacementPlayers.filter((player) => player.team === "A").length;
     const fromGuests = validNewGuests.filter((guest) => guest.team === "A").length;
-    return fromParticipants + fromGuests;
-  }, [assignments, existingParticipants, validNewGuests]);
+    return fromParticipants + fromReplacementPlayers + fromGuests;
+  }, [assignments, existingParticipants, replacementPlayers, validNewGuests]);
   const teamBCount = useMemo(() => {
     const fromParticipants = existingParticipants.filter((participant) => assignments[participant.participantId] === "B").length;
+    const fromReplacementPlayers = replacementPlayers.filter((player) => player.team === "B").length;
     const fromGuests = validNewGuests.filter((guest) => guest.team === "B").length;
-    return fromParticipants + fromGuests;
-  }, [assignments, existingParticipants, validNewGuests]);
+    return fromParticipants + fromReplacementPlayers + fromGuests;
+  }, [assignments, existingParticipants, replacementPlayers, validNewGuests]);
 
   useEffect(() => {
     if (!handicapEnabled) return;
@@ -113,9 +173,13 @@ export function MatchResultEditor({
           rating: Number(guest.rating),
           team: guest.team
         })),
+        newPlayers: replacementPlayers.map((player) => ({
+          playerId: player.playerId,
+          team: player.team
+        })),
         handicapTeam: handicapEnabled ? handicapTeam : null
       }),
-    [assignments, existingParticipants, handicapEnabled, handicapTeam, validNewGuests]
+    [assignments, existingParticipants, handicapEnabled, handicapTeam, replacementPlayers, validNewGuests]
   );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -148,6 +212,10 @@ export function MatchResultEditor({
             name: guest.name.trim(),
             rating: Number(guest.rating),
             team: guest.team
+          })),
+          newPlayers: replacementPlayers.map((player) => ({
+            playerId: player.playerId,
+            team: player.team
           })),
           handicapTeam: handicapEnabled ? handicapTeam : null
         }
@@ -194,6 +262,7 @@ export function MatchResultEditor({
                 </span>
               </div>
               <Select
+                aria-label={`Equipo de ${participant.fullName}`}
                 onChange={(event) =>
                   setAssignments((current) => ({
                     ...current,
@@ -208,6 +277,97 @@ export function MatchResultEditor({
               </Select>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+        <p className="text-sm font-semibold text-slate-100">Reemplazos de plantilla</p>
+        <div className="mt-3 grid gap-2 md:grid-cols-[1fr_130px_auto]">
+          <Select
+            aria-label="Jugador de reemplazo"
+            disabled={!availableReplacementPlayers.length}
+            onChange={(event) => setSelectedReplacementPlayerId(event.target.value)}
+            value={selectedReplacementPlayerId}
+          >
+            {!availableReplacementPlayers.length ? (
+              <option value="">No hay jugadores disponibles</option>
+            ) : null}
+            {availableReplacementPlayers.map((player) => (
+              <option key={player.id} value={player.id}>
+                {player.fullName} ({formatRendimiento(player.rating)})
+              </option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Equipo del reemplazo"
+            onChange={(event) => setSelectedReplacementTeam(event.target.value as TeamSide)}
+            value={selectedReplacementTeam}
+          >
+            <option value="A">{teamALabel}</option>
+            <option value="B">{teamBLabel}</option>
+          </Select>
+          <Button
+            disabled={!selectedReplacementPlayerId}
+            onClick={() => {
+              if (!selectedReplacementPlayerId) return;
+              setReplacementPlayers((current) => [
+                ...current,
+                { playerId: selectedReplacementPlayerId, team: selectedReplacementTeam }
+              ]);
+            }}
+            type="button"
+            variant="ghost"
+          >
+            Agregar
+          </Button>
+        </div>
+        <div className="mt-3 space-y-2">
+          {replacementPlayers.map((player) => {
+            const playerData = playersById.get(player.playerId);
+            return (
+              <div
+                className="grid gap-2 rounded-lg border border-slate-800 bg-slate-900/80 p-2 md:grid-cols-[1fr_130px_auto]"
+                key={player.playerId}
+              >
+                <div className="text-sm text-slate-200">
+                  {playerData?.fullName ?? "Jugador"}
+                  <span className="ml-2 text-xs text-slate-400">
+                    {playerData ? formatRendimiento(playerData.rating) : "-"}
+                  </span>
+                </div>
+                <Select
+                  aria-label={`Equipo de ${playerData?.fullName ?? "Jugador"}`}
+                  onChange={(event) =>
+                    setReplacementPlayers((current) =>
+                      current.map((item) =>
+                        item.playerId === player.playerId
+                          ? { ...item, team: event.target.value as TeamSide }
+                          : item
+                      )
+                    )
+                  }
+                  value={player.team}
+                >
+                  <option value="A">{teamALabel}</option>
+                  <option value="B">{teamBLabel}</option>
+                </Select>
+                <Button
+                  onClick={() =>
+                    setReplacementPlayers((current) =>
+                      current.filter((item) => item.playerId !== player.playerId)
+                    )
+                  }
+                  type="button"
+                  variant="danger"
+                >
+                  Quitar
+                </Button>
+              </div>
+            );
+          })}
+          {!replacementPlayers.length ? (
+            <p className="text-xs text-slate-500">No hay reemplazos agregados.</p>
+          ) : null}
         </div>
       </div>
 
@@ -258,6 +418,7 @@ export function MatchResultEditor({
                 value={guest.rating}
               />
               <Select
+                aria-label={`Equipo de ${guest.name.trim() || "invitado"}`}
                 onChange={(event) =>
                   setNewGuests((current) =>
                     current.map((item) =>
@@ -298,7 +459,11 @@ export function MatchResultEditor({
             <p className="mb-1 text-xs text-slate-400">
               Si gana el equipo en desventaja: +20 / -20. Si gana el otro: +10 / 0.
             </p>
-            <Select onChange={(event) => setHandicapTeam(event.target.value as TeamSide)} value={handicapTeam}>
+            <Select
+              aria-label="Equipo con desventaja"
+              onChange={(event) => setHandicapTeam(event.target.value as TeamSide)}
+              value={handicapTeam}
+            >
               <option value="A">{teamALabel} juega con menos</option>
               <option value="B">{teamBLabel} juega con menos</option>
             </Select>

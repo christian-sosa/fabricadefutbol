@@ -456,6 +456,39 @@ describe("match workflow", () => {
     ]);
   });
 
+  it("guarda resultado con reemplazo de plantilla en la misma accion", async () => {
+    const { fake } = seedConfirmedMatch();
+
+    await saveMatchResult({
+      supabase: fake.client as never,
+      adminId: ADMIN_ID,
+      matchId: "match-1",
+      organizationId: ORG_ID,
+      resultInput: {
+        scoreA: 2,
+        scoreB: 1,
+        lineup: {
+          assignments: [
+            { participantId: "player:player-1", team: "A" },
+            { participantId: "player:player-2", team: "A" },
+            { participantId: "player:player-3", team: "B" },
+            { participantId: "player:player-4", team: "B" }
+          ],
+          newPlayers: [{ playerId: "player-5", team: "A" }]
+        }
+      }
+    });
+
+    expect(fake.table("team_option_players")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ team_option_id: "option-1", player_id: "player-5", team: "A" })
+      ])
+    );
+    expect(fake.find("players", (row) => row.id === "player-5")).toEqual(
+      expect.objectContaining({ current_rating: 1010 })
+    );
+  });
+
   it("rechaza resultados con goles negativos", async () => {
     const { fake } = seedConfirmedMatch();
 

@@ -985,8 +985,9 @@ async function resolveLineupForResult(params: {
   supabase: DbClient;
   matchId: string;
   resultInput: MatchResultInput;
+  organizationId?: string;
 }) {
-  const { supabase, matchId, resultInput } = params;
+  const { supabase, matchId, resultInput, organizationId } = params;
   const confirmed = await loadConfirmedTeams(supabase, matchId);
   const participants = [...confirmed.teamA, ...confirmed.teamB];
   const participantsById = new Map(participants.map((participant) => [participant.id, participant]));
@@ -1023,6 +1024,21 @@ async function resolveLineupForResult(params: {
     if (targetTeam === "A") teamA.push(guest);
     if (targetTeam === "B") teamB.push(guest);
   });
+
+  const normalizedNewPlayers = normalizeLineupPlayers(lineupInput.newPlayers);
+  if (normalizedNewPlayers.length && !organizationId) {
+    throw new Error("No se pudo validar el grupo de los jugadores de reemplazo.");
+  }
+  const additionalPlayers = await resolveNewLineupPlayers({
+    supabase,
+    organizationId: organizationId ?? "",
+    players: normalizedNewPlayers,
+    participantsById
+  });
+  for (const row of additionalPlayers) {
+    if (row.team === "A") teamA.push(row.participant);
+    if (row.team === "B") teamB.push(row.participant);
+  }
 
   if (!teamA.length || !teamB.length) {
     throw new Error("Cada equipo debe tener al menos un participante en la formacion final.");
@@ -1074,7 +1090,8 @@ export async function saveMatchResult(params: {
   const { teamA, teamB, handicapTeam } = await resolveLineupForResult({
     supabase,
     matchId,
-    resultInput
+    resultInput,
+    organizationId
   });
   const adjustments = calculateMatchRatingAdjustments({
     teamA: teamA.map((player) => ({ id: player.id, rating: player.current_rating })),

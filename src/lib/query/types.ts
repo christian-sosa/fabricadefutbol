@@ -42,6 +42,10 @@ export type UpdateMatchResultPayload = {
       rating: number;
       team: "A" | "B";
     }>;
+    newPlayers?: Array<{
+      playerId: string;
+      team: "A" | "B";
+    }>;
     handicapTeam?: "A" | "B" | null;
   };
 };

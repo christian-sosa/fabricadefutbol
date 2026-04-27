@@ -14,10 +14,17 @@ type ExistingParticipant = {
   initialTeam: TeamSide;
 };
 
+type ReplacementPlayerOption = {
+  id: string;
+  fullName: string;
+  rating: number;
+};
+
 type MatchResultEditorQueryProps = {
   organizationId: string;
   matchId: string;
   existingParticipants: ExistingParticipant[];
+  availablePlayers?: ReplacementPlayerOption[];
   defaultScoreA: number;
   defaultScoreB: number;
   defaultNotes?: string | null;
