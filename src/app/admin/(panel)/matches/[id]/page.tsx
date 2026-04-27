@@ -8,7 +8,6 @@ import {
   updateMatchAction,
   updateMatchTeamLabelsAction
 } from "@/app/admin/(panel)/matches/[id]/actions";
-import { MatchResultEditorQuery } from "@/components/admin/match-result-editor-query";
 import { MatchTeamLabelsShareForm } from "@/components/admin/match-team-labels-share-form";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { TeamOptionCard } from "@/components/matches/team-option-card";
@@ -21,15 +20,8 @@ import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth
 import { matchIsoToDatetimeLocal } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
-import { getAdminMatchDetails, getSelectablePlayers } from "@/lib/queries/admin";
+import { getAdminMatchDetails } from "@/lib/queries/admin";
 import { resolveMatchTeamLabels } from "@/lib/team-labels";
-
-type OptionMember = {
-  id: string;
-  full_name: string;
-  current_rating: number;
-  is_guest: boolean;
-};
 
 export default async function AdminMatchDetailPage({
   params,
@@ -57,35 +49,10 @@ export default async function AdminMatchDetailPage({
   const canDeleteMatch =
     details.match.status === "draft" ||
     (details.match.status === "confirmed" && !details.result);
-  const canManageResult = details.match.status === "confirmed" || details.match.status === "finished";
   const confirmedOption = details.options.find((option) => option.is_confirmed) ?? null;
   const visibleOptions = confirmedOption ? [confirmedOption] : details.options;
   const publicMatchUrl = buildAbsolutePublicUrl(withOrgQuery(`/matches/${id}`, selectedOrganization.slug));
   const teamLabels = resolveMatchTeamLabels(details.match);
-  const editableParticipants = confirmedOption
-    ? [
-        ...confirmedOption.teamA.map((member: OptionMember) => ({
-          participantId: `${member.is_guest ? "guest" : "player"}:${member.id}`,
-          fullName: member.full_name,
-          rating: Number(member.current_rating),
-          source: member.is_guest ? "guest" : "player",
-          initialTeam: "A" as const
-        })),
-        ...confirmedOption.teamB.map((member: OptionMember) => ({
-          participantId: `${member.is_guest ? "guest" : "player"}:${member.id}`,
-          fullName: member.full_name,
-          rating: Number(member.current_rating),
-          source: member.is_guest ? "guest" : "player",
-          initialTeam: "B" as const
-        }))
-      ]
-    : [];
-  const selectablePlayers = await getSelectablePlayers(selectedOrganization.id);
-  const availableReplacementPlayers = selectablePlayers.map((player) => ({
-    id: player.id,
-    fullName: player.full_name,
-    rating: Number(player.current_rating)
-  }));
 
   return (
     <div className="space-y-4">
@@ -196,38 +163,6 @@ export default async function AdminMatchDetailPage({
           {!visibleOptions.length ? <p className="text-sm text-slate-400">No hay opciones generadas para este partido.</p> : null}
         </div>
       </Card>
-
-      {canManageResult ? (
-        <Card className="scroll-mt-6" id="resultado">
-          <CardTitle>{details.result ? "Corregir resultado" : "Cargar resultado"}</CardTitle>
-          <CardDescription>
-            Carga marcador, ausencias y reemplazos en una sola accion.
-          </CardDescription>
-          {editableParticipants.length ? (
-            <MatchResultEditorQuery
-              availablePlayers={availableReplacementPlayers}
-              defaultNotes={details.result?.notes ?? ""}
-              defaultScoreA={details.result?.score_a ?? 0}
-              defaultScoreB={details.result?.score_b ?? 0}
-              existingParticipants={editableParticipants}
-              matchId={id}
-              organizationId={selectedOrganization.id}
-              submitLabel={details.result ? "Guardar correccion" : "Guardar resultado y finalizar"}
-              teamALabel={teamLabels.teamA}
-              teamBLabel={teamLabels.teamB}
-            />
-          ) : (
-            <p className="mt-3 text-sm text-slate-400">
-              Falta una opcion confirmada para poder definir la formacion final y guardar resultado.
-            </p>
-          )}
-        </Card>
-      ) : (
-        <Card className="scroll-mt-6" id="resultado">
-          <CardTitle>Resultado</CardTitle>
-          <CardDescription>Confirma una opcion de equipos para habilitar la carga de resultado cuando se juegue.</CardDescription>
-        </Card>
-      )}
 
       {canDeleteMatch ? (
         <Card>

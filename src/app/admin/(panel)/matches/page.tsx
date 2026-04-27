@@ -42,6 +42,7 @@ export default async function AdminMatchesPage({
           {matches.length ? (
             matches.map((match) => {
               const editHref = withOrgQuery(`/admin/matches/${match.id}`, selectedOrganization.slug);
+              const resultHref = withOrgQuery(`/admin/matches/${match.id}/result`, selectedOrganization.slug);
               const canLoadResult = match.status === "confirmed" || match.status === "finished";
 
               return (
@@ -65,7 +66,7 @@ export default async function AdminMatchesPage({
                         {canLoadResult ? (
                           <Link
                             className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
-                            href={`${editHref}#resultado`}
+                            href={resultHref}
                           >
                             Cargar resultado
                           </Link>
