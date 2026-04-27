@@ -77,6 +77,8 @@ type CreateDraftInput = {
   scheduledAt: string;
   modality: MatchModality;
   location?: string;
+  teamALabel?: string | null;
+  teamBLabel?: string | null;
   selectedPlayerIds: string[];
   invitedGuests: DraftGuestInput[];
   teamCreationMode?: "auto" | "manual";
@@ -462,6 +464,8 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
     scheduledAt,
     modality,
     location,
+    teamALabel,
+    teamBLabel,
     selectedPlayerIds,
     invitedGuests,
     teamCreationMode = "auto",
@@ -481,6 +485,8 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
       modality,
       status: "draft",
       location: location || null,
+      team_a_label: teamALabel ?? null,
+      team_b_label: teamBLabel ?? null,
       created_by: adminId
     })
     .select("id")

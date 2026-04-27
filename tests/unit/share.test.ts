@@ -38,6 +38,10 @@ describe("share helpers", () => {
         matchUrl
       ].join("\n")
     )}`);
+    expect(shareUrl).toContain("%E2%9A%BD");
+    expect(shareUrl).toContain("%F0%9F%94%A5");
+    expect(shareUrl).toContain("%F0%9F%9F%A1");
+    expect(shareUrl).toContain("%F0%9F%91%89");
+    expect(shareUrl).not.toContain("%EF%BF%BD");
   });
 });
-

@@ -10,6 +10,7 @@ import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getMatchDetails } from "@/lib/queries/public";
+import { resolveMatchTeamLabels } from "@/lib/team-labels";
 import { formatRendimiento } from "@/lib/utils";
 
 export async function generateMetadata({
@@ -48,6 +49,7 @@ export default async function MatchDetailPage({
   if (!details) notFound();
   const publicMatchPath = withOrgQuery(`/matches/${id}`, resolvedSearchParams.org);
   const publicMatchUrl = buildAbsolutePublicUrl(publicMatchPath);
+  const teamLabels = resolveMatchTeamLabels(details.match);
 
   return (
     <div className="space-y-4">
@@ -63,7 +65,12 @@ export default async function MatchDetailPage({
             </CardDescription>
           </div>
           {details.match.status === "confirmed" ? (
-            <WhatsAppShareButton className="w-full sm:w-auto" matchUrl={publicMatchUrl} />
+            <WhatsAppShareButton
+              className="w-full sm:w-auto"
+              matchUrl={publicMatchUrl}
+              teamAName={teamLabels.teamA}
+              teamBName={teamLabels.teamB}
+            />
           ) : null}
         </div>
       </Card>
@@ -72,7 +79,7 @@ export default async function MatchDetailPage({
         <CardTitle>Equipos confirmados</CardTitle>
         <div className="mt-3 grid gap-4 md:grid-cols-2">
           <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Equipo A</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{teamLabels.teamA}</p>
             <ul className="space-y-2 text-sm">
               {details.teamAPlayers.map((player) => (
                 <li className="flex items-center justify-between gap-3" key={player.id}>
@@ -91,7 +98,7 @@ export default async function MatchDetailPage({
             </ul>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Equipo B</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{teamLabels.teamB}</p>
             <ul className="space-y-2 text-sm">
               {details.teamBPlayers.map((player) => (
                 <li className="flex items-center justify-between gap-3" key={player.id}>
@@ -121,7 +128,12 @@ export default async function MatchDetailPage({
                 {details.result.score_a} - {details.result.score_b}
               </p>
               <p className="text-slate-300">
-                Ganador: {details.result.winner_team === "DRAW" ? "Empate" : `Equipo ${details.result.winner_team}`}
+                Ganador:{" "}
+                {details.result.winner_team === "DRAW"
+                  ? "Empate"
+                  : details.result.winner_team === "A"
+                    ? teamLabels.teamA
+                    : teamLabels.teamB}
               </p>
               {details.result.notes ? <p className="mt-1 text-slate-400">{details.result.notes}</p> : null}
             </>

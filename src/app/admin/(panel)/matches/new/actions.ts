@@ -13,12 +13,15 @@ import { logError, logInfo } from "@/lib/observability/log";
 import { withOrgQuery } from "@/lib/org";
 import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { normalizeTeamLabel, TEAM_LABEL_MAX_LENGTH } from "@/lib/team-labels";
 
 const schema = z.object({
   organizationId: z.string().uuid(),
   scheduledAt: z.string().min(1, "La fecha es obligatoria."),
   modality: z.enum(["5v5", "6v6", "7v7", "9v9", "11v11"]),
   location: z.string().optional(),
+  teamALabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del primer equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),
+  teamBLabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del segundo equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),
   playerIds: z.array(z.string().uuid())
 });
 
@@ -138,6 +141,8 @@ export async function createMatchAction(formData: FormData) {
       scheduledAt: formData.get("scheduledAt"),
       modality: formData.get("modality"),
       location: formData.get("location"),
+      teamALabel: normalizeTeamLabel(String(formData.get("teamALabel") ?? "")) ?? undefined,
+      teamBLabel: normalizeTeamLabel(String(formData.get("teamBLabel") ?? "")) ?? undefined,
       playerIds: formData.getAll("playerIds")
     });
     if (!parsed.success) {
@@ -228,6 +233,8 @@ export async function createMatchAction(formData: FormData) {
       scheduledAt: datetimeLocalToMatchIso(parsed.data.scheduledAt),
       modality: parsed.data.modality,
       location: parsed.data.location ?? "",
+      teamALabel: normalizeTeamLabel(parsed.data.teamALabel),
+      teamBLabel: normalizeTeamLabel(parsed.data.teamBLabel),
       selectedPlayerIds: parsed.data.playerIds,
       invitedGuests,
       teamCreationMode: creationMode,

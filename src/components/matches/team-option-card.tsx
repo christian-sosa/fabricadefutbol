@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL } from "@/lib/team-labels";
 import { formatRendimiento } from "@/lib/utils";
 
 type OptionPlayer = {
@@ -18,6 +19,8 @@ type TeamOptionCardProps = {
   ratingDiff: number;
   ratingSumA: number;
   ratingSumB: number;
+  teamALabel?: string;
+  teamBLabel?: string;
   isConfirmed: boolean;
   confirmAction?: (formData: FormData) => void;
 };
@@ -30,6 +33,8 @@ export function TeamOptionCard({
   ratingDiff,
   ratingSumA,
   ratingSumB,
+  teamALabel = DEFAULT_TEAM_A_LABEL,
+  teamBLabel = DEFAULT_TEAM_B_LABEL,
   isConfirmed,
   confirmAction
 }: TeamOptionCardProps) {
@@ -39,7 +44,8 @@ export function TeamOptionCard({
         <div>
           <CardTitle>Opcion {optionNumber}</CardTitle>
           <CardDescription>
-            Balance A: {formatRendimiento(ratingSumA)} | Balance B: {formatRendimiento(ratingSumB)} | Diferencia:{" "}
+            Balance {teamALabel}: {formatRendimiento(ratingSumA)} | Balance {teamBLabel}:{" "}
+            {formatRendimiento(ratingSumB)} | Diferencia:{" "}
             <span className="font-semibold text-emerald-300">{formatRendimiento(ratingDiff)}</span>
           </CardDescription>
         </div>
@@ -52,7 +58,7 @@ export function TeamOptionCard({
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Equipo A</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{teamALabel}</p>
           <ul className="space-y-2 text-sm text-slate-200">
             {teamA.map((player) => (
               <li className="flex items-center justify-between gap-2" key={player.id}>
@@ -71,7 +77,7 @@ export function TeamOptionCard({
           </ul>
         </div>
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Equipo B</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{teamBLabel}</p>
           <ul className="space-y-2 text-sm text-slate-200">
             {teamB.map((player) => (
               <li className="flex items-center justify-between gap-2" key={player.id}>

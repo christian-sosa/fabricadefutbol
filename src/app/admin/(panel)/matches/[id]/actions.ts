@@ -16,6 +16,7 @@ import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
 import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { normalizeTeamLabel, TEAM_LABEL_MAX_LENGTH } from "@/lib/team-labels";
 
 const confirmSchema = z.object({
   optionId: z.string().uuid()
@@ -84,6 +85,8 @@ const lineupAdjustmentSchema = z.object({
 const updateMatchSchema = z.object({
   scheduledAt: z.string().min(1, "La fecha es obligatoria."),
   location: z.string().optional(),
+  teamALabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del primer equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),
+  teamBLabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del segundo equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),
   status: z.enum(["draft", "confirmed", "finished", "cancelled"])
 });
 
@@ -275,6 +278,8 @@ export async function updateMatchAction(matchId: string, organizationId: string,
     const parsed = updateMatchSchema.safeParse({
       scheduledAt: formData.get("scheduledAt"),
       location: formData.get("location"),
+      teamALabel: normalizeTeamLabel(String(formData.get("teamALabel") ?? "")) ?? undefined,
+      teamBLabel: normalizeTeamLabel(String(formData.get("teamBLabel") ?? "")) ?? undefined,
       status: formData.get("status")
     });
 
@@ -286,11 +291,15 @@ export async function updateMatchAction(matchId: string, organizationId: string,
     const payload: {
       scheduled_at: string;
       location: string | null;
+      team_a_label: string | null;
+      team_b_label: string | null;
       status: "draft" | "confirmed" | "finished" | "cancelled";
       finished_at?: string | null;
     } = {
       scheduled_at: datetimeLocalToMatchIso(parsed.data.scheduledAt),
       location: parsed.data.location || null,
+      team_a_label: normalizeTeamLabel(parsed.data.teamALabel),
+      team_b_label: normalizeTeamLabel(parsed.data.teamBLabel),
       status: parsed.data.status
     };
 

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL } from "@/lib/team-labels";
 import { formatRendimiento } from "@/lib/utils";
 import type { TeamSide } from "@/types/domain";
 
@@ -48,6 +49,8 @@ type MatchResultEditorProps = {
   defaultScoreB: number;
   defaultNotes?: string | null;
   submitLabel: string;
+  teamALabel?: string;
+  teamBLabel?: string;
 };
 
 function isValidGuest(guest: GuestDraft) {
@@ -62,7 +65,9 @@ export function MatchResultEditor({
   defaultScoreA,
   defaultScoreB,
   defaultNotes,
-  submitLabel
+  submitLabel,
+  teamALabel = DEFAULT_TEAM_A_LABEL,
+  teamBLabel = DEFAULT_TEAM_B_LABEL
 }: MatchResultEditorProps) {
   const [assignments, setAssignments] = useState<Record<string, "A" | "B" | "OUT">>(() => {
     const initial: Record<string, "A" | "B" | "OUT"> = {};
@@ -174,7 +179,7 @@ export function MatchResultEditor({
       <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
         <p className="text-sm font-semibold text-slate-100">Formacion final</p>
         <p className="mt-1 text-xs text-slate-400">
-          Equipo A: {teamACount} | Equipo B: {teamBCount}
+          {teamALabel}: {teamACount} | {teamBLabel}: {teamBCount}
         </p>
         <div className="mt-3 space-y-2">
           {existingParticipants.map((participant) => (
@@ -197,8 +202,8 @@ export function MatchResultEditor({
                 }
                 value={assignments[participant.participantId] ?? "OUT"}
               >
-                <option value="A">Equipo A</option>
-                <option value="B">Equipo B</option>
+                <option value="A">{teamALabel}</option>
+                <option value="B">{teamBLabel}</option>
                 <option value="OUT">No juega</option>
               </Select>
             </div>
@@ -262,8 +267,8 @@ export function MatchResultEditor({
                 }
                 value={guest.team}
               >
-                <option value="A">Equipo A</option>
-                <option value="B">Equipo B</option>
+                <option value="A">{teamALabel}</option>
+                <option value="B">{teamBLabel}</option>
               </Select>
               <Button
                 onClick={() => setNewGuests((current) => current.filter((item) => item.id !== guest.id))}
@@ -294,8 +299,8 @@ export function MatchResultEditor({
               Si gana el equipo en desventaja: +20 / -20. Si gana el otro: +10 / 0.
             </p>
             <Select onChange={(event) => setHandicapTeam(event.target.value as TeamSide)} value={handicapTeam}>
-              <option value="A">Equipo A juega con menos</option>
-              <option value="B">Equipo B juega con menos</option>
+              <option value="A">{teamALabel} juega con menos</option>
+              <option value="B">{teamBLabel} juega con menos</option>
             </Select>
           </div>
         ) : null}
