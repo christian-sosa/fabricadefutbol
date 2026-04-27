@@ -5,8 +5,10 @@ import { notFound } from "next/navigation";
 import { MatchStatusBadge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import { WhatsAppShareButton } from "@/components/matches/whatsapp-share-button";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
+import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getMatchDetails } from "@/lib/queries/public";
 import { formatRendimiento } from "@/lib/utils";
 
@@ -44,6 +46,8 @@ export default async function MatchDetailPage({
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   const details = await getMatchDetails(id, resolvedSearchParams.org);
   if (!details) notFound();
+  const publicMatchPath = withOrgQuery(`/matches/${id}`, resolvedSearchParams.org);
+  const publicMatchUrl = buildAbsolutePublicUrl(publicMatchPath);
 
   return (
     <div className="space-y-4">
@@ -51,10 +55,17 @@ export default async function MatchDetailPage({
         Volver al historial
       </Link>
       <Card>
-        <CardTitle>Partido {formatMatchDateTime(details.match.scheduled_at)}</CardTitle>
-        <CardDescription className="mt-1">
-          {details.match.modality} | <MatchStatusBadge status={details.match.status} />
-        </CardDescription>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>Partido {formatMatchDateTime(details.match.scheduled_at)}</CardTitle>
+            <CardDescription className="mt-1">
+              {details.match.modality} | <MatchStatusBadge status={details.match.status} />
+            </CardDescription>
+          </div>
+          {details.match.status === "confirmed" ? (
+            <WhatsAppShareButton className="w-full sm:w-auto" matchUrl={publicMatchUrl} />
+          ) : null}
+        </div>
       </Card>
 
       <Card>
