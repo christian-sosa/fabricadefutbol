@@ -79,6 +79,7 @@ const BASE_PRIMARY_PUBLIC_NAV_ITEMS = [
 ] as const;
 
 export const ORGANIZATION_PUBLIC_NAV_ITEMS = [
+  { href: "/groups", label: "Grupo" },
   { href: "/ranking", label: "Ranking" },
   { href: "/matches", label: "Historial" },
   { href: "/upcoming", label: "Proximos" }

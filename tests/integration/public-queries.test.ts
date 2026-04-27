@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createSupabaseServerClientMock, cookiesMock } = vi.hoisted(() => ({
+const { createSupabaseServerClientMock, cookiesMock, noStoreMock } = vi.hoisted(() => ({
   createSupabaseServerClientMock: vi.fn(),
-  cookiesMock: vi.fn()
+  cookiesMock: vi.fn(),
+  noStoreMock: vi.fn()
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -11,6 +12,10 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("next/headers", () => ({
   cookies: cookiesMock
+}));
+
+vi.mock("next/cache", () => ({
+  unstable_noStore: noStoreMock
 }));
 
 import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
@@ -86,6 +91,7 @@ describe("resolvePublicOrganization", () => {
     vi.setSystemTime(new Date("2026-04-19T12:00:00.000Z"));
     createSupabaseServerClientMock.mockReset();
     cookiesMock.mockReset();
+    noStoreMock.mockReset();
   });
 
   afterEach(() => {
@@ -228,6 +234,10 @@ describe("resolvePublicOrganization", () => {
         expect.objectContaining({
           id: "match-upcoming",
           status: "confirmed"
+        }),
+        expect.objectContaining({
+          id: "match-past-confirmed",
+          status: "confirmed"
         })
       ],
       topPlayers: [
@@ -237,6 +247,35 @@ describe("resolvePublicOrganization", () => {
         expect.objectContaining({ id: "player-4", current_rating: 1040 })
       ]
     });
+  });
+
+  it("interpreta los confirmados de hoy contra la hora de cancha, no contra UTC del servidor", async () => {
+    vi.setSystemTime(new Date("2026-04-27T21:00:00.000Z")); // 18:00 en Argentina.
+    const fake = createFakeSupabase({
+      matches: [
+        {
+          id: "match-tonight",
+          organization_id: ORG_ID,
+          scheduled_at: "2026-04-27T20:00:00.000Z",
+          modality: "5v5",
+          status: "confirmed"
+        },
+        {
+          id: "match-overdue",
+          organization_id: ORG_ID,
+          scheduled_at: "2026-04-27T17:00:00.000Z",
+          modality: "5v5",
+          status: "confirmed"
+        }
+      ]
+    });
+
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    cookiesMock.mockResolvedValue({ get: () => undefined });
+
+    const summary = await getHomeSummary(ORG_ID);
+
+    expect(summary.upcomingMatches.map((match) => match.id)).toEqual(["match-tonight", "match-overdue"]);
   });
 
   it("pagina el historial de partidos y normaliza score y ganador", async () => {
