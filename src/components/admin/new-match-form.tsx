@@ -9,7 +9,13 @@ import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
-import { formatSkillLevelLabel, SKILL_LEVEL_OPTIONS } from "@/lib/domain/skill-level";
+import {
+  formatGuestSkillLevelLabel,
+  formatSkillLevelLabel,
+  GUEST_SKILL_LEVEL_HELP_TEXT,
+  GUEST_SKILL_LEVEL_OPTIONS,
+  parseGuestSkillLevelValue
+} from "@/lib/domain/skill-level";
 import { cn, formatRendimiento } from "@/lib/utils";
 import type { MatchModality, TeamSide } from "@/types/domain";
 
@@ -40,12 +46,6 @@ type ManualParticipant = {
 const EXPECTED_PLAYERS: Record<MatchModality, number> = Object.fromEntries(
   Object.entries(TEAM_SIZE_BY_MODALITY).map(([modality, teamSize]) => [modality, teamSize * 2])
 ) as Record<MatchModality, number>;
-
-function parseGuestSkillLevel(rawValue: string) {
-  const parsed = Number(rawValue);
-  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 5) return null;
-  return Math.trunc(parsed);
-}
 
 export function NewMatchForm({
   organizationId,
@@ -78,7 +78,7 @@ export function NewMatchForm({
       guestRows
         .map((guest) => {
           const name = guest.name.trim();
-          const skillLevel = parseGuestSkillLevel(guest.rating.trim());
+          const skillLevel = parseGuestSkillLevelValue(guest.rating.trim());
           if (!name || skillLevel === null) return null;
           return {
             key: String(guest.key),
@@ -356,8 +356,8 @@ export function NewMatchForm({
           <div>
             <p className="text-sm font-semibold text-slate-100">Invitados (temporales)</p>
             <p className="text-xs text-slate-400">
-              No se guardan como jugadores del club, pero si quedan en el historial del partido. El nivel equivalente
-              usa 1 como mas fuerte y 5 como mas bajo.
+              No se guardan como jugadores del club, pero si quedan en el historial del partido.
+              {` ${GUEST_SKILL_LEVEL_HELP_TEXT}`}
             </p>
           </div>
           <Button onClick={addGuest} type="button" variant="ghost">
@@ -380,14 +380,15 @@ export function NewMatchForm({
                   value={guest.name}
                 />
                 <Select
+                  aria-label={`Nivel de ${guest.name.trim() || `invitado ${index + 1}`}`}
                   name="guestRatings"
                   onChange={(event) => updateGuest(guest.key, "rating", event.target.value)}
                   value={guest.rating}
                 >
-                  <option value="">Nivel equivalente</option>
-                  {SKILL_LEVEL_OPTIONS.map((level) => (
+                  <option value="">Nivel del invitado</option>
+                  {GUEST_SKILL_LEVEL_OPTIONS.map((level) => (
                     <option key={level} value={level}>
-                      {formatSkillLevelLabel(level)}
+                      {formatGuestSkillLevelLabel(level)}
                     </option>
                   ))}
                 </Select>
@@ -429,7 +430,7 @@ export function NewMatchForm({
                       <span>{participant.fullName}</span>
                       <span className="ml-2 text-xs text-slate-400">
                         {participant.source === "guest"
-                          ? `Invitado | ${formatSkillLevelLabel(participant.rating)}`
+                          ? `Invitado | ${formatGuestSkillLevelLabel(participant.rating)}`
                           : `Jugador | rendimiento ${formatRendimiento(participant.rating)}`}
                       </span>
                     </div>

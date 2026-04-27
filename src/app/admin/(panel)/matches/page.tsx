@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
+import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { MatchStatusBadge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
@@ -14,23 +14,13 @@ export default async function AdminMatchesPage({
   searchParams: Promise<{ org?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
+  const { admin, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
   const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   const matches = await getAdminMatches(selectedOrganization.id);
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle>Grupo activo: {selectedOrganization.name}</CardTitle>
-        <div className="mt-3">
-          <OrganizationSwitcher
-            basePath="/admin/matches"
-            currentOrganizationSlug={selectedOrganization.slug}
-            label="Cambiar grupo"
-            organizations={organizations}
-          />
-        </div>
-      </Card>
+      <AdminCurrentGroupCard organization={selectedOrganization} />
 
       <Card>
         <CardTitle>Gestionar partidos</CardTitle>

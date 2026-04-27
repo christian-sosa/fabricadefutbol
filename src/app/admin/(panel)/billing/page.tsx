@@ -2,7 +2,7 @@ import {
   startOrganizationCheckoutProAction,
   syncOrganizationCheckoutPaymentAction
 } from "@/app/admin/(panel)/actions";
-import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
+import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import {
@@ -67,9 +67,7 @@ export default async function AdminBillingPage({
   }>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(
-    resolvedSearchParams.org
-  );
+  const { admin, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
   const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
 
   if (resolvedSearchParams.payment_id) {
@@ -103,20 +101,14 @@ export default async function AdminBillingPage({
 
   return (
     <div className="space-y-4">
+      <AdminCurrentGroupCard organization={selectedOrganization} />
+
       <Card>
         <CardTitle>Facturacion</CardTitle>
         <CardDescription>
           Mercado Pago por grupo: {formatCurrencyArs(ORGANIZATION_MONTHLY_PRICE_ARS)} / 30
           dias.
         </CardDescription>
-        <div className="mt-3">
-          <OrganizationSwitcher
-            basePath="/admin/billing"
-            currentOrganizationSlug={selectedOrganization.slug}
-            label="Cambiar grupo"
-            organizations={organizations}
-          />
-        </div>
       </Card>
 
       {resolvedSearchParams.checkout ? (

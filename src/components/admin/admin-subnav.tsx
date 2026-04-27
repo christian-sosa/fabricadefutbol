@@ -112,13 +112,20 @@ function buildTournamentItems(pathname: string, tournamentId: string | null, cur
   }));
 }
 
-export function AdminSubnav() {
+type AdminSubnavProps = {
+  scope?: "all" | "organizations" | "tournaments";
+};
+
+export function AdminSubnav({ scope = "all" }: AdminSubnavProps) {
   const pathname = usePathname() ?? "";
   const searchParams = useSearchParams();
   const organizationKey = searchParams.get("org");
   const currentTab = searchParams.get("tab");
   const tournamentId = getTournamentIdFromPath(pathname);
   const isTournamentArea = pathname.startsWith("/admin/tournaments");
+
+  if (scope === "organizations" && isTournamentArea) return null;
+  if (scope === "tournaments" && !isTournamentArea) return null;
 
   if (
     !pathname.startsWith("/admin") ||

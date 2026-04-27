@@ -11,6 +11,7 @@ import {
   saveConfirmedMatchLineup,
   saveMatchResult
 } from "@/lib/domain/match-workflow";
+import { parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
 import { datetimeLocalToMatchIso } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
@@ -33,6 +34,13 @@ const lineupAdjustmentPayloadSchema = z.object({
   lineupPayload: z.string().min(1, "La formacion final enviada es invalida.")
 });
 
+const guestSkillLevelSchema = z.coerce
+  .number()
+  .refine(
+    (value) => parseGuestSkillLevelValue(value) !== null,
+    "Selecciona un nivel equivalente valido para cada invitado."
+  );
+
 const lineupSchema = z.object({
   assignments: z
     .array(
@@ -46,7 +54,7 @@ const lineupSchema = z.object({
     .array(
       z.object({
         name: z.string().trim().min(1),
-        rating: z.coerce.number().positive(),
+        rating: guestSkillLevelSchema,
         team: z.enum(["A", "B"])
       })
     )
@@ -83,7 +91,7 @@ const lineupAdjustmentSchema = z.object({
     .array(
       z.object({
         name: z.string().trim().min(1),
-        rating: z.coerce.number().positive(),
+        rating: guestSkillLevelSchema,
         team: z.enum(["A", "B"])
       })
     )

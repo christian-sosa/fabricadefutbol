@@ -12,6 +12,7 @@ import {
   writeOrganizationPublicSnapshot,
   type OrganizationPublicSummary
 } from "@/lib/domain/organization-public-snapshot";
+import { calculateGuestDisplayRating } from "@/lib/domain/skill-level";
 import { calculatePlayerStats, type MatchWithTeams } from "@/lib/domain/stats";
 import { normalizeEmail } from "@/lib/org";
 import type { MatchHistoryItem, OrganizationMatchesResponse } from "@/lib/query/types";
@@ -634,7 +635,7 @@ export async function getUpcomingConfirmedMatches(organizationId: string | null)
       {
         id: `guest-${guest.id}`,
         full_name: guest.guest_name,
-        current_rating: Number(guest.guest_rating),
+        current_rating: calculateGuestDisplayRating(guest.guest_rating),
         is_guest: true
       }
     ])
@@ -725,7 +726,7 @@ export async function getMatchDetails(matchId: string, organizationKey?: string 
       {
         id: `guest-${guest.id}`,
         full_name: guest.guest_name,
-        current_rating: Number(guest.guest_rating),
+        current_rating: calculateGuestDisplayRating(guest.guest_rating),
         is_guest: true
       }
     ])
