@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMatchWhatsAppMessage, buildWhatsAppShareUrl } from "@/lib/share";
+import { buildMatchWhatsAppMessage, buildWhatsAppShareUrl, getWhatsAppShareTarget } from "@/lib/share";
+
+const shareEmojis = {
+  soccer: String.fromCodePoint(0x26bd),
+  fire: String.fromCodePoint(0x1f525),
+  yellowCircle: String.fromCodePoint(0x1f7e1),
+  pointer: String.fromCodePoint(0x1f449)
+} as const;
 
 describe("share helpers", () => {
   it("arma el mensaje de WhatsApp para un partido confirmado", () => {
@@ -8,12 +15,12 @@ describe("share helpers", () => {
 
     expect(buildMatchWhatsAppMessage({ matchUrl })).toBe(
       [
-        "⚽ Partido confirmado",
+        `${shareEmojis.soccer} Partido confirmado`,
         "",
-        "🔥 Equipos armados",
-        "🟡 Negro vs Blanco",
+        `${shareEmojis.fire} Equipos armados`,
+        `${shareEmojis.yellowCircle} Negro vs Blanco`,
         "",
-        "👉 Ver jugadores y posiciones:",
+        `${shareEmojis.pointer} Ver jugadores y posiciones:`,
         matchUrl
       ].join("\n")
     );
@@ -27,14 +34,14 @@ describe("share helpers", () => {
       teamBName: "Equipo B"
     });
 
-    expect(shareUrl).toBe(`https://wa.me/?text=${encodeURIComponent(
+    expect(shareUrl).toBe(`https://web.whatsapp.com/send?text=${encodeURIComponent(
       [
-        "⚽ Partido confirmado",
+        `${shareEmojis.soccer} Partido confirmado`,
         "",
-        "🔥 Equipos armados",
-        "🟡 Equipo A vs Equipo B",
+        `${shareEmojis.fire} Equipos armados`,
+        `${shareEmojis.yellowCircle} Equipo A vs Equipo B`,
         "",
-        "👉 Ver jugadores y posiciones:",
+        `${shareEmojis.pointer} Ver jugadores y posiciones:`,
         matchUrl
       ].join("\n")
     )}`);
@@ -43,5 +50,16 @@ describe("share helpers", () => {
     expect(shareUrl).toContain("%F0%9F%9F%A1");
     expect(shareUrl).toContain("%F0%9F%91%89");
     expect(shareUrl).not.toContain("%EF%BF%BD");
+  });
+
+  it("usa deep link de WhatsApp en mobile", () => {
+    const matchUrl = "https://fabricadefutbol.com.ar/matches/abc-123";
+
+    expect(buildWhatsAppShareUrl({ matchUrl }, "mobile")).toMatch(/^whatsapp:\/\/send\?text=/);
+  });
+
+  it("detecta el destino de WhatsApp segun el navegador", () => {
+    expect(getWhatsAppShareTarget("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)")).toBe("mobile");
+    expect(getWhatsAppShareTarget("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")).toBe("web");
   });
 });

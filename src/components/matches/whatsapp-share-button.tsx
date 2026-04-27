@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { buildWhatsAppShareUrl } from "@/lib/share";
+import { buildWhatsAppShareUrl, getWhatsAppShareTarget } from "@/lib/share";
 
 type WhatsAppShareButtonProps = {
   matchUrl: string;
@@ -17,12 +17,17 @@ export function WhatsAppShareButton({
   className
 }: WhatsAppShareButtonProps) {
   const handleClick = () => {
+    const target = getWhatsAppShareTarget(window.navigator.userAgent);
+
     window.open(
-      buildWhatsAppShareUrl({
-        matchUrl,
-        teamAName,
-        teamBName
-      }),
+      buildWhatsAppShareUrl(
+        {
+          matchUrl,
+          teamAName,
+          teamBName
+        },
+        target
+      ),
       "_blank",
       "noopener,noreferrer"
     );

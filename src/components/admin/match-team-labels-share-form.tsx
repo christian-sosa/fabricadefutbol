@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { buildWhatsAppShareUrl } from "@/lib/share";
+import { buildWhatsAppShareUrl, getWhatsAppShareTarget } from "@/lib/share";
 import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL, normalizeTeamLabel, TEAM_LABEL_MAX_LENGTH } from "@/lib/team-labels";
 
 type MatchTeamLabelsShareFormProps = {
@@ -34,12 +34,17 @@ export function MatchTeamLabelsShareForm({
   );
 
   const handleShare = () => {
+    const target = getWhatsAppShareTarget(window.navigator.userAgent);
+
     window.open(
-      buildWhatsAppShareUrl({
-        matchUrl,
-        teamAName: shareLabels.teamA,
-        teamBName: shareLabels.teamB
-      }),
+      buildWhatsAppShareUrl(
+        {
+          matchUrl,
+          teamAName: shareLabels.teamA,
+          teamBName: shareLabels.teamB
+        },
+        target
+      ),
       "_blank",
       "noopener,noreferrer"
     );

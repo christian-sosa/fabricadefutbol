@@ -58,6 +58,10 @@ export type MatchResultInput = {
       rating: number;
       team: TeamSide;
     }>;
+    newPlayers?: Array<{
+      playerId: string;
+      team: TeamSide;
+    }>;
     handicapTeam?: TeamSide | null;
   };
 };

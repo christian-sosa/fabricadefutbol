@@ -16,10 +16,9 @@ describe("WhatsAppShareButton", () => {
     await user.click(screen.getByRole("button", { name: "Compartir en WhatsApp" }));
 
     expect(openSpy).toHaveBeenCalledWith(
-      buildWhatsAppShareUrl({ matchUrl }),
+      buildWhatsAppShareUrl({ matchUrl }, "web"),
       "_blank",
       "noopener,noreferrer"
     );
   });
 });
-

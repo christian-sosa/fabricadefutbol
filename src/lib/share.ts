@@ -6,6 +6,8 @@ export type MatchWhatsAppShareParams = {
   teamBName?: string;
 };
 
+export type WhatsAppShareTarget = "mobile" | "web";
+
 const WHATSAPP_SHARE_EMOJIS = {
   soccer: String.fromCodePoint(0x26bd),
   fire: String.fromCodePoint(0x1f525),
@@ -29,6 +31,21 @@ export function buildMatchWhatsAppMessage({
   ].join("\n");
 }
 
-export function buildWhatsAppShareUrl(params: MatchWhatsAppShareParams) {
-  return `https://wa.me/?text=${encodeURIComponent(buildMatchWhatsAppMessage(params))}`;
+function encodeWhatsAppShareText(params: MatchWhatsAppShareParams) {
+  return encodeURIComponent(buildMatchWhatsAppMessage(params));
+}
+
+export function getWhatsAppShareTarget(userAgent: string) {
+  return /android|iphone|ipad|ipod|mobile/i.test(userAgent) ? "mobile" : "web";
+}
+
+export function buildWhatsAppShareUrl(
+  params: MatchWhatsAppShareParams,
+  target: WhatsAppShareTarget = "web"
+) {
+  const encodedText = encodeWhatsAppShareText(params);
+  if (target === "mobile") {
+    return `whatsapp://send?text=${encodedText}`;
+  }
+  return `https://web.whatsapp.com/send?text=${encodedText}`;
 }

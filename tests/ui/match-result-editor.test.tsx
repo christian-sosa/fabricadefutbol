@@ -33,6 +33,7 @@ function getLineupPayload(container: HTMLElement) {
   return JSON.parse(input.value) as {
     assignments: Array<{ participantId: string; team: "A" | "B" | "OUT" }>;
     newGuests: Array<{ name: string; rating: number; team: "A" | "B" }>;
+    newPlayers: Array<{ playerId: string; team: "A" | "B" }>;
     handicapTeam: "A" | "B" | null;
   };
 }
@@ -50,15 +51,13 @@ describe("MatchResultEditor", () => {
       />
     );
 
-    const selects = container.querySelectorAll("select");
-    await user.selectOptions(selects[1] as HTMLSelectElement, "OUT");
+    await user.selectOptions(screen.getByLabelText("Equipo de Jugador 2"), "OUT");
     await user.click(screen.getByLabelText("Aplicar regla de desventaja numerica"));
     await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
     await user.type(screen.getByPlaceholderText("Nombre invitado"), "Invitado B");
     await user.clear(screen.getByPlaceholderText("Rendimiento"));
     await user.type(screen.getByPlaceholderText("Rendimiento"), "8");
-    const guestAndHandicapSelects = container.querySelectorAll("select");
-    await user.selectOptions(guestAndHandicapSelects[3] as HTMLSelectElement, "B");
+    await user.selectOptions(screen.getByLabelText("Equipo de Invitado B"), "B");
 
     const payload = getLineupPayload(container);
     expect(payload.assignments).toContainEqual({
@@ -72,13 +71,14 @@ describe("MatchResultEditor", () => {
         team: "B"
       }
     ]);
+    expect(payload.newPlayers).toEqual([]);
     expect(payload.handicapTeam).toBe("A");
   });
 
   it("envia el payload correcto al guardar", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    const { container } = render(
+    render(
       <MatchResultEditor
         defaultNotes="Nota base"
         defaultScoreA={1}
@@ -89,15 +89,13 @@ describe("MatchResultEditor", () => {
       />
     );
 
-    const selects = container.querySelectorAll("select");
-    await user.selectOptions(selects[1] as HTMLSelectElement, "OUT");
+    await user.selectOptions(screen.getByLabelText("Equipo de Jugador 2"), "OUT");
     await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
     await user.type(screen.getByPlaceholderText("Nombre invitado"), "Refuerzo");
     await user.clear(screen.getByPlaceholderText("Rendimiento"));
     await user.type(screen.getByPlaceholderText("Rendimiento"), "7");
     await user.click(screen.getByLabelText("Aplicar regla de desventaja numerica"));
-    const guestAndHandicapSelects = container.querySelectorAll("select");
-    await user.selectOptions(guestAndHandicapSelects[3] as HTMLSelectElement, "B");
+    await user.selectOptions(screen.getByLabelText("Equipo de Refuerzo"), "B");
     await user.type(screen.getByPlaceholderText("Notas opcionales"), " editada");
     await user.click(screen.getByRole("button", { name: "Guardar resultado" }));
 
@@ -113,10 +111,35 @@ describe("MatchResultEditor", () => {
             { participantId: "player:player-3", team: "B" }
           ],
           newGuests: [{ name: "Refuerzo", rating: 7, team: "B" }],
+          newPlayers: [],
           handicapTeam: "A"
         }
       });
     });
+  });
+
+  it("permite agregar reemplazos de plantilla al resultado", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <MatchResultEditor
+        availablePlayers={[{ id: "player-4", fullName: "Jugador 4", rating: 980 }]}
+        defaultNotes=""
+        defaultScoreA={0}
+        defaultScoreB={0}
+        existingParticipants={existingParticipants}
+        submitLabel="Guardar"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Agregar" })).toBeEnabled();
+    });
+
+    await user.selectOptions(screen.getByLabelText("Equipo del reemplazo"), "B");
+    await user.click(screen.getByRole("button", { name: "Agregar" }));
+
+    const payload = getLineupPayload(container);
+    expect(payload.newPlayers).toEqual([{ playerId: "player-4", team: "B" }]);
   });
 
   it("muestra el error si el submit falla", async () => {
