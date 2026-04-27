@@ -9,6 +9,7 @@ import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { createDraftMatchWithOptions } from "@/lib/domain/match-workflow";
 import { datetimeLocalToMatchIso } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
+import { logError, logInfo } from "@/lib/observability/log";
 import { withOrgQuery } from "@/lib/org";
 import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -130,6 +131,7 @@ function parseManualAssignments(formData: FormData): ManualTeamAssignment[] {
 }
 
 export async function createMatchAction(formData: FormData) {
+  const startedAt = Date.now();
   try {
     const parsed = schema.safeParse({
       organizationId: formData.get("organizationId"),
@@ -237,9 +239,23 @@ export async function createMatchAction(formData: FormData) {
     revalidatePath("/admin");
     revalidatePath("/admin/matches/new");
     revalidatePath(`/admin/matches/${matchId}`);
+    logInfo("matches.create.succeeded", {
+      organizationId: parsed.data.organizationId,
+      matchId,
+      adminId: admin.userId,
+      modality: parsed.data.modality,
+      creationMode,
+      playerCount: parsed.data.playerIds.length,
+      guestCount: invitedGuests.length,
+      durationMs: Date.now() - startedAt
+    });
     redirect(withOrgQuery(`/admin/matches/${matchId}`, organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
+    logError("matches.create.failed", error, {
+      organizationId: String(formData.get("organizationId") ?? ""),
+      durationMs: Date.now() - startedAt
+    });
     const message = error instanceof Error ? error.message : "No se pudo crear el partido.";
     const organizationId = String(formData.get("organizationId") ?? "");
     redirect(withError(organizationId, message));

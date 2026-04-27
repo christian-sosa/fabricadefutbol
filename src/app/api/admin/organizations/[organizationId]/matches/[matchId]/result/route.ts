@@ -4,6 +4,7 @@ import { z } from "zod";
 import { assertOrganizationAdminAction } from "@/lib/auth/admin";
 import { saveMatchResult } from "@/lib/domain/match-workflow";
 import { toUserMessage } from "@/lib/errors";
+import { logError, logInfo, logWarn } from "@/lib/observability/log";
 import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -45,8 +46,13 @@ export async function PATCH(
     params: Promise<{ organizationId: string; matchId: string }>;
   }
 ) {
+  const startedAt = Date.now();
   const { organizationId, matchId } = await context.params;
   if (!organizationId || !matchId) {
+    logWarn("matches.result.invalid_params", {
+      organizationId,
+      matchId
+    });
     return NextResponse.json({ error: "organizationId y matchId son requeridos." }, { status: 400 });
   }
 
@@ -55,6 +61,12 @@ export async function PATCH(
     const body = (await request.json()) as unknown;
     const parsed = requestSchema.safeParse(body);
     if (!parsed.success) {
+      logWarn("matches.result.invalid_payload", {
+        organizationId,
+        matchId,
+        issue: parsed.error.issues[0]?.message,
+        durationMs: Date.now() - startedAt
+      });
       return NextResponse.json(
         { error: parsed.error.issues[0]?.message ?? "Payload invalido." },
         { status: 400 }
@@ -71,6 +83,12 @@ export async function PATCH(
     });
 
     await refreshOrganizationPublicSnapshotSafe(organizationId);
+    logInfo("matches.result.succeeded", {
+      organizationId,
+      matchId,
+      adminId: admin.userId,
+      durationMs: Date.now() - startedAt
+    });
     return NextResponse.json({
       success: true,
       organizationId,
@@ -79,13 +97,17 @@ export async function PATCH(
   } catch (error) {
     const rawMessage = error instanceof Error ? error.message : "No se pudo guardar resultado.";
     if (isAuthErrorMessage(rawMessage)) {
+      logWarn("matches.result.forbidden", {
+        organizationId,
+        matchId,
+        durationMs: Date.now() - startedAt
+      });
       return NextResponse.json({ error: rawMessage }, { status: 403 });
     }
-    // Log detalle tecnico en servidor; al cliente un mensaje mapeado en espanol.
-    console.error("[match-result] PATCH fallo", {
+    logError("matches.result.failed", error, {
       organizationId,
       matchId,
-      message: rawMessage
+      durationMs: Date.now() - startedAt
     });
     return NextResponse.json(
       { error: toUserMessage(error, "No se pudo guardar el resultado del partido.") },

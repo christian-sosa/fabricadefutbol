@@ -8,7 +8,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: createSupabaseServerClientMock
 }));
 
-import { getAdminPlayers, getSelectablePlayers } from "@/lib/queries/admin";
+import { getAdminDashboardData, getAdminPlayers, getSelectablePlayers } from "@/lib/queries/admin";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 const ORG_ID = "org-1";
@@ -93,5 +93,36 @@ describe("admin player queries", () => {
     const players = await getSelectablePlayers(ORG_ID);
 
     expect(players.map((player) => player.id)).toEqual(["player-level-2", "player-level-4"]);
+  });
+
+  it("devuelve conteos de onboarding y partidos del dashboard admin", async () => {
+    const fake = createFakeSupabase({
+      players: [
+        { id: "player-1", organization_id: ORG_ID, full_name: "Activo", active: true },
+        { id: "player-2", organization_id: ORG_ID, full_name: "Inactivo", active: false },
+        { id: "player-other", organization_id: "org-2", full_name: "Otro", active: true }
+      ],
+      matches: [
+        { id: "draft-1", organization_id: ORG_ID, status: "draft", scheduled_at: "2026-04-01T20:00:00Z" },
+        { id: "confirmed-1", organization_id: ORG_ID, status: "confirmed", scheduled_at: "2026-04-02T20:00:00Z" },
+        { id: "finished-1", organization_id: ORG_ID, status: "finished", scheduled_at: "2026-04-03T20:00:00Z" },
+        { id: "other-1", organization_id: "org-2", status: "finished", scheduled_at: "2026-04-04T20:00:00Z" }
+      ]
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+
+    const dashboard = await getAdminDashboardData(ORG_ID);
+
+    expect(dashboard).toMatchObject({
+      draftsCount: 1,
+      confirmedCount: 1,
+      finishedCount: 1,
+      playersCount: 1
+    });
+    expect(dashboard.latestMatches.map((match) => match.id)).toEqual([
+      "finished-1",
+      "confirmed-1",
+      "draft-1"
+    ]);
   });
 });
