@@ -12,13 +12,13 @@ import { MatchResultEditorQuery } from "@/components/admin/match-result-editor-q
 import { MatchTeamLabelsShareForm } from "@/components/admin/match-team-labels-share-form";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { TeamOptionCard } from "@/components/matches/team-option-card";
-import { MATCH_STATUS_LABELS, MatchStatusBadge } from "@/components/ui/badge";
+import { MATCH_STATUS_LABELS } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
-import { formatMatchDateTime, matchIsoToDatetimeLocal } from "@/lib/match-datetime";
+import { matchIsoToDatetimeLocal } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getAdminMatchDetails, getSelectablePlayers } from "@/lib/queries/admin";
@@ -101,13 +101,11 @@ export default async function AdminMatchDetailPage({
         </div>
       </Card>
 
-      <Card>
-        <CardTitle>Partido {formatMatchDateTime(details.match.scheduled_at)}</CardTitle>
-        <CardDescription className="mt-1">
-          {details.match.modality} | <MatchStatusBadge status={details.match.status} />
-        </CardDescription>
-        {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
-      </Card>
+      {resolvedSearchParams.error ? (
+        <p className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">
+          {resolvedSearchParams.error}
+        </p>
+      ) : null}
 
       <Card>
         <CardTitle>Editar partido</CardTitle>
@@ -144,17 +142,19 @@ export default async function AdminMatchDetailPage({
         </form>
       </Card>
 
-      {canDeleteMatch ? (
+      {confirmedOption ? (
         <Card>
-          <CardTitle>Eliminar partido</CardTitle>
-          <CardDescription>
-            Disponible solo para partidos en borrador o confirmados que todavia no tengan resultado.
+          <CardTitle>Nombres para compartir</CardTitle>
+          <CardDescription className="mt-1">
+            Se guardan despues de confirmar el armado final de equipos.
           </CardDescription>
-          <form action={deleteAction} className="mt-4">
-            <Button type="submit" variant="danger">
-              Borrar partido
-            </Button>
-          </form>
+          <MatchTeamLabelsShareForm
+            action={teamLabelsUpdateAction}
+            canShare={details.match.status === "confirmed"}
+            initialTeamALabel={details.match.team_a_label}
+            initialTeamBLabel={details.match.team_b_label}
+            matchUrl={publicMatchUrl}
+          />
         </Card>
       ) : null}
 
@@ -197,24 +197,8 @@ export default async function AdminMatchDetailPage({
         </div>
       </Card>
 
-      {confirmedOption ? (
-        <Card>
-          <CardTitle>Nombres para compartir</CardTitle>
-          <CardDescription className="mt-1">
-            Se guardan despues de confirmar el armado final de equipos.
-          </CardDescription>
-          <MatchTeamLabelsShareForm
-            action={teamLabelsUpdateAction}
-            canShare={details.match.status === "confirmed"}
-            initialTeamALabel={details.match.team_a_label}
-            initialTeamBLabel={details.match.team_b_label}
-            matchUrl={publicMatchUrl}
-          />
-        </Card>
-      ) : null}
-
       {canManageResult ? (
-        <Card>
+        <Card className="scroll-mt-6" id="resultado">
           <CardTitle>{details.result ? "Corregir resultado" : "Cargar resultado"}</CardTitle>
           <CardDescription>
             Carga marcador, ausencias y reemplazos en una sola accion.
@@ -239,11 +223,25 @@ export default async function AdminMatchDetailPage({
           )}
         </Card>
       ) : (
-        <Card>
+        <Card className="scroll-mt-6" id="resultado">
           <CardTitle>Resultado</CardTitle>
           <CardDescription>Confirma una opcion de equipos para habilitar la carga de resultado cuando se juegue.</CardDescription>
         </Card>
       )}
+
+      {canDeleteMatch ? (
+        <Card>
+          <CardTitle>Eliminar partido</CardTitle>
+          <CardDescription>
+            Disponible solo para partidos en borrador o confirmados que todavia no tengan resultado.
+          </CardDescription>
+          <form action={deleteAction} className="mt-4">
+            <Button type="submit" variant="danger">
+              Borrar partido
+            </Button>
+          </form>
+        </Card>
+      ) : null}
 
       <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery("/admin", selectedOrganization.slug)}>
         Volver al panel del grupo

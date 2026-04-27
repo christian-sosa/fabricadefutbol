@@ -5,7 +5,7 @@ import { buildMatchWhatsAppMessage, buildWhatsAppShareUrl, getWhatsAppShareTarge
 const shareEmojis = {
   soccer: String.fromCodePoint(0x26bd),
   fire: String.fromCodePoint(0x1f525),
-  yellowCircle: String.fromCodePoint(0x1f7e1),
+  matchup: String.fromCodePoint(0x2694, 0xfe0f),
   pointer: String.fromCodePoint(0x1f449)
 } as const;
 
@@ -18,7 +18,7 @@ describe("share helpers", () => {
         `${shareEmojis.soccer} Partido confirmado`,
         "",
         `${shareEmojis.fire} Equipos armados`,
-        `${shareEmojis.yellowCircle} Negro vs Blanco`,
+        `${shareEmojis.matchup} Negro vs Blanco`,
         "",
         `${shareEmojis.pointer} Ver jugadores y posiciones:`,
         matchUrl
@@ -39,7 +39,7 @@ describe("share helpers", () => {
         `${shareEmojis.soccer} Partido confirmado`,
         "",
         `${shareEmojis.fire} Equipos armados`,
-        `${shareEmojis.yellowCircle} Equipo A vs Equipo B`,
+        `${shareEmojis.matchup} Equipo A vs Equipo B`,
         "",
         `${shareEmojis.pointer} Ver jugadores y posiciones:`,
         matchUrl
@@ -47,7 +47,7 @@ describe("share helpers", () => {
     )}`);
     expect(shareUrl).toContain("%E2%9A%BD");
     expect(shareUrl).toContain("%F0%9F%94%A5");
-    expect(shareUrl).toContain("%F0%9F%9F%A1");
+    expect(shareUrl).toContain("%E2%9A%94%EF%B8%8F");
     expect(shareUrl).toContain("%F0%9F%91%89");
     expect(shareUrl).not.toContain("%EF%BF%BD");
   });

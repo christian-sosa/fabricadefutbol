@@ -11,7 +11,7 @@ export type WhatsAppShareTarget = "mobile" | "web";
 const WHATSAPP_SHARE_EMOJIS = {
   soccer: String.fromCodePoint(0x26bd),
   fire: String.fromCodePoint(0x1f525),
-  yellowCircle: String.fromCodePoint(0x1f7e1),
+  matchup: String.fromCodePoint(0x2694, 0xfe0f),
   pointer: String.fromCodePoint(0x1f449)
 } as const;
 
@@ -24,7 +24,7 @@ export function buildMatchWhatsAppMessage({
     `${WHATSAPP_SHARE_EMOJIS.soccer} Partido confirmado`,
     "",
     `${WHATSAPP_SHARE_EMOJIS.fire} Equipos armados`,
-    `${WHATSAPP_SHARE_EMOJIS.yellowCircle} ${teamAName} vs ${teamBName}`,
+    `${WHATSAPP_SHARE_EMOJIS.matchup} ${teamAName} vs ${teamBName}`,
     "",
     `${WHATSAPP_SHARE_EMOJIS.pointer} Ver jugadores y posiciones:`,
     matchUrl
