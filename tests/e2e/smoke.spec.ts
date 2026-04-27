@@ -73,5 +73,5 @@ test("login admin, crea partido, carga resultado y lo ve en publico", async ({ p
 
   await page.goto(`/matches/${matchId}?org=${ORG_SLUG}`);
   await expect(page.getByText("3 - 2")).toBeVisible();
-  await expect(page.getByText("Ganador: Equipo A")).toBeVisible();
+  await expect(page.getByText("Ganador: Negro")).toBeVisible();
 });
