@@ -8,12 +8,10 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ReactQueryProvider } from "@/components/providers/react-query-provider";
 import { shouldRenderAds } from "@/lib/env";
+import { getPublicAppUrl } from "@/lib/public-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const APP_URL =
-  process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-  process.env.APP_URL?.trim() ||
-  "https://fabricadefutbol.com";
+const APP_URL = getPublicAppUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),

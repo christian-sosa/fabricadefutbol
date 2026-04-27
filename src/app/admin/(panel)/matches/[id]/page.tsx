@@ -12,6 +12,7 @@ import { MatchLineupEditor } from "@/components/admin/match-lineup-editor";
 import { MatchResultEditorQuery } from "@/components/admin/match-result-editor-query";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { TeamOptionCard } from "@/components/matches/team-option-card";
+import { WhatsAppShareButton } from "@/components/matches/whatsapp-share-button";
 import { MATCH_STATUS_LABELS, MatchStatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,7 @@ import { Select } from "@/components/ui/select";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { formatMatchDateTime, matchIsoToDatetimeLocal } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
+import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getAdminMatchDetails, getSelectablePlayers } from "@/lib/queries/admin";
 
 type OptionMember = {
@@ -58,6 +60,7 @@ export default async function AdminMatchDetailPage({
   const canManageResult = details.match.status === "confirmed" || details.match.status === "finished";
   const confirmedOption = details.options.find((option) => option.is_confirmed) ?? null;
   const visibleOptions = confirmedOption ? [confirmedOption] : details.options;
+  const publicMatchUrl = buildAbsolutePublicUrl(withOrgQuery(`/matches/${id}`, selectedOrganization.slug));
   const editableParticipants = confirmedOption
     ? [
         ...confirmedOption.teamA.map((member: OptionMember) => ({
@@ -157,7 +160,7 @@ export default async function AdminMatchDetailPage({
       ) : null}
 
       <Card>
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle>{confirmedOption ? "Equipo confirmado" : "Opciones de equipos"}</CardTitle>
             <CardDescription>
@@ -166,6 +169,9 @@ export default async function AdminMatchDetailPage({
                 : "Puedes regenerar en estado draft y confirmar una opcion final."}
             </CardDescription>
           </div>
+          {details.match.status === "confirmed" && confirmedOption ? (
+            <WhatsAppShareButton className="w-full shrink-0 sm:w-auto" matchUrl={publicMatchUrl} />
+          ) : null}
           {details.match.status === "draft" ? (
             <form action={regenerateAction}>
               <Button type="submit" variant="ghost">
