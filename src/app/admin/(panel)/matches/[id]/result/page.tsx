@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { MatchResultEditorQuery } from "@/components/admin/match-result-editor-query";
-import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { withOrgQuery } from "@/lib/org";
@@ -24,7 +24,7 @@ export default async function AdminMatchResultPage({
   searchParams: Promise<{ org?: string; error?: string }>;
 }) {
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
-  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
+  const { admin, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
   const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   if (!writeAccess.canWrite) {
     const target = withOrgQuery("/admin", selectedOrganization.slug);
@@ -65,17 +65,7 @@ export default async function AdminMatchResultPage({
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle>Grupo activo: {selectedOrganization.name}</CardTitle>
-        <div className="mt-3">
-          <OrganizationSwitcher
-            basePath={`/admin/matches/${id}/result`}
-            currentOrganizationSlug={selectedOrganization.slug}
-            label="Cambiar grupo"
-            organizations={organizations}
-          />
-        </div>
-      </Card>
+      <AdminCurrentGroupCard organization={selectedOrganization} />
 
       {resolvedSearchParams.error ? (
         <p className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">

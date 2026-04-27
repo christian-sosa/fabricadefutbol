@@ -88,6 +88,26 @@ describe("NewMatchForm", () => {
     ).toBeDisabled();
   });
 
+  it("aclara la escala especial para invitados temporales", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <NewMatchForm organizationId="org-1" players={buildPlayers(10)} />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
+
+    expect(screen.getByText(/Figura destacada: invitado superior/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Figura destacada - superior al Nivel 1" })
+    ).toHaveValue("0.5");
+
+    await user.type(screen.getByPlaceholderText("Nombre invitado #1"), "Crack");
+    await user.selectOptions(screen.getByLabelText("Nivel de Crack"), "0.5");
+
+    const ratingSelect = container.querySelector('select[name="guestRatings"]') as HTMLSelectElement;
+    expect(ratingSelect.value).toBe("0.5");
+  });
+
   it("bloquea el submit manual si los arqueros quedan en el mismo equipo", async () => {
     const user = userEvent.setup();
     const { container } = render(

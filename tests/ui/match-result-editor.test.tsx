@@ -55,8 +55,7 @@ describe("MatchResultEditor", () => {
     await user.click(screen.getByLabelText("Aplicar regla de desventaja numerica"));
     await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
     await user.type(screen.getByPlaceholderText("Nombre invitado"), "Invitado B");
-    await user.clear(screen.getByPlaceholderText("Rendimiento"));
-    await user.type(screen.getByPlaceholderText("Rendimiento"), "8");
+    await user.selectOptions(screen.getByLabelText("Nivel de Invitado B"), "0.5");
     await user.selectOptions(screen.getByLabelText("Equipo de Invitado B"), "B");
 
     const payload = getLineupPayload(container);
@@ -67,7 +66,7 @@ describe("MatchResultEditor", () => {
     expect(payload.newGuests).toEqual([
       {
         name: "Invitado B",
-        rating: 8,
+        rating: 0.5,
         team: "B"
       }
     ]);
@@ -92,8 +91,7 @@ describe("MatchResultEditor", () => {
     await user.selectOptions(screen.getByLabelText("Equipo de Jugador 2"), "OUT");
     await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
     await user.type(screen.getByPlaceholderText("Nombre invitado"), "Refuerzo");
-    await user.clear(screen.getByPlaceholderText("Rendimiento"));
-    await user.type(screen.getByPlaceholderText("Rendimiento"), "7");
+    await user.selectOptions(screen.getByLabelText("Nivel de Refuerzo"), "2");
     await user.click(screen.getByLabelText("Aplicar regla de desventaja numerica"));
     await user.selectOptions(screen.getByLabelText("Equipo de Refuerzo"), "B");
     await user.type(screen.getByPlaceholderText("Notas opcionales"), " editada");
@@ -110,7 +108,7 @@ describe("MatchResultEditor", () => {
             { participantId: "player:player-2", team: "OUT" },
             { participantId: "player:player-3", team: "B" }
           ],
-          newGuests: [{ name: "Refuerzo", rating: 7, team: "B" }],
+          newGuests: [{ name: "Refuerzo", rating: 2, team: "B" }],
           newPlayers: [],
           handicapTeam: "A"
         }

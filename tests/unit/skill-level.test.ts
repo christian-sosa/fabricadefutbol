@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  calculateGuestDisplayRating,
+  calculateGuestSkillScore,
   calculateEffectiveSkillLevel,
   calculateEffectiveSkillScore,
   formatSkillLevelLabel,
+  formatGuestSkillLevelLabel,
+  GUEST_FEATURED_SKILL_LEVEL,
   mapInitialRankToSkillLevel,
-  normalizeSkillLevel
+  normalizeSkillLevel,
+  parseGuestSkillLevelValue
 } from "@/lib/domain/skill-level";
 
 describe("skill level helpers", () => {
@@ -48,5 +53,19 @@ describe("skill level helpers", () => {
     expect(formatSkillLevelLabel(1)).toBe("Nivel 1 - Figura");
     expect(formatSkillLevelLabel(3)).toBe("Nivel 3 - Intermedio");
     expect(formatSkillLevelLabel(5)).toBe("Nivel 5 - Principiante");
+  });
+
+  it("agrega una escala especial para invitados superiores al Nivel 1", () => {
+    expect(parseGuestSkillLevelValue("0.5")).toBe(GUEST_FEATURED_SKILL_LEVEL);
+    expect(parseGuestSkillLevelValue("1")).toBe(1);
+    expect(parseGuestSkillLevelValue("1.5")).toBeNull();
+    expect(parseGuestSkillLevelValue("6")).toBeNull();
+    expect(formatGuestSkillLevelLabel(GUEST_FEATURED_SKILL_LEVEL)).toBe(
+      "Figura destacada - superior al Nivel 1"
+    );
+    expect(calculateGuestSkillScore(GUEST_FEATURED_SKILL_LEVEL)).toBe(525);
+    expect(calculateGuestSkillScore(1)).toBe(500);
+    expect(calculateGuestDisplayRating(GUEST_FEATURED_SKILL_LEVEL)).toBe(1050);
+    expect(calculateGuestDisplayRating(3)).toBe(900);
   });
 });

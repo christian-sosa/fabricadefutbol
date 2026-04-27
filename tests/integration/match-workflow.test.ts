@@ -6,7 +6,11 @@ import {
   saveConfirmedMatchLineup,
   saveMatchResult
 } from "@/lib/domain/match-workflow";
-import { calculateEffectiveSkillScore } from "@/lib/domain/skill-level";
+import {
+  calculateEffectiveSkillScore,
+  calculateGuestSkillScore,
+  GUEST_FEATURED_SKILL_LEVEL
+} from "@/lib/domain/skill-level";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 const ORG_ID = "org-1";
@@ -182,7 +186,7 @@ describe("match workflow", () => {
       current_rating: [1080, 1000, 1060, 990, 1000, 1000, 930, 980][index]
     }));
     const guests = [
-      { key: "guest-1", name: "Invitado Nivel 1", rating: 1 },
+      { key: "guest-1", name: "Invitado destacado", rating: GUEST_FEATURED_SKILL_LEVEL },
       { key: "guest-2", name: "Invitado Nivel 4", rating: 4 }
     ];
     const fake = createFakeSupabase({
@@ -200,15 +204,7 @@ describe("match workflow", () => {
           }),
         0
       ) +
-      guests.reduce(
-        (sum, guest) =>
-          sum +
-          calculateEffectiveSkillScore({
-            skillLevel: guest.rating,
-            currentRating: 1000
-          }),
-        0
-      );
+      guests.reduce((sum, guest) => sum + calculateGuestSkillScore(guest.rating), 0);
 
     const matchId = await createDraftMatchWithOptions({
       supabase: fake.client as never,
@@ -226,7 +222,10 @@ describe("match workflow", () => {
       expect(Number(option.rating_sum_a) + Number(option.rating_sum_b)).toBe(expectedTotalScore);
     }
     expect(fake.table("match_guests")).toEqual([
-      expect.objectContaining({ guest_name: "Invitado Nivel 1", guest_rating: 1 }),
+      expect.objectContaining({
+        guest_name: "Invitado destacado",
+        guest_rating: GUEST_FEATURED_SKILL_LEVEL
+      }),
       expect.objectContaining({ guest_name: "Invitado Nivel 4", guest_rating: 4 })
     ]);
     expect(fake.find("players", (row) => row.id === "player-1")).toEqual(
@@ -416,7 +415,7 @@ describe("match workflow", () => {
             { participantId: "player:player-3", team: "B" },
             { participantId: "player:player-4", team: "B" }
           ],
-          newGuests: [{ name: "Invitado B", rating: 8, team: "B" }],
+          newGuests: [{ name: "Invitado B", rating: GUEST_FEATURED_SKILL_LEVEL, team: "B" }],
           handicapTeam: "A"
         }
       }
@@ -594,7 +593,7 @@ describe("match workflow", () => {
           { participantId: "player:player-4", team: "B" }
         ],
         newPlayers: [{ playerId: "player-5", team: "A" }],
-        newGuests: [{ name: "Invitado A", rating: 7, team: "A" }]
+        newGuests: [{ name: "Invitado A", rating: 2, team: "A" }]
       }
     });
 

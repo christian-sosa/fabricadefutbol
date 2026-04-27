@@ -7,6 +7,7 @@ import { z } from "zod";
 import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/lib/auth/admin";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { createDraftMatchWithOptions } from "@/lib/domain/match-workflow";
+import { parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
 import { datetimeLocalToMatchIso } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { logError, logInfo } from "@/lib/observability/log";
@@ -66,9 +67,9 @@ function parseGuestsFromForm(formData: FormData): GuestDraftInput[] {
       throw new Error(`Completa nombre y nivel equivalente para el invitado ${index + 1}.`);
     }
 
-    const numericRating = Number(ratingRaw);
-    if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
-      throw new Error(`El nivel equivalente del invitado ${index + 1} debe estar entre 1 y 5.`);
+    const guestSkillLevel = parseGuestSkillLevelValue(ratingRaw);
+    if (guestSkillLevel === null) {
+      throw new Error(`Selecciona un nivel equivalente valido para el invitado ${index + 1}.`);
     }
 
     const key = keyRaw.length ? keyRaw : `guest-${index + 1}`;
@@ -80,7 +81,7 @@ function parseGuestsFromForm(formData: FormData): GuestDraftInput[] {
     guests.push({
       key,
       name,
-      rating: Math.trunc(numericRating)
+      rating: guestSkillLevel
     });
   }
 

@@ -3,10 +3,18 @@ import { z } from "zod";
 
 import { assertOrganizationAdminAction } from "@/lib/auth/admin";
 import { saveMatchResult } from "@/lib/domain/match-workflow";
+import { parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
 import { toUserMessage } from "@/lib/errors";
 import { logError, logInfo, logWarn } from "@/lib/observability/log";
 import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+const guestSkillLevelSchema = z
+  .number()
+  .refine(
+    (value) => parseGuestSkillLevelValue(value) !== null,
+    "Selecciona un nivel equivalente valido para cada invitado."
+  );
 
 const requestSchema = z.object({
   scoreA: z.number().int().nonnegative(),
@@ -26,7 +34,7 @@ const requestSchema = z.object({
         .array(
           z.object({
             name: z.string().trim().min(1),
-            rating: z.number().positive(),
+            rating: guestSkillLevelSchema,
             team: z.enum(["A", "B"])
           })
         )

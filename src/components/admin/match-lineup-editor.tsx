@@ -5,6 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import {
+  formatGuestSkillLevelLabel,
+  GUEST_SKILL_LEVEL_HELP_TEXT,
+  GUEST_SKILL_LEVEL_OPTIONS,
+  parseGuestSkillLevelValue
+} from "@/lib/domain/skill-level";
 import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL } from "@/lib/team-labels";
 import { formatRendimiento } from "@/lib/utils";
 import type { TeamSide } from "@/types/domain";
@@ -45,8 +51,7 @@ type MatchLineupEditorProps = {
 };
 
 function isValidGuest(guest: GuestDraft) {
-  const parsedRating = Number(guest.rating);
-  return guest.name.trim().length > 0 && Number.isFinite(parsedRating) && parsedRating > 0;
+  return guest.name.trim().length > 0 && parseGuestSkillLevelValue(guest.rating) !== null;
 }
 
 export function MatchLineupEditor({
@@ -139,7 +144,7 @@ export function MatchLineupEditor({
         })),
         newGuests: validNewGuests.map((guest) => ({
           name: guest.name.trim(),
-          rating: Number(guest.rating),
+          rating: parseGuestSkillLevelValue(guest.rating) ?? 3,
           team: guest.team
         }))
       }),
@@ -168,6 +173,7 @@ export function MatchLineupEditor({
                 </span>
               </div>
               <Select
+                aria-label={`Equipo de ${participant.fullName}`}
                 onChange={(event) =>
                   setAssignments((current) => ({
                     ...current,
@@ -189,6 +195,7 @@ export function MatchLineupEditor({
         <p className="text-sm font-semibold text-slate-100">Subir jugador de la plantilla</p>
         <div className="mt-3 grid gap-2 md:grid-cols-[1fr_130px_auto]">
           <Select
+            aria-label="Jugador de reemplazo"
             disabled={!availableReplacementPlayers.length}
             onChange={(event) => setSelectedReplacementPlayerId(event.target.value)}
             value={selectedReplacementPlayerId}
@@ -203,6 +210,7 @@ export function MatchLineupEditor({
             ))}
           </Select>
           <Select
+            aria-label="Equipo del reemplazo"
             onChange={(event) => setSelectedReplacementTeam(event.target.value as TeamSide)}
             value={selectedReplacementTeam}
           >
@@ -239,6 +247,7 @@ export function MatchLineupEditor({
                   </span>
                 </div>
                 <Select
+                  aria-label={`Equipo de ${playerData?.fullName ?? "Jugador"}`}
                   onChange={(event) =>
                     setReplacementPlayers((current) =>
                       current.map((item) =>
@@ -275,7 +284,10 @@ export function MatchLineupEditor({
 
       <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-slate-100">Invitados de reemplazo</p>
+          <div>
+            <p className="text-sm font-semibold text-slate-100">Invitados de reemplazo</p>
+            <p className="text-xs text-slate-400">{GUEST_SKILL_LEVEL_HELP_TEXT}</p>
+          </div>
           <Button
             onClick={() => {
               setNewGuests((current) => [
@@ -283,7 +295,7 @@ export function MatchLineupEditor({
                 {
                   id: guestSequence,
                   name: "",
-                  rating: "1000",
+                  rating: "",
                   team: "A"
                 }
               ]);
@@ -298,7 +310,7 @@ export function MatchLineupEditor({
         <div className="mt-3 space-y-2">
           {newGuests.map((guest) => (
             <div
-              className="grid gap-2 rounded-lg border border-slate-800 bg-slate-900/80 p-2 md:grid-cols-[1fr_120px_130px_96px]"
+              className="grid gap-2 rounded-lg border border-slate-800 bg-slate-900/80 p-2 md:grid-cols-[1fr_200px_130px_96px]"
               key={guest.id}
             >
               <Input
@@ -312,8 +324,8 @@ export function MatchLineupEditor({
                 placeholder="Nombre invitado"
                 value={guest.name}
               />
-              <Input
-                min={1}
+              <Select
+                aria-label={`Nivel de ${guest.name.trim() || "invitado"}`}
                 onChange={(event) =>
                   setNewGuests((current) =>
                     current.map((item) =>
@@ -321,12 +333,17 @@ export function MatchLineupEditor({
                     )
                   )
                 }
-                placeholder="Rendimiento"
-                step={1}
-                type="number"
                 value={guest.rating}
-              />
+              >
+                <option value="">Nivel del invitado</option>
+                {GUEST_SKILL_LEVEL_OPTIONS.map((level) => (
+                  <option key={level} value={level}>
+                    {formatGuestSkillLevelLabel(level)}
+                  </option>
+                ))}
+              </Select>
               <Select
+                aria-label={`Equipo de ${guest.name.trim() || "invitado"}`}
                 onChange={(event) =>
                   setNewGuests((current) =>
                     current.map((item) =>

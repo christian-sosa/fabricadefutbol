@@ -8,8 +8,8 @@ import {
   updateMatchAction,
   updateMatchTeamLabelsAction
 } from "@/app/admin/(panel)/matches/[id]/actions";
+import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { MatchTeamLabelsShareForm } from "@/components/admin/match-team-labels-share-form";
-import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { TeamOptionCard } from "@/components/matches/team-option-card";
 import { MATCH_STATUS_LABELS } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ export default async function AdminMatchDetailPage({
   searchParams: Promise<{ org?: string; error?: string }>;
 }) {
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
-  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
+  const { admin, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
   const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   if (!writeAccess.canWrite) {
     const target = withOrgQuery("/admin", selectedOrganization.slug);
@@ -56,17 +56,7 @@ export default async function AdminMatchDetailPage({
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle>Grupo activo: {selectedOrganization.name}</CardTitle>
-        <div className="mt-3">
-          <OrganizationSwitcher
-            basePath={`/admin/matches/${id}`}
-            currentOrganizationSlug={selectedOrganization.slug}
-            label="Cambiar grupo"
-            organizations={organizations}
-          />
-        </div>
-      </Card>
+      <AdminCurrentGroupCard organization={selectedOrganization} />
 
       {resolvedSearchParams.error ? (
         <p className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">

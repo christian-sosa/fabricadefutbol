@@ -1,6 +1,12 @@
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { calculateMatchRatingAdjustments, deriveWinnerTeam } from "@/lib/domain/rating";
-import { calculateEffectiveSkillScore, mapInitialRankToSkillLevel } from "@/lib/domain/skill-level";
+import {
+  calculateEffectiveSkillScore,
+  calculateGuestDisplayRating,
+  calculateGuestSkillScore,
+  mapInitialRankToSkillLevel,
+  parseGuestSkillLevelValue
+} from "@/lib/domain/skill-level";
 import { generateBalancedTeamOptions } from "@/lib/domain/team-generator";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { MatchModality, MatchResultInput, ResultAssignmentTeam, TeamSide } from "@/types/domain";
@@ -241,10 +247,7 @@ function toBalancePlayers(
   const guestPlayers: BalanceParticipant[] = guests.map((guest) => ({
     id: toGuestParticipantId(guest.id),
     fullName: guest.guest_name,
-    rating: calculateEffectiveSkillScore({
-      skillLevel: Number(guest.guest_rating),
-      currentRating: 1000
-    })
+    rating: calculateGuestSkillScore(guest.guest_rating)
   }));
 
   return [...basePlayers, ...guestPlayers];
@@ -764,7 +767,7 @@ async function loadConfirmedTeams(
       source: "guest",
       entityId: guest.id,
       full_name: guest.guest_name,
-      current_rating: Number(guest.guest_rating)
+      current_rating: calculateGuestDisplayRating(guest.guest_rating)
     };
     if (row.team === "A") teamA.push(normalized);
     if (row.team === "B") teamB.push(normalized);
@@ -797,13 +800,14 @@ function normalizeLineupGuests(rawGuests: NewGuestLineupInput[] | undefined) {
     if (!normalizedName) {
       throw new Error("Los invitados agregados deben tener nombre.");
     }
-    if (!Number.isFinite(normalizedRating) || normalizedRating <= 0) {
-      throw new Error(`El invitado ${normalizedName} tiene un rendimiento invalido.`);
+    const guestSkillLevel = parseGuestSkillLevelValue(normalizedRating);
+    if (guestSkillLevel === null) {
+      throw new Error(`El invitado ${normalizedName} tiene un nivel equivalente invalido.`);
     }
 
     return {
       name: normalizedName,
-      rating: Math.round(normalizedRating),
+      rating: guestSkillLevel,
       team: guest.team
     };
   });
@@ -861,7 +865,7 @@ async function insertNewLineupGuests(params: {
       source: "guest",
       entityId: data.id,
       full_name: data.guest_name,
-      current_rating: Number(data.guest_rating)
+      current_rating: calculateGuestDisplayRating(data.guest_rating)
     });
   }
 

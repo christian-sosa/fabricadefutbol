@@ -6,6 +6,7 @@ import {
   isIsoDateExpired
 } from "@/lib/domain/billing";
 import { cleanupStalePendingOrganizationBillingPayments } from "@/lib/domain/billing-workflow";
+import { calculateGuestDisplayRating } from "@/lib/domain/skill-level";
 import {
   countPendingInvitesByOrganization,
   fetchPendingInvitesForOrganization
@@ -305,7 +306,7 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
         .map((guest) => ({
           id: guest.id,
           full_name: guest.guest_name,
-          current_rating: Number(guest.guest_rating),
+          current_rating: calculateGuestDisplayRating(guest.guest_rating),
           is_guest: true
         }));
       const teamBFromPlayers = memberPlayers
@@ -320,7 +321,7 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
         .map((guest) => ({
           id: guest.id,
           full_name: guest.guest_name,
-          current_rating: Number(guest.guest_rating),
+          current_rating: calculateGuestDisplayRating(guest.guest_rating),
           is_guest: true
         }));
 

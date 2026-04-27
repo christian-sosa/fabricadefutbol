@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
+import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { NewMatchForm } from "@/components/admin/new-match-form";
-import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { withOrgQuery } from "@/lib/org";
@@ -13,7 +13,7 @@ export default async function NewMatchPage({
   searchParams: Promise<{ org?: string; error?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
+  const { admin, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
   const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   if (!writeAccess.canWrite) {
     const target = withOrgQuery("/admin", selectedOrganization.slug);
@@ -25,17 +25,7 @@ export default async function NewMatchPage({
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle>Grupo activo: {selectedOrganization.name}</CardTitle>
-        <div className="mt-3">
-          <OrganizationSwitcher
-            basePath="/admin/matches/new"
-            currentOrganizationSlug={selectedOrganization.slug}
-            label="Cambiar grupo"
-            organizations={organizations}
-          />
-        </div>
-      </Card>
+      <AdminCurrentGroupCard organization={selectedOrganization} />
 
       <Card>
         <CardTitle>Crear partido</CardTitle>

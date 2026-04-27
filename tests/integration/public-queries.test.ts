@@ -338,7 +338,7 @@ describe("resolvePublicOrganization", () => {
     expect(secondPage.pagination.hasPreviousPage).toBe(true);
   });
 
-  it("mezcla jugadores e invitados en proximos partidos y los ordena por rating", async () => {
+  it("mezcla jugadores e invitados en proximos partidos y ordena invitados por nivel equivalente", async () => {
     const fake = createFakeSupabase({
       players: buildPlayers(),
       matches: [
@@ -370,8 +370,8 @@ describe("resolvePublicOrganization", () => {
         { team_option_id: "option-1", player_id: "player-3", team: "B" }
       ],
       match_guests: [
-        { id: "guest-1", match_id: "match-1", guest_name: "Invitado Top", guest_rating: 1180 },
-        { id: "guest-2", match_id: "match-1", guest_name: "Invitado Bajo", guest_rating: 900 }
+        { id: "guest-1", match_id: "match-1", guest_name: "Invitado Top", guest_rating: 0.5 },
+        { id: "guest-2", match_id: "match-1", guest_name: "Invitado Bajo", guest_rating: 5 }
       ],
       team_option_guests: [
         { team_option_id: "option-1", guest_id: "guest-1", team: "A" },

@@ -6,8 +6,8 @@ import {
   deletePlayerAction,
   uploadPlayerPhotoAction
 } from "@/app/admin/(panel)/players/actions";
+import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { PhotoUploadInput } from "@/components/admin/photo-upload-input";
-import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
@@ -26,7 +26,7 @@ export default async function AdminPlayersPage({
   searchParams: Promise<{ org?: string; error?: string; success?: string; refresh?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const { admin, organizations, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
+  const { admin, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
   const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   if (!writeAccess.canWrite) {
     const target = withOrgQuery("/admin", selectedOrganization.slug);
@@ -41,17 +41,7 @@ export default async function AdminPlayersPage({
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle>Grupo activo: {selectedOrganization.name}</CardTitle>
-        <div className="mt-3">
-          <OrganizationSwitcher
-            basePath="/admin/players"
-            currentOrganizationSlug={selectedOrganization.slug}
-            label="Cambiar grupo"
-            organizations={organizations}
-          />
-        </div>
-      </Card>
+      <AdminCurrentGroupCard organization={selectedOrganization} />
 
       <Card>
         <CardTitle>Alta de jugador</CardTitle>
