@@ -85,9 +85,12 @@ const lineupAdjustmentSchema = z.object({
 const updateMatchSchema = z.object({
   scheduledAt: z.string().min(1, "La fecha es obligatoria."),
   location: z.string().optional(),
-  teamALabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del primer equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),
-  teamBLabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del segundo equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),
   status: z.enum(["draft", "confirmed", "finished", "cancelled"])
+});
+
+const updateTeamLabelsSchema = z.object({
+  teamALabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del primer equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),
+  teamBLabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del segundo equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional()
 });
 
 function buildPath(matchId: string, organizationKey: string, error?: string) {
@@ -278,8 +281,6 @@ export async function updateMatchAction(matchId: string, organizationId: string,
     const parsed = updateMatchSchema.safeParse({
       scheduledAt: formData.get("scheduledAt"),
       location: formData.get("location"),
-      teamALabel: normalizeTeamLabel(String(formData.get("teamALabel") ?? "")) ?? undefined,
-      teamBLabel: normalizeTeamLabel(String(formData.get("teamBLabel") ?? "")) ?? undefined,
       status: formData.get("status")
     });
 
@@ -291,15 +292,11 @@ export async function updateMatchAction(matchId: string, organizationId: string,
     const payload: {
       scheduled_at: string;
       location: string | null;
-      team_a_label: string | null;
-      team_b_label: string | null;
       status: "draft" | "confirmed" | "finished" | "cancelled";
       finished_at?: string | null;
     } = {
       scheduled_at: datetimeLocalToMatchIso(parsed.data.scheduledAt),
       location: parsed.data.location || null,
-      team_a_label: normalizeTeamLabel(parsed.data.teamALabel),
-      team_b_label: normalizeTeamLabel(parsed.data.teamBLabel),
       status: parsed.data.status
     };
 
@@ -326,6 +323,58 @@ export async function updateMatchAction(matchId: string, organizationId: string,
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo actualizar partido.";
+    redirect(buildPath(matchId, organizationQueryKey, message));
+  }
+}
+
+export async function updateMatchTeamLabelsAction(matchId: string, organizationId: string, formData: FormData) {
+  const organizationQueryKey = await getOrganizationQueryKeyById(organizationId);
+  try {
+    await assertOrganizationAdminAction(organizationId);
+    const parsed = updateTeamLabelsSchema.safeParse({
+      teamALabel: normalizeTeamLabel(String(formData.get("teamALabel") ?? "")) ?? undefined,
+      teamBLabel: normalizeTeamLabel(String(formData.get("teamBLabel") ?? "")) ?? undefined
+    });
+
+    if (!parsed.success) {
+      redirect(buildPath(matchId, organizationQueryKey, parsed.error.issues[0]?.message ?? "Datos invalidos."));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { data: match, error: matchError } = await supabase
+      .from("matches")
+      .select("id, confirmed_option_id")
+      .eq("id", matchId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+
+    if (matchError) {
+      redirect(buildPath(matchId, organizationQueryKey, matchError.message));
+    }
+
+    if (!match?.confirmed_option_id) {
+      redirect(buildPath(matchId, organizationQueryKey, "Primero confirma una opcion de equipos para nombrarlos."));
+    }
+
+    const { error } = await supabase
+      .from("matches")
+      .update({
+        team_a_label: normalizeTeamLabel(parsed.data.teamALabel),
+        team_b_label: normalizeTeamLabel(parsed.data.teamBLabel)
+      })
+      .eq("id", matchId)
+      .eq("organization_id", organizationId);
+
+    if (error) {
+      redirect(buildPath(matchId, organizationQueryKey, error.message));
+    }
+
+    await refreshOrganizationPublicSnapshotSafe(organizationId);
+    revalidateMatchPaths(matchId);
+    redirect(buildPath(matchId, organizationQueryKey));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    const message = error instanceof Error ? error.message : "No se pudieron guardar los nombres de equipos.";
     redirect(buildPath(matchId, organizationQueryKey, message));
   }
 }

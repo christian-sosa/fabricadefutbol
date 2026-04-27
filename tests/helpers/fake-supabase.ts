@@ -265,6 +265,8 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!normalized.status) normalized.status = "draft";
       if (!("confirmed_option_id" in normalized)) normalized.confirmed_option_id = null;
       if (!("finished_at" in normalized)) normalized.finished_at = null;
+      if (!("team_a_label" in normalized)) normalized.team_a_label = null;
+      if (!("team_b_label" in normalized)) normalized.team_b_label = null;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "team_options":

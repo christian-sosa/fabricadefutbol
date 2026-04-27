@@ -6,13 +6,14 @@ import {
   deleteMatchAction,
   regenerateOptionsAction,
   saveLineupBeforeResultAction,
-  updateMatchAction
+  updateMatchAction,
+  updateMatchTeamLabelsAction
 } from "@/app/admin/(panel)/matches/[id]/actions";
 import { MatchLineupEditor } from "@/components/admin/match-lineup-editor";
 import { MatchResultEditorQuery } from "@/components/admin/match-result-editor-query";
+import { MatchTeamLabelsShareForm } from "@/components/admin/match-team-labels-share-form";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { TeamOptionCard } from "@/components/matches/team-option-card";
-import { WhatsAppShareButton } from "@/components/matches/whatsapp-share-button";
 import { MATCH_STATUS_LABELS, MatchStatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -23,7 +24,7 @@ import { formatMatchDateTime, matchIsoToDatetimeLocal } from "@/lib/match-dateti
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getAdminMatchDetails, getSelectablePlayers } from "@/lib/queries/admin";
-import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL, TEAM_LABEL_MAX_LENGTH, resolveMatchTeamLabels } from "@/lib/team-labels";
+import { resolveMatchTeamLabels } from "@/lib/team-labels";
 
 type OptionMember = {
   id: string;
@@ -53,6 +54,7 @@ export default async function AdminMatchDetailPage({
   const confirmAction = confirmOptionAction.bind(null, id, selectedOrganization.id);
   const regenerateAction = regenerateOptionsAction.bind(null, id, selectedOrganization.id);
   const matchUpdateAction = updateMatchAction.bind(null, id, selectedOrganization.id);
+  const teamLabelsUpdateAction = updateMatchTeamLabelsAction.bind(null, id, selectedOrganization.id);
   const deleteAction = deleteMatchAction.bind(null, id, selectedOrganization.id);
   const saveLineupAction = saveLineupBeforeResultAction.bind(null, id, selectedOrganization.id);
   const canDeleteMatch =
@@ -114,7 +116,7 @@ export default async function AdminMatchDetailPage({
 
       <Card>
         <CardTitle>Editar partido</CardTitle>
-        <form action={matchUpdateAction} className="mt-4 grid gap-3 md:grid-cols-3">
+        <form action={matchUpdateAction} className="mt-4 grid gap-3 md:grid-cols-4">
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="scheduledAt">
               Fecha y hora
@@ -126,30 +128,6 @@ export default async function AdminMatchDetailPage({
               Ubicacion
             </label>
             <Input defaultValue={details.match.location ?? ""} id="location" name="location" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="teamALabel">
-              Nombre del primer equipo
-            </label>
-            <Input
-              defaultValue={details.match.team_a_label ?? ""}
-              id="teamALabel"
-              maxLength={TEAM_LABEL_MAX_LENGTH}
-              name="teamALabel"
-              placeholder={DEFAULT_TEAM_A_LABEL}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="teamBLabel">
-              Nombre del segundo equipo
-            </label>
-            <Input
-              defaultValue={details.match.team_b_label ?? ""}
-              id="teamBLabel"
-              maxLength={TEAM_LABEL_MAX_LENGTH}
-              name="teamBLabel"
-              placeholder={DEFAULT_TEAM_B_LABEL}
-            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="status">
@@ -195,14 +173,6 @@ export default async function AdminMatchDetailPage({
                 : "Puedes regenerar en estado draft y confirmar una opcion final."}
             </CardDescription>
           </div>
-          {details.match.status === "confirmed" && confirmedOption ? (
-            <WhatsAppShareButton
-              className="w-full shrink-0 sm:w-auto"
-              matchUrl={publicMatchUrl}
-              teamAName={teamLabels.teamA}
-              teamBName={teamLabels.teamB}
-            />
-          ) : null}
           {details.match.status === "draft" ? (
             <form action={regenerateAction}>
               <Button type="submit" variant="ghost">
@@ -231,6 +201,22 @@ export default async function AdminMatchDetailPage({
           {!visibleOptions.length ? <p className="text-sm text-slate-400">No hay opciones generadas para este partido.</p> : null}
         </div>
       </Card>
+
+      {confirmedOption ? (
+        <Card>
+          <CardTitle>Nombres para compartir</CardTitle>
+          <CardDescription className="mt-1">
+            Se guardan despues de confirmar el armado final de equipos.
+          </CardDescription>
+          <MatchTeamLabelsShareForm
+            action={teamLabelsUpdateAction}
+            canShare={details.match.status === "confirmed"}
+            initialTeamALabel={details.match.team_a_label}
+            initialTeamBLabel={details.match.team_b_label}
+            matchUrl={publicMatchUrl}
+          />
+        </Card>
+      ) : null}
 
       {canAdjustLineupBeforeResult ? (
         <Card>
