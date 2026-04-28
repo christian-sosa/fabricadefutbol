@@ -19,9 +19,12 @@ import { getCurrentMatchDateTimeIso } from "@/lib/match-datetime";
 import { normalizeEmail } from "@/lib/org";
 import type { MatchHistoryItem, OrganizationMatchesResponse } from "@/lib/query/types";
 import type { Database } from "@/types/database";
+import type { PlayerComputedStats } from "@/types/domain";
 
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+type HomeSummaryBase = Omit<OrganizationPublicSummary, "topPlayers">;
+type HomeSummaryTopPlayer = OrganizationPublicSummary["topPlayers"][number];
 
 type PublicOrganization = {
   id: string;
@@ -82,6 +85,16 @@ function sortConfirmedMatchesForPublic<T extends { scheduled_at: string | null }
 
     return leftIsFuture ? leftTime - rightTime : rightTime - leftTime;
   });
+}
+
+function buildTopPlayersFromStandings(standings: PlayerComputedStats[], limit = 5): HomeSummaryTopPlayer[] {
+  return standings.slice(0, limit).map((player) => ({
+    id: player.playerId,
+    full_name: player.playerName,
+    current_rating: player.currentRating,
+    initial_rank: player.initialRank,
+    display_order: player.currentRank
+  }));
 }
 
 function hashString(input: string) {
@@ -297,13 +310,12 @@ async function fetchMatchTeams(matchIds: string[]) {
     .filter((item): item is MatchWithTeams => item !== null);
 }
 
-async function getHomeSummaryLive(organizationId: string | null): Promise<OrganizationPublicSummary> {
+async function getHomeSummaryBaseLive(organizationId: string | null): Promise<HomeSummaryBase> {
   if (!organizationId) {
     return {
       totalPlayers: 0,
       totalFinishedMatches: 0,
-      upcomingMatches: [],
-      topPlayers: []
+      upcomingMatches: []
     };
   }
 
@@ -326,23 +338,31 @@ async function getHomeSummaryLive(organizationId: string | null): Promise<Organi
   if (playersRes.error) throw new Error(playersRes.error.message);
   if (finishedRes.error) throw new Error(finishedRes.error.message);
 
-  const { data: topPlayers, error: topPlayersError } = await supabase
-    .from("players")
-    .select("id, full_name, current_rating, initial_rank, skill_level, display_order")
-    .eq("organization_id", organizationId)
-    .eq("active", true)
-    .order("current_rating", { ascending: false })
-    .order("skill_level", { ascending: true })
-    .order("display_order", { ascending: true })
-    .order("full_name", { ascending: true })
-    .limit(5);
-  if (topPlayersError) throw new Error(topPlayersError.message);
-
   return {
     totalPlayers: playersRes.count ?? 0,
     totalFinishedMatches: finishedRes.count ?? 0,
-    upcomingMatches,
-    topPlayers: topPlayers ?? []
+    upcomingMatches
+  };
+}
+
+async function getHomeSummaryLive(organizationId: string | null): Promise<OrganizationPublicSummary> {
+  if (!organizationId) {
+    return {
+      totalPlayers: 0,
+      totalFinishedMatches: 0,
+      upcomingMatches: [],
+      topPlayers: []
+    };
+  }
+
+  const [summaryBase, standings] = await Promise.all([
+    getHomeSummaryBaseLive(organizationId),
+    getPlayersWithStatsLive(organizationId)
+  ]);
+
+  return {
+    ...summaryBase,
+    topPlayers: buildTopPlayersFromStandings(standings)
   };
 }
 
@@ -351,10 +371,14 @@ export async function getHomeSummary(organizationId: string | null) {
   if (!organizationId) return getHomeSummaryLive(null);
 
   const supabase = await createSupabaseServerClient();
-  const summary = await readOrganizationPublicSummarySnapshot(supabase, organizationId);
+  const [summary, standings] = await Promise.all([
+    readOrganizationPublicSummarySnapshot(supabase, organizationId),
+    readOrganizationPublicStandingsSnapshot(supabase, organizationId)
+  ]);
   if (summary) {
     return {
       ...summary,
+      topPlayers: standings?.length ? buildTopPlayersFromStandings(standings) : summary.topPlayers,
       upcomingMatches: await getConfirmedMatchSummariesLive(supabase, organizationId)
     };
   }
@@ -601,11 +625,15 @@ export async function getMatchHistoryCards(organizationId: string | null) {
 }
 
 export async function refreshOrganizationPublicSnapshot(organizationId: string) {
-  const [summary, standings, matchHistory] = await Promise.all([
-    getHomeSummaryLive(organizationId),
+  const [summaryBase, standings, matchHistory] = await Promise.all([
+    getHomeSummaryBaseLive(organizationId),
     getPlayersWithStatsLive(organizationId),
     getMatchHistoryCardsForSnapshot(organizationId)
   ]);
+  const summary = {
+    ...summaryBase,
+    topPlayers: buildTopPlayersFromStandings(standings)
+  };
   const payload = buildOrganizationPublicSnapshotPayload({
     summary,
     standings,

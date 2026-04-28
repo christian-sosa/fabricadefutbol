@@ -249,6 +249,132 @@ describe("resolvePublicOrganization", () => {
     });
   });
 
+  it("ordena el top del grupo con los mismos desempates que ranking", async () => {
+    const fake = createFakeSupabase({
+      players: [
+        {
+          id: "player-lucas",
+          organization_id: ORG_ID,
+          full_name: "LucasDias",
+          initial_rank: 2,
+          skill_level: 3,
+          display_order: 2,
+          current_rating: 1030,
+          active: true
+        },
+        {
+          id: "player-gonza",
+          organization_id: ORG_ID,
+          full_name: "GonzaMastro",
+          initial_rank: 1,
+          skill_level: 1,
+          display_order: 1,
+          current_rating: 1030,
+          active: true
+        }
+      ],
+      matches: [
+        {
+          id: "match-1",
+          organization_id: ORG_ID,
+          scheduled_at: "2026-04-18T20:00:00.000Z",
+          modality: "5v5",
+          status: "finished"
+        }
+      ],
+      team_options: [
+        {
+          id: "option-1",
+          match_id: "match-1",
+          option_number: 1,
+          is_confirmed: true,
+          rating_sum_a: 10,
+          rating_sum_b: 10,
+          rating_diff: 0,
+          created_by: "admin-1"
+        }
+      ],
+      team_option_players: [{ team_option_id: "option-1", player_id: "player-lucas", team: "A" }],
+      match_result: [{ match_id: "match-1", score_a: 1, score_b: 0, winner_team: "A", created_by: "admin-1" }]
+    });
+
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    cookiesMock.mockResolvedValue({ get: () => undefined });
+
+    const summary = await getHomeSummary(ORG_ID);
+
+    expect(summary.topPlayers.map((player) => player.id)).toEqual(["player-lucas", "player-gonza"]);
+  });
+
+  it("corrige el top del snapshot usando el orden cacheado de standings", async () => {
+    const fake = createFakeSupabase({
+      organization_public_snapshots: [
+        {
+          organization_id: ORG_ID,
+          summary: {
+            totalPlayers: 2,
+            totalFinishedMatches: 1,
+            upcomingMatches: [],
+            topPlayers: [
+              {
+                id: "player-gonza",
+                full_name: "GonzaMastro",
+                current_rating: 1030,
+                initial_rank: 1
+              },
+              {
+                id: "player-lucas",
+                full_name: "LucasDias",
+                current_rating: 1030,
+                initial_rank: 2
+              }
+            ]
+          },
+          standings: [
+            {
+              playerId: "player-lucas",
+              playerName: "LucasDias",
+              currentRating: 1030,
+              initialRank: 2,
+              currentRank: 1,
+              matchesPlayed: 1,
+              wins: 1,
+              draws: 0,
+              losses: 0,
+              winRate: 100,
+              streak: "W1",
+              goals: 0,
+              assists: 0
+            },
+            {
+              playerId: "player-gonza",
+              playerName: "GonzaMastro",
+              currentRating: 1030,
+              initialRank: 1,
+              currentRank: 2,
+              matchesPlayed: 0,
+              wins: 0,
+              draws: 0,
+              losses: 0,
+              winRate: 0,
+              streak: "-",
+              goals: 0,
+              assists: 0
+            }
+          ],
+          match_history: []
+        }
+      ]
+    });
+
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    cookiesMock.mockResolvedValue({ get: () => undefined });
+
+    const summary = await getHomeSummary(ORG_ID);
+
+    expect(summary.topPlayers.map((player) => player.id)).toEqual(["player-lucas", "player-gonza"]);
+  });
+
   it("interpreta los confirmados de hoy contra la hora de cancha, no contra UTC del servidor", async () => {
     vi.setSystemTime(new Date("2026-04-27T21:00:00.000Z")); // 18:00 en Argentina.
     const fake = createFakeSupabase({
