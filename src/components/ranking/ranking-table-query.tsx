@@ -169,7 +169,7 @@ export function RankingTableQuery({ organizationId, initialPlayers }: RankingTab
               <button
                 aria-label={`Ordenar por ${column.label}`}
                 className={cn(
-                  "inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                  "inline-flex min-h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition",
                   isActive
                     ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
                     : "border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-500 hover:text-slate-100"
@@ -245,7 +245,7 @@ export function RankingTableQuery({ organizationId, initialPlayers }: RankingTab
                   >
                     <button
                       className={cn(
-                        "inline-flex min-h-8 items-center gap-1 text-left uppercase tracking-[0.18em] transition hover:text-emerald-300",
+                        "inline-flex min-h-8 items-center gap-1 whitespace-nowrap text-left uppercase tracking-[0.18em] transition hover:text-emerald-300",
                         isActive ? "text-emerald-300" : "text-slate-400"
                       )}
                       onClick={() => onSort(column.key)}
