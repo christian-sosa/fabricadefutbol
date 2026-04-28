@@ -39,6 +39,23 @@ function getLineupPayload(container: HTMLElement) {
 }
 
 describe("MatchResultEditor", () => {
+  it("identifica los inputs del resultado con el nombre de cada equipo", () => {
+    render(
+      <MatchResultEditor
+        defaultNotes=""
+        defaultScoreA={2}
+        defaultScoreB={1}
+        existingParticipants={existingParticipants}
+        submitLabel="Guardar"
+        teamALabel="TEST1"
+        teamBLabel="TEST2"
+      />
+    );
+
+    expect(screen.getByLabelText("Goles de TEST1")).toHaveAttribute("name", "scoreA");
+    expect(screen.getByLabelText("Goles de TEST2")).toHaveAttribute("name", "scoreB");
+  });
+
   it("actualiza el payload de lineup, invitados y handicap", async () => {
     const user = userEvent.setup();
     const { container } = render(

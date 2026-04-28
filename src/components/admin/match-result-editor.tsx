@@ -238,8 +238,18 @@ export function MatchResultEditor({
       <input name="lineupPayload" type="hidden" value={lineupPayload} />
 
       <div className="grid gap-3 md:grid-cols-4">
-        <Input defaultValue={defaultScoreA} min={0} name="scoreA" required type="number" />
-        <Input defaultValue={defaultScoreB} min={0} name="scoreB" required type="number" />
+        <div>
+          <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="scoreA">
+            Goles de {teamALabel}
+          </label>
+          <Input defaultValue={defaultScoreA} id="scoreA" min={0} name="scoreA" required type="number" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="scoreB">
+            Goles de {teamBLabel}
+          </label>
+          <Input defaultValue={defaultScoreB} id="scoreB" min={0} name="scoreB" required type="number" />
+        </div>
         <Textarea
           className="md:col-span-2"
           defaultValue={defaultNotes ?? ""}
