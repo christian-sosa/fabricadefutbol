@@ -26,7 +26,7 @@ const columnConfig: Array<{ key: SortKey; label: string }> = [
   { key: "pg", label: "PG" },
   { key: "pe", label: "PE" },
   { key: "pp", label: "PP" },
-  { key: "winRate", label: "Win Rate" }
+  { key: "winRate", label: "Efectividad" }
 ];
 
 function readSortableValue(player: PlayerStatsRow, key: SortKey) {
@@ -115,7 +115,7 @@ export function PlayersStatsTable({ players }: { players: PlayerStatsRow[] }) {
                 <p className="mt-1 font-semibold text-slate-100">{player.matchesPlayed}</p>
               </div>
               <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">Win Rate</p>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Efectividad</p>
                 <p className="mt-1 font-semibold text-emerald-300">{formatPercent(player.winRate)}</p>
               </div>
               <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2">

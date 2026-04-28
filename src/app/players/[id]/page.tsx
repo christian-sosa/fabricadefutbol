@@ -67,7 +67,7 @@ export default async function PlayerDetailPage({
             <p>PG: {details.playerStats.wins}</p>
             <p>PE: {details.playerStats.draws}</p>
             <p>PP: {details.playerStats.losses}</p>
-            <p>Win rate: {formatPercent(details.playerStats.winRate)}</p>
+            <p>Efectividad: {formatPercent(details.playerStats.winRate)}</p>
             <p>Racha: {details.playerStats.streak}</p>
             <p>Goles: {details.playerStats.goals}</p>
             <p>Asistencias: {details.playerStats.assists}</p>
