@@ -23,7 +23,7 @@ const CONTENT_TYPE_EXTENSION: Record<string, string> = {
 
 export const PLAYER_PHOTO_CACHE_CONTROL =
   "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400";
-export const PLAYER_PHOTO_PLACEHOLDER_CACHE_CONTROL = "public, max-age=86400, immutable";
+export const PLAYER_PHOTO_PLACEHOLDER_CACHE_CONTROL = "public, max-age=0, must-revalidate";
 
 export function inferPlayerPhotoExtension(file: File) {
   if (file.type in CONTENT_TYPE_EXTENSION) {

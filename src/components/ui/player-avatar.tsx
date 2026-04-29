@@ -20,6 +20,8 @@ const sizePixels: Record<NonNullable<PlayerAvatarProps["size"]>, number> = {
   lg: 56
 };
 
+const PLAYER_PHOTO_SRC_VERSION = "2026-04-29";
+
 function getInitials(name: string) {
   const trimmed = name.trim();
   if (!trimmed) return "??";
@@ -29,7 +31,7 @@ function getInitials(name: string) {
 
 export function getPlayerPhotoSrc(playerId?: string) {
   if (!playerId) return "/avatar-placeholder.svg";
-  return `/api/player-photo/${encodeURIComponent(playerId)}`;
+  return `/api/player-photo/${encodeURIComponent(playerId)}?v=${PLAYER_PHOTO_SRC_VERSION}`;
 }
 
 export function PlayerAvatar({ playerId, name, size = "md", className }: PlayerAvatarProps) {
