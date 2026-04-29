@@ -49,14 +49,7 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
         </CardDescription>
         <p className="mt-3 text-sm text-slate-300">{moduleDescription}</p>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">WhatsApp</p>
-            <p className="mt-2 text-sm font-semibold text-white">En configuracion</p>
-            <p className="mt-2 text-sm text-slate-400">
-              Cuando definamos el numero oficial, lo vas a ver publicado aqui.
-            </p>
-          </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Mail</p>
             <a
