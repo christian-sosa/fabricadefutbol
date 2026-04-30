@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { getPublicClubBySlug } from "@/lib/queries/clubs";
+import type { ClubPublicActivity, ClubPublicPlayerStat } from "@/lib/domain/clubs";
 
 export async function generateMetadata({
   params
@@ -29,42 +30,61 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function StatTable({
-  emptyText,
-  label,
-  rows
-}: {
-  emptyText: string;
-  label: string;
-  rows: Array<{ name: string; teamName: string; value: number }>;
-}) {
+function getActivityLabel(type: ClubPublicActivity["type"]) {
+  switch (type) {
+    case "match_played":
+      return "Partido";
+    case "player_added_to_club":
+      return "Jugador";
+    case "team_created":
+      return "Equipo";
+    default:
+      return "Club";
+  }
+}
+
+function PlayerStatsTable({ rows }: { rows: ClubPublicPlayerStat[] }) {
   return (
     <Card>
-      <CardTitle>{label}</CardTitle>
+      <CardTitle>Jugadores destacados</CardTitle>
       <div className="mt-4 overflow-x-auto">
-        {rows.length ? (
-          <Table>
-            <THead>
-              <tr>
-                <TH>Jugador</TH>
-                <TH>Equipo</TH>
-                <TH>Total</TH>
+        <Table>
+          <THead>
+            <tr>
+              <TH>Jugador</TH>
+              <TH>Equipos</TH>
+              <TH>PJ</TH>
+              <TH>Goles</TH>
+              <TH>Asist.</TH>
+              <TH>Figuras</TH>
+              <TH>Ultimo</TH>
+            </tr>
+          </THead>
+          <TBody>
+            {rows.map((row) => (
+              <tr key={row.playerId}>
+                <TD className="font-semibold">{row.name}</TD>
+                <TD>{row.teamNames.join(" / ")}</TD>
+                <TD>{row.matchesPlayed}</TD>
+                <TD>{row.goals}</TD>
+                <TD>{row.assists}</TD>
+                <TD>{row.mvps}</TD>
+                <TD>{row.lastMatchDate ? formatDate(row.lastMatchDate) : ""}</TD>
               </tr>
-            </THead>
-            <TBody>
-              {rows.map((row) => (
-                <tr key={`${row.name}-${row.teamName}`}>
-                  <TD className="font-semibold">{row.name}</TD>
-                  <TD>{row.teamName}</TD>
-                  <TD className="font-black text-white">{row.value}</TD>
-                </tr>
-              ))}
-            </TBody>
-          </Table>
-        ) : (
-          <p className="text-sm text-slate-400">{emptyText}</p>
-        )}
+            ))}
+          </TBody>
+        </Table>
       </div>
+    </Card>
+  );
+}
+
+function RecordCard({ label, row, value }: { label: string; row: ClubPublicPlayerStat; value: number }) {
+  return (
+    <Card>
+      <CardDescription>{label}</CardDescription>
+      <CardTitle className="mt-2 text-2xl">{row.name}</CardTitle>
+      <p className="mt-2 text-sm font-semibold text-emerald-200">{value}</p>
     </Card>
   );
 }
@@ -79,6 +99,44 @@ export default async function PublicClubPage({
   if (!data) notFound();
 
   const { club, snapshot } = data;
+  const hasSummaryData =
+    snapshot.summary.teamCount > 0 ||
+    snapshot.summary.playerCount > 0 ||
+    snapshot.summary.totalMatches > 0;
+  const recordRows = [
+    snapshot.records.topScorerAllTime
+      ? {
+          key: "topScorerAllTime",
+          label: "Goleador historico",
+          row: snapshot.records.topScorerAllTime,
+          value: snapshot.records.topScorerAllTime.goals
+        }
+      : null,
+    snapshot.records.topAssistsAllTime
+      ? {
+          key: "topAssistsAllTime",
+          label: "Mas asistencias",
+          row: snapshot.records.topAssistsAllTime,
+          value: snapshot.records.topAssistsAllTime.assists
+        }
+      : null,
+    snapshot.records.mostMvps
+      ? {
+          key: "mostMvps",
+          label: "Mas figuras",
+          row: snapshot.records.mostMvps,
+          value: snapshot.records.mostMvps.mvps
+        }
+      : null,
+    snapshot.records.mostMatchesPlayed
+      ? {
+          key: "mostMatchesPlayed",
+          label: "Mas partidos",
+          row: snapshot.records.mostMatchesPlayed,
+          value: snapshot.records.mostMatchesPlayed.matchesPlayed
+        }
+      : null
+  ].filter(Boolean) as Array<{ key: string; label: string; row: ClubPublicPlayerStat; value: number }>;
 
   return (
     <div className="space-y-5">
@@ -99,89 +157,103 @@ export default async function PublicClubPage({
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-5">
-        <Card>
-          <CardDescription>Equipos</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{snapshot.summary.teamCount}</CardTitle>
-        </Card>
-        <Card>
-          <CardDescription>Jugadores</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{snapshot.summary.playerCount}</CardTitle>
-        </Card>
-        <Card>
-          <CardDescription>Partidos</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{snapshot.summary.playedMatches}</CardTitle>
-        </Card>
-        <Card>
-          <CardDescription>Goles a favor</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{snapshot.summary.goalsFor}</CardTitle>
-        </Card>
-        <Card>
-          <CardDescription>Goles en contra</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{snapshot.summary.goalsAgainst}</CardTitle>
-        </Card>
-      </section>
+      {hasSummaryData ? (
+        <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+          <Card>
+            <CardDescription>Partidos</CardDescription>
+            <CardTitle className="mt-1 text-3xl">{snapshot.summary.totalMatches}</CardTitle>
+          </Card>
+          <Card>
+            <CardDescription>Goles</CardDescription>
+            <CardTitle className="mt-1 text-3xl">{snapshot.summary.totalGoals}</CardTitle>
+          </Card>
+          <Card>
+            <CardDescription>Promedio gol</CardDescription>
+            <CardTitle className="mt-1 text-3xl">{snapshot.summary.avgGoalsPerMatch}</CardTitle>
+          </Card>
+          <Card>
+            <CardDescription>Jugadores usados</CardDescription>
+            <CardTitle className="mt-1 text-3xl">{snapshot.summary.totalPlayersDistinct}</CardTitle>
+          </Card>
+          <Card>
+            <CardDescription>Primer partido</CardDescription>
+            <CardTitle className="mt-1 text-lg">
+              {snapshot.summary.firstMatchDate ? formatDate(snapshot.summary.firstMatchDate) : ""}
+            </CardTitle>
+          </Card>
+          <Card>
+            <CardDescription>Ultimo partido</CardDescription>
+            <CardTitle className="mt-1 text-lg">
+              {snapshot.summary.lastMatchDate ? formatDate(snapshot.summary.lastMatchDate) : ""}
+            </CardTitle>
+          </Card>
+        </section>
+      ) : null}
 
-      <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+      {snapshot.activity.length ? (
+        <Card>
+          <CardTitle>Actividad reciente</CardTitle>
+          <div className="mt-4 space-y-3">
+            {snapshot.activity.map((item) => (
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4" key={`${item.type}-${item.entityId}-${item.createdAt}`}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-300">
+                      {getActivityLabel(item.type)}
+                    </p>
+                    <p className="mt-1 font-semibold text-slate-100">{item.title}</p>
+                    <p className="mt-1 text-sm text-slate-400">{item.description}</p>
+                  </div>
+                  <p className="text-sm text-slate-400">{formatDate(item.createdAt)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
+      {snapshot.teams.length ? (
         <Card>
           <CardTitle>Equipos</CardTitle>
           <div className="mt-4 space-y-3">
-            {snapshot.teams.length ? (
-              snapshot.teams.map((team) => (
-                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4" key={team.id}>
-                  <p className="font-semibold text-slate-100">{team.name}</p>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {team.playerCount} jugadores - {team.matchesPlayed} partidos
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate-400">Todavia no hay equipos publicados.</p>
-            )}
-          </div>
-        </Card>
-
-        <Card>
-          <CardTitle>Ultimos partidos</CardTitle>
-          <div className="mt-4 space-y-3">
-            {snapshot.recentMatches.length ? (
-              snapshot.recentMatches.map((match) => (
-                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4" key={match.id}>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="font-semibold text-slate-100">
-                        {match.teamName} vs {match.opponentName}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-400">
-                        {formatDate(match.playedAt)}
-                        {match.venue ? ` - ${match.venue}` : ""}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-emerald-300">
-                        {match.competitionName}
-                      </p>
-                    </div>
-                    <p className="text-2xl font-black text-white">
-                      {match.goalsFor} - {match.goalsAgainst}
+            {snapshot.teams.map((team) => (
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4" key={team.id}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-100">{team.name}</p>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {team.playerCount} jugadores - {team.matchesPlayed} partidos
                     </p>
+                    {team.lastMatchDate ? (
+                      <p className="mt-1 text-xs text-slate-500">Ultimo: {formatDate(team.lastMatchDate)}</p>
+                    ) : null}
+                  </div>
+                  <div className="text-left text-sm text-slate-300 sm:text-right">
+                    <p>{team.wins} G / {team.draws} E / {team.losses} P</p>
+                    <p className="mt-1">{team.goalsFor} GF / {team.goalsAgainst} GC</p>
                   </div>
                 </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate-400">Todavia no hay partidos publicados.</p>
-            )}
+              </div>
+            ))}
           </div>
         </Card>
-      </section>
+      ) : null}
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        <StatTable emptyText="Sin goles cargados." label="Goleadores" rows={snapshot.topScorers} />
-        <StatTable emptyText="Sin asistencias cargadas." label="Asistidores" rows={snapshot.topAssisters} />
-        <StatTable emptyText="Sin figuras cargadas." label="Figuras" rows={snapshot.topFigures} />
-      </section>
+      {snapshot.playerStats.length ? (
+        <PlayerStatsTable rows={snapshot.playerStats.slice(0, 12)} />
+      ) : null}
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        {snapshot.competitionStats.length ? (
-          snapshot.competitionStats.map((competition) => (
+      {recordRows.length ? (
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {recordRows.map((record) => (
+            <RecordCard key={record.key} label={record.label} row={record.row} value={record.value} />
+          ))}
+        </section>
+      ) : null}
+
+      {snapshot.competitionStats.length ? (
+        <section className="grid gap-4 lg:grid-cols-3">
+          {snapshot.competitionStats.map((competition) => (
             <Card key={competition.id ?? competition.name}>
               <CardTitle>{competition.name}</CardTitle>
               <CardDescription className="mt-2">
@@ -190,30 +262,25 @@ export default async function PublicClubPage({
               <div className="mt-4 space-y-3 text-sm">
                 <div>
                   <p className="font-semibold text-slate-200">Goles</p>
-                  <p className="mt-1 text-slate-400">
-                    {competition.topScorers[0]
-                      ? `${competition.topScorers[0].name}: ${competition.topScorers[0].value}`
-                      : "Sin goles"}
-                  </p>
+                  {competition.topScorers[0] ? (
+                    <p className="mt-1 text-slate-400">
+                      {competition.topScorers[0].name}: {competition.topScorers[0].value}
+                    </p>
+                  ) : null}
                 </div>
                 <div>
                   <p className="font-semibold text-slate-200">Asistencias</p>
-                  <p className="mt-1 text-slate-400">
-                    {competition.topAssisters[0]
-                      ? `${competition.topAssisters[0].name}: ${competition.topAssisters[0].value}`
-                      : "Sin asistencias"}
-                  </p>
+                  {competition.topAssisters[0] ? (
+                    <p className="mt-1 text-slate-400">
+                      {competition.topAssisters[0].name}: {competition.topAssisters[0].value}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </Card>
-          ))
-        ) : (
-          <Card>
-            <CardTitle>Torneos</CardTitle>
-            <CardDescription className="mt-2">Todavia no hay partidos clasificados.</CardDescription>
-          </Card>
-        )}
-      </section>
+          ))}
+        </section>
+      ) : null}
     </div>
   );
 }

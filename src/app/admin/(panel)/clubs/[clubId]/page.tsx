@@ -16,6 +16,7 @@ import {
   uploadClubPlayerPhotoAction,
   uploadClubTeamLogoAction
 } from "@/app/admin/(panel)/clubs/[clubId]/actions";
+import { MatchPlayerPicker } from "@/app/admin/(panel)/clubs/[clubId]/match-player-picker";
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -447,15 +448,16 @@ function MatchesTab({
   competitions,
   matches,
   players,
+  teamPlayers,
   teams
 }: {
   clubId: string;
   competitions: ClubCompetitionRecord[];
   matches: ClubMatchRecord[];
   players: ClubPlayerRecord[];
+  teamPlayers: ClubTeamPlayerRecord[];
   teams: ClubTeamRecord[];
 }) {
-  const activePlayers = players.filter((player) => player.active);
   const activeTeams = teams.filter((team) => team.active);
   const activeCompetitions = competitions.filter((competition) => competition.active);
   const competitionById = new Map(competitions.map((competition) => [competition.id, competition]));
@@ -476,17 +478,6 @@ function MatchesTab({
                 {activeCompetitions.map((competition) => (
                   <option key={competition.id} value={competition.id}>
                     {competition.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200">Equipo</label>
-              <Select name="teamId" required>
-                <option value="">Elegir equipo</option>
-                {activeTeams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
                   </option>
                 ))}
               </Select>
@@ -513,42 +504,7 @@ function MatchesTab({
             </div>
           </section>
 
-          <section className="overflow-x-auto">
-            <Table>
-              <THead>
-                <tr>
-                  <TH>Jugador</TH>
-                  <TH>Titular</TH>
-                  <TH>Suplente</TH>
-                  <TH>Goles</TH>
-                  <TH>Asist.</TH>
-                  <TH>Figura</TH>
-                </tr>
-              </THead>
-              <TBody>
-                {activePlayers.map((player) => (
-                  <tr key={player.id}>
-                    <TD className="font-semibold">{player.full_name}</TD>
-                    <TD>
-                      <input className="h-4 w-4 accent-emerald-400" name="starterPlayerIds" type="checkbox" value={player.id} />
-                    </TD>
-                    <TD>
-                      <input className="h-4 w-4 accent-emerald-400" name="substitutePlayerIds" type="checkbox" value={player.id} />
-                    </TD>
-                    <TD>
-                      <Input className="w-20" min={0} name={`playerGoals:${player.id}`} type="number" />
-                    </TD>
-                    <TD>
-                      <Input className="w-20" min={0} name={`playerAssists:${player.id}`} type="number" />
-                    </TD>
-                    <TD>
-                      <input className="h-4 w-4 accent-emerald-400" name="mvp" type="radio" value={`player:${player.id}`} />
-                    </TD>
-                  </tr>
-                ))}
-              </TBody>
-            </Table>
-          </section>
+          <MatchPlayerPicker players={players} teamPlayers={teamPlayers} teams={activeTeams} />
 
           <section>
             <p className="text-sm font-semibold text-slate-200">Invitados</p>
@@ -753,7 +709,14 @@ export default async function AdminClubDetailPage({
         <CompetitionsTab clubId={clubId} competitions={details.competitions} />
       ) : null}
       {selectedTab === "matches" ? (
-        <MatchesTab clubId={clubId} competitions={details.competitions} matches={details.matches} players={details.players} teams={details.teams} />
+        <MatchesTab
+          clubId={clubId}
+          competitions={details.competitions}
+          matches={details.matches}
+          players={details.players}
+          teamPlayers={details.teamPlayers}
+          teams={details.teams}
+        />
       ) : null}
       {selectedTab === "admins" ? <AdminsTab clubId={clubId} details={details} /> : null}
     </div>

@@ -5,11 +5,14 @@ import { getAdminClubs } from "@/lib/auth/clubs";
 import {
   buildClubPublicSnapshot,
   type ClubCompetitionRecord,
+  type ClubPublicActivity,
   type ClubLineupRecord,
   type ClubMatchPlayerStatRecord,
   type ClubMatchRecord,
+  type ClubPublicPlayerStat,
   type ClubPlayerRecord,
   type ClubPublicMatch,
+  type ClubPublicRecords,
   type ClubPublicSnapshot,
   type ClubPublicStatRow,
   type ClubPublicSummary,
@@ -73,8 +76,11 @@ type ClubAdminInviteRow = {
 
 type ClubSnapshotRow = {
   summary: ClubPublicSummary | null;
+  activity: ClubPublicActivity[] | null;
   teams: ClubPublicTeam[] | null;
   recent_matches: ClubPublicMatch[] | null;
+  player_stats: ClubPublicPlayerStat[] | null;
+  records: ClubPublicRecords | null;
   top_scorers: ClubPublicStatRow[] | null;
   top_assisters: ClubPublicStatRow[] | null;
   top_figures: ClubPublicStatRow[] | null;
@@ -89,10 +95,25 @@ function emptySnapshot(clubName: string): ClubPublicSnapshot {
       playerCount: 0,
       playedMatches: 0,
       goalsFor: 0,
-      goalsAgainst: 0
+      goalsAgainst: 0,
+      totalMatches: 0,
+      totalGoals: 0,
+      avgGoalsPerMatch: 0,
+      totalPlayersDistinct: 0,
+      firstMatchDate: null,
+      lastMatchDate: null
     },
+    activity: [],
     teams: [],
     recentMatches: [],
+    playerStats: [],
+    records: {
+      topScorerAllTime: null,
+      topAssistsAllTime: null,
+      mostMvps: null,
+      mostMatchesPlayed: null,
+      bestWinStreak: null
+    },
     topScorers: [],
     topAssisters: [],
     topFigures: [],
@@ -105,8 +126,11 @@ function normalizeSnapshot(row: ClubSnapshotRow | null, clubName: string): ClubP
 
   return {
     summary: row.summary ?? emptySnapshot(clubName).summary,
+    activity: row.activity ?? [],
     teams: row.teams ?? [],
     recentMatches: row.recent_matches ?? [],
+    playerStats: row.player_stats ?? [],
+    records: row.records ?? emptySnapshot(clubName).records,
     topScorers: row.top_scorers ?? [],
     topAssisters: row.top_assisters ?? [],
     topFigures: row.top_figures ?? [],
@@ -161,7 +185,7 @@ async function loadClubPrivateData(clubId: string) {
       .maybeSingle(),
     supabase
       .from("club_players")
-      .select("id, club_id, full_name, nickname, position, shirt_number, photo_path, active")
+      .select("id, club_id, full_name, nickname, position, shirt_number, photo_path, active, created_at")
       .eq("club_id", clubId)
       .order("full_name", { ascending: true }),
     supabase
@@ -171,13 +195,13 @@ async function loadClubPrivateData(clubId: string) {
       .order("name", { ascending: true }),
     supabase
       .from("club_teams")
-      .select("id, club_id, name, short_name, logo_path, active")
+      .select("id, club_id, name, short_name, logo_path, active, created_at")
       .eq("club_id", clubId)
       .order("name", { ascending: true }),
     supabase.from("club_team_players").select("id, club_team_id, club_player_id"),
     supabase
       .from("club_matches")
-      .select("id, club_id, club_team_id, club_competition_id, played_at, opponent_name, venue, goals_for, goals_against, status, notes")
+      .select("id, club_id, club_team_id, club_competition_id, played_at, opponent_name, venue, goals_for, goals_against, status, notes, created_at")
       .eq("club_id", clubId)
       .order("played_at", { ascending: false }),
     supabase.from("club_match_lineups").select("id, match_id, club_player_id, guest_name, display_name, role"),
@@ -224,8 +248,11 @@ export async function refreshClubPublicSnapshot(clubId: string) {
     {
       club_id: clubId,
       summary: snapshot.summary,
+      activity: snapshot.activity,
       teams: snapshot.teams,
       recent_matches: snapshot.recentMatches,
+      player_stats: snapshot.playerStats,
+      records: snapshot.records,
       top_scorers: snapshot.topScorers,
       top_assisters: snapshot.topAssisters,
       top_figures: snapshot.topFigures,
@@ -252,7 +279,7 @@ export async function getAdminClubDetails(clubId: string): Promise<AdminClubDeta
   ] = await Promise.all([
     supabase
       .from("club_public_snapshots")
-      .select("summary, teams, recent_matches, top_scorers, top_assisters, top_figures, competition_stats")
+      .select("summary, activity, teams, recent_matches, player_stats, records, top_scorers, top_assisters, top_figures, competition_stats")
       .eq("club_id", clubId)
       .maybeSingle(),
     supabase
@@ -323,7 +350,7 @@ export async function getPublicClubBySlug(slug: string) {
 
   const { data: snapshot, error: snapshotError } = await supabase
     .from("club_public_snapshots")
-    .select("summary, teams, recent_matches, top_scorers, top_assisters, top_figures, competition_stats")
+    .select("summary, activity, teams, recent_matches, player_stats, records, top_scorers, top_assisters, top_figures, competition_stats")
     .eq("club_id", club.id)
     .maybeSingle();
 

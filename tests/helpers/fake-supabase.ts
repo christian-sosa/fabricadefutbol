@@ -338,8 +338,11 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       break;
     case "club_public_snapshots":
       if (!("summary" in normalized)) normalized.summary = {};
+      if (!("activity" in normalized)) normalized.activity = [];
       if (!("teams" in normalized)) normalized.teams = [];
       if (!("recent_matches" in normalized)) normalized.recent_matches = [];
+      if (!("player_stats" in normalized)) normalized.player_stats = [];
+      if (!("records" in normalized)) normalized.records = {};
       if (!("top_scorers" in normalized)) normalized.top_scorers = [];
       if (!("top_assisters" in normalized)) normalized.top_assisters = [];
       if (!("top_figures" in normalized)) normalized.top_figures = [];

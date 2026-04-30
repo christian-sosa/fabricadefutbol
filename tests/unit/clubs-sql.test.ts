@@ -64,4 +64,13 @@ describeSupabaseSql("clubes sql", () => {
     expect(policiesSql).toContain("is_club_admin(p.club_id)");
     expect(policiesSql).toContain("scope_name = 'club-teams'");
   });
+
+  it("mantiene los agregados publicos dentro del snapshot", () => {
+    expect(schemaSql).toContain("activity jsonb not null default '[]'::jsonb");
+    expect(schemaSql).toContain("player_stats jsonb not null default '[]'::jsonb");
+    expect(schemaSql).toContain("records jsonb not null default '{}'::jsonb");
+    expect(schemaSql).toContain("'totalMatches', 0");
+    expect(schemaSql).not.toContain("create table if not exists public.club_events");
+    expect(schemaSql).not.toContain("create view public.club_stats_summary");
+  });
 });

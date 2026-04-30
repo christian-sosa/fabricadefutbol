@@ -1172,10 +1172,13 @@ export type Database = {
       };
       club_public_snapshots: {
         Row: {
+          activity: Json;
           club_id: string;
           competition_stats: Json;
+          player_stats: Json;
           recent_matches: Json;
           refreshed_at: string;
+          records: Json;
           summary: Json;
           teams: Json;
           top_assisters: Json;
@@ -1184,10 +1187,13 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          activity?: Json;
           club_id: string;
           competition_stats?: Json;
+          player_stats?: Json;
           recent_matches?: Json;
           refreshed_at?: string;
+          records?: Json;
           summary?: Json;
           teams?: Json;
           top_assisters?: Json;
@@ -1196,10 +1202,13 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          activity?: Json;
           club_id?: string;
           competition_stats?: Json;
+          player_stats?: Json;
           recent_matches?: Json;
           refreshed_at?: string;
+          records?: Json;
           summary?: Json;
           teams?: Json;
           top_assisters?: Json;

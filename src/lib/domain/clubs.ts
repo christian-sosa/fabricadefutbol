@@ -22,6 +22,7 @@ export type ClubPlayerRecord = {
   shirt_number: number | null;
   photo_path: string | null;
   active: boolean;
+  created_at?: string;
 };
 
 export type ClubCompetitionRecord = {
@@ -40,6 +41,7 @@ export type ClubTeamRecord = {
   short_name: string | null;
   logo_path: string | null;
   active: boolean;
+  created_at?: string;
 };
 
 export type ClubTeamPlayerRecord = {
@@ -60,6 +62,7 @@ export type ClubMatchRecord = {
   goals_against: number;
   status: ClubMatchStatus;
   notes: string | null;
+  created_at?: string;
 };
 
 export type ClubLineupRecord = {
@@ -87,6 +90,12 @@ export type ClubPublicSummary = {
   playedMatches: number;
   goalsFor: number;
   goalsAgainst: number;
+  totalMatches: number;
+  totalGoals: number;
+  avgGoalsPerMatch: number;
+  totalPlayersDistinct: number;
+  firstMatchDate: string | null;
+  lastMatchDate: string | null;
 };
 
 export type ClubPublicTeam = {
@@ -95,6 +104,12 @@ export type ClubPublicTeam = {
   shortName: string | null;
   playerCount: number;
   matchesPlayed: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  lastMatchDate: string | null;
 };
 
 export type ClubPublicMatch = {
@@ -127,10 +142,42 @@ export type ClubPublicCompetitionStat = {
   topFigures: ClubPublicStatRow[];
 };
 
+export type ClubPublicActivityType = "match_played" | "player_added_to_club" | "team_created";
+
+export type ClubPublicActivity = {
+  type: ClubPublicActivityType;
+  title: string;
+  description: string;
+  createdAt: string;
+  entityId: string;
+};
+
+export type ClubPublicPlayerStat = {
+  playerId: string;
+  name: string;
+  teamNames: string[];
+  matchesPlayed: number;
+  goals: number;
+  assists: number;
+  mvps: number;
+  lastMatchDate: string | null;
+};
+
+export type ClubPublicRecords = {
+  topScorerAllTime: ClubPublicPlayerStat | null;
+  topAssistsAllTime: ClubPublicPlayerStat | null;
+  mostMvps: ClubPublicPlayerStat | null;
+  mostMatchesPlayed: ClubPublicPlayerStat | null;
+  bestWinStreak: null;
+};
+
 export type ClubPublicSnapshot = {
   summary: ClubPublicSummary;
+  activity: ClubPublicActivity[];
   teams: ClubPublicTeam[];
   recentMatches: ClubPublicMatch[];
+  playerStats: ClubPublicPlayerStat[];
+  records: ClubPublicRecords;
   topScorers: ClubPublicStatRow[];
   topAssisters: ClubPublicStatRow[];
   topFigures: ClubPublicStatRow[];
@@ -167,6 +214,36 @@ function createStatAccumulator() {
 
 function toTopRows(accumulator: Map<string, ClubPublicStatRow>) {
   return Array.from(accumulator.values()).sort(compareByValueThenName).slice(0, 10);
+}
+
+function compareDateAsc(left: string, right: string) {
+  return new Date(left).getTime() - new Date(right).getTime();
+}
+
+function compareDateDesc(left: string, right: string) {
+  return new Date(right).getTime() - new Date(left).getTime();
+}
+
+function comparePlayerStats(left: ClubPublicPlayerStat, right: ClubPublicPlayerStat) {
+  if (right.goals !== left.goals) return right.goals - left.goals;
+  if (right.assists !== left.assists) return right.assists - left.assists;
+  if (right.mvps !== left.mvps) return right.mvps - left.mvps;
+  if (right.matchesPlayed !== left.matchesPlayed) return right.matchesPlayed - left.matchesPlayed;
+  return left.name.localeCompare(right.name, "es");
+}
+
+function pickRecord(
+  rows: ClubPublicPlayerStat[],
+  metric: "goals" | "assists" | "mvps" | "matchesPlayed"
+) {
+  const [record] = rows
+    .filter((row) => row[metric] > 0)
+    .sort((left, right) => {
+      if (right[metric] !== left[metric]) return right[metric] - left[metric];
+      return comparePlayerStats(left, right);
+    });
+
+  return record ?? null;
 }
 
 function addStatValue(params: {
@@ -276,26 +353,72 @@ export function buildClubPublicSnapshot(params: {
   const activePlayers = params.players.filter((player) => player.active);
   const competitionsById = new Map(params.competitions.map((competition) => [competition.id, competition]));
   const teamsById = new Map(params.teams.map((team) => [team.id, team]));
+  const playersById = new Map(params.players.map((player) => [player.id, player]));
   const playedMatches = params.matches
     .filter((match) => match.status === "played")
     .sort((left, right) => new Date(right.played_at).getTime() - new Date(left.played_at).getTime());
   const playedMatchIds = new Set(playedMatches.map((match) => match.id));
-  const playedMatchesByTeam = new Map<string, number>();
+  const playedMatchDatesAscending = playedMatches.map((match) => match.played_at).sort(compareDateAsc);
+  const playedMatchesByTeam = new Map<
+    string,
+    {
+      matchesPlayed: number;
+      wins: number;
+      draws: number;
+      losses: number;
+      goalsFor: number;
+      goalsAgainst: number;
+      lastMatchDate: string | null;
+    }
+  >();
 
   for (const match of playedMatches) {
-    playedMatchesByTeam.set(match.club_team_id, (playedMatchesByTeam.get(match.club_team_id) ?? 0) + 1);
+    const current = playedMatchesByTeam.get(match.club_team_id) ?? {
+      matchesPlayed: 0,
+      wins: 0,
+      draws: 0,
+      losses: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      lastMatchDate: null
+    };
+    current.matchesPlayed += 1;
+    current.goalsFor += Number(match.goals_for);
+    current.goalsAgainst += Number(match.goals_against);
+    if (Number(match.goals_for) > Number(match.goals_against)) current.wins += 1;
+    if (Number(match.goals_for) === Number(match.goals_against)) current.draws += 1;
+    if (Number(match.goals_for) < Number(match.goals_against)) current.losses += 1;
+    if (!current.lastMatchDate || compareDateDesc(match.played_at, current.lastMatchDate) < 0) {
+      current.lastMatchDate = match.played_at;
+    }
+    playedMatchesByTeam.set(match.club_team_id, current);
   }
 
   const playerCountByTeam = new Map<string, number>();
+  const rosterTeamNamesByPlayerId = new Map<string, Set<string>>();
   for (const teamPlayer of params.teamPlayers) {
     playerCountByTeam.set(
       teamPlayer.club_team_id,
       (playerCountByTeam.get(teamPlayer.club_team_id) ?? 0) + 1
     );
+    const teamName = teamsById.get(teamPlayer.club_team_id)?.name;
+    if (teamName) {
+      const teamNames = rosterTeamNamesByPlayerId.get(teamPlayer.club_player_id) ?? new Set<string>();
+      teamNames.add(teamName);
+      rosterTeamNamesByPlayerId.set(teamPlayer.club_player_id, teamNames);
+    }
   }
 
   const lineupById = new Map(params.lineups.map((lineup) => [lineup.id, lineup]));
   const matchById = new Map(params.matches.map((match) => [match.id, match]));
+  const playerStatsById = new Map<
+    string,
+    ClubPublicPlayerStat & {
+      matchIds: Set<string>;
+      teamNamesSet: Set<string>;
+    }
+  >();
+  const playedPersistentPlayerIds = new Set<string>();
   const scorers = createStatAccumulator();
   const assisters = createStatAccumulator();
   const figures = createStatAccumulator();
@@ -333,11 +456,57 @@ export function buildClubPublicSnapshot(params: {
     return created;
   }
 
+  function getPlayerAccumulator(lineup: ClubLineupRecord, match: ClubMatchRecord) {
+    if (!lineup.club_player_id) return null;
+    const playerId = lineup.club_player_id;
+    playedPersistentPlayerIds.add(playerId);
+    const player = playersById.get(playerId);
+    const existing = playerStatsById.get(playerId);
+    if (existing) return existing;
+
+    const created = {
+      playerId,
+      name: player?.full_name ?? lineup.display_name,
+      teamNames: [],
+      teamNamesSet: new Set<string>(),
+      matchIds: new Set<string>(),
+      matchesPlayed: 0,
+      goals: 0,
+      assists: 0,
+      mvps: 0,
+      lastMatchDate: null
+    };
+    for (const teamName of rosterTeamNamesByPlayerId.get(playerId) ?? []) {
+      created.teamNamesSet.add(teamName);
+    }
+    const matchTeamName = teamsById.get(match.club_team_id)?.name;
+    if (matchTeamName) created.teamNamesSet.add(matchTeamName);
+    playerStatsById.set(playerId, created);
+    return created;
+  }
+
   for (const match of playedMatches) {
     const competitionStats = getCompetitionAccumulator(match);
     competitionStats.matchesPlayed += 1;
     competitionStats.goalsFor += Number(match.goals_for);
     competitionStats.goalsAgainst += Number(match.goals_against);
+  }
+
+  for (const lineup of params.lineups) {
+    if (!playedMatchIds.has(lineup.match_id)) continue;
+    const match = matchById.get(lineup.match_id);
+    if (!match || !lineup.club_player_id) continue;
+    const playerStats = getPlayerAccumulator(lineup, match);
+    if (!playerStats) continue;
+    if (!playerStats.matchIds.has(match.id)) {
+      playerStats.matchIds.add(match.id);
+      playerStats.matchesPlayed += 1;
+    }
+    const matchTeamName = teamsById.get(match.club_team_id)?.name;
+    if (matchTeamName) playerStats.teamNamesSet.add(matchTeamName);
+    if (!playerStats.lastMatchDate || compareDateDesc(match.played_at, playerStats.lastMatchDate) < 0) {
+      playerStats.lastMatchDate = match.played_at;
+    }
   }
 
   for (const stat of params.stats) {
@@ -347,6 +516,12 @@ export function buildClubPublicSnapshot(params: {
     if (!lineup || !match) continue;
     const teamName = teamsById.get(match.club_team_id)?.name ?? "Equipo";
     const competitionStats = getCompetitionAccumulator(match);
+    const playerStats = getPlayerAccumulator(lineup, match);
+    if (playerStats) {
+      playerStats.goals += Number(stat.goals);
+      playerStats.assists += Number(stat.assists);
+      if (stat.is_mvp) playerStats.mvps += 1;
+    }
 
     addStatValue({
       accumulator: scorers,
@@ -386,25 +561,98 @@ export function buildClubPublicSnapshot(params: {
     });
   }
 
+  const playerStats = Array.from(playerStatsById.values())
+    .map((row) => ({
+      playerId: row.playerId,
+      name: row.name,
+      teamNames: Array.from(row.teamNamesSet).sort((left, right) => left.localeCompare(right, "es")),
+      matchesPlayed: row.matchesPlayed,
+      goals: row.goals,
+      assists: row.assists,
+      mvps: row.mvps,
+      lastMatchDate: row.lastMatchDate
+    }))
+    .sort(comparePlayerStats);
+
   const summary: ClubPublicSummary = {
     clubName: params.club.name,
     teamCount: activeTeams.length,
     playerCount: activePlayers.length,
     playedMatches: playedMatches.length,
     goalsFor: playedMatches.reduce((total, match) => total + Number(match.goals_for), 0),
-    goalsAgainst: playedMatches.reduce((total, match) => total + Number(match.goals_against), 0)
+    goalsAgainst: playedMatches.reduce((total, match) => total + Number(match.goals_against), 0),
+    totalMatches: playedMatches.length,
+    totalGoals: playedMatches.reduce((total, match) => total + Number(match.goals_for), 0),
+    avgGoalsPerMatch:
+      playedMatches.length > 0
+        ? Number((playedMatches.reduce((total, match) => total + Number(match.goals_for), 0) / playedMatches.length).toFixed(2))
+        : 0,
+    totalPlayersDistinct: playedPersistentPlayerIds.size,
+    firstMatchDate: playedMatchDatesAscending[0] ?? null,
+    lastMatchDate: playedMatches[0]?.played_at ?? null
+  };
+
+  const activity: ClubPublicActivity[] = [
+    ...playedMatches.map((match) => ({
+      type: "match_played" as const,
+      title: `${teamsById.get(match.club_team_id)?.name ?? "Equipo"} vs ${match.opponent_name}`,
+      description: `${match.goals_for} - ${match.goals_against}`,
+      createdAt: match.played_at,
+      entityId: match.id
+    })),
+    ...params.players
+      .filter((player) => Boolean(player.created_at))
+      .map((player) => ({
+        type: "player_added_to_club" as const,
+        title: player.full_name,
+        description: "Jugador agregado al club",
+        createdAt: player.created_at as string,
+        entityId: player.id
+      })),
+    ...params.teams
+      .filter((team) => Boolean(team.created_at))
+      .map((team) => ({
+        type: "team_created" as const,
+        title: team.name,
+        description: "Equipo creado",
+        createdAt: team.created_at as string,
+        entityId: team.id
+      }))
+  ]
+    .sort((left, right) => compareDateDesc(left.createdAt, right.createdAt))
+    .slice(0, 12);
+
+  const records: ClubPublicRecords = {
+    topScorerAllTime: pickRecord(playerStats, "goals"),
+    topAssistsAllTime: pickRecord(playerStats, "assists"),
+    mostMvps: pickRecord(playerStats, "mvps"),
+    mostMatchesPlayed: pickRecord(playerStats, "matchesPlayed"),
+    bestWinStreak: null
   };
 
   return {
     summary,
+    activity,
     teams: activeTeams
-      .map((team) => ({
-        id: team.id,
-        name: team.name,
-        shortName: team.short_name,
-        playerCount: playerCountByTeam.get(team.id) ?? 0,
-        matchesPlayed: playedMatchesByTeam.get(team.id) ?? 0
-      }))
+      .map((team) => {
+        const metrics = playedMatchesByTeam.get(team.id) ?? {
+          matchesPlayed: 0,
+          wins: 0,
+          draws: 0,
+          losses: 0,
+          goalsFor: 0,
+          goalsAgainst: 0,
+          lastMatchDate: null
+        };
+
+        return {
+          id: team.id,
+          name: team.name,
+          shortName: team.short_name,
+          playerCount: playerCountByTeam.get(team.id) ?? 0,
+          ...metrics
+        };
+      })
       .sort((left, right) => left.name.localeCompare(right.name, "es")),
     recentMatches: playedMatches.slice(0, 10).map((match) => ({
       id: match.id,
@@ -420,6 +668,8 @@ export function buildClubPublicSnapshot(params: {
       goalsFor: Number(match.goals_for),
       goalsAgainst: Number(match.goals_against)
     })),
+    playerStats,
+    records,
     topScorers: toTopRows(scorers),
     topAssisters: toTopRows(assisters),
     topFigures: toTopRows(figures),
