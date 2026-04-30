@@ -107,7 +107,7 @@ export default async function PublicClubPage({
     snapshot.records.topScorerAllTime
       ? {
           key: "topScorerAllTime",
-          label: "Goleador historico",
+          label: "Maximo goleador",
           row: snapshot.records.topScorerAllTime,
           value: snapshot.records.topScorerAllTime.goals
         }
@@ -115,7 +115,7 @@ export default async function PublicClubPage({
     snapshot.records.topAssistsAllTime
       ? {
           key: "topAssistsAllTime",
-          label: "Mas asistencias",
+          label: "Maximo asistidor",
           row: snapshot.records.topAssistsAllTime,
           value: snapshot.records.topAssistsAllTime.assists
         }
@@ -131,7 +131,7 @@ export default async function PublicClubPage({
     snapshot.records.mostMatchesPlayed
       ? {
           key: "mostMatchesPlayed",
-          label: "Mas partidos",
+          label: "Mas presencias",
           row: snapshot.records.mostMatchesPlayed,
           value: snapshot.records.mostMatchesPlayed.matchesPlayed
         }
@@ -160,6 +160,10 @@ export default async function PublicClubPage({
       {hasSummaryData ? (
         <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
           <Card>
+            <CardDescription>Jugadores</CardDescription>
+            <CardTitle className="mt-1 text-3xl">{snapshot.summary.totalPlayersDistinct}</CardTitle>
+          </Card>
+          <Card>
             <CardDescription>Partidos</CardDescription>
             <CardTitle className="mt-1 text-3xl">{snapshot.summary.totalMatches}</CardTitle>
           </Card>
@@ -170,10 +174,6 @@ export default async function PublicClubPage({
           <Card>
             <CardDescription>Promedio gol</CardDescription>
             <CardTitle className="mt-1 text-3xl">{snapshot.summary.avgGoalsPerMatch}</CardTitle>
-          </Card>
-          <Card>
-            <CardDescription>Jugadores usados</CardDescription>
-            <CardTitle className="mt-1 text-3xl">{snapshot.summary.totalPlayersDistinct}</CardTitle>
           </Card>
           <Card>
             <CardDescription>Primer partido</CardDescription>

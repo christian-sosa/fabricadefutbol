@@ -140,7 +140,7 @@ function SummaryTab({
       <Card>
         <CardTitle>Configuracion general</CardTitle>
         <CardDescription className="mt-2">
-          Estos datos alimentan la vista publica oculta del club.
+          Estos datos alimentan la vista publica del club.
         </CardDescription>
         <form action={updateClubAction.bind(null, clubId)} className="mt-4 grid gap-3 md:grid-cols-2">
           <div>

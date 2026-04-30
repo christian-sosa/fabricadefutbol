@@ -587,7 +587,7 @@ export function buildClubPublicSnapshot(params: {
       playedMatches.length > 0
         ? Number((playedMatches.reduce((total, match) => total + Number(match.goals_for), 0) / playedMatches.length).toFixed(2))
         : 0,
-    totalPlayersDistinct: playedPersistentPlayerIds.size,
+    totalPlayersDistinct: activePlayers.length,
     firstMatchDate: playedMatchDatesAscending[0] ?? null,
     lastMatchDate: playedMatches[0]?.played_at ?? null
   };

@@ -326,7 +326,7 @@ describe("club public snapshot", () => {
       totalMatches: 3,
       totalGoals: 3,
       avgGoalsPerMatch: 1,
-      totalPlayersDistinct: 2,
+      totalPlayersDistinct: 3,
       firstMatchDate: "2026-04-19T20:00:00Z",
       lastMatchDate: "2026-04-22T20:00:00Z"
     });

@@ -15,9 +15,6 @@ export default async function AdminClubsPage() {
     <div className="space-y-4">
       <Card>
         <CardTitle>Clubes</CardTitle>
-        <CardDescription className="mt-2">
-          POC oculta para administrar clubes, equipos internos, pool de jugadores y partidos 11 vs 11.
-        </CardDescription>
       </Card>
 
       <div className="space-y-3">
