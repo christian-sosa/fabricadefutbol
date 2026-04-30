@@ -5,8 +5,8 @@ export const PLAYER_PHOTO_UPLOAD_COOLDOWN_MONTHS = 3;
 export const PLAYER_PHOTO_TARGET_LIMIT = 2;
 export const CAPTAIN_PLAYER_PHOTO_TOTAL_LIMIT = 40;
 
-export type PlayerPhotoUploaderRole = "organization_admin" | "league_admin" | "captain";
-export type PlayerPhotoTargetType = "organization_player" | "competition_player";
+export type PlayerPhotoUploaderRole = "organization_admin" | "league_admin" | "club_admin" | "captain";
+export type PlayerPhotoTargetType = "organization_player" | "competition_player" | "club_player";
 
 export type PlayerPhotoUploadPolicy = {
   targetLimit: number;

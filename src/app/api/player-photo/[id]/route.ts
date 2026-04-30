@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import {
+  getClubPlayerPhotoObjectPath,
   getCompetitionPlayerPhotoObjectPath,
   CONTENT_TYPE_BY_EXTENSION,
   getLegacyPhotoPath,
@@ -80,6 +81,31 @@ export async function GET(
       getOrganizationPlayerPhotoObjectPath(schemaName, player.organization_id, playerId),
       `${player.organization_id}/${playerId}.webp`
     ];
+
+    for (const objectPath of objectPaths) {
+      const streamedResponse = await createStorageObjectStreamResponse({
+        supabase,
+        bucketName,
+        objectPath,
+        contentType: "image/webp",
+        cacheControl: PLAYER_PHOTO_CACHE_CONTROL
+      });
+
+      if (streamedResponse) return streamedResponse;
+    }
+  }
+
+  const { data: clubPlayer, error: clubPlayerError } = await supabase
+    .from("club_players")
+    .select("club_id, photo_path")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  if (!clubPlayerError && clubPlayer?.club_id) {
+    const objectPaths = [
+      String(clubPlayer.photo_path ?? ""),
+      getClubPlayerPhotoObjectPath(schemaName, String(clubPlayer.club_id), playerId)
+    ].filter(Boolean);
 
     for (const objectPath of objectPaths) {
       const streamedResponse = await createStorageObjectStreamResponse({

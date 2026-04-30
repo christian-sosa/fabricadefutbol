@@ -60,6 +60,14 @@ export function getCompetitionPlayerPhotoObjectPath(
   return `${schemaName}/competitions/${competitionId}/${playerId}.webp`;
 }
 
+export function getClubPlayerPhotoObjectPath(
+  schemaName: string,
+  clubId: string,
+  playerId: string
+) {
+  return `${schemaName}/clubs/${clubId}/players/${playerId}.webp`;
+}
+
 export function getLegacyPhotoPath(playerId: string, extension: (typeof PHOTO_EXTENSIONS)[number]) {
   return path.join(process.cwd(), "public", "players", `${playerId}.${extension}`);
 }

@@ -49,5 +49,7 @@ describeSupabaseSql("storage privacy policies", () => {
     expect(policiesSql).toContain("public.can_read_league_logo_object(name)");
     expect(policiesSql).toContain("public.can_read_league_photo_object(name)");
     expect(policiesSql).toContain("public.can_read_team_logo_object(name)");
+    expect(policiesSql).toContain("scope_name = 'clubs'");
+    expect(policiesSql).toContain("scope_name = 'club-teams'");
   });
 });

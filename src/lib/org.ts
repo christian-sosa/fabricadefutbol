@@ -66,3 +66,7 @@ export function slugifyOrganizationName(value: string) {
 export function slugifyTournamentName(value: string) {
   return slugifyName(value);
 }
+
+export function slugifyClubName(value: string) {
+  return slugifyName(value);
+}

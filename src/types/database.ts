@@ -822,6 +822,393 @@ export type Database = {
         };
         Relationships: [];
       };
+      clubs: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          home_venue: string | null;
+          id: string;
+          is_public: boolean;
+          name: string;
+          slug: string;
+          status: "draft" | "active" | "archived";
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          home_venue?: string | null;
+          id?: string;
+          is_public?: boolean;
+          name: string;
+          slug: string;
+          status?: "draft" | "active" | "archived";
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          home_venue?: string | null;
+          id?: string;
+          is_public?: boolean;
+          name?: string;
+          slug?: string;
+          status?: "draft" | "active" | "archived";
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      club_admins: {
+        Row: {
+          admin_id: string;
+          club_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+        };
+        Insert: {
+          admin_id: string;
+          club_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+        };
+        Update: {
+          admin_id?: string;
+          club_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+        };
+        Relationships: [];
+      };
+      club_admin_invites: {
+        Row: {
+          accepted_at: string | null;
+          accepted_by: string | null;
+          club_id: string;
+          created_at: string;
+          email: string;
+          expires_at: string;
+          id: string;
+          invite_token: string;
+          invited_by: string;
+          status: "pending" | "accepted" | "revoked";
+        };
+        Insert: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          club_id: string;
+          created_at?: string;
+          email: string;
+          expires_at?: string;
+          id?: string;
+          invite_token?: string;
+          invited_by: string;
+          status?: "pending" | "accepted" | "revoked";
+        };
+        Update: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          club_id?: string;
+          created_at?: string;
+          email?: string;
+          expires_at?: string;
+          id?: string;
+          invite_token?: string;
+          invited_by?: string;
+          status?: "pending" | "accepted" | "revoked";
+        };
+        Relationships: [];
+      };
+      club_competitions: {
+        Row: {
+          active: boolean;
+          club_id: string;
+          created_at: string;
+          id: string;
+          name: string;
+          notes: string | null;
+          slug: string;
+          updated_at: string;
+        };
+        Insert: {
+          active?: boolean;
+          club_id: string;
+          created_at?: string;
+          id?: string;
+          name: string;
+          notes?: string | null;
+          slug: string;
+          updated_at?: string;
+        };
+        Update: {
+          active?: boolean;
+          club_id?: string;
+          created_at?: string;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          slug?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      club_players: {
+        Row: {
+          active: boolean;
+          club_id: string;
+          created_at: string;
+          full_name: string;
+          id: string;
+          nickname: string | null;
+          notes: string | null;
+          photo_path: string | null;
+          position: string | null;
+          shirt_number: number | null;
+          updated_at: string;
+        };
+        Insert: {
+          active?: boolean;
+          club_id: string;
+          created_at?: string;
+          full_name: string;
+          id?: string;
+          nickname?: string | null;
+          notes?: string | null;
+          photo_path?: string | null;
+          position?: string | null;
+          shirt_number?: number | null;
+          updated_at?: string;
+        };
+        Update: {
+          active?: boolean;
+          club_id?: string;
+          created_at?: string;
+          full_name?: string;
+          id?: string;
+          nickname?: string | null;
+          notes?: string | null;
+          photo_path?: string | null;
+          position?: string | null;
+          shirt_number?: number | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      club_teams: {
+        Row: {
+          active: boolean;
+          club_id: string;
+          created_at: string;
+          id: string;
+          logo_path: string | null;
+          name: string;
+          notes: string | null;
+          short_name: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          active?: boolean;
+          club_id: string;
+          created_at?: string;
+          id?: string;
+          logo_path?: string | null;
+          name: string;
+          notes?: string | null;
+          short_name?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          active?: boolean;
+          club_id?: string;
+          created_at?: string;
+          id?: string;
+          logo_path?: string | null;
+          name?: string;
+          notes?: string | null;
+          short_name?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      club_team_players: {
+        Row: {
+          club_player_id: string;
+          club_team_id: string;
+          created_at: string;
+          id: string;
+        };
+        Insert: {
+          club_player_id: string;
+          club_team_id: string;
+          created_at?: string;
+          id?: string;
+        };
+        Update: {
+          club_player_id?: string;
+          club_team_id?: string;
+          created_at?: string;
+          id?: string;
+        };
+        Relationships: [];
+      };
+      club_matches: {
+        Row: {
+          club_competition_id: string | null;
+          club_id: string;
+          club_team_id: string;
+          created_at: string;
+          created_by: string;
+          goals_against: number;
+          goals_for: number;
+          id: string;
+          notes: string | null;
+          opponent_name: string;
+          played_at: string;
+          status: "draft" | "played" | "cancelled";
+          updated_at: string;
+          venue: string | null;
+        };
+        Insert: {
+          club_competition_id?: string | null;
+          club_id: string;
+          club_team_id: string;
+          created_at?: string;
+          created_by: string;
+          goals_against?: number;
+          goals_for?: number;
+          id?: string;
+          notes?: string | null;
+          opponent_name: string;
+          played_at: string;
+          status?: "draft" | "played" | "cancelled";
+          updated_at?: string;
+          venue?: string | null;
+        };
+        Update: {
+          club_competition_id?: string | null;
+          club_id?: string;
+          club_team_id?: string;
+          created_at?: string;
+          created_by?: string;
+          goals_against?: number;
+          goals_for?: number;
+          id?: string;
+          notes?: string | null;
+          opponent_name?: string;
+          played_at?: string;
+          status?: "draft" | "played" | "cancelled";
+          updated_at?: string;
+          venue?: string | null;
+        };
+        Relationships: [];
+      };
+      club_match_lineups: {
+        Row: {
+          club_player_id: string | null;
+          created_at: string;
+          display_name: string;
+          guest_name: string | null;
+          id: string;
+          match_id: string;
+          role: "starter" | "substitute";
+        };
+        Insert: {
+          club_player_id?: string | null;
+          created_at?: string;
+          display_name: string;
+          guest_name?: string | null;
+          id?: string;
+          match_id: string;
+          role?: "starter" | "substitute";
+        };
+        Update: {
+          club_player_id?: string | null;
+          created_at?: string;
+          display_name?: string;
+          guest_name?: string | null;
+          id?: string;
+          match_id?: string;
+          role?: "starter" | "substitute";
+        };
+        Relationships: [];
+      };
+      club_match_player_stats: {
+        Row: {
+          assists: number;
+          created_at: string;
+          goals: number;
+          id: string;
+          is_mvp: boolean;
+          lineup_id: string;
+          match_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          assists?: number;
+          created_at?: string;
+          goals?: number;
+          id?: string;
+          is_mvp?: boolean;
+          lineup_id: string;
+          match_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          assists?: number;
+          created_at?: string;
+          goals?: number;
+          id?: string;
+          is_mvp?: boolean;
+          lineup_id?: string;
+          match_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      club_public_snapshots: {
+        Row: {
+          club_id: string;
+          competition_stats: Json;
+          recent_matches: Json;
+          refreshed_at: string;
+          summary: Json;
+          teams: Json;
+          top_assisters: Json;
+          top_figures: Json;
+          top_scorers: Json;
+          updated_at: string;
+        };
+        Insert: {
+          club_id: string;
+          competition_stats?: Json;
+          recent_matches?: Json;
+          refreshed_at?: string;
+          summary?: Json;
+          teams?: Json;
+          top_assisters?: Json;
+          top_figures?: Json;
+          top_scorers?: Json;
+          updated_at?: string;
+        };
+        Update: {
+          club_id?: string;
+          competition_stats?: Json;
+          recent_matches?: Json;
+          refreshed_at?: string;
+          summary?: Json;
+          teams?: Json;
+          top_assisters?: Json;
+          top_figures?: Json;
+          top_scorers?: Json;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       public_match_cards: {
@@ -892,6 +1279,9 @@ export type Database = {
       tournament_admin_role: "owner" | "editor";
       tournament_match_status: "draft" | "scheduled" | "played" | "cancelled";
       tournament_status: "draft" | "active" | "finished" | "archived";
+      club_status: "draft" | "active" | "archived";
+      club_match_status: "draft" | "played" | "cancelled";
+      club_lineup_role: "starter" | "substitute";
       winner_team: "A" | "B" | "DRAW";
     };
     CompositeTypes: {
