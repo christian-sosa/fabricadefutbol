@@ -12,6 +12,7 @@ import {
 } from "@/app/admin/(panel)/actions";
 import { TrackedLink } from "@/components/analytics/tracked-link";
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
+import { GroupPaymentValueCard } from "@/components/admin/group-payment-value-card";
 import { OrganizationImage } from "@/components/groups/organization-image";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Button } from "@/components/ui/button";
@@ -418,6 +419,17 @@ export default async function AdminDashboardPage({
           </div>
         </Card>
       ) : null}
+
+      <GroupPaymentValueCard
+        accessValidUntil={organizationWriteAccess?.accessValidUntil ?? null}
+        canWrite={canWriteSelectedOrganization}
+        finishedCount={dashboardData.finishedCount}
+        organizationSlug={selectedOrganization.slug}
+        playersCount={dashboardData.playersCount}
+        subscriptionActive={organizationWriteAccess?.subscriptionActive ?? false}
+        totalMatches={dashboardData.draftsCount + dashboardData.confirmedCount + dashboardData.finishedCount}
+        variant="dashboard"
+      />
 
       <Card>
         <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">

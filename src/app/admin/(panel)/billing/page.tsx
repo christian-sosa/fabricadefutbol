@@ -4,6 +4,7 @@ import {
 } from "@/app/admin/(panel)/actions";
 import { TrackedButton } from "@/components/analytics/tracked-button";
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
+import { GroupPaymentValueCard } from "@/components/admin/group-payment-value-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import {
@@ -17,7 +18,7 @@ import {
   ORGANIZATION_MONTHLY_PRICE_ARS
 } from "@/lib/constants";
 import { GROWTH_EVENTS } from "@/lib/growth";
-import { getOrganizationBillingData } from "@/lib/queries/admin";
+import { getAdminDashboardData, getOrganizationBillingData } from "@/lib/queries/admin";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { formatDateTime } from "@/lib/utils";
 
@@ -87,7 +88,10 @@ export default async function AdminBillingPage({
     }
   }
 
-  const billingData = await getOrganizationBillingData(selectedOrganization.id);
+  const [billingData, dashboardData] = await Promise.all([
+    getOrganizationBillingData(selectedOrganization.id),
+    getAdminDashboardData(selectedOrganization.id)
+  ]);
   const subscription = billingData.subscription;
   const isSubscriptionActive = writeAccess.subscriptionActive;
   const accessValidUntil = resolveOrganizationVisibleAccessValidUntil({
@@ -108,10 +112,20 @@ export default async function AdminBillingPage({
       <Card>
         <CardTitle>Facturacion</CardTitle>
         <CardDescription>
-          Mercado Pago por grupo: {formatCurrencyArs(ORGANIZATION_MONTHLY_PRICE_ARS)} / 30
-          dias.
+          Mercado Pago por grupo: {formatCurrencyArs(ORGANIZATION_MONTHLY_PRICE_ARS)} / 30 dias. El plan mantiene habilitada la creacion de partidos, carga de resultados, ranking y gestion del plantel.
         </CardDescription>
       </Card>
+
+      <GroupPaymentValueCard
+        accessValidUntil={accessValidUntil}
+        canWrite={writeAccess.canWrite}
+        finishedCount={dashboardData.finishedCount}
+        organizationSlug={selectedOrganization.slug}
+        playersCount={dashboardData.playersCount}
+        subscriptionActive={writeAccess.subscriptionActive}
+        totalMatches={dashboardData.draftsCount + dashboardData.confirmedCount + dashboardData.finishedCount}
+        variant="billing"
+      />
 
       {resolvedSearchParams.checkout ? (
         <Card
@@ -230,6 +244,24 @@ export default async function AdminBillingPage({
             </form>
           </div>
         )}
+      </Card>
+
+      <Card>
+        <CardTitle>Que mantiene activo el plan?</CardTitle>
+        <CardDescription className="mt-2">
+          El grupo publico sigue siendo consultable, pero el plan mensual conserva la operacion viva: crear partidos, modificar plantel, cargar resultados y seguir alimentando el ranking semana a semana.
+        </CardDescription>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {[
+            "Edicion del grupo y jugadores",
+            "Creacion de partidos y equipos",
+            "Carga de resultados e historial"
+          ].map((item) => (
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-sm font-semibold text-slate-200" key={item}>
+              {item}
+            </div>
+          ))}
+        </div>
       </Card>
 
       <Card>
