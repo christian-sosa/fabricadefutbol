@@ -129,6 +129,49 @@ function createUuid(counter: number) {
   return `00000000-0000-4000-8000-${String(counter).padStart(12, "0")}`;
 }
 
+function addDaysToIsoDate(isoDate: string, days: number) {
+  const base = new Date(isoDate);
+  return new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function addMonthsToIsoDate(isoDate: string, months: number) {
+  const base = new Date(isoDate);
+  return new Date(
+    Date.UTC(
+      base.getUTCFullYear(),
+      base.getUTCMonth() + months,
+      base.getUTCDate(),
+      base.getUTCHours(),
+      base.getUTCMinutes(),
+      base.getUTCSeconds(),
+      base.getUTCMilliseconds()
+    )
+  ).toISOString();
+}
+
+function resolveNextOrganizationBillingPeriod(
+  previousPeriodEnd: unknown,
+  accessValidUntil: unknown
+) {
+  const now = new Date();
+  const candidateDates = [previousPeriodEnd, accessValidUntil]
+    .map((value) => (typeof value === "string" && value ? new Date(value) : null))
+    .filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()));
+
+  const futureCandidate = candidateDates.reduce<Date | null>((latest, candidate) => {
+    if (candidate.getTime() <= now.getTime()) return latest;
+    if (!latest) return candidate;
+    return candidate.getTime() > latest.getTime() ? candidate : latest;
+  }, null);
+
+  const periodStart = futureCandidate ? futureCandidate.toISOString() : now.toISOString();
+
+  return {
+    periodStart,
+    periodEnd: addMonthsToIsoDate(periodStart, 1)
+  };
+}
+
 function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
   const now = new Date().toISOString();
   const normalized: Row = {
@@ -799,7 +842,107 @@ class FakeSupabaseState {
     }
   }
 
+  private applyOrganizationBillingPaymentPeriod(args: Record<string, unknown>) {
+    const paymentId = String(args.payment_row_id ?? "");
+    const paymentRow =
+      this.db.organization_billing_payments.find((row) => String(row.id) === paymentId) ?? null;
+
+    if (!paymentRow) {
+      return {
+        data: null,
+        error: { message: "No se encontro el pago local para aplicar la suscripcion." }
+      };
+    }
+
+    if (paymentRow.subscription_applied_at) {
+      return {
+        data: [
+          {
+            period_start: paymentRow.period_start ?? null,
+            period_end: paymentRow.period_end ?? null,
+            applied: false
+          }
+        ],
+        error: null
+      };
+    }
+
+    const organizationId = String(args.target_organization_id ?? paymentRow.organization_id ?? "");
+    const organization =
+      this.db.organizations.find((row) => String(row.id) === organizationId) ?? null;
+
+    if (!organization) {
+      return {
+        data: null,
+        error: { message: "No se encontro el grupo para aplicar la suscripcion." }
+      };
+    }
+
+    const subscription =
+      this.db.organization_billing_subscriptions.find(
+        (row) => String(row.organization_id) === organizationId
+      ) ?? null;
+    const trialEndsAt =
+      typeof organization.created_at === "string"
+        ? addDaysToIsoDate(organization.created_at, 30)
+        : null;
+    const { periodStart, periodEnd } = resolveNextOrganizationBillingPeriod(
+      subscription?.current_period_end ?? null,
+      trialEndsAt
+    );
+    const approvedAt =
+      typeof args.payment_approved_at === "string" && args.payment_approved_at
+        ? args.payment_approved_at
+        : new Date().toISOString();
+
+    const subscriptionPayload = {
+      organization_id: organizationId,
+      status: "active",
+      current_period_start: periodStart,
+      current_period_end: periodEnd,
+      last_payment_at: approvedAt
+    };
+
+    if (subscription) {
+      Object.assign(subscription, subscriptionPayload);
+      if ("updated_at" in subscription) {
+        subscription.updated_at = new Date().toISOString();
+      }
+    } else {
+      this.insertRow("organization_billing_subscriptions", subscriptionPayload);
+    }
+
+    organization.player_photos_purge_at = null;
+    organization.player_photos_purged_at = null;
+    if ("updated_at" in organization) {
+      organization.updated_at = new Date().toISOString();
+    }
+
+    paymentRow.organization_id = organizationId;
+    paymentRow.period_start = periodStart;
+    paymentRow.period_end = periodEnd;
+    paymentRow.subscription_applied_at = new Date().toISOString();
+    if ("updated_at" in paymentRow) {
+      paymentRow.updated_at = new Date().toISOString();
+    }
+
+    return {
+      data: [
+        {
+          period_start: periodStart,
+          period_end: periodEnd,
+          applied: true
+        }
+      ],
+      error: null
+    };
+  }
+
   async runRpc(name: string, args: Record<string, unknown>) {
+    if (name === "apply_organization_billing_payment_period") {
+      return this.applyOrganizationBillingPaymentPeriod(args);
+    }
+
     if (name !== "finalize_organization_creation_payment") {
       return {
         data: null,

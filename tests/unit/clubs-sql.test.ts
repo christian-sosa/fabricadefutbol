@@ -49,6 +49,8 @@ describeSupabaseSql("clubes sql", () => {
   it("incluye limites de admins, equipos y seed no-op de La Quinta", () => {
     expect(schemaSql).toContain("Cada club admite hasta 5 equipos activos.");
     expect(policiesSql).toContain("create or replace function public.club_has_admin_slot");
+    expect(policiesSql).toContain("select c.created_by");
+    expect(policiesSql).toContain("c.created_by = club_admins.admin_id");
     expect(schemaSql).toContain("se omite seed de club La Quinta");
     expect(schemaSql).toContain("'La Quinta'");
   });

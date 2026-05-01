@@ -863,24 +863,38 @@ export async function inviteClubAdminAction(clubId: string, formData: FormData) 
     }
 
     const supabase = await createSupabaseServerClient();
-    const [{ count: currentAdmins, error: adminCountError }, { data: inviteRows, error: inviteRowsError }] =
-      await Promise.all([
-        supabase.from("club_admins").select("id", { count: "exact", head: true }).eq("club_id", clubId),
-        supabase.from("club_admin_invites").select("id, expires_at").eq("club_id", clubId).eq("status", "pending")
-      ]);
+    const [
+      { data: clubRow, error: clubError },
+      { data: adminRows, error: adminRowsError },
+      { data: inviteRows, error: inviteRowsError }
+    ] = await Promise.all([
+      supabase.from("clubs").select("created_by").eq("id", clubId).maybeSingle(),
+      supabase.from("club_admins").select("admin_id").eq("club_id", clubId),
+      supabase.from("club_admin_invites").select("id, expires_at").eq("club_id", clubId).eq("status", "pending")
+    ]);
 
-    if (adminCountError) {
-      redirect(buildClubDetailPath({ clubId, tab: "admins", error: toUserMessage(adminCountError, "No se pudo verificar los admins actuales.") }));
+    if (clubError || !clubRow) {
+      redirect(buildClubDetailPath({ clubId, tab: "admins", error: toUserMessage(clubError, "No se pudo verificar el club actual.") }));
+    }
+    if (adminRowsError) {
+      redirect(buildClubDetailPath({ clubId, tab: "admins", error: toUserMessage(adminRowsError, "No se pudo verificar los admins actuales.") }));
     }
     if (inviteRowsError) {
       redirect(buildClubDetailPath({ clubId, tab: "admins", error: toUserMessage(inviteRowsError, "No se pudo verificar invitaciones pendientes.") }));
+    }
+
+    const currentAdminIds = new Set(
+      (adminRows ?? []).map((row) => String(row.admin_id ?? "")).filter(Boolean)
+    );
+    if (clubRow.created_by) {
+      currentAdminIds.add(String(clubRow.created_by));
     }
 
     const activePendingInvites = (inviteRows ?? []).filter((row) => {
       const expiresAt = Date.parse(row.expires_at);
       return !Number.isFinite(expiresAt) || expiresAt > Date.now();
     });
-    if ((currentAdmins ?? 0) + activePendingInvites.length >= 4) {
+    if (currentAdminIds.size + activePendingInvites.length >= 4) {
       redirect(buildClubDetailPath({ clubId, tab: "admins", error: "Este club ya alcanzo el maximo de 4 administradores." }));
     }
 
@@ -962,16 +976,31 @@ export async function removeClubAdminAction(clubId: string, formData: FormData) 
     }
 
     const supabase = await createSupabaseServerClient();
-    const { count: adminsCount, error: adminsCountError } = await supabase
-      .from("club_admins")
-      .select("id", { count: "exact", head: true })
-      .eq("club_id", clubId);
+    const [{ data: clubRow, error: clubError }, { data: adminRows, error: adminRowsError }] =
+      await Promise.all([
+        supabase.from("clubs").select("created_by").eq("id", clubId).maybeSingle(),
+        supabase.from("club_admins").select("admin_id").eq("club_id", clubId)
+      ]);
 
-    if (adminsCountError) {
-      redirect(buildClubDetailPath({ clubId, tab: "admins", error: toUserMessage(adminsCountError, "No se pudo contar los admins actuales.") }));
+    if (clubError || !clubRow) {
+      redirect(buildClubDetailPath({ clubId, tab: "admins", error: toUserMessage(clubError, "No se pudo verificar el club actual.") }));
+    }
+    if (adminRowsError) {
+      redirect(buildClubDetailPath({ clubId, tab: "admins", error: toUserMessage(adminRowsError, "No se pudo contar los admins actuales.") }));
     }
 
-    if ((adminsCount ?? 0) <= 1) {
+    if (clubRow.created_by && parsed.data.adminId === String(clubRow.created_by)) {
+      redirect(buildClubDetailPath({ clubId, tab: "admins", error: "El creador del club conserva permisos de owner y no puede quitarse desde admins." }));
+    }
+
+    const activeAdminIds = new Set(
+      (adminRows ?? []).map((row) => String(row.admin_id ?? "")).filter(Boolean)
+    );
+    if (clubRow.created_by) {
+      activeAdminIds.add(String(clubRow.created_by));
+    }
+
+    if (activeAdminIds.size <= 1) {
       redirect(buildClubDetailPath({ clubId, tab: "admins", error: "El club debe mantener al menos 1 admin activo." }));
     }
 

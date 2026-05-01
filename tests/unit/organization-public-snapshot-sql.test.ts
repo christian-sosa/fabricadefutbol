@@ -26,8 +26,8 @@ describeSupabaseSql("organization public snapshot SQL", () => {
     expect(policiesSql).toContain("using (public.can_read_org(organization_id));");
   });
 
-  it("limita la escritura a admins del grupo", () => {
+  it("limita la escritura a admins con grupo activo o en trial", () => {
     expect(policiesSql).toContain("organization_public_snapshots_admin_write");
-    expect(policiesSql).toContain("with check (public.is_org_admin(organization_id));");
+    expect(policiesSql).toContain("with check (public.can_write_org(organization_id));");
   });
 });

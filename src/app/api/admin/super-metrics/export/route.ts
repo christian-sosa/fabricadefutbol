@@ -2,18 +2,10 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getAdminSession } from "@/lib/auth/admin";
+import { toCsv, type CsvCellValue } from "@/lib/csv";
 import { maskEmail, maskUserId } from "@/lib/log-pii";
 import { getSuperAdminDashboardMetrics } from "@/lib/queries/admin";
 import { getClientIpFromHeaders } from "@/lib/rate-limit";
-
-function csvCell(value: string | number) {
-  const safeValue = String(value ?? "");
-  return `"${safeValue.replace(/"/g, '""')}"`;
-}
-
-function toCsv(rows: Array<Array<string | number>>) {
-  return rows.map((row) => row.map((cell) => csvCell(cell)).join(",")).join("\n");
-}
 
 export async function GET() {
   const admin = await getAdminSession();
@@ -42,7 +34,7 @@ export async function GET() {
   const metrics = await getSuperAdminDashboardMetrics();
   const dateStamp = new Date().toISOString().slice(0, 10);
 
-  const summaryRows: Array<Array<string | number>> = [
+  const summaryRows: CsvCellValue[][] = [
     ["section", "metric", "value"],
     ["meta", "generated_at", metrics.generatedAt],
     ["current_month", "label", metrics.currentMonth.label],
@@ -87,7 +79,7 @@ export async function GET() {
     ["last_30_days", "matches_finished", metrics.last30Days.matchesFinished]
   ];
 
-  const orgRows: Array<Array<string | number>> = [
+  const orgRows: CsvCellValue[][] = [
     [
       "organization_id",
       "name",

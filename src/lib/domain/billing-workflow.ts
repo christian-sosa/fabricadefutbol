@@ -1,4 +1,3 @@
-import { getOrganizationTrialEndsAt, resolveNextOrganizationBillingPeriod } from "@/lib/domain/billing";
 import { getMercadoPagoPaymentById } from "@/lib/payments/mercadopago";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -123,72 +122,12 @@ async function applyApprovedPaymentPeriod(params: {
   if (paymentRow.subscription_applied_at) return;
   const organizationId = targetOrganizationId ?? paymentRow.organization_id;
 
-  const [{ data: subscription, error: subscriptionError }, { data: organization, error: organizationError }] =
-    await Promise.all([
-      supabase
-        .from("organization_billing_subscriptions")
-        .select("organization_id, current_period_end")
-        .eq("organization_id", organizationId)
-        .maybeSingle(),
-      supabase
-        .from("organizations")
-        .select("created_at")
-        .eq("id", organizationId)
-        .maybeSingle()
-    ]);
-  if (subscriptionError) throw new Error(subscriptionError.message);
-  if (organizationError) throw new Error(organizationError.message);
-
-  const organizationTrialEndsAt = organization?.created_at
-    ? getOrganizationTrialEndsAt(organization.created_at)
-    : null;
-
-  const { periodStart, periodEnd } = resolveNextOrganizationBillingPeriod(
-    subscription?.current_period_end ?? null,
-    organizationTrialEndsAt
-  );
-
-  const { error: upsertSubscriptionError } = await supabase
-    .from("organization_billing_subscriptions")
-    .upsert(
-      {
-        organization_id: organizationId,
-        status: "active",
-        current_period_start: periodStart,
-        current_period_end: periodEnd,
-        last_payment_at: approvedAt
-      },
-      { onConflict: "organization_id" }
-    );
-  if (upsertSubscriptionError) throw new Error(upsertSubscriptionError.message);
-
-  const { error: resetRetentionError } = await supabase
-    .from("organizations")
-    .update({
-      player_photos_purge_at: null,
-      player_photos_purged_at: null
-    })
-    .eq("id", organizationId);
-  if (resetRetentionError) throw new Error(resetRetentionError.message);
-
-  // Guard atomico: solo una ejecucion concurrente puede pasar el WHERE.
-  // El WHERE adicional `subscription_applied_at IS NULL` evita doble aplicacion
-  // si el webhook llega dos veces casi simultaneamente.
-  const { data: markedRows, error: markAppliedError } = await supabase
-    .from("organization_billing_payments")
-    .update({
-      period_start: periodStart,
-      period_end: periodEnd,
-      subscription_applied_at: new Date().toISOString()
-    })
-    .eq("id", paymentRow.id)
-    .is("subscription_applied_at", null)
-    .select("id");
-  if (markAppliedError) throw new Error(markAppliedError.message);
-  if (!markedRows || markedRows.length === 0) {
-    // Otro proceso ya aplico este pago; no hay nada mas que hacer.
-    return;
-  }
+  const { error } = await supabase.rpc("apply_organization_billing_payment_period", {
+    payment_row_id: paymentRow.id,
+    target_organization_id: organizationId,
+    payment_approved_at: approvedAt
+  });
+  if (error) throw new Error(error.message);
 }
 
 async function createOrganizationFromApprovedPayment(params: {
