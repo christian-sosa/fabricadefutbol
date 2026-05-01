@@ -11,6 +11,7 @@ import { parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
 import { datetimeLocalToMatchIso } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { logError, logInfo } from "@/lib/observability/log";
+import { GROWTH_EVENTS, withGrowthEvent } from "@/lib/growth";
 import { withOrgQuery } from "@/lib/org";
 import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -250,7 +251,7 @@ export async function createMatchAction(formData: FormData) {
       guestCount: invitedGuests.length,
       durationMs: Date.now() - startedAt
     });
-    redirect(withOrgQuery(`/admin/matches/${matchId}`, organizationQueryKey));
+    redirect(withGrowthEvent(withOrgQuery(`/admin/matches/${matchId}`, organizationQueryKey), GROWTH_EVENTS.matchCreated));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     logError("matches.create.failed", error, {

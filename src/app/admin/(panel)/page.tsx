@@ -10,6 +10,7 @@ import {
   startOrganizationCreationCheckoutAction,
   uploadOrganizationImageAction
 } from "@/app/admin/(panel)/actions";
+import { TrackedLink } from "@/components/analytics/tracked-link";
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { OrganizationImage } from "@/components/groups/organization-image";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
@@ -25,6 +26,7 @@ import {
 } from "@/lib/auth/admin";
 import { syncOrganizationBillingPaymentFromMercadoPago } from "@/lib/domain/billing-workflow";
 import { isTournamentsEnabled } from "@/lib/features";
+import { GROWTH_EVENTS } from "@/lib/growth";
 import { getOrganizationImageUrl } from "@/lib/organization-images";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminDashboardData, getOrganizationAdminData } from "@/lib/queries/admin";
@@ -163,12 +165,14 @@ function AdminOnboardingCard({
               </span>
             </div>
             <p className="mt-2 text-sm text-slate-300">{step.description}</p>
-            <Link
+            <TrackedLink
               className="mt-4 inline-flex rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
+              eventName={GROWTH_EVENTS.ctaClicked}
+              eventProperties={{ cta: step.cta, source: "admin_onboarding" }}
               href={step.href}
             >
               {step.cta}
-            </Link>
+            </TrackedLink>
           </div>
         ))}
       </div>

@@ -42,6 +42,7 @@ import {
   optimizeOrganizationImage
 } from "@/lib/organization-images";
 import { toUserMessage } from "@/lib/errors";
+import { GROWTH_EVENTS, withGrowthEvent } from "@/lib/growth";
 import { createCheckoutProPreference } from "@/lib/payments/mercadopago";
 import { REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL } from "@/lib/storage-image-responses";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -255,7 +256,7 @@ export async function createOrganizationAction(formData: FormData) {
       adminId: admin.userId,
       durationMs: Date.now() - startedAt
     });
-    redirect(withOrgQuery("/admin", slug));
+    redirect(withGrowthEvent(withOrgQuery("/admin", slug), GROWTH_EVENTS.groupCreated));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     logError("organizations.create.failed", error, {
@@ -317,17 +318,20 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
       .randomUUID()
       .slice(0, 8)}`;
     const publicBaseUrl = await resolveServerBaseUrl();
-    const successPath = withOrgQuery(
-      "/admin?checkout=success&flow=create-org",
-      organizationQueryKey
+    const successPath = withGrowthEvent(
+      withOrgQuery("/admin?checkout=success&flow=create-org", organizationQueryKey),
+      GROWTH_EVENTS.paymentReturned,
+      "mercadopago"
     );
-    const failurePath = withOrgQuery(
-      "/admin?checkout=failure&flow=create-org",
-      organizationQueryKey
+    const failurePath = withGrowthEvent(
+      withOrgQuery("/admin?checkout=failure&flow=create-org", organizationQueryKey),
+      GROWTH_EVENTS.paymentReturned,
+      "mercadopago"
     );
-    const pendingPath = withOrgQuery(
-      "/admin?checkout=pending&flow=create-org",
-      organizationQueryKey
+    const pendingPath = withGrowthEvent(
+      withOrgQuery("/admin?checkout=pending&flow=create-org", organizationQueryKey),
+      GROWTH_EVENTS.paymentReturned,
+      "mercadopago"
     );
     const notificationPath = "/api/payments/mercadopago/webhook";
 
@@ -455,9 +459,21 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
       .randomUUID()
       .slice(0, 8)}`;
     const publicBaseUrl = await resolveServerBaseUrl();
-    const successPath = withOrgQuery("/admin/billing?checkout=success", organizationQueryKey);
-    const failurePath = withOrgQuery("/admin/billing?checkout=failure", organizationQueryKey);
-    const pendingPath = withOrgQuery("/admin/billing?checkout=pending", organizationQueryKey);
+    const successPath = withGrowthEvent(
+      withOrgQuery("/admin/billing?checkout=success", organizationQueryKey),
+      GROWTH_EVENTS.paymentReturned,
+      "mercadopago"
+    );
+    const failurePath = withGrowthEvent(
+      withOrgQuery("/admin/billing?checkout=failure", organizationQueryKey),
+      GROWTH_EVENTS.paymentReturned,
+      "mercadopago"
+    );
+    const pendingPath = withGrowthEvent(
+      withOrgQuery("/admin/billing?checkout=pending", organizationQueryKey),
+      GROWTH_EVENTS.paymentReturned,
+      "mercadopago"
+    );
     const notificationPath = "/api/payments/mercadopago/webhook";
 
     await cleanupStalePendingOrganizationBillingPayments({

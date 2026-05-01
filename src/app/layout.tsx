@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
 
 import "@/app/globals.css";
+import { GrowthEventTracker } from "@/components/analytics/growth-event-tracker";
 import { BetaNotice } from "@/components/layout/beta-notice";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -95,6 +96,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <SiteFooter />
           </Suspense>
         </ReactQueryProvider>
+        <Suspense fallback={null}>
+          <GrowthEventTracker />
+        </Suspense>
         <Analytics />
       </body>
     </html>

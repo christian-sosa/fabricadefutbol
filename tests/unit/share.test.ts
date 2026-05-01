@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMatchWhatsAppMessage, buildWhatsAppShareUrl, getWhatsAppShareTarget } from "@/lib/share";
+import {
+  buildGroupWhatsAppMessage,
+  buildMatchWhatsAppMessage,
+  buildRankingWhatsAppMessage,
+  buildWhatsAppShareUrl,
+  getWhatsAppShareTarget
+} from "@/lib/share";
 
 const shareEmojis = {
   soccer: String.fromCodePoint(0x26bd),
@@ -56,6 +62,24 @@ describe("share helpers", () => {
     const matchUrl = "https://fabricadefutbol.com.ar/matches/abc-123";
 
     expect(buildWhatsAppShareUrl({ matchUrl }, "mobile")).toMatch(/^whatsapp:\/\/send\?text=/);
+  });
+
+  it("arma el mensaje para compartir la pagina publica del grupo", () => {
+    expect(
+      buildGroupWhatsAppMessage({
+        groupName: "Los Pibes",
+        groupUrl: "https://fabricadefutbol.com.ar/groups?org=los-pibes"
+      })
+    ).toContain("Ranking, historial y proximos partidos de Los Pibes");
+  });
+
+  it("arma el mensaje para compartir el ranking del grupo", () => {
+    expect(
+      buildRankingWhatsAppMessage({
+        groupName: "Los Pibes",
+        rankingUrl: "https://fabricadefutbol.com.ar/ranking?org=los-pibes"
+      })
+    ).toContain("Ranking actualizado de Los Pibes");
   });
 
   it("detecta el destino de WhatsApp segun el navegador", () => {

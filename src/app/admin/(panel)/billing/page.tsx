@@ -2,6 +2,7 @@ import {
   startOrganizationCheckoutProAction,
   syncOrganizationCheckoutPaymentAction
 } from "@/app/admin/(panel)/actions";
+import { TrackedButton } from "@/components/analytics/tracked-button";
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import {
   ORGANIZATION_BILLING_CURRENCY,
   ORGANIZATION_MONTHLY_PRICE_ARS
 } from "@/lib/constants";
+import { GROWTH_EVENTS } from "@/lib/growth";
 import { getOrganizationBillingData } from "@/lib/queries/admin";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { formatDateTime } from "@/lib/utils";
@@ -197,9 +199,13 @@ export default async function AdminBillingPage({
             ) : null}
             <form action={startOrganizationCheckoutProAction} className="mt-3">
               <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-              <Button type="submit">
+              <TrackedButton
+                eventName={GROWTH_EVENTS.billingStarted}
+                eventProperties={{ cta: "activate_plan", source: "admin_billing" }}
+                type="submit"
+              >
                 Pagar {formatCurrencyArs(ORGANIZATION_MONTHLY_PRICE_ARS)} y activar 30 dias
-              </Button>
+              </TrackedButton>
             </form>
           </div>
         ) : (
@@ -213,9 +219,14 @@ export default async function AdminBillingPage({
             </p>
             <form action={startOrganizationCheckoutProAction} className="mt-3">
               <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-              <Button type="submit" variant="secondary">
+              <TrackedButton
+                eventName={GROWTH_EVENTS.billingStarted}
+                eventProperties={{ cta: "buy_extra_month", source: "admin_billing" }}
+                type="submit"
+                variant="secondary"
+              >
                 Comprar otro mes
-              </Button>
+              </TrackedButton>
             </form>
           </div>
         )}

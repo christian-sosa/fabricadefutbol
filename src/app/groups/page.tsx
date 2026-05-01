@@ -1,14 +1,18 @@
 import Link from "next/link";
 
+import { GroupShareActions } from "@/components/groups/group-share-actions";
 import { OrganizationImage } from "@/components/groups/organization-image";
+import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
 import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { formatMatchDateTime } from "@/lib/match-datetime";
+import { withShareTracking } from "@/lib/growth";
 import { getOrganizationImageUrl } from "@/lib/organization-images";
 import { withOrgQuery } from "@/lib/org";
+import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
 import { formatRendimiento } from "@/lib/utils";
 
@@ -23,6 +27,12 @@ export default async function GroupsPage({
     getViewerAdminOrganizations()
   ]);
   const summary = await getHomeSummary(selectedOrganization?.id ?? null);
+  const groupShareUrl = selectedOrganization
+    ? buildAbsolutePublicUrl(withShareTracking(withOrgQuery("/groups", selectedOrganization.slug), "group"))
+    : null;
+  const rankingShareUrl = selectedOrganization
+    ? buildAbsolutePublicUrl(withShareTracking(withOrgQuery("/ranking", selectedOrganization.slug), "ranking"))
+    : null;
 
   return (
     <div className="space-y-6">
@@ -65,6 +75,12 @@ export default async function GroupsPage({
             <h2 className="text-3xl font-black text-slate-100 md:text-5xl">
               {selectedOrganization.name}
             </h2>
+            <GroupShareActions
+              groupName={selectedOrganization.name}
+              groupUrl={groupShareUrl ?? undefined}
+              rankingUrl={rankingShareUrl ?? undefined}
+              source="groups_page"
+            />
           </section>
 
           <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
@@ -163,6 +179,8 @@ export default async function GroupsPage({
           </CardDescription>
         </Card>
       )}
+
+      <PublicGroupGrowthCta source="groups_page" />
 
       <AdPlaceholder slot="organizations-bottom" />
     </div>

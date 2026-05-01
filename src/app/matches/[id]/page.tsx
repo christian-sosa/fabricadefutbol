@@ -6,7 +6,9 @@ import { MatchStatusBadge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { WhatsAppShareButton } from "@/components/matches/whatsapp-share-button";
+import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
 import { formatMatchDateTime } from "@/lib/match-datetime";
+import { withShareTracking } from "@/lib/growth";
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getMatchDetails } from "@/lib/queries/public";
@@ -48,7 +50,7 @@ export default async function MatchDetailPage({
   const details = await getMatchDetails(id, resolvedSearchParams.org);
   if (!details) notFound();
   const publicMatchPath = withOrgQuery(`/matches/${id}`, resolvedSearchParams.org);
-  const publicMatchUrl = buildAbsolutePublicUrl(publicMatchPath);
+  const publicMatchUrl = buildAbsolutePublicUrl(withShareTracking(publicMatchPath, "match"));
   const teamLabels = resolveMatchTeamLabels(details.match);
 
   return (
@@ -142,6 +144,8 @@ export default async function MatchDetailPage({
           )}
         </div>
       </Card>
+
+      <PublicGroupGrowthCta source="match_detail" />
     </div>
   );
 }

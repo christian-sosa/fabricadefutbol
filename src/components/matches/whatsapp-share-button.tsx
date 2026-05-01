@@ -1,6 +1,9 @@
 "use client";
 
+import { track } from "@vercel/analytics";
+
 import { Button } from "@/components/ui/button";
+import { GROWTH_EVENTS } from "@/lib/growth";
 import { buildWhatsAppShareUrl, getWhatsAppShareTarget } from "@/lib/share";
 
 type WhatsAppShareButtonProps = {
@@ -18,6 +21,7 @@ export function WhatsAppShareButton({
 }: WhatsAppShareButtonProps) {
   const handleClick = () => {
     const target = getWhatsAppShareTarget(window.navigator.userAgent);
+    track(GROWTH_EVENTS.matchShared, { source: "match_detail" });
 
     window.open(
       buildWhatsAppShareUrl(

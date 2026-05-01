@@ -6,13 +6,25 @@ export type MatchWhatsAppShareParams = {
   teamBName?: string;
 };
 
+export type GroupWhatsAppShareParams = {
+  groupName: string;
+  groupUrl: string;
+};
+
+export type RankingWhatsAppShareParams = {
+  groupName: string;
+  rankingUrl: string;
+};
+
 export type WhatsAppShareTarget = "mobile" | "web";
 
 const WHATSAPP_SHARE_EMOJIS = {
+  chart: String.fromCodePoint(0x1f4ca),
   soccer: String.fromCodePoint(0x26bd),
   fire: String.fromCodePoint(0x1f525),
   matchup: String.fromCodePoint(0x2694, 0xfe0f),
-  pointer: String.fromCodePoint(0x1f449)
+  pointer: String.fromCodePoint(0x1f449),
+  trophy: String.fromCodePoint(0x1f3c6)
 } as const;
 
 export function buildMatchWhatsAppMessage({
@@ -31,12 +43,48 @@ export function buildMatchWhatsAppMessage({
   ].join("\n");
 }
 
+export function buildGroupWhatsAppMessage({ groupName, groupUrl }: GroupWhatsAppShareParams) {
+  return [
+    `${WHATSAPP_SHARE_EMOJIS.soccer} Ranking, historial y proximos partidos de ${groupName}`,
+    "",
+    "Mira como esta organizado el grupo en Fabrica de Futbol:",
+    groupUrl
+  ].join("\n");
+}
+
+export function buildRankingWhatsAppMessage({
+  groupName,
+  rankingUrl
+}: RankingWhatsAppShareParams) {
+  return [
+    `${WHATSAPP_SHARE_EMOJIS.trophy} Ranking actualizado de ${groupName}`,
+    "",
+    `${WHATSAPP_SHARE_EMOJIS.chart} Tabla de posiciones, rendimiento y estadisticas:`,
+    rankingUrl
+  ].join("\n");
+}
+
 function encodeWhatsAppShareText(params: MatchWhatsAppShareParams) {
   return encodeURIComponent(buildMatchWhatsAppMessage(params));
 }
 
+function encodeMessageText(message: string) {
+  return encodeURIComponent(message);
+}
+
 export function getWhatsAppShareTarget(userAgent: string) {
   return /android|iphone|ipad|ipod|mobile/i.test(userAgent) ? "mobile" : "web";
+}
+
+export function buildWhatsAppUrlFromMessage(
+  message: string,
+  target: WhatsAppShareTarget = "web"
+) {
+  const encodedText = encodeMessageText(message);
+  if (target === "mobile") {
+    return `whatsapp://send?text=${encodedText}`;
+  }
+  return `https://web.whatsapp.com/send?text=${encodedText}`;
 }
 
 export function buildWhatsAppShareUrl(

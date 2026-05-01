@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { TrackedLink } from "@/components/analytics/tracked-link";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import {
   ORGANIZATION_BILLING_CURRENCY,
@@ -7,6 +8,7 @@ import {
   TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS
 } from "@/lib/constants";
 import { isTournamentsEnabled } from "@/lib/features";
+import { GROWTH_EVENTS } from "@/lib/growth";
 
 function formatArs(amount: number) {
   return new Intl.NumberFormat("es-AR", {
@@ -79,12 +81,14 @@ export default function PricingPage() {
             : "Empieza con jugadores, partidos, rendimiento, ranking publico e historial claro para todos."}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link
+          <TrackedLink
             className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+            eventName={GROWTH_EVENTS.ctaClicked}
+            eventProperties={{ cta: "start_now", source: "pricing_hero" }}
             href="/admin/login"
           >
             Empezar ahora
-          </Link>
+          </TrackedLink>
           <Link
             className="rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
             href="/help"
@@ -125,12 +129,14 @@ export default function PricingPage() {
             </div>
 
             <div className="mt-5">
-              <Link
+              <TrackedLink
                 className="inline-flex rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                eventName={GROWTH_EVENTS.ctaClicked}
+                eventProperties={{ cta: plan.title === "Grupos" ? "create_group" : "create_league", source: "pricing_plan" }}
                 href={plan.href}
               >
                 {plan.cta}
-              </Link>
+              </TrackedLink>
             </div>
           </Card>
         ))}

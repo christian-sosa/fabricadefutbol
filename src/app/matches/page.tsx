@@ -1,3 +1,4 @@
+import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
 import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
@@ -55,6 +56,8 @@ export default async function MatchesPage({
         organizationSlug={selectedOrganization?.slug}
         pageSize={10}
       />
+
+      <PublicGroupGrowthCta source="matches_page" />
     </div>
   );
 }

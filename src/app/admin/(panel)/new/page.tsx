@@ -4,8 +4,8 @@ import {
   createOrganizationAction,
   startOrganizationCreationCheckoutAction
 } from "@/app/admin/(panel)/actions";
+import { TrackedButton } from "@/components/analytics/tracked-button";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
-import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,6 +13,7 @@ import {
   getAdminOrganizationCreationAccess
 } from "@/lib/auth/admin";
 import { ORGANIZATION_MONTHLY_PRICE_ARS } from "@/lib/constants";
+import { GROWTH_EVENTS } from "@/lib/growth";
 import { withOrgQuery } from "@/lib/org";
 
 function formatAmountArs(amount: number) {
@@ -82,9 +83,17 @@ export default async function NewOrganizationPage({
             <input name="organizationId" type="hidden" value={selectedOrganization.id} />
           ) : null}
           <Input name="name" placeholder="Nombre del grupo" required />
-          <Button disabled={!creationAccess.canCreateOrganization && !selectedOrganization} type="submit">
+          <TrackedButton
+            disabled={!creationAccess.canCreateOrganization && !selectedOrganization}
+            eventName={creationAccess.canCreateOrganization ? GROWTH_EVENTS.ctaClicked : GROWTH_EVENTS.billingStarted}
+            eventProperties={{
+              cta: creationAccess.canCreateOrganization ? "create_group_submit" : "pay_create_group",
+              source: "admin_new_group"
+            }}
+            type="submit"
+          >
             {creationAccess.canCreateOrganization ? "Crear grupo" : "Pagar y crear grupo"}
-          </Button>
+          </TrackedButton>
         </form>
 
         {!creationAccess.canCreateOrganization ? (

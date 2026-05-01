@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { TrackedLink } from "@/components/analytics/tracked-link";
 import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -7,6 +8,7 @@ import {
   ORGANIZATION_BILLING_CURRENCY,
   ORGANIZATION_MONTHLY_PRICE_ARS
 } from "@/lib/constants";
+import { GROWTH_EVENTS } from "@/lib/growth";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery, withPublicQuery } from "@/lib/org";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
@@ -104,18 +106,22 @@ export default async function HomePage({
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link
+              <TrackedLink
                 className="rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_-18px_rgba(16,185,129,0.95)] transition hover:brightness-110"
+                eventName={GROWTH_EVENTS.ctaClicked}
+                eventProperties={{ cta: "create_group", source: "home_hero" }}
                 href="/admin/login"
               >
                 Crear mi grupo gratis
-              </Link>
-              <Link
+              </TrackedLink>
+              <TrackedLink
                 className="rounded-xl border border-slate-700 bg-slate-950/70 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
+                eventName={GROWTH_EVENTS.ctaClicked}
+                eventProperties={{ cta: "pricing", source: "home_hero" }}
                 href={withPublicQuery("/pricing", { organizationKey: selectedOrganizationSlug })}
               >
                 Ver planes
-              </Link>
+              </TrackedLink>
             </div>
 
             <div className="mt-6 flex flex-wrap gap-2">
@@ -377,18 +383,22 @@ export default async function HomePage({
           Probá Fábrica de Fútbol gratis durante 1 mes. Armá equipos parejos, cargá resultados y dejá ranking e historial disponibles para todos.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link
+          <TrackedLink
             className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-95"
+            eventName={GROWTH_EVENTS.ctaClicked}
+            eventProperties={{ cta: "create_group", source: "home_bottom" }}
             href="/admin/login"
           >
             Crear mi grupo gratis
-          </Link>
-          <Link
+          </TrackedLink>
+          <TrackedLink
             className="rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
+            eventName={GROWTH_EVENTS.ctaClicked}
+            eventProperties={{ cta: "pricing", source: "home_bottom" }}
             href={withPublicQuery("/pricing", { organizationKey: selectedOrganizationSlug })}
           >
             Ver precios
-          </Link>
+          </TrackedLink>
           <Link
             className="rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
             href={withPublicQuery("/help", { organizationKey: selectedOrganizationSlug })}

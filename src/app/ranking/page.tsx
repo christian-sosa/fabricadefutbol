@@ -1,7 +1,12 @@
+import { GroupShareActions } from "@/components/groups/group-share-actions";
+import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
 import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { RankingTableQuery } from "@/components/ranking/ranking-table-query";
+import { withShareTracking } from "@/lib/growth";
+import { withOrgQuery } from "@/lib/org";
+import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getPlayersWithStats, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
 
 export default async function RankingPage({
@@ -15,6 +20,9 @@ export default async function RankingPage({
     getViewerAdminOrganizations()
   ]);
   const initialPlayers = await getPlayersWithStats(selectedOrganization?.id ?? null);
+  const rankingShareUrl = selectedOrganization
+    ? buildAbsolutePublicUrl(withShareTracking(withOrgQuery("/ranking", selectedOrganization.slug), "ranking"))
+    : null;
 
   return (
     <div className="-mx-4 min-h-[calc(100vh-6.5rem)] bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-4 py-6 md:rounded-3xl md:border md:border-slate-800 md:p-8">
@@ -38,6 +46,14 @@ export default async function RankingPage({
         />
 
         {selectedOrganization ? (
+          <GroupShareActions
+            groupName={selectedOrganization.name}
+            rankingUrl={rankingShareUrl ?? undefined}
+            source="ranking_page"
+          />
+        ) : null}
+
+        {selectedOrganization ? (
           <section className="lg:hidden">
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
               <OrganizationPublicNav
@@ -53,6 +69,8 @@ export default async function RankingPage({
         <AdPlaceholder slot="ranking-top" />
 
         <RankingTableQuery initialPlayers={initialPlayers} organizationId={selectedOrganization?.id ?? null} />
+
+        <PublicGroupGrowthCta source="ranking_page" />
 
         <AdPlaceholder slot="ranking-bottom" />
       </div>

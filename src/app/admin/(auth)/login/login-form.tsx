@@ -1,5 +1,6 @@
 "use client";
 
+import { track } from "@vercel/analytics";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -12,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { GROWTH_EVENTS } from "@/lib/growth";
 
 const initialLoginState: LoginState = { error: null };
 const initialRegisterState: RegisterState = { error: null, success: null };
@@ -28,7 +30,13 @@ function LoginSubmitButton() {
 function RegisterSubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <Button className="w-full" disabled={pending} type="submit" variant="secondary">
+    <Button
+      className="w-full"
+      disabled={pending}
+      onClick={() => track(GROWTH_EVENTS.signupStarted, { source: "login_form" })}
+      type="submit"
+      variant="secondary"
+    >
       {pending ? "Creando cuenta..." : "Crear cuenta"}
     </Button>
   );
