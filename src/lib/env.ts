@@ -50,7 +50,9 @@ const NEXT_PUBLIC_ENV = {
   NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_DEV:
     process.env.NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_DEV,
   NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_PROD:
-    process.env.NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_PROD
+    process.env.NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_PROD,
+  NEXT_PUBLIC_SPEED_INSIGHTS_ENABLED:
+    process.env.NEXT_PUBLIC_SPEED_INSIGHTS_ENABLED
 } as const;
 
 function getEnv(name: string) {
@@ -100,6 +102,10 @@ function parseBooleanEnv(value: string | null, fallback = false) {
 
 export function shouldRenderAds() {
   return parseBooleanEnv(getEnv("NEXT_PUBLIC_ENABLE_ADS"), false);
+}
+
+export function shouldRenderSpeedInsights() {
+  return parseBooleanEnv(getEnv("NEXT_PUBLIC_SPEED_INSIGHTS_ENABLED"), false);
 }
 
 function getSupabaseTargetEnv(): SupabaseTargetEnv {

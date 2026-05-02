@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import "@/app/globals.css";
 import { GrowthEventTracker } from "@/components/analytics/growth-event-tracker";
@@ -8,7 +9,7 @@ import { BetaNotice } from "@/components/layout/beta-notice";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ReactQueryProvider } from "@/components/providers/react-query-provider";
-import { shouldRenderAds } from "@/lib/env";
+import { shouldRenderAds, shouldRenderSpeedInsights } from "@/lib/env";
 import { getPublicAppUrl } from "@/lib/public-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -70,6 +71,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   } = await supabase.auth.getUser();
   const initialIsAuthenticated = Boolean(user);
   const adsEnabled = shouldRenderAds();
+  const speedInsightsEnabled = shouldRenderSpeedInsights();
 
   return (
     <html lang="es">
@@ -100,6 +102,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <GrowthEventTracker />
         </Suspense>
         <Analytics />
+        {speedInsightsEnabled ? <SpeedInsights /> : null}
       </body>
     </html>
   );
