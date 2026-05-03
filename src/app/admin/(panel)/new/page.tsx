@@ -45,8 +45,8 @@ export default async function NewOrganizationPage({
       <Card className="p-5 sm:p-6">
         <CardTitle>Datos del grupo</CardTitle>
         <CardDescription className="mt-2">
-          Grupos es gratis. Para controlar costos, por ahora cada cuenta puede crear 1 grupo; si necesitas mas,
-          escribinos.
+          Creá tu grupo gratis y empezá a cargar jugadores, partidos e historial. Si administrás más de un grupo,
+          escribinos y lo habilitamos.
         </CardDescription>
 
         {!creationAccess.canCreateOrganization && organizations.length > 1 ? (
@@ -83,7 +83,8 @@ export default async function NewOrganizationPage({
 
         {!creationAccess.canCreateOrganization ? (
           <p className="mt-2 text-xs font-semibold text-amber-300">
-            {creationAccess.reason ?? "Por ahora cada cuenta puede crear 1 grupo. Escribinos si necesitas mas."}
+            {creationAccess.reason ??
+              "Si querés sumar otro grupo, escribinos y lo habilitamos manualmente."}
           </p>
         ) : null}
         {resolvedSearchParams.error ? (

@@ -186,7 +186,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         question: "¿Cuánto cuesta usar Grupos?",
         answer:
-          "Grupos es gratis. Para controlar costos, por ahora cada cuenta puede crear 1 grupo; si necesitás más, escribinos desde Contacto."
+          "Grupos es gratis para arrancar y usar con tu equipo. Si administrás varios grupos, escribinos desde Contacto y lo vemos."
       },
       {
         question: "¿Cuántos admins puede tener un grupo?",

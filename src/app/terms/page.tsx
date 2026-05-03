@@ -138,8 +138,8 @@ export default async function TermsPage({
 
         <LegalSection title="8. Grupos gratis, limites y continuidad">
           <p>
-            Grupos es gratis en esta etapa. Para controlar costos y abuso, por ahora cada cuenta no-superadmin puede
-            crear 1 grupo. Si necesitas administrar mas grupos, podes escribirnos para evaluarlo manualmente.
+            Grupos es gratis en esta etapa. Para cuidar costos y evitar abuso, las altas adicionales pueden requerir
+            aprobación manual. Si necesitás administrar más grupos, podés escribirnos para habilitarlo.
           </p>
           <p>
             Fabrica de Futbol puede aplicar limites razonables de uso, carga de imagenes, reemplazos, almacenamiento,

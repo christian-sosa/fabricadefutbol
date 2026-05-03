@@ -90,6 +90,9 @@ describe("RankingTableQuery", () => {
 
     expect(getBodyRows()[0]).toHaveTextContent("#2");
     expect(getBodyRows()[0]).toHaveTextContent("GonzaMastro");
-    expect(getBodyRows()[0]).toHaveTextContent("4");
+    const firstRowCells = within(getBodyRows()[0]).getAllByRole("cell");
+    expect(firstRowCells).toHaveLength(9);
+    expect(firstRowCells.at(-2)).toHaveTextContent("4");
+    expect(firstRowCells.at(-1)).toHaveTextContent("90.0%");
   });
 });

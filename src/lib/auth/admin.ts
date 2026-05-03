@@ -170,7 +170,7 @@ export async function getAdminOrganizationCreationAccess(admin: AdminSession) {
       return {
         canCreateOrganization: false,
         reason:
-          "Ya administras un grupo. Por ahora cada cuenta puede crear 1 grupo; escribinos si necesitas mas."
+          "Ya administrás un grupo. Si querés sumar otro, escribinos y lo habilitamos manualmente."
       };
     }
 
@@ -183,7 +183,7 @@ export async function getAdminOrganizationCreationAccess(admin: AdminSession) {
   return {
     canCreateOrganization: false,
     reason:
-      "Por ahora cada cuenta puede crear 1 grupo. Escribinos si necesitas mas."
+      "Ya tenés un grupo para administrar. Si querés sumar otro, escribinos y lo habilitamos manualmente."
   };
 }
 
@@ -194,7 +194,7 @@ export async function assertCanCreateOrganization(admin: AdminSession) {
   if (creationAccess.canCreateOrganization) return;
   throw new Error(
     creationAccess.reason ??
-      "Por ahora cada cuenta puede crear 1 grupo. Escribinos si necesitas mas."
+      "Si querés sumar otro grupo, escribinos y lo habilitamos manualmente."
   );
 }
 

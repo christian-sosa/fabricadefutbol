@@ -56,7 +56,7 @@ describe("admin group creation access", () => {
     await expect(getAdminOrganizationCreationAccess(ADMIN_SESSION)).resolves.toEqual({
       canCreateOrganization: false,
       reason:
-        "Por ahora cada cuenta puede crear 1 grupo. Escribinos si necesitas mas."
+        "Ya tenés un grupo para administrar. Si querés sumar otro, escribinos y lo habilitamos manualmente."
     });
   });
 
@@ -84,7 +84,7 @@ describe("admin group creation access", () => {
     await expect(getAdminOrganizationCreationAccess(ADMIN_SESSION)).resolves.toEqual({
       canCreateOrganization: false,
       reason:
-        "Ya administras un grupo. Por ahora cada cuenta puede crear 1 grupo; escribinos si necesitas mas."
+        "Ya administrás un grupo. Si querés sumar otro, escribinos y lo habilitamos manualmente."
     });
   });
 

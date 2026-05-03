@@ -41,16 +41,16 @@ const STAT_CARDS = [
     className: "text-slate-100"
   },
   {
-    key: "winRate",
-    label: "Efectividad",
-    value: (player: PlayerComputedStats) => formatPercent(player.winRate),
-    className: "text-emerald-300"
-  },
-  {
     key: "mvpCount",
     label: "MVP",
     value: (player: PlayerComputedStats) => player.mvpCount ?? 0,
     className: "text-amber-200"
+  },
+  {
+    key: "winRate",
+    label: "Efectividad",
+    value: (player: PlayerComputedStats) => formatPercent(player.winRate),
+    className: "text-emerald-300"
   }
 ] as const;
 
@@ -65,8 +65,8 @@ const SORTABLE_COLUMNS: Array<{ key: SortKey; label: string }> = [
   { key: "pg", label: "PG" },
   { key: "pe", label: "PE" },
   { key: "pp", label: "PP" },
-  { key: "winRate", label: "Efectividad" },
-  { key: "mvp", label: "MVP" }
+  { key: "mvp", label: "MVP" },
+  { key: "winRate", label: "Efectividad" }
 ];
 
 type RankingTableQueryProps = {
@@ -242,8 +242,19 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
         ) : null}
       </div>
 
-      <div className="hidden overflow-x-auto md:block">
-        <Table className="text-base text-slate-100 md:text-lg">
+      <div className="hidden md:block">
+        <Table className="table-fixed text-sm text-slate-100">
+          <colgroup>
+            <col className="w-[8%]" />
+            <col className="w-[26%]" />
+            <col className="w-[14%]" />
+            <col className="w-[7%]" />
+            <col className="w-[7%]" />
+            <col className="w-[7%]" />
+            <col className="w-[7%]" />
+            <col className="w-[8%]" />
+            <col className="w-[16%]" />
+          </colgroup>
           <THead className="bg-slate-800/90 text-slate-300">
             <tr>
               {SORTABLE_COLUMNS.map((column) => {
@@ -251,12 +262,12 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
                 return (
                   <TH
                     aria-sort={isActive ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
-                    className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:text-sm"
+                    className="px-2.5 py-3 text-[11px] font-bold uppercase text-slate-400 lg:px-3"
                     key={column.key}
                   >
                     <button
                       className={cn(
-                        "inline-flex min-h-8 items-center gap-1 whitespace-nowrap text-left uppercase tracking-[0.18em] transition hover:text-emerald-300",
+                        "inline-flex min-h-8 items-center gap-1 text-left uppercase transition hover:text-emerald-300",
                         isActive ? "text-emerald-300" : "text-slate-400"
                       )}
                       onClick={() => onSort(column.key)}
@@ -274,27 +285,28 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
               const rank = player.currentRank;
               return (
                 <tr className="transition-colors hover:bg-slate-800/75" key={player.playerId}>
-                  <TD className="px-6 py-5">
+                  <TD className="px-2.5 py-4 lg:px-3">
                     <span
                       className={cn(
-                        "inline-flex min-w-[4.5rem] justify-center rounded-full border px-4 py-2 text-base font-black md:text-lg",
+                        "inline-flex min-w-12 justify-center rounded-full border px-2.5 py-1.5 text-sm font-black",
                         PODIUM_RANK_STYLES[rank] ?? "border-slate-700 bg-slate-800 text-slate-200"
                       )}
                     >
                       #{rank}
                     </span>
                   </TD>
-                  <TD className="px-6 py-5">
+                  <TD className="px-2.5 py-4 lg:px-3">
                     <PlayerPhotoModalTrigger avatarSize="md" playerId={player.playerId} playerName={player.playerName} />
                   </TD>
-                  <TD className="px-6 py-5 text-lg font-semibold text-emerald-300 md:text-xl">
+                  <TD className="px-2.5 py-4 text-base font-semibold text-emerald-300 lg:px-3">
                     {formatRendimiento(player.currentRating)}
                   </TD>
-                  <TD className="px-6 py-5 text-lg font-medium text-slate-300 md:text-xl">{player.matchesPlayed}</TD>
-                  <TD className="px-6 py-5 text-lg font-medium text-slate-300 md:text-xl">{player.wins}</TD>
-                  <TD className="px-6 py-5 text-lg font-medium text-slate-300 md:text-xl">{player.draws}</TD>
-                  <TD className="px-6 py-5 text-lg font-medium text-slate-300 md:text-xl">{player.losses}</TD>
-                  <TD className="px-6 py-5 text-lg font-semibold text-emerald-300 md:text-xl">
+                  <TD className="px-2.5 py-4 text-base font-medium text-slate-300 lg:px-3">{player.matchesPlayed}</TD>
+                  <TD className="px-2.5 py-4 text-base font-medium text-slate-300 lg:px-3">{player.wins}</TD>
+                  <TD className="px-2.5 py-4 text-base font-medium text-slate-300 lg:px-3">{player.draws}</TD>
+                  <TD className="px-2.5 py-4 text-base font-medium text-slate-300 lg:px-3">{player.losses}</TD>
+                  <TD className="px-2.5 py-4 text-base font-semibold text-amber-200 lg:px-3">{player.mvpCount ?? 0}</TD>
+                  <TD className="px-2.5 py-4 text-base font-semibold text-emerald-300 lg:px-3">
                     {formatPercent(player.winRate)}
                   </TD>
                 </tr>
@@ -303,7 +315,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
 
             {!sortedPlayers.length ? (
               <tr>
-                <TD className="px-6 py-6 text-sm text-slate-400" colSpan={8}>
+                <TD className="px-3 py-6 text-sm text-slate-400" colSpan={9}>
                   {isFetching ? "Cargando ranking..." : "No hay jugadores para este grupo."}
                 </TD>
               </tr>

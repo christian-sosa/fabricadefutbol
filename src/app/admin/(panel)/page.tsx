@@ -251,9 +251,9 @@ function AdminHomeHub({
               ))
             ) : (
               <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                <p className="text-sm font-semibold text-slate-100">Todavia no administras grupos.</p>
+                <p className="text-sm font-semibold text-slate-100">Todavía no administrás grupos.</p>
                 <p className="mt-1 text-sm text-slate-400">
-                  Crea el primero para empezar a cargar jugadores y partidos semanales.
+                  Creá el primero para empezar a cargar jugadores y partidos semanales.
                 </p>
                 <form
                   action={createOrganizationAction}
@@ -266,7 +266,8 @@ function AdminHomeHub({
                 </form>
                 {!creationAccess.canCreateOrganization ? (
                   <p className="mt-2 text-xs font-semibold text-amber-300">
-                    {creationAccess.reason ?? "Por ahora cada cuenta puede crear 1 grupo. Escribinos si necesitas mas."}
+                    {creationAccess.reason ??
+                      "Si querés sumar otro grupo, escribinos y lo habilitamos manualmente."}
                   </p>
                 ) : null}
               </div>
