@@ -42,7 +42,7 @@ export function SeasonFilterLinks({
   ];
 
   return (
-    <nav aria-label="Filtrar temporada" className="flex gap-2 overflow-x-auto pb-1">
+    <nav aria-label="Filtrar temporada" className="flex flex-wrap gap-2">
       {items.map((item) => {
         const active = currentSeason === item.key || (currentSeason === "current" && item.key === activeSeason?.id);
         return (

@@ -1,8 +1,7 @@
-import { GroupShareActions } from "@/components/groups/group-share-actions";
 import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
-import { SeasonFilterLinks } from "@/components/groups/season-filter-links";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
+import { RankingActionsRow } from "@/components/ranking/ranking-actions-row";
 import { RankingTableQuery } from "@/components/ranking/ranking-table-query";
 import { withShareTracking } from "@/lib/growth";
 import { withOrgQuery } from "@/lib/org";
@@ -55,19 +54,12 @@ export default async function RankingPage({
         />
 
         {selectedOrganization ? (
-          <SeasonFilterLinks
-            basePath="/ranking"
+          <RankingActionsRow
             currentSeason={selectedSeason}
-            organizationSlug={selectedOrganization.slug}
-            seasons={seasons}
-          />
-        ) : null}
-
-        {selectedOrganization ? (
-          <GroupShareActions
             groupName={selectedOrganization.name}
-            rankingUrl={rankingShareUrl ?? undefined}
-            source="ranking_page"
+            organizationSlug={selectedOrganization.slug}
+            rankingShareUrl={rankingShareUrl}
+            seasons={seasons}
           />
         ) : null}
 
