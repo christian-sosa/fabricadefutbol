@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { deleteOrganizationDeep } from "@/lib/domain/organization-workflow";
+import {
+  acceptOrganizationInvite,
+  deleteOrganizationDeep,
+  revokeOrganizationInvite
+} from "@/lib/domain/organization-workflow";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 const ORG_ID = "org-1";
@@ -10,6 +14,90 @@ const PLAYER_ID = "player-1";
 const TEAM_OPTION_ID = "team-option-1";
 
 describe("organization workflow", () => {
+  it("acepta una invitacion conservando quien invito al nuevo admin", async () => {
+    const fake = createFakeSupabase({
+      admins: [
+        { id: "admin-owner", display_name: "Admin Owner" },
+        { id: "admin-invited", display_name: "Admin Invitado" }
+      ],
+      organizations: [{ id: ORG_ID, name: "LQ1", slug: "lq1", created_by: "admin-owner" }],
+      organization_invites: [
+        {
+          id: "invite-1",
+          organization_id: ORG_ID,
+          email: "nuevo@example.com",
+          invited_by: "admin-owner",
+          status: "pending",
+          accepted_by: null,
+          accepted_at: null
+        }
+      ]
+    });
+
+    await expect(
+      acceptOrganizationInvite({
+        supabase: fake.client as never,
+        inviteId: "invite-1",
+        organizationId: ORG_ID,
+        invitedEmail: "nuevo@example.com",
+        userId: "admin-invited"
+      })
+    ).resolves.toEqual({ acceptedInviteId: "invite-1" });
+
+    expect(fake.table("organization_admins")).toEqual([
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        admin_id: "admin-invited",
+        created_by: "admin-invited"
+      })
+    ]);
+    expect(fake.table("organization_invites")).toEqual([
+      expect.objectContaining({
+        id: "invite-1",
+        organization_id: ORG_ID,
+        email: "nuevo@example.com",
+        invited_by: "admin-owner",
+        status: "accepted",
+        accepted_by: "admin-invited",
+        accepted_at: expect.any(String)
+      })
+    ]);
+  });
+
+  it("revoca una invitacion pendiente sin borrar quien la envio", async () => {
+    const fake = createFakeSupabase({
+      admins: [{ id: "admin-owner", display_name: "Admin Owner" }],
+      organizations: [{ id: ORG_ID, name: "LQ1", slug: "lq1", created_by: "admin-owner" }],
+      organization_invites: [
+        {
+          id: "invite-1",
+          organization_id: ORG_ID,
+          email: "nuevo@example.com",
+          invited_by: "admin-owner",
+          status: "pending"
+        }
+      ]
+    });
+
+    await expect(
+      revokeOrganizationInvite({
+        supabase: fake.client as never,
+        inviteId: "invite-1",
+        organizationId: ORG_ID
+      })
+    ).resolves.toEqual({ revokedInviteId: "invite-1" });
+
+    expect(fake.table("organization_invites")).toEqual([
+      expect.objectContaining({
+        id: "invite-1",
+        organization_id: ORG_ID,
+        email: "nuevo@example.com",
+        invited_by: "admin-owner",
+        status: "revoked"
+      })
+    ]);
+  });
+
   it("borra la organizacion con sus dependencias en orden y conserva datos de otras organizaciones", async () => {
     const fake = createFakeSupabase({
       organizations: [

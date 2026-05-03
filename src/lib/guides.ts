@@ -131,6 +131,126 @@ export const GUIDES: Guide[] = [
         ]
       }
     ]
+  },
+  {
+    slug: "buenas-practicas-admins-futbol",
+    title: "Buenas prácticas para admins de fútbol amateur",
+    description:
+      "Criterios concretos para administrar un grupo sin quemarse: reglas claras, cambios comunicados a tiempo y decisiones consistentes.",
+    readingTime: "5 min",
+    sections: [
+      {
+        title: "Escribí pocas reglas, pero útiles",
+        body: [
+          "Un grupo amateur no necesita un reglamento enorme. Necesita acuerdos simples sobre confirmación, bajas tarde, invitados, pagos de cancha y carga de resultados.",
+          "Cuando una regla cambia, avisala antes del partido siguiente. Las decisiones sorpresivas suelen generar más conflicto que la regla en sí."
+        ]
+      },
+      {
+        title: "Separá amistad de administración",
+        body: [
+          "El admin suele conocer a todos, pero el sistema funciona mejor si las decisiones se apoyan en criterios visibles y no en afinidades.",
+          "Si un jugador cuestiona equipos, puntajes o cupos, respondé con datos del grupo: asistencia, historial, rol y rendimiento reciente."
+        ]
+      },
+      {
+        title: "Delegá sin perder control",
+        body: [
+          "Sumar otro admin ayuda cuando el grupo crece, pero conviene dar acceso solo a personas que entiendan las reglas del grupo.",
+          "Revisá periódicamente quiénes tienen permisos. Si alguien ya no participa, quitá el acceso para evitar cambios accidentales."
+        ]
+      }
+    ]
+  },
+  {
+    slug: "manejar-ausencias-y-suplentes",
+    title: "Cómo manejar ausencias y suplentes",
+    description:
+      "Una guía para resolver bajas de último momento sin romper el balance del partido ni castigar de más a quienes avisan bien.",
+    readingTime: "4 min",
+    sections: [
+      {
+        title: "Definí horarios de corte",
+        body: [
+          "Pedir confirmación sin horario límite vuelve imprevisible la organización. Marcá una hora de cierre y aplicala de forma consistente.",
+          "Si alguien avisa tarde muchas veces, no hace falta discutir cada caso: el historial de asistencia permite decidir con menos desgaste."
+        ]
+      },
+      {
+        title: "Usá suplentes por perfil",
+        body: [
+          "El primer suplente disponible no siempre es el mejor reemplazo. Buscá que el nivel, el rol y la posición se parezcan al jugador que se bajó.",
+          "Cuando no haya reemplazo equivalente, compensá en el armado de equipos antes de arrancar. Es mejor ajustar temprano que discutir al final."
+        ]
+      },
+      {
+        title: "Registrá invitados frecuentes",
+        body: [
+          "Un invitado que juega seguido deja de ser un desconocido. Conviene cargarlo y darle una referencia para que el balance sea más justo.",
+          "Con el tiempo, esos datos también sirven para decidir si merece cupo fijo o si sigue entrando solo cuando falta alguien."
+        ]
+      }
+    ]
+  },
+  {
+    slug: "usar-mvp-sin-discutir",
+    title: "Cómo elegir MVP sin discutir cada partido",
+    description:
+      "Ideas para que la elección del jugador destacado sea divertida, consistente y útil para recordar el partido sin volverse una pelea.",
+    readingTime: "4 min",
+    sections: [
+      {
+        title: "Acordá qué significa MVP",
+        body: [
+          "Para algunos grupos el MVP es quien jugó mejor; para otros, quien fue decisivo. Si no se aclara, cada voto mide algo distinto.",
+          "Una definición simple alcanza: impacto en el resultado, regularidad durante el partido y aporte al equipo."
+        ]
+      },
+      {
+        title: "No lo uses para castigar",
+        body: [
+          "El MVP funciona mejor como memoria positiva que como herramienta para señalar errores ajenos.",
+          "Si el partido fue muy desparejo, podés dejarlo sin MVP o elegir una mención de esfuerzo. Forzar una figura no siempre agrega valor."
+        ]
+      },
+      {
+        title: "Mirá el historial",
+        body: [
+          "Con el tiempo, los MVP repetidos muestran tendencias: jugadores decisivos, arqueros que sostienen partidos o invitados que cambian el nivel.",
+          "Ese historial también ayuda a que el reconocimiento no dependa solo de la memoria del último gol."
+        ]
+      }
+    ]
+  },
+  {
+    slug: "temporadas-futbol-amateur",
+    title: "Cómo cerrar temporadas en un grupo amateur",
+    description:
+      "Una forma simple de ordenar meses de partidos, reconocer constancia y reiniciar objetivos sin perder el historial construido por el grupo.",
+    readingTime: "5 min",
+    sections: [
+      {
+        title: "Elegí cortes naturales",
+        body: [
+          "Una temporada puede durar tres meses, seis meses o todo el año. Lo importante es que el corte tenga sentido para la frecuencia real del grupo.",
+          "Si juegan todas las semanas, un trimestre suele dar suficientes datos sin volver eterno el ranking."
+        ]
+      },
+      {
+        title: "Reconocé más que al primero",
+        body: [
+          "El campeón del ranking es importante, pero también podés destacar asistencia, mejora, valla, goleador, fair play o jugador revelación.",
+          "Esos reconocimientos hacen que más personas se sientan parte del historial, incluso si no pelean arriba."
+        ]
+      },
+      {
+        title: "Reiniciá sin borrar memoria",
+        body: [
+          "Cerrar una temporada no implica perder datos. El historial viejo sirve para comparar etapas y ver cómo cambió el grupo.",
+          "Antes de arrancar otra etapa, revisá niveles iniciales, jugadores inactivos e invitados que ya merecen una referencia propia."
+        ]
+      }
+    ]
   }
 ];
 

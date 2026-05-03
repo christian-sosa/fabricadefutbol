@@ -7,6 +7,11 @@ import crypto from "node:crypto";
 import { z } from "zod";
 
 import {
+  ACTION_RATE_LIMITS,
+  checkActionRateLimit,
+  formatActionRateLimitMessage
+} from "@/lib/action-rate-limit";
+import {
   assertAdminAction,
   assertCanCreateOrganization,
   assertOrganizationAdminAction,
@@ -22,8 +27,10 @@ import {
   cleanupStalePendingOrganizationBillingPayments,
   syncOrganizationBillingPaymentFromMercadoPago
 } from "@/lib/domain/billing-workflow";
+import { recordOrganizationAuditEvent } from "@/lib/domain/organization-audit";
 import {
-  deleteOrganizationDeep
+  deleteOrganizationDeep,
+  revokeOrganizationInvite
 } from "@/lib/domain/organization-workflow";
 import {
   getPlayerPhotosBucket,
@@ -162,6 +169,15 @@ async function organizationAlreadyHasAdminWithEmail(params: {
   return adminIds.some((adminId) => currentAdminEmails.get(adminId) === params.normalizedEmail);
 }
 
+async function resolveAdminEmailById(adminId: string) {
+  const supabaseAdmin = createSupabaseAdminClient();
+  if (!supabaseAdmin) return null;
+
+  const { data, error } = await supabaseAdmin.auth.admin.getUserById(adminId);
+  if (error) return null;
+  return data?.user?.email?.toLowerCase() ?? null;
+}
+
 async function resolveServerBaseUrl() {
   const configuredPublicBaseUrl = getMercadoPagoWebhookBaseUrl();
   if (configuredPublicBaseUrl) {
@@ -197,6 +213,16 @@ export async function createOrganizationAction(formData: FormData) {
   try {
     const admin = await assertAdminAction();
     await assertCanCreateOrganization(admin);
+    const createRateLimit = await checkActionRateLimit({
+      scope: "organizations:create",
+      actorId: admin.userId,
+      ...ACTION_RATE_LIMITS.createOrganization
+    });
+
+    if (!createRateLimit.allowed) {
+      redirect(buildAdminPath(undefined, formatActionRateLimitMessage(createRateLimit)));
+    }
+
     const parsed = createOrganizationSchema.safeParse({
       name: formData.get("name")
     });
@@ -244,6 +270,18 @@ export async function createOrganizationAction(formData: FormData) {
     if (membershipError && membershipError.code !== "23505") {
       redirect(buildAdminPath(undefined, toUserMessage(membershipError, "No se pudo asociar el admin al grupo.")));
     }
+
+    await recordOrganizationAuditEvent({
+      organizationId: organization.id,
+      eventType: "organization.created",
+      actorAdminId: admin.userId,
+      actorEmail: admin.email,
+      entityType: "organization",
+      entityId: organization.id,
+      details: {
+        slug
+      }
+    });
 
     revalidatePath("/admin");
     revalidatePath("/");
@@ -607,6 +645,16 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
     const admin = await assertOrganizationAdminAction(parsed.data.organizationId);
     const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
     const normalizedEmail = normalizeEmail(parsed.data.email);
+    const inviteRateLimit = await checkActionRateLimit({
+      scope: "organization-admins:invite",
+      actorId: admin.userId,
+      organizationId: parsed.data.organizationId,
+      ...ACTION_RATE_LIMITS.inviteOrganizationAdmin
+    });
+
+    if (!inviteRateLimit.allowed) {
+      redirect(buildAdminPath(organizationQueryKey, formatActionRateLimitMessage(inviteRateLimit)));
+    }
 
     if (normalizedEmail === admin.email) {
       redirect(buildAdminPath(organizationQueryKey, "Tu usuario ya administra este grupo."));
@@ -647,12 +695,16 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
       redirect(buildAdminPath(organizationQueryKey, "Este grupo ya alcanzo el maximo de 4 administradores."));
     }
 
-    const { error: inviteError } = await supabase.from("organization_invites").insert({
-      organization_id: parsed.data.organizationId,
-      email: normalizedEmail,
-      invited_by: admin.userId,
-      status: "pending"
-    });
+    const { data: invite, error: inviteError } = await supabase
+      .from("organization_invites")
+      .insert({
+        organization_id: parsed.data.organizationId,
+        email: normalizedEmail,
+        invited_by: admin.userId,
+        status: "pending"
+      })
+      .select("id")
+      .single();
 
     if (inviteError) {
       const alreadyInvited = inviteError.code === "23505";
@@ -665,6 +717,16 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
         )
       );
     }
+
+    await recordOrganizationAuditEvent({
+      organizationId: parsed.data.organizationId,
+      eventType: "organization.admin_invite.created",
+      actorAdminId: admin.userId,
+      actorEmail: admin.email,
+      targetEmail: normalizedEmail,
+      entityType: "organization_invite",
+      entityId: invite?.id ?? null
+    });
 
     revalidatePath("/admin");
     redirect(withOrgQuery("/admin", organizationQueryKey));
@@ -685,19 +747,31 @@ export async function revokeOrganizationInviteAction(formData: FormData) {
       redirect(buildAdminPath(undefined, parsed.error.issues[0]?.message ?? "Datos invalidos."));
     }
 
-    await assertOrganizationAdminAction(parsed.data.organizationId);
+    const admin = await assertOrganizationAdminAction(parsed.data.organizationId);
     const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
     const supabase = await createSupabaseServerClient();
-
-    const { error } = await supabase
+    const { data: inviteBeforeRevoke } = await supabase
       .from("organization_invites")
-      .delete()
+      .select("email")
       .eq("id", parsed.data.inviteId)
-      .eq("organization_id", parsed.data.organizationId);
+      .eq("organization_id", parsed.data.organizationId)
+      .maybeSingle();
 
-    if (error) {
-      redirect(buildAdminPath(organizationQueryKey, toUserMessage(error, "No se pudo cancelar la invitacion.")));
-    }
+    await revokeOrganizationInvite({
+      supabase,
+      inviteId: parsed.data.inviteId,
+      organizationId: parsed.data.organizationId
+    });
+
+    await recordOrganizationAuditEvent({
+      organizationId: parsed.data.organizationId,
+      eventType: "organization.admin_invite.revoked",
+      actorAdminId: admin.userId,
+      actorEmail: admin.email,
+      targetEmail: inviteBeforeRevoke?.email ?? null,
+      entityType: "organization_invite",
+      entityId: parsed.data.inviteId
+    });
 
     revalidatePath("/admin");
     redirect(withOrgQuery("/admin", organizationQueryKey));
@@ -739,6 +813,7 @@ export async function removeOrganizationAdminAction(formData: FormData) {
       redirect(buildAdminPath(organizationQueryKey, "El grupo debe mantener al menos 1 admin activo."));
     }
 
+    const targetEmail = await resolveAdminEmailById(parsed.data.adminId);
     const { error: deleteError } = await supabase
       .from("organization_admins")
       .delete()
@@ -748,6 +823,17 @@ export async function removeOrganizationAdminAction(formData: FormData) {
     if (deleteError) {
       redirect(buildAdminPath(organizationQueryKey, toUserMessage(deleteError, "No se pudo quitar al administrador.")));
     }
+
+    await recordOrganizationAuditEvent({
+      organizationId: parsed.data.organizationId,
+      eventType: "organization.admin.removed",
+      actorAdminId: actingAdmin.userId,
+      actorEmail: actingAdmin.email,
+      targetAdminId: parsed.data.adminId,
+      targetEmail,
+      entityType: "organization_admin",
+      entityId: parsed.data.adminId
+    });
 
     revalidatePath("/admin");
     redirect(withOrgQuery("/admin", organizationQueryKey));

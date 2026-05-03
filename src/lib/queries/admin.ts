@@ -488,6 +488,21 @@ export type SuperAdminDashboardMetrics = {
     subscriptionCurrentPeriodEnd: string | null;
     createdAt: string;
   }>;
+  recentAuditEvents: Array<{
+    id: string;
+    organizationId: string;
+    organizationName: string;
+    organizationSlug: string;
+    eventType: string;
+    actorAdminId: string | null;
+    actorEmail: string | null;
+    targetAdminId: string | null;
+    targetEmail: string | null;
+    entityType: string | null;
+    entityId: string | null;
+    details: unknown;
+    createdAt: string;
+  }>;
 };
 
 function isRecentDate(value: string | null | undefined, sinceDate: Date) {
@@ -513,6 +528,7 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
     { data: subscriptions, error: subscriptionsError },
     { data: billingPayments, error: billingPaymentsError },
     { data: orgAdmins, error: orgAdminsError },
+    { data: auditEvents, error: auditEventsError },
     pendingInvites,
     { count: adminsCount, error: adminsCountError },
     { count: resultsCount, error: resultsCountError },
@@ -531,6 +547,11 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
       .from("organization_billing_payments")
       .select("organization_id, status, amount, approved_at"),
     supabase.from("organization_admins").select("organization_id"),
+    supabase
+      .from("organization_audit_events")
+      .select("id, organization_id, event_type, actor_admin_id, actor_email, target_admin_id, target_email, entity_type, entity_id, details, created_at")
+      .order("created_at", { ascending: false })
+      .limit(20),
     countPendingInvitesByOrganization(supabase),
     supabase.from("admins").select("id", { count: "exact", head: true }),
     supabase.from("match_result").select("id", { count: "exact", head: true }),
@@ -547,6 +568,7 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
     throw new Error(billingPaymentsError.message);
   }
   if (orgAdminsError) throw new Error(orgAdminsError.message);
+  if (auditEventsError) throw new Error(auditEventsError.message);
   if (adminsCountError) throw new Error(adminsCountError.message);
   if (resultsCountError) throw new Error(resultsCountError.message);
   if (guestsCountError) throw new Error(guestsCountError.message);
@@ -559,7 +581,9 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
   const safeBillingPayments =
     billingPaymentsError && isBillingSchemaMissing(billingPaymentsError) ? [] : billingPayments ?? [];
   const safeOrgAdmins = orgAdmins ?? [];
+  const safeAuditEvents = auditEvents ?? [];
   const safePendingInvites = pendingInvites;
+  const organizationsById = new Map(safeOrganizations.map((organization) => [organization.id, organization]));
 
   const playersByOrg = new Map<string, OrgPlayersAggregate>();
   for (const player of safePlayers) {
@@ -691,6 +715,25 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
   const topOrganizations = [...organizationsBreakdown]
     .sort((a, b) => b.players - a.players || b.matches - a.matches || a.name.localeCompare(b.name, "es"))
     .slice(0, 10);
+  const recentAuditEvents = safeAuditEvents.map((event) => {
+    const organization = organizationsById.get(event.organization_id);
+
+    return {
+      id: event.id,
+      organizationId: event.organization_id,
+      organizationName: organization?.name ?? "Grupo eliminado",
+      organizationSlug: organization?.slug ?? event.organization_id,
+      eventType: event.event_type,
+      actorAdminId: event.actor_admin_id ?? null,
+      actorEmail: event.actor_email ?? null,
+      targetAdminId: event.target_admin_id ?? null,
+      targetEmail: event.target_email ?? null,
+      entityType: event.entity_type ?? null,
+      entityId: event.entity_id ?? null,
+      details: event.details ?? {},
+      createdAt: event.created_at
+    };
+  });
 
   return {
     generatedAt,
@@ -738,6 +781,7 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
       matchesFinished: safeMatches.filter((match) => isRecentDate(match.finished_at, sinceDate)).length
     },
     organizationsBreakdown,
-    topOrganizations
+    topOrganizations,
+    recentAuditEvents
   };
 }

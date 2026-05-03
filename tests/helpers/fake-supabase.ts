@@ -5,6 +5,7 @@ type TableName =
   | "organizations"
   | "organization_admins"
   | "organization_invites"
+  | "organization_audit_events"
   | "organization_billing_payments"
   | "organization_billing_subscriptions"
   | "leagues"
@@ -81,6 +82,7 @@ function createEmptyDatabase(): FakeDatabase {
     organizations: [],
     organization_admins: [],
     organization_invites: [],
+    organization_audit_events: [],
     organization_billing_payments: [],
     organization_billing_subscriptions: [],
     leagues: [],
@@ -202,6 +204,15 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!normalized.purpose) normalized.purpose = "organization_subscription";
       if (!normalized.updated_at) normalized.updated_at = now;
       if (!("subscription_applied_at" in normalized)) normalized.subscription_applied_at = null;
+      break;
+    case "organization_audit_events":
+      if (!("details" in normalized)) normalized.details = {};
+      if (!("actor_admin_id" in normalized)) normalized.actor_admin_id = null;
+      if (!("actor_email" in normalized)) normalized.actor_email = null;
+      if (!("target_admin_id" in normalized)) normalized.target_admin_id = null;
+      if (!("target_email" in normalized)) normalized.target_email = null;
+      if (!("entity_type" in normalized)) normalized.entity_type = null;
+      if (!("entity_id" in normalized)) normalized.entity_id = null;
       break;
     case "leagues":
       if (!("description" in normalized)) normalized.description = null;

@@ -23,6 +23,82 @@ function chunkValues<T>(values: T[], size = 200) {
   return chunks;
 }
 
+export async function acceptOrganizationInvite(params: {
+  supabase: DbClient;
+  inviteId: string;
+  organizationId: string;
+  invitedEmail: string;
+  userId: string;
+}) {
+  const { supabase, inviteId, organizationId, invitedEmail, userId } = params;
+
+  const { data: acceptedInvite, error: acceptInviteError } = await supabase
+    .from("organization_invites")
+    .update({
+      status: "accepted",
+      accepted_by: userId,
+      accepted_at: new Date().toISOString()
+    })
+    .eq("id", inviteId)
+    .eq("organization_id", organizationId)
+    .eq("status", "pending")
+    .eq("email", invitedEmail)
+    .select("id")
+    .maybeSingle();
+
+  if (acceptInviteError) {
+    throw new Error(acceptInviteError.message);
+  }
+
+  if (!acceptedInvite) {
+    throw new Error("La invitacion ya fue usada o cancelada.");
+  }
+
+  const { error: insertMembershipError } = await supabase.from("organization_admins").insert({
+    organization_id: organizationId,
+    admin_id: userId,
+    created_by: userId
+  });
+
+  if (insertMembershipError && insertMembershipError.code !== "23505") {
+    throw new Error(insertMembershipError.message);
+  }
+
+  return {
+    acceptedInviteId: inviteId
+  };
+}
+
+export async function revokeOrganizationInvite(params: {
+  supabase: DbClient;
+  inviteId: string;
+  organizationId: string;
+}) {
+  const { supabase, inviteId, organizationId } = params;
+  const { data: revokedInvite, error } = await supabase
+    .from("organization_invites")
+    .update({
+      status: "revoked"
+    })
+    .eq("id", inviteId)
+    .eq("organization_id", organizationId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!revokedInvite) {
+    throw new Error("La invitacion ya fue usada o cancelada.");
+  }
+
+  return {
+    revokedInviteId: inviteId
+  };
+}
+
 async function deleteByIds(params: {
   supabase: DbClient;
   table:

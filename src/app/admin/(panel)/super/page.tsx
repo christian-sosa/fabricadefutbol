@@ -10,6 +10,14 @@ function metricNumber(value: number) {
   return new Intl.NumberFormat("es-AR").format(value);
 }
 
+const AUDIT_EVENT_LABELS: Record<string, string> = {
+  "organization.created": "Grupo creado",
+  "organization.admin_invite.created": "Invitacion enviada",
+  "organization.admin_invite.accepted": "Invitacion aceptada",
+  "organization.admin_invite.revoked": "Invitacion cancelada",
+  "organization.admin.removed": "Admin removido"
+};
+
 export default async function SuperAdminDashboardPage() {
   const admin = await requireAdminSession();
   if (!admin.isSuperAdmin) {
@@ -127,6 +135,50 @@ export default async function SuperAdminDashboardPage() {
                 <tr>
                   <td className="px-4 py-4 text-slate-400" colSpan={7}>
                     No hay grupos cargados.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Auditoria reciente</CardTitle>
+        <CardDescription className="mt-1">
+          Ultimos eventos sensibles de grupos: altas, invitaciones, aceptaciones, cancelaciones y remociones.
+        </CardDescription>
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full text-left text-sm text-slate-100">
+            <thead className="bg-slate-800/80 text-slate-300">
+              <tr>
+                <th className="px-4 py-3 font-semibold">Fecha</th>
+                <th className="px-4 py-3 font-semibold">Evento</th>
+                <th className="px-4 py-3 font-semibold">Grupo</th>
+                <th className="px-4 py-3 font-semibold">Actor</th>
+                <th className="px-4 py-3 font-semibold">Destino</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {metrics.recentAuditEvents.map((event) => (
+                <tr key={event.id}>
+                  <td className="px-4 py-3 whitespace-nowrap">{formatDateTime(event.createdAt)}</td>
+                  <td className="px-4 py-3">
+                    <p className="font-semibold">{AUDIT_EVENT_LABELS[event.eventType] ?? event.eventType}</p>
+                    <p className="text-xs text-slate-400">{event.eventType}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="font-semibold">{event.organizationName}</p>
+                    <p className="text-xs text-slate-400">{event.organizationSlug}</p>
+                  </td>
+                  <td className="px-4 py-3">{event.actorEmail ?? event.actorAdminId ?? "-"}</td>
+                  <td className="px-4 py-3">{event.targetEmail ?? event.targetAdminId ?? "-"}</td>
+                </tr>
+              ))}
+              {!metrics.recentAuditEvents.length ? (
+                <tr>
+                  <td className="px-4 py-4 text-slate-400" colSpan={5}>
+                    No hay eventos de auditoria registrados todavia.
                   </td>
                 </tr>
               ) : null}

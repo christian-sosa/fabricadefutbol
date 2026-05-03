@@ -26,4 +26,16 @@ describe("public routes for crawlers", () => {
     }
     expect(urls).not.toContain("https://fabricadefutbol.com.ar/pricing");
   });
+
+  it("mantiene suficientes guias originales para AdSense", () => {
+    expect(GUIDES.length).toBeGreaterThanOrEqual(8);
+
+    for (const guide of GUIDES) {
+      expect(guide.description.length).toBeGreaterThanOrEqual(90);
+      expect(guide.sections.length).toBeGreaterThanOrEqual(3);
+      for (const section of guide.sections) {
+        expect(section.body.length).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
 });

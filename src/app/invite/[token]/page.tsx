@@ -1,20 +1,23 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { acceptInviteAction } from "@/app/invite/[token]/actions";
+import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { buildAdminLoginPath } from "@/lib/auth/redirects";
-import { deriveDisplayName } from "@/lib/auth/profile";
-import { getOrganizationQueryKeyById } from "@/lib/auth/admin";
-import { normalizeEmail, withOrgQuery } from "@/lib/org";
+import { normalizeEmail } from "@/lib/org";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function InviteByLinkPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const { token } = await params;
+  const resolvedSearchParams = await searchParams;
   const loginHref = buildAdminLoginPath(`/invite/${token}`);
   const supabase = await createSupabaseServerClient();
   const privilegedSupabase = createSupabaseAdminClient() ?? supabase;
@@ -69,6 +72,13 @@ export default async function InviteByLinkPage({
     );
   }
 
+  const { data: organization } = await privilegedSupabase
+    .from("organizations")
+    .select("id, name")
+    .eq("id", invite.organization_id)
+    .maybeSingle();
+  const organizationName = organization?.name ?? "este grupo";
+
   if (invite.expires_at) {
     const expiresAtMs = Date.parse(invite.expires_at);
     if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) {
@@ -114,39 +124,35 @@ export default async function InviteByLinkPage({
     );
   }
 
-  const { error: ensureAdminError } = await privilegedSupabase.from("admins").upsert(
-    {
-      id: user.id,
-      display_name: deriveDisplayName(user.email, (user.user_metadata ?? undefined) as Record<string, unknown> | undefined)
-    },
-    { onConflict: "id" }
+  return (
+    <div className="mx-auto max-w-xl py-6">
+      <Card>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">
+          Invitacion de admin
+        </p>
+        <CardTitle className="mt-3">Aceptar acceso a {organizationName}</CardTitle>
+        <CardDescription className="mt-2">
+          Vas a entrar como administrador con <strong>{user.email}</strong>. Al aceptar vas a poder gestionar jugadores,
+          partidos, resultados e invitaciones de este grupo.
+        </CardDescription>
+
+        {resolvedSearchParams.error ? (
+          <p className="mt-4 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p>
+        ) : null}
+
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+          <form action={acceptInviteAction}>
+            <input name="token" type="hidden" value={token} />
+            <Button type="submit">Aceptar invitacion</Button>
+          </form>
+          <Link
+            className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
+            href="/admin"
+          >
+            Ahora no
+          </Link>
+        </div>
+      </Card>
+    </div>
   );
-
-  if (ensureAdminError) {
-    throw new Error(ensureAdminError.message);
-  }
-
-  const { error: insertMembershipError } = await privilegedSupabase.from("organization_admins").insert({
-    organization_id: invite.organization_id,
-    admin_id: user.id,
-    created_by: user.id
-  });
-
-  if (insertMembershipError && insertMembershipError.code !== "23505") {
-    throw new Error(insertMembershipError.message);
-  }
-
-  const { error: deleteInviteError } = await privilegedSupabase
-    .from("organization_invites")
-    .delete()
-    .eq("id", invite.id)
-    .eq("status", "pending")
-    .eq("email", invitedEmail);
-
-  if (deleteInviteError) {
-    throw new Error(deleteInviteError.message);
-  }
-
-  const organizationQueryKey = await getOrganizationQueryKeyById(invite.organization_id);
-  redirect(withOrgQuery("/admin", organizationQueryKey));
 }

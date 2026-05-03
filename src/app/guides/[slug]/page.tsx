@@ -3,6 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Card, CardTitle } from "@/components/ui/card";
+import {
+  buildGuideArticleJsonLd,
+  buildGuideBreadcrumbJsonLd
+} from "@/lib/guide-structured-data";
 import { getGuideBySlug, GUIDES } from "@/lib/guides";
 
 type GuidePageProps = {
@@ -28,9 +32,14 @@ export default async function GuidePage({ params }: GuidePageProps) {
   const { slug } = await params;
   const guide = getGuideBySlug(slug);
   if (!guide) notFound();
+  const jsonLd = [buildGuideArticleJsonLd(guide), buildGuideBreadcrumbJsonLd(guide)];
 
   return (
     <article className="mx-auto max-w-3xl space-y-6">
+      <script
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        type="application/ld+json"
+      />
       <Link className="text-sm font-semibold text-emerald-300 transition hover:underline" href="/guides">
         Volver a guías
       </Link>

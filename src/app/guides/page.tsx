@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { buildGuidesItemListJsonLd } from "@/lib/guide-structured-data";
 import { GUIDES } from "@/lib/guides";
 
 export const metadata: Metadata = {
@@ -11,8 +12,14 @@ export const metadata: Metadata = {
 };
 
 export default function GuidesPage() {
+  const jsonLd = buildGuidesItemListJsonLd(GUIDES);
+
   return (
     <div className="space-y-6">
+      <script
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        type="application/ld+json"
+      />
       <section className="rounded-[2rem] border border-slate-800 bg-slate-900/80 p-6 shadow-[0_18px_40px_-28px_rgba(16,185,129,0.65)]">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
           Guías

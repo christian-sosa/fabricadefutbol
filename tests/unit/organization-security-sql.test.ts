@@ -37,4 +37,17 @@ describeSupabaseSql("organization security sql", () => {
     expect(schemaSql).toContain("before update of created_at, created_by on public.organizations");
     expect(policiesSql).toContain("grant execute on function public.apply_organization_billing_payment_period");
   });
+
+  it("agrega auditoria append-only para eventos sensibles de grupos", () => {
+    expect(schemaSql).toContain("create table if not exists public.organization_audit_events");
+    expect(schemaSql).toContain("event_type text not null");
+    expect(schemaSql).toContain("details jsonb not null default '{}'::jsonb");
+    expect(policiesSql).toContain("alter table public.organization_audit_events enable row level security");
+    expect(policiesSql).toMatch(
+      /grant select on table[\s\S]*public\.organization_audit_events[\s\S]*to authenticated/
+    );
+    expect(policiesSql).not.toContain("grant select, insert, update, delete on table public.organization_audit_events to authenticated");
+    expect(policiesSql).toContain("create policy organization_audit_events_select");
+    expect(policiesSql).toContain("using (public.is_super_admin() or public.is_org_admin(organization_id))");
+  });
 });
