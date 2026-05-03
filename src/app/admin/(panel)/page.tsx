@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import {
   createOrganizationAction,
@@ -7,12 +6,11 @@ import {
   inviteOrganizationAdminAction,
   removeOrganizationAdminAction,
   revokeOrganizationInviteAction,
-  startOrganizationCreationCheckoutAction,
   uploadOrganizationImageAction
 } from "@/app/admin/(panel)/actions";
 import { TrackedLink } from "@/components/analytics/tracked-link";
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
-import { GroupPaymentValueCard } from "@/components/admin/group-payment-value-card";
+import { GroupActivityValueCard } from "@/components/admin/group-activity-value-card";
 import { OrganizationImage } from "@/components/groups/organization-image";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Button } from "@/components/ui/button";
@@ -22,17 +20,14 @@ import { Input } from "@/components/ui/input";
 import {
   getAdminOrganizationContext,
   getAdminOrganizationCreationAccess,
-  getOrganizationQueryKeyById,
   getOrganizationWriteAccess
 } from "@/lib/auth/admin";
-import { syncOrganizationBillingPaymentFromMercadoPago } from "@/lib/domain/billing-workflow";
 import { isTournamentsEnabled } from "@/lib/features";
 import { GROWTH_EVENTS } from "@/lib/growth";
 import { getOrganizationImageUrl } from "@/lib/organization-images";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminDashboardData, getOrganizationAdminData } from "@/lib/queries/admin";
 import { getAdminLeagueList } from "@/lib/queries/tournaments";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type OrganizationEntry = {
   id: string;
@@ -79,9 +74,9 @@ function AdminFeedback({
 
   return (
     <Card>
-      {checkout === "created-org" ? (
+      {checkout ? (
         <p className="text-sm font-semibold text-emerald-300">
-          Pago confirmado. El nuevo grupo ya fue creado y seleccionado.
+          Grupo actualizado.
         </p>
       ) : null}
       {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
@@ -260,21 +255,17 @@ function AdminHomeHub({
                   Crea el primero para empezar a cargar jugadores y partidos semanales.
                 </p>
                 <form
-                  action={
-                    creationAccess.canCreateOrganization
-                      ? createOrganizationAction
-                      : startOrganizationCreationCheckoutAction
-                  }
+                  action={createOrganizationAction}
                   className="mt-4 flex flex-col gap-3 md:flex-row"
                 >
                   <Input name="name" placeholder="Nombre del grupo" required />
                   <Button disabled={!creationAccess.canCreateOrganization} type="submit">
-                    {creationAccess.canCreateOrganization ? "Crear grupo" : "Pagar y crear grupo"}
+                    Crear grupo
                   </Button>
                 </form>
                 {!creationAccess.canCreateOrganization ? (
                   <p className="mt-2 text-xs font-semibold text-amber-300">
-                    {creationAccess.reason ?? "Para crear un nuevo grupo necesitas activar el plan pago."}
+                    {creationAccess.reason ?? "Por ahora cada cuenta puede crear 1 grupo. Escribinos si necesitas mas."}
                   </p>
                 ) : null}
               </div>
@@ -348,29 +339,10 @@ function AdminHomeHub({
 export default async function AdminDashboardPage({
   searchParams
 }: {
-  searchParams: Promise<{ org?: string; error?: string; checkout?: string; flow?: string; payment_id?: string }>;
+  searchParams: Promise<{ org?: string; error?: string; checkout?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const { admin, organizations } = await getAdminOrganizationContext(resolvedSearchParams.org);
-
-  if (resolvedSearchParams.flow === "create-org" && resolvedSearchParams.payment_id) {
-    const supabaseAdmin = createSupabaseAdminClient();
-    if (supabaseAdmin) {
-      try {
-        const syncResult = await syncOrganizationBillingPaymentFromMercadoPago({
-          supabase: supabaseAdmin,
-          mercadopagoPaymentId: resolvedSearchParams.payment_id
-        });
-
-        if (syncResult.updated && syncResult.createdOrganizationId) {
-          const createdOrganizationKey = await getOrganizationQueryKeyById(syncResult.createdOrganizationId);
-          redirect(withOrgQuery("/admin?checkout=created-org", createdOrganizationKey));
-        }
-      } catch {
-        // Mantiene la pantalla operativa aunque falle la sincronizacion puntual.
-      }
-    }
-  }
 
   const creationAccess = await getAdminOrganizationCreationAccess(admin);
   const selectedOrganization = findOrganizationByKey(organizations, resolvedSearchParams.org);
@@ -402,33 +374,11 @@ export default async function AdminDashboardPage({
 
       <AdminCurrentGroupCard organization={selectedOrganization} />
 
-      {!canWriteSelectedOrganization ? (
-        <Card className="border-amber-500/40 bg-amber-500/10">
-          <CardTitle className="text-amber-100">Grupo en modo solo lectura</CardTitle>
-          <CardDescription className="mt-1 text-amber-200/90">
-            {organizationWriteAccess?.reason ??
-              "Este grupo no tiene escritura habilitada en el plan actual."}
-          </CardDescription>
-          <div className="mt-3">
-            <Link
-              className="text-sm font-semibold text-amber-100 underline underline-offset-4"
-              href={withOrgQuery("/admin/billing", selectedOrganization.slug)}
-            >
-              Activar plan mensual
-            </Link>
-          </div>
-        </Card>
-      ) : null}
-
-      <GroupPaymentValueCard
-        accessValidUntil={organizationWriteAccess?.accessValidUntil ?? null}
-        canWrite={canWriteSelectedOrganization}
+      <GroupActivityValueCard
         finishedCount={dashboardData.finishedCount}
         organizationSlug={selectedOrganization.slug}
         playersCount={dashboardData.playersCount}
-        subscriptionActive={organizationWriteAccess?.subscriptionActive ?? false}
         totalMatches={dashboardData.draftsCount + dashboardData.confirmedCount + dashboardData.finishedCount}
-        variant="dashboard"
       />
 
       <Card>
@@ -482,7 +432,7 @@ export default async function AdminDashboardPage({
           <form action={deleteOrganizationAction} className="mt-4">
             <input name="organizationId" type="hidden" value={selectedOrganization.id} />
             <ConfirmSubmitButton
-              confirmMessage={`Estas seguro de borrar ${selectedOrganization.name}? Se perderan definitivamente todas las fotos, jugadores, partidos, historial, admins, invitaciones y pagos asociados. Esta accion no se puede deshacer.`}
+              confirmMessage={`Estas seguro de borrar ${selectedOrganization.name}? Se perderan definitivamente todas las fotos, jugadores, partidos, historial, admins, invitaciones y datos asociados. Esta accion no se puede deshacer.`}
               label="Borrar grupo"
               variant="danger"
             />

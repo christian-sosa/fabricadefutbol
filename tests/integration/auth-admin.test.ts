@@ -8,7 +8,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: createSupabaseServerClientMock
 }));
 
-import { getAdminOrganizationCreationAccess } from "@/lib/auth/admin";
+import { getAdminOrganizationCreationAccess, getOrganizationWriteAccess } from "@/lib/auth/admin";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 const ADMIN_SESSION = {
@@ -56,7 +56,7 @@ describe("admin group creation access", () => {
     await expect(getAdminOrganizationCreationAccess(ADMIN_SESSION)).resolves.toEqual({
       canCreateOrganization: false,
       reason:
-        "Ya consumiste tu grupo free. Para crear uno nuevo vas a necesitar activar el plan pago."
+        "Por ahora cada cuenta puede crear 1 grupo. Escribinos si necesitas mas."
     });
   });
 
@@ -84,7 +84,41 @@ describe("admin group creation access", () => {
     await expect(getAdminOrganizationCreationAccess(ADMIN_SESSION)).resolves.toEqual({
       canCreateOrganization: false,
       reason:
-        "Ya administras un grupo. Para crear uno nuevo vas a necesitar activar el plan pago."
+        "Ya administras un grupo. Por ahora cada cuenta puede crear 1 grupo; escribinos si necesitas mas."
+    });
+  });
+
+  it("habilita escritura en grupos existentes aunque ya no haya trial o suscripcion activa", async () => {
+    const fake = createFakeSupabase({
+      organizations: [
+        {
+          id: "org-1",
+          name: "Liga A",
+          slug: "liga-a",
+          created_by: ADMIN_SESSION.userId,
+          created_at: "2025-01-01T00:00:00.000Z",
+          player_photos_purge_at: "2025-08-01T00:00:00.000Z",
+          player_photos_purged_at: "2025-08-02T00:00:00.000Z"
+        }
+      ]
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+
+    await expect(getOrganizationWriteAccess(ADMIN_SESSION, "org-1")).resolves.toMatchObject({
+      canWrite: true,
+      reason: null,
+      accessValidUntil: null,
+      writeLockedAt: null,
+      organizationTrialEndsAt: null,
+      organizationTrialExpired: false,
+      adminTrialEndsAt: null,
+      adminTrialExpired: false,
+      subscriptionStatus: null,
+      subscriptionCurrentPeriodEnd: null,
+      subscriptionActive: false,
+      playerPhotosPurgeAt: null,
+      playerPhotosRetentionExpired: false,
+      playerPhotosPurgedAt: null
     });
   });
 });

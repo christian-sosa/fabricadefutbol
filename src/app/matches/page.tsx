@@ -1,5 +1,4 @@
 import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
-import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { MatchesHistoryQueryTable } from "@/components/matches/matches-history-query-table";
@@ -46,8 +45,6 @@ export default async function MatchesPage({
           </div>
         </section>
       ) : null}
-
-      <AdPlaceholder slot="matches-top" />
 
       <MatchesHistoryQueryTable
         initialData={initialMatchesData}

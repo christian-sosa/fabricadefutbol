@@ -1,12 +1,7 @@
 import Link from "next/link";
 
-import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { PublicModuleToggle } from "@/components/layout/public-module-toggle";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import {
-  ORGANIZATION_BILLING_CURRENCY,
-  ORGANIZATION_MONTHLY_PRICE_ARS
-} from "@/lib/constants";
 import { type PublicModuleContext, resolvePublicModule, withPublicQuery } from "@/lib/org";
 
 type HelpSectionItem = {
@@ -34,7 +29,6 @@ type HelpContent = {
   eyebrow: string;
   title: string;
   description: string;
-  priceDescription?: string;
   primaryCtaLabel: string;
   listingCtaLabel: string;
   capabilitiesLabel: string;
@@ -53,27 +47,17 @@ type HelpContent = {
   finalCta?: HelpFinalCta;
 };
 
-function formatAmountArs(amount: number) {
-  return `$${new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount)} ${ORGANIZATION_BILLING_CURRENCY}`;
-}
-
-const groupMonthlyPrice = formatAmountArs(ORGANIZATION_MONTHLY_PRICE_ARS);
-
 const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
   organizations: {
     eyebrow: "Ayuda para Grupos",
     title: "Organizá tu grupo sin discusiones",
     description:
-      "Armá partidos parejos, cargá resultados y mantené un ranking real de tu grupo. Fábrica de Fútbol te ayuda a llevar el historial, los jugadores y los próximos partidos en un solo lugar.",
-    priceDescription: `Probá 1 mes gratis. Después, ${groupMonthlyPrice}/mes por grupo para seguir creando partidos y cargando resultados.`,
+      "Armá partidos parejos, cargá resultados y mantené un ranking real de tu grupo. Fábrica de Fútbol es gratis para Grupos y te ayuda a llevar historial, jugadores y próximos partidos en un solo lugar.",
     primaryCtaLabel: "Crear mi grupo gratis",
     listingCtaLabel: "Ver grupo de ejemplo",
     capabilitiesLabel: "Qué podés hacer con Grupos",
     capabilities: [
-      "Crear y administrar uno o varios grupos desde la misma cuenta.",
+      "Crear y administrar un grupo gratis desde tu cuenta.",
       "Cargar jugadores con niveles simples, repetibles y editables.",
       "Armar equipos parejos usando nivel, rendimiento, invitados y arqueros.",
       "Publicar ranking, historial y próximos partidos para que cualquiera pueda consultarlos."
@@ -166,7 +150,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "Lo que controla el admin",
         description:
-          "Jugadores, niveles, partidos, resultados, imagen del grupo, admins invitados y facturación."
+          "Jugadores, niveles, partidos, resultados, imagen del grupo y admins invitados."
       }
     ],
     faq: [
@@ -200,9 +184,9 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
           "Podés mantener el plantel y empezar a registrar partidos desde ahora sin perder lo que ya cargaste."
       },
       {
-        question: "¿Qué pasa si no pago?",
+        question: "¿Cuánto cuesta usar Grupos?",
         answer:
-          "El grupo queda en modo lectura hasta reactivar el plan. La información deportiva se conserva."
+          "Grupos es gratis. Para controlar costos, por ahora cada cuenta puede crear 1 grupo; si necesitás más, escribinos desde Contacto."
       },
       {
         question: "¿Cuántos admins puede tener un grupo?",
@@ -217,7 +201,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
     finalCta: {
       title: "¿Listo para organizar tu grupo como corresponde?",
       description:
-        "Probá Fábrica de Fútbol gratis durante 1 mes y empezá a armar partidos parejos con ranking e historial."
+        "Creá tu grupo gratis y empezá a armar partidos parejos con ranking e historial."
     }
   },
   tournaments: {
@@ -364,7 +348,7 @@ export default async function HelpPage({
           organizationKey,
           module: currentModule
         });
-  const pricingPath = withPublicQuery("/pricing", {
+  const guidesPath = withPublicQuery("/guides", {
     organizationKey,
     module: currentModule
   });
@@ -381,11 +365,6 @@ export default async function HelpPage({
           {content.title}
         </h1>
         <p className="mt-4 max-w-4xl text-base leading-7 text-slate-300 md:text-lg">{content.description}</p>
-        {content.priceDescription ? (
-          <p className="mt-4 max-w-3xl rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100">
-            {content.priceDescription}
-          </p>
-        ) : null}
         <PublicModuleToggle
           basePath="/help"
           className="mt-5"
@@ -407,9 +386,9 @@ export default async function HelpPage({
           </Link>
           <Link
             className="rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
-            href={pricingPath}
+            href={guidesPath}
           >
-            Ver precios
+            Ver guías
           </Link>
           <Link
             className="rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
@@ -469,8 +448,6 @@ export default async function HelpPage({
           ))}
         </div>
       </section>
-
-      <AdPlaceholder slot="help-top-banner" />
 
       <section className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{content.workflowLabel}</p>
@@ -532,9 +509,9 @@ export default async function HelpPage({
             </Link>
             <Link
               className="rounded-md border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
-              href={pricingPath}
+              href={guidesPath}
             >
-              Ver precios
+              Ver guías
             </Link>
             <Link
               className="rounded-md border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
@@ -546,7 +523,6 @@ export default async function HelpPage({
         </section>
       ) : null}
 
-      <AdPlaceholder slot="help-bottom-banner" />
     </div>
   );
 }

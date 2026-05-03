@@ -1,13 +1,8 @@
 import Link from "next/link";
 
 import { TrackedLink } from "@/components/analytics/tracked-link";
-import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import {
-  ORGANIZATION_BILLING_CURRENCY,
-  ORGANIZATION_MONTHLY_PRICE_ARS
-} from "@/lib/constants";
 import { GROWTH_EVENTS } from "@/lib/growth";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery, withPublicQuery } from "@/lib/org";
@@ -64,15 +59,6 @@ const exampleRankingPreview = [
   { name: "Diego", rendimiento: 960, matchesPlayed: 54 }
 ] as const;
 
-function formatAmountArs(amount: number) {
-  return `$${new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount)} ${ORGANIZATION_BILLING_CURRENCY}`;
-}
-
-const monthlyGroupPrice = formatAmountArs(ORGANIZATION_MONTHLY_PRICE_ARS);
-
 export default async function HomePage({
   searchParams
 }: {
@@ -102,7 +88,7 @@ export default async function HomePage({
               Con Fábrica de Fútbol cargás jugadores, organizás partidos, medís rendimiento y publicás ranking, historial y próximas fechas para todos.
             </p>
             <p className="mt-4 max-w-2xl rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100">
-              Probá 1 mes gratis. Después, {monthlyGroupPrice}/mes por grupo para seguir creando partidos y cargando resultados.
+              Gratis para crear y administrar tu grupo. Por ahora cada cuenta puede crear 1 grupo; si necesitás más, escribinos.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -117,10 +103,10 @@ export default async function HomePage({
               <TrackedLink
                 className="rounded-xl border border-slate-700 bg-slate-950/70 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
                 eventName={GROWTH_EVENTS.ctaClicked}
-                eventProperties={{ cta: "pricing", source: "home_hero" }}
-                href={withPublicQuery("/pricing", { organizationKey: selectedOrganizationSlug })}
+                eventProperties={{ cta: "guides", source: "home_hero" }}
+                href={withPublicQuery("/guides", { organizationKey: selectedOrganizationSlug })}
               >
-                Ver planes
+                Ver guías
               </TrackedLink>
             </div>
 
@@ -237,8 +223,6 @@ export default async function HomePage({
           </div>
         </Card>
       </section>
-
-      <AdPlaceholder slot="home-top-banner" />
 
       <section className="grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
         <Card className="p-5">
@@ -380,7 +364,7 @@ export default async function HomePage({
       <section className="rounded-[2rem] border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.14),rgba(15,23,42,0.98))] p-6 text-center shadow-[0_24px_60px_-38px_rgba(16,185,129,0.75)] md:p-8">
         <h2 className="text-3xl font-black text-white md:text-4xl">Tu grupo puede estar ordenado desde el próximo partido</h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm text-slate-200 md:text-base">
-          Probá Fábrica de Fútbol gratis durante 1 mes. Armá equipos parejos, cargá resultados y dejá ranking e historial disponibles para todos.
+          Usá Fábrica de Fútbol gratis para armar equipos parejos, cargar resultados y dejar ranking e historial disponibles para todos.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <TrackedLink
@@ -394,10 +378,10 @@ export default async function HomePage({
           <TrackedLink
             className="rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
             eventName={GROWTH_EVENTS.ctaClicked}
-            eventProperties={{ cta: "pricing", source: "home_bottom" }}
-            href={withPublicQuery("/pricing", { organizationKey: selectedOrganizationSlug })}
+            eventProperties={{ cta: "guides", source: "home_bottom" }}
+            href={withPublicQuery("/guides", { organizationKey: selectedOrganizationSlug })}
           >
-            Ver precios
+            Ver guías
           </TrackedLink>
           <Link
             className="rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
@@ -408,7 +392,6 @@ export default async function HomePage({
         </div>
       </section>
 
-      <AdPlaceholder slot="home-bottom-banner" />
     </div>
   );
 }

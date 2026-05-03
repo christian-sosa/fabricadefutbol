@@ -2,9 +2,9 @@ import path from "node:path";
 
 import sharp from "sharp";
 
-export const MAX_PLAYER_PHOTO_SIZE_MB = 20;
-export const PLAYER_AVATAR_SIZE_PX = 400;
-export const PLAYER_AVATAR_QUALITY = 80;
+export const MAX_PLAYER_PHOTO_SIZE_MB = 5;
+export const PLAYER_AVATAR_SIZE_PX = 320;
+export const PLAYER_AVATAR_QUALITY = 72;
 
 export const PHOTO_EXTENSIONS = ["jpg", "jpeg", "png", "webp"] as const;
 

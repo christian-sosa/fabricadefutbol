@@ -1,31 +1,33 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { GroupPaymentValueCard } from "@/components/admin/group-payment-value-card";
+import { GroupActivityValueCard } from "@/components/admin/group-activity-value-card";
 
 vi.mock("@vercel/analytics", () => ({
   track: vi.fn()
 }));
 
-describe("GroupPaymentValueCard", () => {
-  it("muestra CTA de pago cuando el trial esta cerca de vencer", () => {
+describe("GroupActivityValueCard", () => {
+  it("muestra actividad acumulada sin CTA de pago", () => {
     render(
-      <GroupPaymentValueCard
-        accessValidUntil="2026-05-03T00:00:00.000Z"
-        canWrite
+      <GroupActivityValueCard
         finishedCount={3}
         organizationSlug="la-cantera"
         playersCount={16}
-        subscriptionActive={false}
         totalMatches={5}
-        variant="dashboard"
       />
     );
 
     expect(screen.getByText("Tu grupo ya tiene valor acumulado")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Activar plan mensual" })).toHaveAttribute(
+    expect(screen.queryByRole("link", { name: /Activar plan/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/trial|prueba|plan mensual|pago/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Crear proximo partido" })).toHaveAttribute(
       "href",
-      "/admin/billing?org=la-cantera"
+      "/admin/matches/new?org=la-cantera"
+    );
+    expect(screen.getByRole("link", { name: "Ir a jugadores" })).toHaveAttribute(
+      "href",
+      "/admin/players?org=la-cantera"
     );
   });
 });

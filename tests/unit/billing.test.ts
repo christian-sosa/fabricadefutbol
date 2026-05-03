@@ -96,7 +96,7 @@ describe("billing helpers", () => {
     expect(period.periodEnd).toBe("2026-07-10T00:00:00.000Z");
   });
 
-  it("si el trial vencio y no hay plan inicia la retencion de fotos desde ese vencimiento", () => {
+  it("si el trial vencio y no hay plan mantiene la ventana historica de retencion de fotos", () => {
     const window = resolveOrganizationWriteWindow({
       organizationCreatedAt: "2026-02-01T00:00:00.000Z",
       subscription: null
@@ -104,11 +104,11 @@ describe("billing helpers", () => {
 
     expect(window.canWrite).toBe(false);
     expect(window.writeLockedAt).toBe("2026-03-03T00:00:00.000Z");
-    expect(window.playerPhotosPurgeAt).toBe("2026-06-01T00:00:00.000Z");
+    expect(window.playerPhotosPurgeAt).toBe("2026-08-30T00:00:00.000Z");
     expect(window.playerPhotosRetentionExpired).toBe(false);
   });
 
-  it("si hubo suscripcion, la retencion corre desde el fin del ultimo periodo pago", () => {
+  it("si hubo suscripcion, la retencion historica corre desde el fin del ultimo periodo pago", () => {
     const window = resolveOrganizationWriteWindow({
       organizationCreatedAt: "2026-02-01T00:00:00.000Z",
       subscription: {
@@ -120,7 +120,7 @@ describe("billing helpers", () => {
     expect(window.canWrite).toBe(false);
     expect(window.accessValidUntil).toBe("2026-04-10T00:00:00.000Z");
     expect(window.writeLockedAt).toBe("2026-04-10T00:00:00.000Z");
-    expect(window.playerPhotosPurgeAt).toBe("2026-07-09T00:00:00.000Z");
+    expect(window.playerPhotosPurgeAt).toBe("2026-10-07T00:00:00.000Z");
     expect(window.playerPhotosRetentionExpired).toBe(false);
   });
 

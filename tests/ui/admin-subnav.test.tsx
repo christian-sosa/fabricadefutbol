@@ -38,6 +38,7 @@ describe("AdminSubnav", () => {
       "href",
       "/admin/players?org=grupo-a"
     );
+    expect(screen.queryByRole("link", { name: "Facturacion" })).not.toBeInTheDocument();
   });
 
   it("muestra navegacion de liga dentro de una liga seleccionada", () => {

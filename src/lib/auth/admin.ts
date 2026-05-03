@@ -1,12 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { FREE_TRIAL_DAYS, SUPER_ADMIN_EMAIL } from "@/lib/constants";
-import {
-  addDaysToIsoDate,
-  resolveOrganizationWriteWindow,
-  isIsoDateExpired,
-  toShortDate
-} from "@/lib/domain/billing";
+import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import { deriveDisplayName } from "@/lib/auth/profile";
 import { maskEmail, maskUserId } from "@/lib/log-pii";
 import { normalizeEmail } from "@/lib/org";
@@ -30,9 +24,6 @@ export type AdminOrganization = {
 
 type FreeTrialStatus = {
   hasCreatedOrganization: boolean;
-  firstOrganizationCreatedAt: string | null;
-  trialEndsAt: string | null;
-  trialExpired: boolean;
 };
 
 export type OrganizationWriteAccess = {
@@ -51,8 +42,6 @@ export type OrganizationWriteAccess = {
   playerPhotosRetentionExpired: boolean;
   playerPhotosPurgedAt: string | null;
 };
-
-let cachedSuperAdminUserId: string | null | undefined;
 
 function findOrganizationByKey(organizations: AdminOrganization[], organizationKey?: string | null) {
   if (!organizationKey) return null;
@@ -127,51 +116,11 @@ function isSuperAdminEmail(email: string) {
   return normalized === SUPER_ADMIN_EMAIL;
 }
 
-async function resolveSuperAdminUserId() {
-  if (typeof cachedSuperAdminUserId !== "undefined") {
-    return cachedSuperAdminUserId;
-  }
-
-  if (!SUPER_ADMIN_EMAIL) {
-    cachedSuperAdminUserId = null;
-    return null;
-  }
-
-  const adminClient = createSupabaseAdminClient();
-  if (!adminClient) {
-    cachedSuperAdminUserId = null;
-    return null;
-  }
-
-  const { data, error } = await adminClient.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000
-  });
-
-  if (error) {
-    cachedSuperAdminUserId = null;
-    return null;
-  }
-
-  const user = (data?.users ?? []).find((candidate) => {
-    const candidateEmail = normalizeEmail(candidate.email ?? "");
-    return candidateEmail.length > 0 && candidateEmail === SUPER_ADMIN_EMAIL;
-  });
-  cachedSuperAdminUserId = user?.id ?? null;
-  return cachedSuperAdminUserId;
-}
-
-function isBillingSchemaMissing(message: string) {
-  return /organization_billing_subscriptions|organization_billing_payments|requested_organization_name|requested_organization_slug|created_organization_id|purpose/i.test(
-    message
-  );
-}
-
 async function getAdminFreeTrialStatus(userId: string): Promise<FreeTrialStatus> {
   const supabase = await createSupabaseServerClient();
   const { data: firstCreatedOrganization, error } = await supabase
     .from("organizations")
-    .select("id, created_at")
+    .select("id")
     .eq("created_by", userId)
     .order("created_at", { ascending: true })
     .limit(1)
@@ -181,21 +130,14 @@ async function getAdminFreeTrialStatus(userId: string): Promise<FreeTrialStatus>
     throw new Error(error.message);
   }
 
-  if (!firstCreatedOrganization?.created_at) {
+  if (!firstCreatedOrganization?.id) {
     return {
-      hasCreatedOrganization: false,
-      firstOrganizationCreatedAt: null,
-      trialEndsAt: null,
-      trialExpired: false
+      hasCreatedOrganization: false
     };
   }
 
-  const trialEndsAt = addDaysToIsoDate(firstCreatedOrganization.created_at, FREE_TRIAL_DAYS);
   return {
-    hasCreatedOrganization: true,
-    firstOrganizationCreatedAt: firstCreatedOrganization.created_at,
-    trialEndsAt,
-    trialExpired: isIsoDateExpired(trialEndsAt)
+    hasCreatedOrganization: true
   };
 }
 
@@ -228,7 +170,7 @@ export async function getAdminOrganizationCreationAccess(admin: AdminSession) {
       return {
         canCreateOrganization: false,
         reason:
-          "Ya administras un grupo. Para crear uno nuevo vas a necesitar activar el plan pago."
+          "Ya administras un grupo. Por ahora cada cuenta puede crear 1 grupo; escribinos si necesitas mas."
       };
     }
 
@@ -241,7 +183,7 @@ export async function getAdminOrganizationCreationAccess(admin: AdminSession) {
   return {
     canCreateOrganization: false,
     reason:
-      "Ya consumiste tu grupo free. Para crear uno nuevo vas a necesitar activar el plan pago."
+      "Por ahora cada cuenta puede crear 1 grupo. Escribinos si necesitas mas."
   };
 }
 
@@ -252,7 +194,7 @@ export async function assertCanCreateOrganization(admin: AdminSession) {
   if (creationAccess.canCreateOrganization) return;
   throw new Error(
     creationAccess.reason ??
-      "Cada cuenta tiene 1 grupo free. Para crear un nuevo grupo tendras que activar el plan pago."
+      "Por ahora cada cuenta puede crear 1 grupo. Escribinos si necesitas mas."
   );
 }
 
@@ -282,7 +224,7 @@ export async function getOrganizationWriteAccess(
   const supabase = await createSupabaseServerClient();
   const { data: organization, error: organizationError } = await supabase
     .from("organizations")
-    .select("id, created_at, created_by, player_photos_purge_at, player_photos_purged_at")
+    .select("id")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -290,97 +232,25 @@ export async function getOrganizationWriteAccess(
     throw new Error(organizationError.message);
   }
 
-  if (!organization?.created_at) {
+  if (!organization?.id) {
     throw new Error("El grupo no existe.");
-  }
-
-  const superAdminUserId = await resolveSuperAdminUserId();
-  const isSuperAdminOwnedOrganization = Boolean(
-    superAdminUserId && organization.created_by === superAdminUserId
-  );
-  if (isSuperAdminOwnedOrganization) {
-    return {
-      canWrite: true,
-      reason: null,
-      accessValidUntil: null,
-      writeLockedAt: null,
-      organizationTrialEndsAt: null,
-      organizationTrialExpired: false,
-      adminTrialEndsAt: null,
-      adminTrialExpired: false,
-      subscriptionStatus: null,
-      subscriptionCurrentPeriodEnd: null,
-      subscriptionActive: false,
-      playerPhotosPurgeAt: null,
-      playerPhotosRetentionExpired: false,
-      playerPhotosPurgedAt: null
-    };
-  }
-
-  const { data: subscription, error: subscriptionError } = await supabase
-    .from("organization_billing_subscriptions")
-    .select("status, current_period_end")
-    .eq("organization_id", organizationId)
-    .maybeSingle();
-
-  if (subscriptionError && !isBillingSchemaMissing(subscriptionError.message)) {
-    throw new Error(subscriptionError.message);
-  }
-
-  const safeSubscription = subscriptionError && isBillingSchemaMissing(subscriptionError.message) ? null : subscription;
-  const subscriptionStatus = safeSubscription?.status ?? null;
-  const subscriptionCurrentPeriodEnd = safeSubscription?.current_period_end ?? null;
-  const writeWindow = resolveOrganizationWriteWindow({
-    organizationCreatedAt: organization.created_at,
-    subscription: safeSubscription
-  });
-
-  const userTrial = await getAdminFreeTrialStatus(admin.userId);
-  const adminTrialEndsAt = userTrial.trialEndsAt;
-  const adminTrialExpired = userTrial.trialExpired;
-
-  if (!writeWindow.canWrite) {
-    const expiredReason = subscriptionCurrentPeriodEnd
-      ? `El ultimo periodo pago del grupo vencio el ${toShortDate(
-          writeWindow.accessValidUntil
-        )}. Necesita reactivar el plan mensual para volver a gestionar.`
-      : `El grupo supero sus 30 dias free (vencio el ${toShortDate(
-          writeWindow.accessValidUntil
-        )}). Necesita activar el plan mensual para volver a gestionar.`;
-
-    return {
-      canWrite: false,
-      reason: expiredReason,
-      accessValidUntil: writeWindow.accessValidUntil,
-      writeLockedAt: writeWindow.writeLockedAt,
-      organizationTrialEndsAt: writeWindow.organizationTrialEndsAt,
-      organizationTrialExpired: writeWindow.organizationTrialExpired,
-      adminTrialEndsAt,
-      adminTrialExpired,
-      subscriptionStatus,
-      subscriptionCurrentPeriodEnd,
-      subscriptionActive: writeWindow.subscriptionActive,
-      playerPhotosPurgeAt: writeWindow.playerPhotosPurgeAt,
-      playerPhotosRetentionExpired: writeWindow.playerPhotosRetentionExpired,
-      playerPhotosPurgedAt: organization.player_photos_purged_at ?? null
-    };
   }
 
   return {
     canWrite: true,
     reason: null,
-    accessValidUntil: writeWindow.accessValidUntil,
-    writeLockedAt: writeWindow.writeLockedAt,
-    organizationTrialEndsAt: writeWindow.organizationTrialEndsAt,
-    organizationTrialExpired: writeWindow.organizationTrialExpired,
-    adminTrialEndsAt,
-    adminTrialExpired,
-    subscriptionStatus,
-    subscriptionCurrentPeriodEnd,
-    subscriptionActive: writeWindow.subscriptionActive,
-    playerPhotosPurgeAt: writeWindow.playerPhotosPurgeAt,
-    playerPhotosRetentionExpired: writeWindow.playerPhotosRetentionExpired,
-    playerPhotosPurgedAt: organization.player_photos_purged_at ?? null
+    accessValidUntil: null,
+    writeLockedAt: null,
+    organizationTrialEndsAt: null,
+    organizationTrialExpired: false,
+    adminTrialEndsAt: null,
+    adminTrialExpired: false,
+    subscriptionStatus: null,
+    subscriptionCurrentPeriodEnd: null,
+    subscriptionActive: false,
+    playerPhotosPurgeAt: null,
+    playerPhotosRetentionExpired: false,
+    playerPhotosPurgedAt: null
   };
 }
 
@@ -405,10 +275,6 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   // eso aceptaba silenciosamente cualquier invite pendiente que coincidiera
   // con el email del usuario, incluso si nunca habia visto el link.
   // Ahora la aceptacion solo ocurre por el flujo explicito en /invite/[token].
-  if (isSuperAdminEmail(email)) {
-    cachedSuperAdminUserId = user.id;
-  }
-
   return {
     userId: user.id,
     email,

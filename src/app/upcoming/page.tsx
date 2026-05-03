@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -49,8 +48,6 @@ export default async function UpcomingPage({
           </div>
         </section>
       ) : null}
-
-      <AdPlaceholder slot="upcoming-top" />
 
       {upcoming.length ? (
         <div className="space-y-4">

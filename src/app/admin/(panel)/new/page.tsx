@@ -1,9 +1,6 @@
 import Link from "next/link";
 
-import {
-  createOrganizationAction,
-  startOrganizationCreationCheckoutAction
-} from "@/app/admin/(panel)/actions";
+import { createOrganizationAction } from "@/app/admin/(panel)/actions";
 import { TrackedButton } from "@/components/analytics/tracked-button";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -12,16 +9,8 @@ import {
   getAdminOrganizationContext,
   getAdminOrganizationCreationAccess
 } from "@/lib/auth/admin";
-import { ORGANIZATION_MONTHLY_PRICE_ARS } from "@/lib/constants";
 import { GROWTH_EVENTS } from "@/lib/growth";
 import { withOrgQuery } from "@/lib/org";
-
-function formatAmountArs(amount: number) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount);
-}
 
 export default async function NewOrganizationPage({
   searchParams
@@ -56,8 +45,8 @@ export default async function NewOrganizationPage({
       <Card className="p-5 sm:p-6">
         <CardTitle>Datos del grupo</CardTitle>
         <CardDescription className="mt-2">
-          Probá 1 mes gratis. Después, ${formatAmountArs(ORGANIZATION_MONTHLY_PRICE_ARS)} ARS/mes por grupo
-          para seguir creando partidos y cargando resultados.
+          Grupos es gratis. Para controlar costos, por ahora cada cuenta puede crear 1 grupo; si necesitas mas,
+          escribinos.
         </CardDescription>
 
         {!creationAccess.canCreateOrganization && organizations.length > 1 ? (
@@ -72,11 +61,7 @@ export default async function NewOrganizationPage({
         ) : null}
 
         <form
-          action={
-            creationAccess.canCreateOrganization
-              ? createOrganizationAction
-              : startOrganizationCreationCheckoutAction
-          }
+          action={createOrganizationAction}
           className="mt-4 flex flex-col gap-3 md:flex-row"
         >
           {selectedOrganization ? (
@@ -84,22 +69,21 @@ export default async function NewOrganizationPage({
           ) : null}
           <Input name="name" placeholder="Nombre del grupo" required />
           <TrackedButton
-            disabled={!creationAccess.canCreateOrganization && !selectedOrganization}
-            eventName={creationAccess.canCreateOrganization ? GROWTH_EVENTS.ctaClicked : GROWTH_EVENTS.billingStarted}
+            disabled={!creationAccess.canCreateOrganization}
+            eventName={GROWTH_EVENTS.ctaClicked}
             eventProperties={{
-              cta: creationAccess.canCreateOrganization ? "create_group_submit" : "pay_create_group",
+              cta: "create_group_submit",
               source: "admin_new_group"
             }}
             type="submit"
           >
-            {creationAccess.canCreateOrganization ? "Crear grupo" : "Pagar y crear grupo"}
+            Crear grupo
           </TrackedButton>
         </form>
 
         {!creationAccess.canCreateOrganization ? (
           <p className="mt-2 text-xs font-semibold text-amber-300">
-            {creationAccess.reason ?? "Para crear un nuevo grupo necesitas activar el plan pago."}{" "}
-            El alta se realiza automaticamente cuando Mercado Pago confirma el pago.
+            {creationAccess.reason ?? "Por ahora cada cuenta puede crear 1 grupo. Escribinos si necesitas mas."}
           </p>
         ) : null}
         {resolvedSearchParams.error ? (

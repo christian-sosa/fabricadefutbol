@@ -3,18 +3,10 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { ORGANIZATION_BILLING_CURRENCY, ORGANIZATION_MONTHLY_PRICE_ARS } from "@/lib/constants";
 import { isTournamentsEnabled } from "@/lib/features";
 import { resolvePublicModule, withPublicQuery } from "@/lib/org";
 
-const LAST_UPDATED = "29 de abril de 2026";
-
-function formatArs(amount: number) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount);
-}
+const LAST_UPDATED = "2 de mayo de 2026";
 
 function LegalSection({ children, title }: { children: ReactNode; title: string }) {
   return (
@@ -54,7 +46,7 @@ export default async function TermsPage({
         <CardTitle className="mt-2 text-3xl">Terminos y condiciones</CardTitle>
         <CardDescription className="mt-3 text-base">
           Estos terminos regulan el uso de Fabrica de Futbol, incluyendo la administracion de grupos, jugadores,
-          partidos, rankings, historial, contenido publico, fotos y pagos del servicio.
+          partidos, rankings, historial, contenido publico, fotos y publicidad del servicio.
         </CardDescription>
         <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
           Ultima actualizacion: {LAST_UPDATED}
@@ -92,7 +84,7 @@ export default async function TermsPage({
               "La persona administradora es responsable de mantener sus credenciales seguras y de usar datos reales, actualizados y pertinentes.",
               "El administrador decide que informacion carga, que jugadores integra y que contenido queda disponible para vistas publicas.",
               "No esta permitido compartir accesos de forma que comprometa datos de terceros o permita acciones no autorizadas.",
-              "Fabrica de Futbol puede limitar, suspender o cerrar accesos si detecta abuso, uso fraudulento, incumplimiento de pago o riesgo para otros usuarios."
+              "Fabrica de Futbol puede limitar, suspender o cerrar accesos si detecta abuso, uso fraudulento, consumo desproporcionado de recursos o riesgo para otros usuarios."
             ]}
           />
         </LegalSection>
@@ -127,7 +119,7 @@ export default async function TermsPage({
               "Solo se deben subir imagenes propias, autorizadas o cuyo uso este permitido.",
               "No se deben cargar imagenes ofensivas, discriminatorias, enganosas, de terceros sin permiso o que vulneren derechos de imagen, privacidad o propiedad intelectual.",
               "Las fotos de jugadores se optimizan y reemplazan para evitar acumulacion innecesaria en Storage.",
-              "El servicio puede aplicar limites de reemplazo, ventanas de espera y purgas de fotos cuando un grupo queda inactivo o fuera de periodo pago."
+              "El servicio puede aplicar limites de reemplazo, ventanas de espera y purgas de fotos cuando un grupo queda inactivo."
             ]}
           />
         </LegalSection>
@@ -144,34 +136,31 @@ export default async function TermsPage({
           />
         </LegalSection>
 
-        <LegalSection title="8. Planes, prueba y pagos">
+        <LegalSection title="8. Grupos gratis, limites y continuidad">
           <p>
-            Los grupos cuentan con un periodo de prueba de 30 dias. Finalizado ese periodo, la continuidad de la edicion
-            y administracion requiere un plan activo. El precio publico vigente para Grupos es{" "}
-            {ORGANIZATION_BILLING_CURRENCY} {formatArs(ORGANIZATION_MONTHLY_PRICE_ARS)} por mes, salvo promociones,
-            acuerdos particulares o cambios publicados en la pagina de precios.
+            Grupos es gratis en esta etapa. Para controlar costos y abuso, por ahora cada cuenta no-superadmin puede
+            crear 1 grupo. Si necesitas administrar mas grupos, podes escribirnos para evaluarlo manualmente.
           </p>
           <p>
-            Los pagos se procesan mediante Mercado Pago u otros proveedores que podamos habilitar. Fabrica de Futbol no
-            almacena datos completos de tarjeta. Podemos conservar identificadores de pago, estado, periodo abonado y
-            datos necesarios para conciliacion, soporte y cumplimiento.
+            Fabrica de Futbol puede aplicar limites razonables de uso, carga de imagenes, reemplazos, almacenamiento,
+            invitaciones o automatizaciones cuando sea necesario para sostener el servicio gratis.
           </p>
           <p>
             {tournamentsEnabled
-              ? "Grupos y Torneos pueden tener reglas de facturacion separadas. En Torneos, la facturacion puede asociarse a la liga activa y no necesariamente a cada competencia creada."
-              : "Si mas adelante se habilitan nuevos modulos, podran tener reglas de facturacion propias informadas antes de su contratacion."}
+              ? "Torneos puede tener reglas de facturacion separadas. En Torneos, la facturacion puede asociarse a la liga activa y no necesariamente a cada competencia creada."
+              : "Si mas adelante se habilitan nuevos modulos con contratacion, tendran reglas propias informadas antes de aceptarlos."}
           </p>
         </LegalSection>
 
-        <LegalSection title="9. Baja, vencimiento y reactivacion">
+        <LegalSection title="9. Baja, inactividad y retencion">
           <p>
-            Si un periodo vence o el pago no se confirma, el espacio puede quedar protegido en modo lectura o con
-            restricciones de edicion. La informacion deportiva no se elimina automaticamente por el solo vencimiento,
-            pero ciertas fotos y archivos pueden quedar sujetos a retencion limitada para evitar costos innecesarios.
+            La informacion deportiva no se elimina automaticamente por inactividad. Sin embargo, ciertas fotos de
+            jugadores y archivos reemplazables pueden quedar sujetos a retencion limitada para evitar costos
+            innecesarios.
           </p>
           <p>
-            Las solicitudes de baja, cambio de plan, inconvenientes de cobro o reclamos por pagos deben canalizarse por
-            el formulario de contacto o por email.
+            Las solicitudes de baja, correccion de datos, ampliacion de limites o consultas comerciales deben
+            canalizarse por el formulario de contacto o por email.
           </p>
         </LegalSection>
 

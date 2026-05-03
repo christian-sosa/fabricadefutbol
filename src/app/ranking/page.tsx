@@ -1,6 +1,5 @@
 import { GroupShareActions } from "@/components/groups/group-share-actions";
 import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
-import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { RankingTableQuery } from "@/components/ranking/ranking-table-query";
@@ -66,13 +65,9 @@ export default async function RankingPage({
           </section>
         ) : null}
 
-        <AdPlaceholder slot="ranking-top" />
-
         <RankingTableQuery initialPlayers={initialPlayers} organizationId={selectedOrganization?.id ?? null} />
 
         <PublicGroupGrowthCta source="ranking_page" />
-
-        <AdPlaceholder slot="ranking-bottom" />
       </div>
     </div>
   );

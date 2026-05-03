@@ -23,6 +23,15 @@ const allowedDevOrigins = collectAllowedDevOrigins();
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   ...(allowedDevOrigins.length ? { allowedDevOrigins } : {}),
+  async redirects() {
+    return [
+      {
+        source: "/pricing",
+        destination: "/help",
+        permanent: true
+      }
+    ];
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "2mb",

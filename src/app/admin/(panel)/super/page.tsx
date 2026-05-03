@@ -10,28 +10,6 @@ function metricNumber(value: number) {
   return new Intl.NumberFormat("es-AR").format(value);
 }
 
-function formatCurrencyArs(value: number) {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value);
-}
-
-function commercialStatusLabel(status: "paid_active" | "free_trial" | "expired_without_plan") {
-  switch (status) {
-    case "paid_active":
-      return "Plan activo";
-    case "free_trial":
-      return "Trial gratis";
-    case "expired_without_plan":
-      return "Sin plan";
-    default:
-      return status;
-  }
-}
-
 export default async function SuperAdminDashboardPage() {
   const admin = await requireAdminSession();
   if (!admin.isSuperAdmin) {
@@ -79,11 +57,10 @@ export default async function SuperAdminDashboardPage() {
           </p>
         </Card>
         <Card>
-          <CardDescription>Recaudado en {metrics.currentMonth.label}</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{formatCurrencyArs(metrics.currentMonth.approvedRevenueArs)}</CardTitle>
+          <CardDescription>Admins</CardDescription>
+          <CardTitle className="mt-1 text-3xl">{metricNumber(metrics.totals.admins)}</CardTitle>
           <p className="mt-2 text-xs text-slate-400">
-            Pagos aprobados {metricNumber(metrics.currentMonth.approvedPayments)} | Grupos cobrados{" "}
-            {metricNumber(metrics.currentMonth.organizationsWithApprovedPayments)}
+            Invitaciones pendientes: {metricNumber(metrics.totals.pendingInvites)}
           </p>
         </Card>
       </section>
@@ -99,16 +76,6 @@ export default async function SuperAdminDashboardPage() {
             <p>Promedio de partidos por grupo: {metrics.derived.avgMatchesPerOrganization.toFixed(2)}</p>
             <p>Resultados cargados: {metricNumber(metrics.totals.matchResults)}</p>
             <p>Invitados en partidos: {metricNumber(metrics.totals.matchGuests)}</p>
-          </div>
-        </Card>
-
-        <Card>
-          <CardTitle>Negocio y planes</CardTitle>
-          <div className="mt-3 space-y-2 text-sm text-slate-200">
-            <p>Grupos con plan activo: {metricNumber(metrics.business.activePaidOrganizations)}</p>
-            <p>Grupos en trial gratis: {metricNumber(metrics.business.freeTrialOrganizations)}</p>
-            <p>Grupos sin plan vigente: {metricNumber(metrics.business.expiredWithoutPlanOrganizations)}</p>
-            <p>Grupos que alguna vez pagaron: {metricNumber(metrics.business.organizationsWithAnyApprovedPayment)}</p>
           </div>
         </Card>
 
@@ -137,7 +104,6 @@ export default async function SuperAdminDashboardPage() {
                 <th className="px-4 py-3 font-semibold">Activos</th>
                 <th className="px-4 py-3 font-semibold">Partidos</th>
                 <th className="px-4 py-3 font-semibold">Finalizados</th>
-                <th className="px-4 py-3 font-semibold">Estado comercial</th>
                 <th className="px-4 py-3 font-semibold">Admins</th>
                 <th className="px-4 py-3 font-semibold">Invites pendientes</th>
               </tr>
@@ -153,21 +119,13 @@ export default async function SuperAdminDashboardPage() {
                   <td className="px-4 py-3">{metricNumber(organization.activePlayers)}</td>
                   <td className="px-4 py-3">{metricNumber(organization.matches)}</td>
                   <td className="px-4 py-3">{metricNumber(organization.finishedMatches)}</td>
-                  <td className="px-4 py-3">
-                    <p>{commercialStatusLabel(organization.commercialStatus)}</p>
-                    <p className="text-xs text-slate-400">
-                      {organization.subscriptionCurrentPeriodEnd
-                        ? `Hasta ${new Date(organization.subscriptionCurrentPeriodEnd).toLocaleDateString("es-AR")}`
-                        : `Trial hasta ${new Date(organization.trialEndsAt).toLocaleDateString("es-AR")}`}
-                    </p>
-                  </td>
                   <td className="px-4 py-3">{metricNumber(organization.admins)}</td>
                   <td className="px-4 py-3">{metricNumber(organization.pendingInvites)}</td>
                 </tr>
               ))}
               {!metrics.topOrganizations.length ? (
                 <tr>
-                  <td className="px-4 py-4 text-slate-400" colSpan={8}>
+                  <td className="px-4 py-4 text-slate-400" colSpan={7}>
                     No hay grupos cargados.
                   </td>
                 </tr>
@@ -193,14 +151,7 @@ export default async function SuperAdminDashboardPage() {
             medir ritmo de crecimiento.
           </p>
           <p>
-            4. Recaudacion del mes: suma pagos aprobados de Mercado Pago del mes calendario actual en zona horaria{" "}
-            {metrics.currentMonth.timezone}.
-          </p>
-          <p>
-            5. Estado comercial: clasifica cada grupo entre plan activo, trial gratis o sin plan vigente.
-          </p>
-          <p>
-            6. Export CSV: descarga snapshot con timestamp, metricas globales y detalle por grupo para analisis
+            4. Export CSV: descarga snapshot con timestamp, metricas globales y detalle por grupo para analisis
             en BI/Excel.
           </p>
         </div>

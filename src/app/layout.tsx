@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -9,7 +10,7 @@ import { BetaNotice } from "@/components/layout/beta-notice";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ReactQueryProvider } from "@/components/providers/react-query-provider";
-import { shouldRenderAds, shouldRenderSpeedInsights } from "@/lib/env";
+import { getAdsenseClientId, shouldRenderAds, shouldRenderSpeedInsights } from "@/lib/env";
 import { getPublicAppUrl } from "@/lib/public-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -70,19 +71,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     data: { user }
   } = await supabase.auth.getUser();
   const initialIsAuthenticated = Boolean(user);
-  const adsEnabled = shouldRenderAds();
+  const adsenseClientId = getAdsenseClientId();
+  const adsEnabled = shouldRenderAds() && Boolean(adsenseClientId);
   const speedInsightsEnabled = shouldRenderSpeedInsights();
 
   return (
     <html lang="es">
       <body>
         <ReactQueryProvider>
-          {adsEnabled ? (
-            <script
+          {adsEnabled && adsenseClientId ? (
+            <Script
               async
-              src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7913239873831344"
               crossOrigin="anonymous"
-            ></script>
+              id="adsense-loader"
+              src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`}
+              strategy="beforeInteractive"
+            />
           ) : null}
           <a className="skip-link" href="#contenido-principal">
             Saltar al contenido

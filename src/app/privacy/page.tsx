@@ -3,11 +3,11 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { FREE_TRIAL_DAYS, ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS } from "@/lib/constants";
+import { ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS } from "@/lib/constants";
 import { isTournamentsEnabled } from "@/lib/features";
 import { resolvePublicModule, withPublicQuery } from "@/lib/org";
 
-const LAST_UPDATED = "29 de abril de 2026";
+const LAST_UPDATED = "2 de mayo de 2026";
 
 function PrivacySection({ children, title }: { children: ReactNode; title: string }) {
   return (
@@ -47,7 +47,7 @@ export default async function PrivacyPage({
         <CardTitle className="mt-2 text-3xl">Politica de privacidad</CardTitle>
         <CardDescription className="mt-3 text-base">
           Esta politica explica como Fabrica de Futbol trata informacion de administradores, jugadores, visitantes,
-          grupos, fotos, pagos, mensajes de contacto y datos tecnicos necesarios para operar el servicio.
+          grupos, fotos, publicidad, mensajes de contacto y datos tecnicos necesarios para operar el servicio.
         </CardDescription>
         <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
           Ultima actualizacion: {LAST_UPDATED}
@@ -66,7 +66,7 @@ export default async function PrivacyPage({
           </p>
           <p>
             Esta politica aplica al sitio, al panel de administracion, a las paginas publicas de grupos y a los flujos de
-            soporte, pagos y carga de imagenes.
+            soporte, publicidad, pagos historicos o de Torneos y carga de imagenes.
           </p>
         </PrivacySection>
 
@@ -74,13 +74,14 @@ export default async function PrivacyPage({
           <PrivacyList
             items={[
               "Datos de cuenta y acceso: email, identificadores de usuario, sesiones, rol de administrador y fechas de alta.",
-              "Datos de grupos: nombre, slug, configuracion, administradores, estado de suscripcion y contenido publico asociado.",
+              "Datos de grupos: nombre, slug, configuracion, administradores, actividad e informacion publica asociada.",
               "Datos de jugadores: nombre, orden, nivel, ranking, rendimiento, estadisticas, asistencia a partidos, resultados y fotos si fueron cargadas.",
               tournamentsEnabled
                 ? "Datos de torneos: ligas, competencias, equipos, capitanes, planteles, fixture, tablas, resultados y estadisticas."
                 : "Datos de torneos solo si el modulo se habilita o se usa en entornos internos de prueba.",
               "Datos de soporte: nombre, email, tema, mensaje, grupo o torneo referido y comunicaciones posteriores.",
-              "Datos de pago: identificadores de operacion, proveedor, estado, periodo abonado, moneda, importe y fechas relevantes. No almacenamos datos completos de tarjeta."
+              "Datos de publicidad y navegacion: cookies de terceros, direccion IP, identificadores tecnicos, informacion del navegador, impresiones y eventos publicitarios cuando se habilite Google AdSense.",
+              "Datos de pago solo para Torneos, flujos historicos o integraciones futuras: identificadores de operacion, proveedor, estado, periodo abonado, moneda, importe y fechas relevantes. No almacenamos datos completos de tarjeta."
             ]}
           />
         </PrivacySection>
@@ -88,8 +89,8 @@ export default async function PrivacyPage({
         <PrivacySection title="3. Como obtenemos la informacion">
           <p>
             La informacion puede ser ingresada por el propio usuario, por administradores del grupo, por capitanes o
-            responsables autorizados, por proveedores de pago y por sistemas tecnicos que permiten autenticar, proteger y
-            medir el funcionamiento del servicio.
+            responsables autorizados, por proveedores de pago cuando correspondan, por proveedores publicitarios y por
+            sistemas tecnicos que permiten autenticar, proteger y medir el funcionamiento del servicio.
           </p>
           <p>
             Si una persona administradora carga datos de terceros, debe contar con autorizacion, consentimiento o base
@@ -104,7 +105,8 @@ export default async function PrivacyPage({
               "Crear y administrar cuentas, grupos, jugadores, partidos, rankings, historial y paginas publicas.",
               "Calcular rendimiento, resultados, equipos y estadisticas deportivas.",
               "Mostrar informacion publica del grupo cuando el administrador decide usar esas vistas.",
-              "Procesar pagos, validar periodos activos, gestionar prueba gratuita y resolver reclamos de facturacion.",
+              "Procesar pagos solo cuando corresponda a Torneos, flujos historicos o integraciones futuras.",
+              "Mostrar publicidad mediante Google AdSense cuando la configuracion publica de anuncios este habilitada.",
               "Responder consultas, reportes de error, pedidos comerciales y solicitudes legales o de privacidad.",
               "Prevenir abuso, proteger cuentas, investigar incidentes, depurar errores y mejorar estabilidad del servicio."
             ]}
@@ -130,28 +132,29 @@ export default async function PrivacyPage({
           <p>
             Para reducir abusos y costos, el servicio aplica limites de subida y reemplazo. Actualmente, una misma
             persona puede reemplazar su foto hasta 2 veces dentro de una ventana de 3 meses, y los capitanes tienen un
-            limite global de subidas por ventana. Si un grupo queda fuera de periodo activo, las fotos pueden purgarse
-            luego de {ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS} dias.
+            limite global de subidas por ventana. Si un grupo queda inactivo, las fotos de jugadores pueden purgarse
+            luego de {ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS} dias sin borrar datos deportivos ni la imagen del grupo.
           </p>
         </PrivacySection>
 
         <PrivacySection title="7. Pagos y proveedores">
           <p>
-            Los pagos se procesan mediante Mercado Pago u otros proveedores que podamos integrar. Esos proveedores tratan
-            informacion segun sus propias politicas. Fabrica de Futbol recibe y conserva datos necesarios para confirmar
-            pagos, conciliar periodos, habilitar acceso y responder consultas.
+            Grupos es gratis en esta etapa y no inicia pagos nuevos para crear o administrar grupos. Torneos, flujos
+            historicos o integraciones futuras pueden usar Mercado Pago u otros proveedores.
           </p>
           <p>
-            El servicio puede ofrecer {FREE_TRIAL_DAYS} dias de prueba para grupos. Finalizado el periodo de prueba o el
-            periodo pago, algunas acciones de administracion pueden quedar restringidas hasta reactivar el plan.
+            Cuando exista un pago, esos proveedores tratan informacion segun sus propias politicas. Fabrica de Futbol
+            conserva solo datos necesarios para confirmar operaciones, conciliar periodos, responder consultas y cumplir
+            obligaciones aplicables.
           </p>
         </PrivacySection>
 
         <PrivacySection title="8. Infraestructura y encargados">
           <p>
             Para operar el servicio usamos proveedores de infraestructura, base de datos, autenticacion, almacenamiento,
-            despliegue, analitica, email, soporte y pagos. Entre ellos pueden encontrarse Supabase, Vercel, Mercado Pago
-            y servicios equivalentes que cumplan funciones necesarias para prestar el producto.
+            despliegue, analitica, email, soporte, publicidad y pagos cuando correspondan. Entre ellos pueden
+            encontrarse Supabase, Vercel, Google AdSense, Mercado Pago y servicios equivalentes que cumplan funciones
+            necesarias para prestar el producto.
           </p>
           <p>
             Estos proveedores pueden procesar datos dentro o fuera de Argentina. En esos casos, buscamos limitar la
@@ -165,6 +168,20 @@ export default async function PrivacyPage({
             El sitio puede usar cookies o tecnologias similares para mantener sesiones, recordar preferencias tecnicas,
             proteger accesos y medir uso agregado del producto. Tambien puede usar analitica de Vercel u otra herramienta
             equivalente para entender rendimiento, errores y navegacion general.
+          </p>
+          <p>
+            Cuando Google AdSense esta habilitado, Google y sus socios pueden usar cookies de terceros, web beacons,
+            direccion IP, identificadores tecnicos del navegador o dispositivo, datos de impresiones y datos de
+            interaccion para publicar anuncios, limitar frecuencia, medir rendimiento y prevenir fraude. Podes leer{" "}
+            <a
+              className="font-semibold text-emerald-300 transition hover:underline"
+              href="https://policies.google.com/technologies/partner-sites"
+              rel="noreferrer"
+              target="_blank"
+            >
+              como Google usa datos de sitios o apps que usan sus servicios
+            </a>
+            .
           </p>
           <p>
             No buscamos vender informacion personal ni crear perfiles publicitarios sensibles a partir de los datos

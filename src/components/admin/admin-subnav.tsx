@@ -53,11 +53,6 @@ function buildOrganizationItems(pathname: string, organizationKey: string | null
       href: withOrgQuery("/admin/matches", organizationKey),
       label: "Partidos",
       active: pathname === "/admin/matches" || isMatchDetail
-    },
-    {
-      href: withOrgQuery("/admin/billing", organizationKey),
-      label: "Facturacion",
-      active: pathname === "/admin/billing"
     }
   ];
 }

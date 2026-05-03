@@ -15,14 +15,15 @@ describe("organization photo retention", () => {
     vi.useRealTimers();
   });
 
-  it("programa el purge mientras el grupo sigue impago pero aun dentro de los 90 dias", async () => {
+  it("programa el purge de fotos a 180 dias desde la ultima actividad", async () => {
     const fake = createFakeSupabase({
       organizations: [
         {
           id: ORG_ID,
           name: "La cantera",
           slug: "la-cantera",
-          created_at: "2026-03-25T00:00:00.000Z"
+          created_at: "2026-03-25T00:00:00.000Z",
+          updated_at: "2026-03-25T00:00:00.000Z"
         }
       ]
     });
@@ -55,13 +56,13 @@ describe("organization photo retention", () => {
     expect(removedPaths).toEqual([]);
     expect(fake.find("organizations", (row) => row.id === ORG_ID)).toEqual(
       expect.objectContaining({
-        player_photos_purge_at: "2026-07-23T00:00:00.000Z",
+        player_photos_purge_at: "2026-09-21T00:00:00.000Z",
         player_photos_purged_at: null
       })
     );
   });
 
-  it("borra fotos de jugadores cuando pasan 90 dias de impago y conserva la imagen del grupo", async () => {
+  it("borra fotos de jugadores cuando el grupo lleva 180 dias sin actividad y conserva la imagen del grupo", async () => {
     const fake = createFakeSupabase({
       organizations: [
         {
@@ -69,14 +70,8 @@ describe("organization photo retention", () => {
           name: "La cantera",
           slug: "la-cantera",
           image_path: "app_dev/organizations/org-1.webp",
-          created_at: "2026-01-01T00:00:00.000Z"
-        }
-      ],
-      organization_billing_subscriptions: [
-        {
-          organization_id: ORG_ID,
-          status: "active",
-          current_period_end: "2026-02-10T00:00:00.000Z"
+          created_at: "2025-01-01T00:00:00.000Z",
+          updated_at: "2025-01-01T00:00:00.000Z"
         }
       ],
       players: [
@@ -84,13 +79,17 @@ describe("organization photo retention", () => {
           id: "player-1",
           organization_id: ORG_ID,
           full_name: "Juan",
-          initial_rank: 1
+          initial_rank: 1,
+          created_at: "2025-01-01T00:00:00.000Z",
+          updated_at: "2025-01-01T00:00:00.000Z"
         },
         {
           id: "player-2",
           organization_id: ORG_ID,
           full_name: "Pedro",
-          initial_rank: 2
+          initial_rank: 2,
+          created_at: "2025-01-01T00:00:00.000Z",
+          updated_at: "2025-01-01T00:00:00.000Z"
         }
       ],
       player_photo_upload_events: [
@@ -147,7 +146,7 @@ describe("organization photo retention", () => {
     expect(fake.find("organizations", (row) => row.id === ORG_ID)).toEqual(
       expect.objectContaining({
         image_path: "app_dev/organizations/org-1.webp",
-        player_photos_purge_at: "2026-05-11T00:00:00.000Z",
+        player_photos_purge_at: "2025-06-30T00:00:00.000Z",
         player_photos_purged_at: "2026-05-20T12:00:00.000Z"
       })
     );
@@ -159,7 +158,7 @@ describe("organization photo retention", () => {
     ]);
   });
 
-  it("resetea la retencion si el grupo vuelve a tener acceso activo", async () => {
+  it("resetea la retencion si el grupo vuelve a tener actividad reciente", async () => {
     const fake = createFakeSupabase({
       organizations: [
         {
@@ -167,15 +166,18 @@ describe("organization photo retention", () => {
           name: "La cantera",
           slug: "la-cantera",
           created_at: "2026-01-01T00:00:00.000Z",
+          updated_at: "2025-01-01T00:00:00.000Z",
           player_photos_purge_at: "2026-05-11T00:00:00.000Z",
           player_photos_purged_at: "2026-05-12T12:00:00.000Z"
         }
       ],
-      organization_billing_subscriptions: [
+      matches: [
         {
+          id: "match-1",
           organization_id: ORG_ID,
-          status: "active",
-          current_period_end: "2026-06-25T00:00:00.000Z"
+          status: "finished",
+          date: "2026-05-10",
+          updated_at: "2026-05-10T00:00:00.000Z"
         }
       ]
     });

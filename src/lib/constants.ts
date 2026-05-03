@@ -38,7 +38,7 @@ export function isSuperAdminConfigured() {
 }
 
 export const FREE_TRIAL_DAYS = 30;
-export const ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS = 90;
+export const ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS = 180;
 export const ORGANIZATION_MONTHLY_PRICE_ARS = 5000;
 export const TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS = 100;
 export const MAX_TOURNAMENT_PLAYERS_PER_TEAM = 20;
@@ -64,7 +64,7 @@ const BASE_PUBLIC_NAV_ITEMS = [
   { href: "/ranking", label: "Ranking" },
   { href: "/matches", label: "Historial" },
   { href: "/upcoming", label: "Proximos" },
-  { href: "/pricing", label: "Precios" },
+  { href: "/guides", label: "Guías" },
   { href: "/feedback", label: "Contacto" },
   { href: "/help", label: "Ayuda" }
 ] as const;
@@ -73,7 +73,7 @@ const BASE_PRIMARY_PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
   { href: "/groups", label: "Grupos" },
   { href: "/tournaments", label: "Torneos" },
-  { href: "/pricing", label: "Precios" },
+  { href: "/guides", label: "Guías" },
   { href: "/feedback", label: "Contacto" },
   { href: "/help", label: "Ayuda" }
 ] as const;

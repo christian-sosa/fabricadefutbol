@@ -2,12 +2,13 @@ import sharp from "sharp";
 
 import { escapeXmlAttribute, escapeXmlText } from "@/lib/xml";
 
-export const MAX_ORGANIZATION_IMAGE_SIZE_MB = 20;
-export const ORGANIZATION_IMAGE_WIDTH_PX = 1600;
-export const ORGANIZATION_IMAGE_HEIGHT_PX = 900;
-export const ORGANIZATION_IMAGE_QUALITY = 84;
-export const ORGANIZATION_IMAGE_CACHE_CONTROL = "no-store";
-export const ORGANIZATION_IMAGE_PLACEHOLDER_CACHE_CONTROL = "no-store";
+export const MAX_ORGANIZATION_IMAGE_SIZE_MB = 8;
+export const ORGANIZATION_IMAGE_WIDTH_PX = 1200;
+export const ORGANIZATION_IMAGE_HEIGHT_PX = 675;
+export const ORGANIZATION_IMAGE_QUALITY = 78;
+export const ORGANIZATION_IMAGE_CACHE_CONTROL =
+  "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400";
+export const ORGANIZATION_IMAGE_PLACEHOLDER_CACHE_CONTROL = "public, max-age=3600, s-maxage=3600";
 
 const ORGANIZATION_IMAGE_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 

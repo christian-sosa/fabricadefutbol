@@ -19,7 +19,6 @@ const { PublicModuleToggle } = await import("@/components/layout/public-module-t
 const { SiteFooter } = await import("@/components/layout/site-footer");
 const { default: FeedbackPage } = await import("@/app/feedback/page");
 const { default: HelpPage } = await import("@/app/help/page");
-const { default: PricingPage } = await import("@/app/pricing/page");
 
 describe("tournament feature flag disabled", () => {
   beforeEach(() => {
@@ -45,15 +44,9 @@ describe("tournament feature flag disabled", () => {
 
     expect(screen.getAllByRole("link", { name: /Grupos/ }).length).toBeGreaterThan(0);
     expect(screen.queryByText("Torneos")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Precios" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Guías" })).toHaveAttribute("href", "/guides");
     expect(screen.getByText("Ranking real para grupos")).toBeInTheDocument();
-  });
-
-  it("muestra solo el plan de grupos en precios", () => {
-    render(<PricingPage />);
-
-    expect(screen.getByRole("heading", { name: "Grupos" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Torneos" })).not.toBeInTheDocument();
-    expect(screen.getByText("Un plan simple para ordenar tu grupo.")).toBeInTheDocument();
   });
 
   it("muestra ayuda de grupos aunque llegue module=tournaments", async () => {

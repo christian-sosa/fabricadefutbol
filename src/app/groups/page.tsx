@@ -3,7 +3,6 @@ import Link from "next/link";
 import { GroupShareActions } from "@/components/groups/group-share-actions";
 import { OrganizationImage } from "@/components/groups/organization-image";
 import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
-import { AdPlaceholder } from "@/components/layout/ad-placeholder";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -52,8 +51,6 @@ export default async function GroupsPage({
           />
         </div>
       </section>
-
-      <AdPlaceholder slot="organizations-top" />
 
       {selectedOrganization ? (
         <>
@@ -182,7 +179,6 @@ export default async function GroupsPage({
 
       <PublicGroupGrowthCta source="groups_page" />
 
-      <AdPlaceholder slot="organizations-bottom" />
     </div>
   );
 }
