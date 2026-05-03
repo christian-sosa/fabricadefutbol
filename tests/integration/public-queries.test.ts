@@ -606,8 +606,22 @@ describe("resolvePublicOrganization", () => {
         { team_option_id: "option-old", player_id: "player-1", team: "A" }
       ],
       match_result: [
-        { match_id: "match-current", score_a: 1, score_b: 0, winner_team: "A", created_by: "admin-1" },
-        { match_id: "match-old", score_a: 2, score_b: 0, winner_team: "A", created_by: "admin-1" }
+        {
+          match_id: "match-current",
+          score_a: 1,
+          score_b: 0,
+          winner_team: "A",
+          mvp_player_id: "player-2",
+          created_by: "admin-1"
+        },
+        {
+          match_id: "match-old",
+          score_a: 2,
+          score_b: 0,
+          winner_team: "A",
+          mvp_player_id: "player-1",
+          created_by: "admin-1"
+        }
       ]
     });
 
@@ -618,9 +632,9 @@ describe("resolvePublicOrganization", () => {
     const history = await getMatchHistoryCardsPage(ORG_ID, { page: 1, pageSize: 10, season: "season-current" });
     const allHistory = await getMatchHistoryCardsPage(ORG_ID, { page: 1, pageSize: 10, season: "all" });
 
-    expect(standings.map((player) => [player.playerId, player.currentRating, player.matchesPlayed])).toEqual([
-      ["player-2", 1015, 1],
-      ["player-1", 1000, 0]
+    expect(standings.map((player) => [player.playerId, player.currentRating, player.matchesPlayed, player.mvpCount])).toEqual([
+      ["player-2", 1015, 1, 1],
+      ["player-1", 1000, 0, 1]
     ]);
     expect(history.matches.map((match) => match.id)).toEqual(["match-current"]);
     expect(allHistory.matches.map((match) => match.id)).toEqual(["match-current", "match-old"]);

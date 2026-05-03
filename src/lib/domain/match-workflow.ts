@@ -1,5 +1,6 @@
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { calculateMatchRatingAdjustments, deriveWinnerTeam } from "@/lib/domain/rating";
+import { buildOrganizationSeasonInsert } from "@/lib/domain/organization-seasons";
 import {
   calculateEffectiveSkillScore,
   calculateGuestDisplayRating,
@@ -182,22 +183,6 @@ function parseParticipantId(participantId: string): { source: "player" | "guest"
   throw new Error("Participante invalido dentro de la opcion de equipos.");
 }
 
-function toDateOnly(value: Date) {
-  return value.toISOString().slice(0, 10);
-}
-
-function addMonthsDateOnly(startDate: Date, months: number) {
-  const next = new Date(
-    Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + months, startDate.getUTCDate())
-  );
-  return toDateOnly(next);
-}
-
-function buildSeasonLabel(startDate: Date, durationMonths: number) {
-  const year = startDate.getUTCFullYear();
-  return durationMonths === 12 ? `Temporada ${year}` : `Temporada ${year} - ${durationMonths} meses`;
-}
-
 async function getActiveOrganizationSeason(supabase: DbClient, organizationId: string) {
   const { data, error } = await supabase
     .from("organization_seasons")
@@ -229,26 +214,21 @@ async function ensureActiveOrganizationSeason(params: {
   organizationId: string;
   adminId?: string;
   startsAt?: Date;
-  durationMonths?: 6 | 12;
 }) {
-  const { supabase, organizationId, adminId, durationMonths = 6 } = params;
+  const { supabase, organizationId, adminId } = params;
   const current = await getActiveOrganizationSeason(supabase, organizationId);
   if (current) return current;
 
   const startDate = params.startsAt ?? new Date();
-  const startsAt = toDateOnly(startDate);
-  const endsAt = addMonthsDateOnly(startDate, durationMonths);
   const { data, error } = await supabase
     .from("organization_seasons")
-    .insert({
-      organization_id: organizationId,
-      label: buildSeasonLabel(startDate, durationMonths),
-      duration_months: durationMonths,
-      starts_at: startsAt,
-      ends_at: endsAt,
-      status: "active",
-      created_by: adminId ?? null
-    })
+    .insert(
+      buildOrganizationSeasonInsert({
+        organizationId,
+        createdBy: adminId ?? null,
+        startsAt: startDate
+      })
+    )
     .select("*")
     .single();
 

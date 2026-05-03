@@ -382,6 +382,32 @@ async function fetchMatchTeams(matchIds: string[]) {
     .filter((item): item is MatchWithTeams => item !== null);
 }
 
+async function fetchAllTimeMvpCounts(supabase: SupabaseServerClient, organizationId: string) {
+  const { data: allFinishedMatches, error: matchesError } = await supabase
+    .from("matches")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("status", "finished");
+  if (matchesError) throw new Error(matchesError.message);
+
+  const allMatchIds = (allFinishedMatches ?? []).map((match) => match.id);
+  if (!allMatchIds.length) return new Map<string, number>();
+
+  const { data: results, error: resultsError } = await supabase
+    .from("match_result")
+    .select("mvp_player_id")
+    .in("match_id", allMatchIds);
+  if (resultsError) throw new Error(resultsError.message);
+
+  const counts = new Map<string, number>();
+  for (const result of results ?? []) {
+    if (!result.mvp_player_id) continue;
+    counts.set(result.mvp_player_id, (counts.get(result.mvp_player_id) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
 async function getHomeSummaryBaseLive(organizationId: string | null): Promise<HomeSummaryBase> {
   if (!organizationId) {
     return {
@@ -512,7 +538,10 @@ async function getPlayersWithStatsLive(
   if (matchesError) throw new Error(matchesError.message);
 
   const matchIds = (finishedMatches ?? []).map((match) => match.id);
-  const finishedWithTeams = await fetchMatchTeams(matchIds);
+  const [finishedWithTeams, allTimeMvpCounts] = await Promise.all([
+    fetchMatchTeams(matchIds),
+    fetchAllTimeMvpCounts(supabase, organizationId)
+  ]);
 
   let playersForStats = players ?? [];
   if (seasonFilter.mode === "season") {
@@ -539,7 +568,10 @@ async function getPlayersWithStatsLive(
     players: playersForStats,
     finishedMatches: finishedWithTeams,
     matchPlayerStats: matchPlayerStats ?? []
-  });
+  }).map((player) => ({
+    ...player,
+    mvpCount: allTimeMvpCounts.get(player.playerId) ?? 0
+  }));
 }
 
 export async function getPlayersWithStats(

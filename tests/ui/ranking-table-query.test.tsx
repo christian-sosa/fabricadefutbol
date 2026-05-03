@@ -26,7 +26,8 @@ const players: PlayerComputedStats[] = [
     winRate: 66.67,
     streak: "W1",
     goals: 0,
-    assists: 0
+    assists: 0,
+    mvpCount: 1
   },
   {
     playerId: "player-gonza",
@@ -41,7 +42,8 @@ const players: PlayerComputedStats[] = [
     winRate: 90,
     streak: "W1",
     goals: 0,
-    assists: 0
+    assists: 0,
+    mvpCount: 4
   },
   {
     playerId: "player-gabi",
@@ -56,7 +58,8 @@ const players: PlayerComputedStats[] = [
     winRate: 85.71,
     streak: "W3",
     goals: 0,
-    assists: 0
+    assists: 0,
+    mvpCount: 2
   }
 ];
 
@@ -82,5 +85,11 @@ describe("RankingTableQuery", () => {
 
     expect(getBodyRows()[0]).toHaveTextContent("#2");
     expect(getBodyRows()[0]).toHaveTextContent("GonzaMastro");
+
+    await user.click(within(screen.getByRole("table")).getByRole("button", { name: /MVP/ }));
+
+    expect(getBodyRows()[0]).toHaveTextContent("#2");
+    expect(getBodyRows()[0]).toHaveTextContent("GonzaMastro");
+    expect(getBodyRows()[0]).toHaveTextContent("4");
   });
 });

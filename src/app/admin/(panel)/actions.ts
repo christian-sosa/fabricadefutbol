@@ -33,6 +33,9 @@ import {
   revokeOrganizationInvite
 } from "@/lib/domain/organization-workflow";
 import {
+  buildOrganizationSeasonInsert
+} from "@/lib/domain/organization-seasons";
+import {
   getPlayerPhotosBucket,
   getOrganizationImagesBucket,
   getMercadoPagoWebhookBaseUrl,
@@ -103,10 +106,7 @@ const uploadOrganizationImageSchema = z.object({
 });
 
 const startOrganizationSeasonSchema = z.object({
-  organizationId: z.string().uuid(),
-  durationMonths: z.coerce.number().refine((value): value is 6 | 12 => value === 6 || value === 12, {
-    message: "La temporada puede durar 6 meses o 1 año."
-  })
+  organizationId: z.string().uuid()
 });
 
 const MERCADOPAGO_PREFERENCE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -137,21 +137,6 @@ function buildMercadoPagoReturnUrl(baseUrl: string, targetPath: string) {
 
 function buildMercadoPagoPreferenceExpirationDate() {
   return new Date(Date.now() + MERCADOPAGO_PREFERENCE_TTL_MS).toISOString();
-}
-
-function toDateOnly(value: Date) {
-  return value.toISOString().slice(0, 10);
-}
-
-function addMonthsDateOnly(startDate: Date, months: number) {
-  return new Date(
-    Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + months, startDate.getUTCDate())
-  ).toISOString().slice(0, 10);
-}
-
-function buildOrganizationSeasonLabel(startDate: Date, durationMonths: 6 | 12) {
-  const year = startDate.getUTCFullYear();
-  return durationMonths === 12 ? `Temporada ${year}` : `Temporada ${year} - 6 meses`;
 }
 
 async function organizationAlreadyHasAdminWithEmail(params: {
@@ -253,6 +238,7 @@ export async function createOrganizationAction(formData: FormData) {
       redirect(buildAdminPath(undefined, parsed.error.issues[0]?.message ?? "Datos invalidos."));
     }
 
+    const now = new Date();
     const supabase = await createSupabaseServerClient();
 
     const baseSlug = slugifyOrganizationName(parsed.data.name) || `grupo-${Date.now()}`;
@@ -293,6 +279,18 @@ export async function createOrganizationAction(formData: FormData) {
       redirect(buildAdminPath(undefined, toUserMessage(membershipError, "No se pudo asociar el admin al grupo.")));
     }
 
+    const { error: seasonError } = await supabase.from("organization_seasons").insert(
+      buildOrganizationSeasonInsert({
+        organizationId: organization.id,
+        createdBy: admin.userId,
+        startsAt: now
+      })
+    );
+
+    if (seasonError) {
+      redirect(buildAdminPath(slug, toUserMessage(seasonError, "No se pudo crear la temporada inicial.")));
+    }
+
     await recordOrganizationAuditEvent({
       organizationId: organization.id,
       eventType: "organization.created",
@@ -328,8 +326,7 @@ export async function createOrganizationAction(formData: FormData) {
 
 export async function startOrganizationSeasonAction(formData: FormData) {
   const parsed = startOrganizationSeasonSchema.safeParse({
-    organizationId: formData.get("organizationId"),
-    durationMonths: formData.get("durationMonths")
+    organizationId: formData.get("organizationId")
   });
   const organizationId = parsed.success ? parsed.data.organizationId : String(formData.get("organizationId") ?? "");
   const organizationQueryKey = organizationId ? await getOrganizationQueryKeyById(organizationId) : undefined;
@@ -339,39 +336,13 @@ export async function startOrganizationSeasonAction(formData: FormData) {
       redirect(buildAdminPath(organizationQueryKey, parsed.error.issues[0]?.message ?? "Temporada invalida."));
     }
 
-    const admin = await assertOrganizationAdminAction(parsed.data.organizationId);
-    const supabase = await createSupabaseServerClient();
-    const now = new Date();
-    const startsAt = toDateOnly(now);
-    const { error: closeError } = await supabase
-      .from("organization_seasons")
-      .update({
-        status: "closed",
-        closed_at: now.toISOString()
-      })
-      .eq("organization_id", parsed.data.organizationId)
-      .eq("status", "active");
-    if (closeError) {
-      redirect(buildAdminPath(organizationQueryKey, closeError.message));
-    }
-
-    const { error: insertError } = await supabase.from("organization_seasons").insert({
-      organization_id: parsed.data.organizationId,
-      label: buildOrganizationSeasonLabel(now, parsed.data.durationMonths),
-      duration_months: parsed.data.durationMonths,
-      starts_at: startsAt,
-      ends_at: addMonthsDateOnly(now, parsed.data.durationMonths),
-      status: "active",
-      created_by: admin.userId
-    });
-    if (insertError) {
-      redirect(buildAdminPath(organizationQueryKey, insertError.message));
-    }
-
-    revalidatePath("/admin");
-    revalidatePath("/ranking");
-    revalidatePath("/matches");
-    redirect(buildAdminPath(organizationQueryKey));
+    await assertOrganizationAdminAction(parsed.data.organizationId);
+    redirect(
+      buildAdminPath(
+        organizationQueryKey,
+        "Las temporadas son anuales y cierran automaticamente el 31/12. No se pueden cambiar manualmente."
+      )
+    );
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildAdminPath(organizationQueryKey, toUserMessage(error, "No se pudo iniciar la temporada.")));

@@ -6,7 +6,6 @@ import {
   inviteOrganizationAdminAction,
   removeOrganizationAdminAction,
   revokeOrganizationInviteAction,
-  startOrganizationSeasonAction,
   uploadOrganizationImageAction
 } from "@/app/admin/(panel)/actions";
 import { TrackedLink } from "@/components/analytics/tracked-link";
@@ -18,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import {
   getAdminOrganizationContext,
   getAdminOrganizationCreationAccess,
@@ -393,7 +391,7 @@ export default async function AdminDashboardPage({
           <div>
             <CardTitle>Temporada del grupo</CardTitle>
             <CardDescription className="mt-2">
-              El ranking publico de temporada arranca en 1000. El acumulado historico se conserva para armar equipos.
+              Las temporadas son anuales y cierran el 31/12 a ultima hora. El ranking publico de temporada arranca en 1000; el acumulado historico se conserva para armar equipos.
             </CardDescription>
             <p className="mt-3 text-sm text-slate-300">
               {activeSeason
@@ -401,19 +399,9 @@ export default async function AdminDashboardPage({
                 : "Todavia no hay temporada activa. Se creara automaticamente al cargar un resultado."}
             </p>
           </div>
-          <form action={startOrganizationSeasonAction} className="flex flex-col gap-2 sm:min-w-72">
-            <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-            <Select defaultValue="6" name="durationMonths">
-              <option value="6">6 meses</option>
-              <option value="12">1 año</option>
-            </Select>
-            <ConfirmSubmitButton
-              confirmMessage="Esto cierra la temporada activa e inicia una nueva con ranking visible en 1000. El acumulado historico no se borra."
-              disabled={!canWriteSelectedOrganization}
-              label="Iniciar nueva temporada"
-              variant="ghost"
-            />
-          </form>
+          <span className="inline-flex w-fit rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">
+            Cierre fijo anual
+          </span>
         </div>
       </Card>
 

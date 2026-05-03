@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { MatchStatusBadge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { getAdminMatchListActions } from "@/lib/admin-match-actions";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
@@ -33,7 +34,7 @@ export default async function AdminMatchesPage({
             matches.map((match) => {
               const editHref = withOrgQuery(`/admin/matches/${match.id}`, selectedOrganization.slug);
               const resultHref = withOrgQuery(`/admin/matches/${match.id}/result`, selectedOrganization.slug);
-              const canLoadResult = match.status === "confirmed" || match.status === "finished";
+              const { canLoadResult } = getAdminMatchListActions(match.status);
 
               return (
                 <div

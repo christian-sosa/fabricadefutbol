@@ -219,7 +219,7 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!("entity_id" in normalized)) normalized.entity_id = null;
       break;
     case "organization_seasons":
-      if (!("duration_months" in normalized)) normalized.duration_months = 6;
+      if (!("duration_months" in normalized)) normalized.duration_months = 12;
       if (!("status" in normalized)) normalized.status = "active";
       if (!("created_by" in normalized)) normalized.created_by = null;
       if (!("closed_at" in normalized)) normalized.closed_at = null;
