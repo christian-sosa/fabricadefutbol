@@ -64,6 +64,7 @@ export type Database = {
           id: string;
           initial_rank: number;
           notes: string | null;
+          organization_id: string;
           skill_level: number;
           updated_at: string;
         };
@@ -76,6 +77,7 @@ export type Database = {
           id?: string;
           initial_rank: number;
           notes?: string | null;
+          organization_id: string;
           skill_level?: number;
           updated_at?: string;
         };
@@ -88,7 +90,80 @@ export type Database = {
           id?: string;
           initial_rank?: number;
           notes?: string | null;
+          organization_id?: string;
           skill_level?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      organization_seasons: {
+        Row: {
+          closed_at: string | null;
+          created_at: string;
+          created_by: string | null;
+          duration_months: number;
+          ends_at: string;
+          id: string;
+          label: string;
+          organization_id: string;
+          starts_at: string;
+          status: "active" | "closed";
+          updated_at: string;
+        };
+        Insert: {
+          closed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          duration_months?: number;
+          ends_at: string;
+          id?: string;
+          label: string;
+          organization_id: string;
+          starts_at: string;
+          status?: "active" | "closed";
+          updated_at?: string;
+        };
+        Update: {
+          closed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          duration_months?: number;
+          ends_at?: string;
+          id?: string;
+          label?: string;
+          organization_id?: string;
+          starts_at?: string;
+          status?: "active" | "closed";
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      organization_season_player_ratings: {
+        Row: {
+          created_at: string;
+          current_rating: number;
+          id: string;
+          organization_id: string;
+          player_id: string;
+          season_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          current_rating?: number;
+          id?: string;
+          organization_id: string;
+          player_id: string;
+          season_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          current_rating?: number;
+          id?: string;
+          organization_id?: string;
+          player_id?: string;
+          season_id?: string;
           updated_at?: string;
         };
         Relationships: [];
@@ -102,7 +177,9 @@ export type Database = {
           id: string;
           location: string | null;
           modality: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
+          organization_id: string;
           scheduled_at: string;
+          season_id: string | null;
           status: "draft" | "confirmed" | "finished" | "cancelled";
           team_a_label: string | null;
           team_b_label: string | null;
@@ -116,7 +193,9 @@ export type Database = {
           id?: string;
           location?: string | null;
           modality: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
+          organization_id: string;
           scheduled_at: string;
+          season_id?: string | null;
           status?: "draft" | "confirmed" | "finished" | "cancelled";
           team_a_label?: string | null;
           team_b_label?: string | null;
@@ -130,7 +209,9 @@ export type Database = {
           id?: string;
           location?: string | null;
           modality?: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
+          organization_id?: string;
           scheduled_at?: string;
+          season_id?: string | null;
           status?: "draft" | "confirmed" | "finished" | "cancelled";
           team_a_label?: string | null;
           team_b_label?: string | null;
@@ -273,6 +354,9 @@ export type Database = {
           created_by: string;
           id: string;
           match_id: string;
+          mvp_display_name: string | null;
+          mvp_guest_id: string | null;
+          mvp_player_id: string | null;
           notes: string | null;
           score_a: number;
           score_b: number;
@@ -284,6 +368,9 @@ export type Database = {
           created_by: string;
           id?: string;
           match_id: string;
+          mvp_display_name?: string | null;
+          mvp_guest_id?: string | null;
+          mvp_player_id?: string | null;
           notes?: string | null;
           score_a: number;
           score_b: number;
@@ -295,6 +382,9 @@ export type Database = {
           created_by?: string;
           id?: string;
           match_id?: string;
+          mvp_display_name?: string | null;
+          mvp_guest_id?: string | null;
+          mvp_player_id?: string | null;
           notes?: string | null;
           score_a?: number;
           score_b?: number;
@@ -313,6 +403,10 @@ export type Database = {
           rating_after: number;
           rating_before: number;
           reason: string;
+          season_delta: number | null;
+          season_id: string | null;
+          season_rating_after: number | null;
+          season_rating_before: number | null;
         };
         Insert: {
           created_at?: string;
@@ -323,6 +417,10 @@ export type Database = {
           rating_after: number;
           rating_before: number;
           reason?: string;
+          season_delta?: number | null;
+          season_id?: string | null;
+          season_rating_after?: number | null;
+          season_rating_before?: number | null;
         };
         Update: {
           created_at?: string;
@@ -333,6 +431,10 @@ export type Database = {
           rating_after?: number;
           rating_before?: number;
           reason?: string;
+          season_delta?: number | null;
+          season_id?: string | null;
+          season_rating_after?: number | null;
+          season_rating_before?: number | null;
         };
         Relationships: [];
       };

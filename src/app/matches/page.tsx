@@ -1,23 +1,34 @@
 import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
+import { SeasonFilterLinks } from "@/components/groups/season-filter-links";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { MatchesHistoryQueryTable } from "@/components/matches/matches-history-query-table";
-import { getMatchHistoryCardsPage, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
+import {
+  getMatchHistoryCardsPage,
+  getOrganizationSeasons,
+  getViewerAdminOrganizations,
+  resolvePublicOrganization
+} from "@/lib/queries/public";
 
 export default async function MatchesPage({
   searchParams
 }: {
-  searchParams: Promise<{ org?: string }>;
+  searchParams: Promise<{ org?: string; season?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
+  const selectedSeason = resolvedSearchParams.season ?? "current";
   const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
     resolvePublicOrganization(resolvedSearchParams.org),
     getViewerAdminOrganizations()
   ]);
-  const initialMatchesData = await getMatchHistoryCardsPage(selectedOrganization?.id ?? null, {
-    page: 1,
-    pageSize: 10
-  });
+  const [initialMatchesData, seasons] = await Promise.all([
+    getMatchHistoryCardsPage(selectedOrganization?.id ?? null, {
+      page: 1,
+      pageSize: 10,
+      season: selectedSeason
+    }),
+    getOrganizationSeasons(selectedOrganization?.id ?? null)
+  ]);
 
   return (
     <div className="space-y-4">
@@ -32,6 +43,15 @@ export default async function MatchesPage({
         organizations={organizations}
         quickOrganizations={viewerAdminOrganizations}
       />
+
+      {selectedOrganization ? (
+        <SeasonFilterLinks
+          basePath="/matches"
+          currentSeason={selectedSeason}
+          organizationSlug={selectedOrganization.slug}
+          seasons={seasons}
+        />
+      ) : null}
 
       {selectedOrganization ? (
         <section className="lg:hidden">
@@ -52,6 +72,7 @@ export default async function MatchesPage({
         organizationId={selectedOrganization?.id ?? null}
         organizationSlug={selectedOrganization?.slug}
         pageSize={10}
+        season={selectedSeason}
       />
 
       <PublicGroupGrowthCta source="matches_page" />

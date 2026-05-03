@@ -18,8 +18,10 @@ async function parseApiError(response: Response) {
   return fallbackMessage;
 }
 
-export async function fetchOrganizationStandings(organizationId: string) {
-  const response = await fetch(`/api/organizations/${organizationId}/standings`, {
+export async function fetchOrganizationStandings(organizationId: string, season = "current") {
+  const params = new URLSearchParams();
+  params.set("season", season);
+  const response = await fetch(`/api/organizations/${organizationId}/standings?${params.toString()}`, {
     method: "GET",
     headers: {
       "content-type": "application/json"
@@ -34,9 +36,13 @@ export async function fetchOrganizationStandings(organizationId: string) {
   return data.standings;
 }
 
-export async function fetchOrganizationMatches(params: { organizationId: string; page: number; pageSize: number }) {
-  const { organizationId, page, pageSize } = params;
-  const response = await fetch(`/api/organizations/${organizationId}/matches?page=${page}&pageSize=${pageSize}`, {
+export async function fetchOrganizationMatches(params: { organizationId: string; page: number; pageSize: number; season?: string }) {
+  const { organizationId, page, pageSize, season = "current" } = params;
+  const searchParams = new URLSearchParams();
+  searchParams.set("page", String(page));
+  searchParams.set("pageSize", String(pageSize));
+  searchParams.set("season", season);
+  const response = await fetch(`/api/organizations/${organizationId}/matches?${searchParams.toString()}`, {
     method: "GET",
     headers: {
       "content-type": "application/json"

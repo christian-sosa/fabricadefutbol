@@ -6,6 +6,8 @@ type TableName =
   | "organization_admins"
   | "organization_invites"
   | "organization_audit_events"
+  | "organization_seasons"
+  | "organization_season_player_ratings"
   | "organization_billing_payments"
   | "organization_billing_subscriptions"
   | "leagues"
@@ -83,6 +85,8 @@ function createEmptyDatabase(): FakeDatabase {
     organization_admins: [],
     organization_invites: [],
     organization_audit_events: [],
+    organization_seasons: [],
+    organization_season_player_ratings: [],
     organization_billing_payments: [],
     organization_billing_subscriptions: [],
     leagues: [],
@@ -213,6 +217,17 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!("target_email" in normalized)) normalized.target_email = null;
       if (!("entity_type" in normalized)) normalized.entity_type = null;
       if (!("entity_id" in normalized)) normalized.entity_id = null;
+      break;
+    case "organization_seasons":
+      if (!("duration_months" in normalized)) normalized.duration_months = 6;
+      if (!("status" in normalized)) normalized.status = "active";
+      if (!("created_by" in normalized)) normalized.created_by = null;
+      if (!("closed_at" in normalized)) normalized.closed_at = null;
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "organization_season_player_ratings":
+      if (!("current_rating" in normalized)) normalized.current_rating = 1000;
+      if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "leagues":
       if (!("description" in normalized)) normalized.description = null;
@@ -415,6 +430,7 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!normalized.status) normalized.status = "draft";
       if (!("confirmed_option_id" in normalized)) normalized.confirmed_option_id = null;
       if (!("finished_at" in normalized)) normalized.finished_at = null;
+      if (!("season_id" in normalized)) normalized.season_id = null;
       if (!("team_a_label" in normalized)) normalized.team_a_label = null;
       if (!("team_b_label" in normalized)) normalized.team_b_label = null;
       if (!normalized.updated_at) normalized.updated_at = now;
@@ -423,6 +439,9 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!("is_confirmed" in normalized)) normalized.is_confirmed = false;
       break;
     case "match_result":
+      if (!("mvp_player_id" in normalized)) normalized.mvp_player_id = null;
+      if (!("mvp_guest_id" in normalized)) normalized.mvp_guest_id = null;
+      if (!("mvp_display_name" in normalized)) normalized.mvp_display_name = null;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "organization_public_snapshots":

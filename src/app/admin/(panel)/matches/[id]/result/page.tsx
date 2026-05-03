@@ -62,6 +62,11 @@ export default async function AdminMatchResultPage({
     fullName: player.full_name,
     rating: Number(player.current_rating)
   }));
+  const defaultMvpParticipantId = details.result?.mvp_player_id
+    ? `player:${details.result.mvp_player_id}`
+    : details.result?.mvp_guest_id
+      ? `guest:${details.result.mvp_guest_id}`
+      : null;
 
   return (
     <div className="space-y-4">
@@ -82,6 +87,7 @@ export default async function AdminMatchResultPage({
           <MatchResultEditorQuery
             availablePlayers={availableReplacementPlayers}
             defaultNotes={details.result?.notes ?? ""}
+            defaultMvpParticipantId={defaultMvpParticipantId}
             defaultScoreA={details.result?.score_a ?? 0}
             defaultScoreB={details.result?.score_b ?? 0}
             existingParticipants={editableParticipants}

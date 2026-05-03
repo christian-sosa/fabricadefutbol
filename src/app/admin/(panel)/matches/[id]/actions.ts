@@ -27,6 +27,7 @@ const resultSchema = z.object({
   scoreA: z.coerce.number().int().nonnegative(),
   scoreB: z.coerce.number().int().nonnegative(),
   notes: z.string().optional(),
+  mvpParticipantId: z.string().optional(),
   lineupPayload: z.string().optional()
 });
 
@@ -53,6 +54,7 @@ const lineupSchema = z.object({
   newGuests: z
     .array(
       z.object({
+        clientId: z.string().optional(),
         name: z.string().trim().min(1),
         rating: guestSkillLevelSchema,
         team: z.enum(["A", "B"])
@@ -90,6 +92,7 @@ const lineupAdjustmentSchema = z.object({
   newGuests: z
     .array(
       z.object({
+        clientId: z.string().optional(),
         name: z.string().trim().min(1),
         rating: guestSkillLevelSchema,
         team: z.enum(["A", "B"])
@@ -182,6 +185,7 @@ export async function saveResultAction(matchId: string, organizationId: string, 
       scoreA: formData.get("scoreA"),
       scoreB: formData.get("scoreB"),
       notes: formData.get("notes"),
+      mvpParticipantId: formData.get("mvpParticipantId"),
       lineupPayload: formData.get("lineupPayload")
     });
     if (!parsed.success) {
@@ -220,6 +224,7 @@ export async function saveResultAction(matchId: string, organizationId: string, 
         scoreA: parsed.data.scoreA,
         scoreB: parsed.data.scoreB,
         notes: parsed.data.notes,
+        mvpParticipantId: parsed.data.mvpParticipantId?.trim() || null,
         lineup: parsedLineup
       }
     });

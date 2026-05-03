@@ -20,6 +20,7 @@ const requestSchema = z.object({
   scoreA: z.number().int().nonnegative(),
   scoreB: z.number().int().nonnegative(),
   notes: z.string().optional(),
+  mvpParticipantId: z.union([z.string().min(1), z.null()]).optional(),
   lineup: z
     .object({
       assignments: z
@@ -33,6 +34,7 @@ const requestSchema = z.object({
       newGuests: z
         .array(
           z.object({
+            clientId: z.string().optional(),
             name: z.string().trim().min(1),
             rating: guestSkillLevelSchema,
             team: z.enum(["A", "B"])

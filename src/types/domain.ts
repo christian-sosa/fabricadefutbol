@@ -35,6 +35,7 @@ export type PlayerComputedStats = {
   playerId: string;
   playerName: string;
   currentRating: number;
+  allTimeRating?: number;
   initialRank: number;
   currentRank: number;
   matchesPlayed: number;
@@ -45,18 +46,21 @@ export type PlayerComputedStats = {
   streak: string;
   goals: number;
   assists: number;
+  mvpCount?: number;
 };
 
 export type MatchResultInput = {
   scoreA: number;
   scoreB: number;
   notes?: string;
+  mvpParticipantId?: string | null;
   lineup?: {
     assignments: Array<{
       participantId: string;
       team: ResultAssignmentTeam;
     }>;
     newGuests?: Array<{
+      clientId?: string;
       name: string;
       rating: number;
       team: TeamSide;

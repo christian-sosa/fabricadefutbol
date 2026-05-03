@@ -107,6 +107,8 @@ function seedConfirmedMatchWith(overrides: Parameters<typeof createFakeSupabase>
     match_result: overrides.match_result ?? [],
     match_guests: overrides.match_guests ?? [],
     team_option_guests: overrides.team_option_guests ?? [],
+    organization_seasons: overrides.organization_seasons ?? [],
+    organization_season_player_ratings: overrides.organization_season_player_ratings ?? [],
     rating_history: overrides.rating_history ?? [],
     queryFailures: overrides.queryFailures
   });
@@ -408,6 +410,7 @@ describe("match workflow", () => {
         scoreA: 1,
         scoreB: 0,
         notes: "Ganaron con uno menos",
+        mvpParticipantId: "newGuest:1",
         lineup: {
           assignments: [
             { participantId: "player:player-1", team: "A" },
@@ -415,7 +418,7 @@ describe("match workflow", () => {
             { participantId: "player:player-3", team: "B" },
             { participantId: "player:player-4", team: "B" }
           ],
-          newGuests: [{ name: "Invitado B", rating: GUEST_FEATURED_SKILL_LEVEL, team: "B" }],
+          newGuests: [{ clientId: "1", name: "Invitado B", rating: GUEST_FEATURED_SKILL_LEVEL, team: "B" }],
           handicapTeam: "A"
         }
       }
@@ -431,6 +434,7 @@ describe("match workflow", () => {
         score_a: 1,
         score_b: 0,
         winner_team: "A",
+        mvp_display_name: "Invitado B",
         notes: "Ganaron con uno menos"
       })
     );
@@ -486,6 +490,120 @@ describe("match workflow", () => {
     expect(fake.find("players", (row) => row.id === "player-5")).toEqual(
       expect.objectContaining({ current_rating: 1010 })
     );
+  });
+
+  it("suma bonus de MVP registrado al acumulado y a la temporada activa", async () => {
+    const { fake } = seedConfirmedMatchWith({
+      organization_seasons: [
+        {
+          id: "season-1",
+          organization_id: ORG_ID,
+          label: "Temporada 2026",
+          duration_months: 6,
+          starts_at: "2026-01-01",
+          ends_at: "2026-07-01",
+          status: "active",
+          created_by: ADMIN_ID
+        }
+      ]
+    });
+
+    await saveMatchResult({
+      supabase: fake.client as never,
+      adminId: ADMIN_ID,
+      matchId: "match-1",
+      organizationId: ORG_ID,
+      resultInput: {
+        scoreA: 2,
+        scoreB: 1,
+        mvpParticipantId: "player:player-1"
+      }
+    });
+
+    expect(fake.find("matches", (row) => row.id === "match-1")).toEqual(
+      expect.objectContaining({
+        season_id: "season-1",
+        status: "finished"
+      })
+    );
+    expect(fake.find("match_result", (row) => row.match_id === "match-1")).toEqual(
+      expect.objectContaining({
+        mvp_player_id: "player-1",
+        mvp_guest_id: null,
+        mvp_display_name: "Jugador 1"
+      })
+    );
+    expect(fake.find("players", (row) => row.id === "player-1")).toEqual(
+      expect.objectContaining({ current_rating: 1015 })
+    );
+    expect(fake.find("organization_season_player_ratings", (row) => row.player_id === "player-1")).toEqual(
+      expect.objectContaining({
+        season_id: "season-1",
+        organization_id: ORG_ID,
+        current_rating: 1015
+      })
+    );
+    expect(fake.table("rating_history")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          player_id: "player-1",
+          reason: "match_result",
+          delta: 10,
+          season_id: "season-1",
+          season_delta: 10
+        }),
+        expect.objectContaining({
+          player_id: "player-1",
+          reason: "mvp_bonus",
+          delta: 5,
+          season_id: "season-1",
+          season_delta: 5
+        })
+      ])
+    );
+  });
+
+  it("registra MVP invitado sin sumar bonus de rendimiento", async () => {
+    const { fake } = seedConfirmedMatchWith({
+      organization_seasons: [
+        {
+          id: "season-1",
+          organization_id: ORG_ID,
+          label: "Temporada 2026",
+          duration_months: 6,
+          starts_at: "2026-01-01",
+          ends_at: "2026-07-01",
+          status: "active",
+          created_by: ADMIN_ID
+        }
+      ],
+      match_guests: [{ id: "guest-1", match_id: "match-1", guest_name: "Invitado Figura", guest_rating: 2 }],
+      team_option_guests: [{ team_option_id: "option-1", guest_id: "guest-1", team: "B" }]
+    });
+
+    await saveMatchResult({
+      supabase: fake.client as never,
+      adminId: ADMIN_ID,
+      matchId: "match-1",
+      organizationId: ORG_ID,
+      resultInput: {
+        scoreA: 0,
+        scoreB: 1,
+        mvpParticipantId: "guest:guest-1"
+      }
+    });
+
+    expect(fake.find("match_result", (row) => row.match_id === "match-1")).toEqual(
+      expect.objectContaining({
+        mvp_player_id: null,
+        mvp_guest_id: "guest-1",
+        mvp_display_name: "Invitado Figura"
+      })
+    );
+    expect(fake.find("players", (row) => row.id === "player-3")).toEqual(
+      expect.objectContaining({ current_rating: 1010 })
+    );
+    expect(fake.table("rating_history").filter((row) => row.reason === "mvp_bonus")).toHaveLength(0);
   });
 
   it("rechaza resultados con goles negativos", async () => {

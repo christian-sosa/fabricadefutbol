@@ -137,6 +137,9 @@ export default async function MatchDetailPage({
                     ? teamLabels.teamA
                     : teamLabels.teamB}
               </p>
+              {details.result.mvp_display_name ? (
+                <p className="mt-1 font-semibold text-amber-200">MVP: {details.result.mvp_display_name}</p>
+              ) : null}
               {details.result.notes ? <p className="mt-1 text-slate-400">{details.result.notes}</p> : null}
             </>
           ) : (

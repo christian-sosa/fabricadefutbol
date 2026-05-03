@@ -32,7 +32,7 @@ function getLineupPayload(container: HTMLElement) {
   const input = container.querySelector('input[name="lineupPayload"]') as HTMLInputElement;
   return JSON.parse(input.value) as {
     assignments: Array<{ participantId: string; team: "A" | "B" | "OUT" }>;
-    newGuests: Array<{ name: string; rating: number; team: "A" | "B" }>;
+    newGuests: Array<{ clientId?: string; name: string; rating: number; team: "A" | "B" }>;
     newPlayers: Array<{ playerId: string; team: "A" | "B" }>;
     handicapTeam: "A" | "B" | null;
   };
@@ -82,6 +82,7 @@ describe("MatchResultEditor", () => {
     });
     expect(payload.newGuests).toEqual([
       {
+        clientId: "1",
         name: "Invitado B",
         rating: 0.5,
         team: "B"
@@ -119,17 +120,74 @@ describe("MatchResultEditor", () => {
         scoreA: 1,
         scoreB: 0,
         notes: "Nota base editada",
+        mvpParticipantId: null,
         lineup: {
           assignments: [
             { participantId: "player:player-1", team: "A" },
             { participantId: "player:player-2", team: "OUT" },
             { participantId: "player:player-3", team: "B" }
           ],
-          newGuests: [{ name: "Refuerzo", rating: 2, team: "B" }],
+          newGuests: [{ clientId: "1", name: "Refuerzo", rating: 2, team: "B" }],
           newPlayers: [],
           handicapTeam: "A"
         }
       });
+    });
+  });
+
+  it("permite elegir MVP al guardar resultado", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <MatchResultEditor
+        defaultNotes=""
+        defaultScoreA={3}
+        defaultScoreB={1}
+        existingParticipants={existingParticipants}
+        onSubmit={onSubmit}
+        submitLabel="Guardar resultado"
+      />
+    );
+
+    await user.selectOptions(screen.getByLabelText("MVP del partido"), "player:player-1");
+    await user.click(screen.getByRole("button", { name: "Guardar resultado" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mvpParticipantId: "player:player-1"
+        })
+      );
+    });
+  });
+
+  it("permite elegir como MVP a un invitado agregado en el resultado", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <MatchResultEditor
+        defaultNotes=""
+        defaultScoreA={1}
+        defaultScoreB={0}
+        existingParticipants={existingParticipants}
+        onSubmit={onSubmit}
+        submitLabel="Guardar resultado"
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
+    await user.type(screen.getByPlaceholderText("Nombre invitado"), "Invitado Nuevo");
+    await user.selectOptions(screen.getByLabelText("Nivel de Invitado Nuevo"), "2");
+    await user.selectOptions(screen.getByLabelText("Equipo de Invitado Nuevo"), "B");
+    await user.selectOptions(screen.getByLabelText("MVP del partido"), "newGuest:1");
+    await user.click(screen.getByRole("button", { name: "Guardar resultado" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mvpParticipantId: "newGuest:1"
+        })
+      );
     });
   });
 

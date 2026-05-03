@@ -11,13 +11,15 @@ const ORGANIZATION_QUERY_STALE_TIME = 60_000;
 
 export function useOrganizationStandingsQuery(params: {
   organizationId: string | null | undefined;
+  season?: string;
   initialData?: PlayerComputedStats[];
 }) {
   const organizationId = params.organizationId ?? null;
+  const season = params.season ?? "current";
 
   return useQuery({
-    queryKey: organizationId ? organizationQueryKeys.standings(organizationId) : ["organizations", "none", "standings"],
-    queryFn: () => fetchOrganizationStandings(organizationId as string),
+    queryKey: organizationId ? organizationQueryKeys.standings(organizationId, season) : ["organizations", "none", "standings", season],
+    queryFn: () => fetchOrganizationStandings(organizationId as string, season),
     enabled: Boolean(organizationId),
     initialData: params.initialData,
     staleTime: ORGANIZATION_QUERY_STALE_TIME,
@@ -31,21 +33,24 @@ export function useOrganizationMatchesQuery(params: {
   organizationId: string | null | undefined;
   page: number;
   pageSize?: number;
+  season?: string;
   initialData?: OrganizationMatchesResponse;
 }) {
   const organizationId = params.organizationId ?? null;
   const page = params.page;
   const pageSize = params.pageSize ?? 10;
+  const season = params.season ?? "current";
 
   return useQuery({
     queryKey: organizationId
-      ? organizationQueryKeys.matchesPage(organizationId, page, pageSize)
-      : ["organizations", "none", "matches", page, pageSize],
+      ? organizationQueryKeys.matchesPage(organizationId, page, pageSize, season)
+      : ["organizations", "none", "matches", page, pageSize, season],
     queryFn: () =>
       fetchOrganizationMatches({
         organizationId: organizationId as string,
         page,
-        pageSize
+        pageSize,
+        season
       }),
     enabled: Boolean(organizationId),
     initialData: params.initialData,
@@ -73,8 +78,7 @@ export function useUpdateMatchResultMutation(params: { organizationId: string; m
           queryKey: organizationQueryKeys.matches(organizationId)
         }),
         queryClient.invalidateQueries({
-          queryKey: organizationQueryKeys.standings(organizationId),
-          exact: true
+          queryKey: organizationQueryKeys.byId(organizationId)
         }),
         queryClient.invalidateQueries({
           queryKey: organizationQueryKeys.matchDetail(organizationId, matchId),

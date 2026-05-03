@@ -27,6 +27,7 @@ type InternalStats = {
   outcomes: ("W" | "D" | "L")[];
   goals: number;
   assists: number;
+  mvpCount: number;
 };
 
 function pushOutcome(stats: InternalStats, outcome: "W" | "D" | "L") {
@@ -75,7 +76,8 @@ export function calculatePlayerStats(params: {
         losses: 0,
         outcomes: [],
         goals: 0,
-        assists: 0
+        assists: 0,
+        mvpCount: 0
       }
     ])
   );
@@ -100,6 +102,11 @@ export function calculatePlayerStats(params: {
       if (!row) continue;
       row.matchesPlayed += 1;
       pushOutcome(row, outcomeByTeam(item.result.winner_team, "B"));
+    }
+
+    if (item.result.mvp_player_id) {
+      const mvpStats = statsByPlayer.get(item.result.mvp_player_id);
+      if (mvpStats) mvpStats.mvpCount += 1;
     }
   }
 
@@ -144,7 +151,8 @@ export function calculatePlayerStats(params: {
         winRate: Number(winRate.toFixed(2)),
         streak: buildStreak(stats.outcomes),
         goals: stats.goals,
-        assists: stats.assists
+        assists: stats.assists,
+        mvpCount: stats.mvpCount
       };
     })
     .sort((a, b) => a.currentRank - b.currentRank);

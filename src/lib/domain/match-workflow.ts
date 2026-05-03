@@ -53,6 +53,7 @@ type LineupAssignmentInput = {
 };
 
 type NewGuestLineupInput = {
+  clientId?: string;
   name: string;
   rating: number;
   team: TeamSide;
@@ -74,6 +75,7 @@ type ResolvedMatchLineup = {
   teamA: ConfirmedParticipant[];
   teamB: ConfirmedParticipant[];
   handicapTeam: TeamSide | null;
+  participantAliases: Map<string, string>;
 };
 
 type CreateDraftInput = {
@@ -92,6 +94,24 @@ type CreateDraftInput = {
 
 const PLAYER_PREFIX = "player:";
 const GUEST_PREFIX = "guest:";
+const SEASON_STARTING_RATING = 1000;
+const MVP_BONUS_POINTS = 5;
+
+type OrganizationSeasonRow = {
+  id: string;
+  organization_id: string;
+  label: string;
+  duration_months: number;
+  starts_at: string;
+  ends_at: string;
+  status: "active" | "closed";
+};
+
+type SeasonRatingState = {
+  ratingBefore: number;
+  ratingAfter: number;
+  delta: number;
+};
 
 function isGuestSchemaMissing(message: string) {
   const normalized = message.toLowerCase();
@@ -160,6 +180,162 @@ function parseParticipantId(participantId: string): { source: "player" | "guest"
     };
   }
   throw new Error("Participante invalido dentro de la opcion de equipos.");
+}
+
+function toDateOnly(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function addMonthsDateOnly(startDate: Date, months: number) {
+  const next = new Date(
+    Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + months, startDate.getUTCDate())
+  );
+  return toDateOnly(next);
+}
+
+function buildSeasonLabel(startDate: Date, durationMonths: number) {
+  const year = startDate.getUTCFullYear();
+  return durationMonths === 12 ? `Temporada ${year}` : `Temporada ${year} - ${durationMonths} meses`;
+}
+
+async function getActiveOrganizationSeason(supabase: DbClient, organizationId: string) {
+  const { data, error } = await supabase
+    .from("organization_seasons")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .order("starts_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(`No se pudo leer la temporada activa: ${error.message}`);
+  return data as OrganizationSeasonRow | null;
+}
+
+async function getOrganizationSeasonById(supabase: DbClient, organizationId: string, seasonId: string) {
+  const { data, error } = await supabase
+    .from("organization_seasons")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("id", seasonId)
+    .maybeSingle();
+
+  if (error) throw new Error(`No se pudo leer la temporada del partido: ${error.message}`);
+  return data as OrganizationSeasonRow | null;
+}
+
+async function ensureActiveOrganizationSeason(params: {
+  supabase: DbClient;
+  organizationId: string;
+  adminId?: string;
+  startsAt?: Date;
+  durationMonths?: 6 | 12;
+}) {
+  const { supabase, organizationId, adminId, durationMonths = 6 } = params;
+  const current = await getActiveOrganizationSeason(supabase, organizationId);
+  if (current) return current;
+
+  const startDate = params.startsAt ?? new Date();
+  const startsAt = toDateOnly(startDate);
+  const endsAt = addMonthsDateOnly(startDate, durationMonths);
+  const { data, error } = await supabase
+    .from("organization_seasons")
+    .insert({
+      organization_id: organizationId,
+      label: buildSeasonLabel(startDate, durationMonths),
+      duration_months: durationMonths,
+      starts_at: startsAt,
+      ends_at: endsAt,
+      status: "active",
+      created_by: adminId ?? null
+    })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    throw new Error(`No se pudo crear la temporada activa: ${error?.message ?? "sin detalle"}`);
+  }
+  return data as OrganizationSeasonRow;
+}
+
+async function resolveSeasonForResult(params: {
+  supabase: DbClient;
+  organizationId: string;
+  adminId: string;
+  matchSeasonId?: string | null;
+  matchScheduledAt?: string | null;
+}) {
+  const { supabase, organizationId, adminId, matchSeasonId } = params;
+  if (matchSeasonId) {
+    const existing = await getOrganizationSeasonById(supabase, organizationId, matchSeasonId);
+    if (existing) return existing;
+  }
+
+  const scheduledAt = params.matchScheduledAt ? new Date(params.matchScheduledAt) : new Date();
+  const startsAt = Number.isFinite(scheduledAt.getTime()) ? scheduledAt : new Date();
+  return ensureActiveOrganizationSeason({
+    supabase,
+    organizationId,
+    adminId,
+    startsAt
+  });
+}
+
+async function getOrCreateSeasonPlayerRating(params: {
+  supabase: DbClient;
+  organizationId: string;
+  seasonId: string;
+  playerId: string;
+}) {
+  const { supabase, organizationId, seasonId, playerId } = params;
+  const { data: existing, error: readError } = await supabase
+    .from("organization_season_player_ratings")
+    .select("current_rating")
+    .eq("season_id", seasonId)
+    .eq("player_id", playerId)
+    .maybeSingle();
+
+  if (readError) {
+    throw new Error(`No se pudo leer el rendimiento de temporada: ${readError.message}`);
+  }
+  if (existing) return Number(existing.current_rating);
+
+  const { error: insertError } = await supabase.from("organization_season_player_ratings").insert({
+    organization_id: organizationId,
+    season_id: seasonId,
+    player_id: playerId,
+    current_rating: SEASON_STARTING_RATING
+  });
+  if (insertError) {
+    throw new Error(`No se pudo inicializar el rendimiento de temporada: ${insertError.message}`);
+  }
+  return SEASON_STARTING_RATING;
+}
+
+async function applySeasonRatingDelta(params: {
+  supabase: DbClient;
+  organizationId: string;
+  seasonId: string;
+  playerId: string;
+  delta: number;
+}) {
+  const ratingBefore = await getOrCreateSeasonPlayerRating(params);
+  const ratingAfter = Math.round(ratingBefore + params.delta);
+  const { error } = await params.supabase
+    .from("organization_season_player_ratings")
+    .update({ current_rating: ratingAfter })
+    .eq("season_id", params.seasonId)
+    .eq("player_id", params.playerId);
+
+  if (error) {
+    throw new Error(`No se pudo actualizar el rendimiento de temporada: ${error.message}`);
+  }
+
+  return {
+    ratingBefore,
+    ratingAfter,
+    delta: params.delta
+  } satisfies SeasonRatingState;
 }
 
 function resolveManualParticipantId(
@@ -655,7 +831,7 @@ export async function confirmTeamOption(params: {
 async function rollbackPreviousRatingHistory(supabase: DbClient, matchId: string) {
   const { data: previousHistory, error: historyError } = await supabase
     .from("rating_history")
-    .select("id, player_id, delta")
+    .select("id, player_id, delta, season_id, season_delta")
     .eq("match_id", matchId);
 
   if (historyError) throw new Error(`No se pudo leer historial de rendimiento: ${historyError.message}`);
@@ -678,6 +854,30 @@ async function rollbackPreviousRatingHistory(supabase: DbClient, matchId: string
       .eq("id", row.player_id);
     if (revertError) {
       throw new Error(`No se pudo revertir rendimiento de jugador: ${revertError.message}`);
+    }
+
+    if (row.season_id && row.season_delta !== null && row.season_delta !== undefined) {
+      const { data: seasonRatingRow, error: seasonRatingError } = await supabase
+        .from("organization_season_player_ratings")
+        .select("current_rating")
+        .eq("season_id", row.season_id)
+        .eq("player_id", row.player_id)
+        .maybeSingle();
+      if (seasonRatingError) {
+        throw new Error(`No se pudo leer rendimiento de temporada anterior: ${seasonRatingError.message}`);
+      }
+
+      if (seasonRatingRow) {
+        const revertedSeasonRating = Math.round(Number(seasonRatingRow.current_rating) - Number(row.season_delta));
+        const { error: revertSeasonError } = await supabase
+          .from("organization_season_player_ratings")
+          .update({ current_rating: revertedSeasonRating })
+          .eq("season_id", row.season_id)
+          .eq("player_id", row.player_id);
+        if (revertSeasonError) {
+          throw new Error(`No se pudo revertir rendimiento de temporada: ${revertSeasonError.message}`);
+        }
+      }
     }
   }
 
@@ -806,6 +1006,7 @@ function normalizeLineupGuests(rawGuests: NewGuestLineupInput[] | undefined) {
     }
 
     return {
+      clientId: guest.clientId?.trim() || null,
       name: normalizedName,
       rating: guestSkillLevel,
       team: guest.team
@@ -836,7 +1037,7 @@ function normalizeLineupPlayers(rawPlayers: NewPlayerLineupInput[] | undefined) 
 async function insertNewLineupGuests(params: {
   supabase: DbClient;
   matchId: string;
-  guests: Array<{ name: string; rating: number; team: TeamSide }>;
+  guests: Array<{ clientId: string | null; name: string; rating: number; team: TeamSide }>;
 }) {
   const { supabase, matchId, guests } = params;
   if (!guests.length) return [];
@@ -1002,7 +1203,8 @@ async function resolveLineupForResult(params: {
       optionId: confirmed.optionId,
       teamA: confirmed.teamA,
       teamB: confirmed.teamB,
-      handicapTeam: null
+      handicapTeam: null,
+      participantAliases: new Map<string, string>()
     } satisfies ResolvedMatchLineup;
   }
 
@@ -1022,9 +1224,12 @@ async function resolveLineupForResult(params: {
     matchId,
     guests: normalizedGuests
   });
+  const participantAliases = new Map<string, string>();
 
   insertedGuests.forEach((guest, index) => {
     const targetTeam = normalizedGuests[index]?.team;
+    const clientId = normalizedGuests[index]?.clientId;
+    if (clientId) participantAliases.set(`newGuest:${clientId}`, guest.id);
     if (targetTeam === "A") teamA.push(guest);
     if (targetTeam === "B") teamB.push(guest);
   });
@@ -1068,8 +1273,24 @@ async function resolveLineupForResult(params: {
     optionId: confirmed.optionId,
     teamA,
     teamB,
-    handicapTeam
+    handicapTeam,
+    participantAliases
   } satisfies ResolvedMatchLineup;
+}
+
+function resolveMvpParticipant(params: {
+  mvpParticipantId?: string | null;
+  teamA: ConfirmedParticipant[];
+  teamB: ConfirmedParticipant[];
+}) {
+  const requestedId = params.mvpParticipantId?.trim();
+  if (!requestedId) return null;
+
+  const participant = [...params.teamA, ...params.teamB].find((member) => member.id === requestedId);
+  if (!participant) {
+    throw new Error("El MVP elegido no esta dentro de la formacion final.");
+  }
+  return participant;
 }
 
 export async function saveMatchResult(params: {
@@ -1088,14 +1309,38 @@ export async function saveMatchResult(params: {
 
   await assertMatchBelongsToOrganization({ supabase, matchId, organizationId });
 
+  const { data: match, error: matchError } = await supabase
+    .from("matches")
+    .select("id, organization_id, scheduled_at, season_id")
+    .eq("id", matchId)
+    .single();
+  if (matchError || !match) {
+    throw new Error("No se encontro el partido.");
+  }
+
+  const targetOrganizationId = organizationId ?? match.organization_id;
   const winnerTeam = deriveWinnerTeam(scoreA, scoreB);
 
   await rollbackPreviousRatingHistory(supabase, matchId);
-  const { teamA, teamB, handicapTeam } = await resolveLineupForResult({
+  const { teamA, teamB, handicapTeam, participantAliases } = await resolveLineupForResult({
     supabase,
     matchId,
     resultInput,
-    organizationId
+    organizationId: targetOrganizationId
+  });
+  const season = await resolveSeasonForResult({
+    supabase,
+    organizationId: targetOrganizationId,
+    adminId,
+    matchSeasonId: match.season_id,
+    matchScheduledAt: match.scheduled_at
+  });
+  const mvpParticipant = resolveMvpParticipant({
+    mvpParticipantId: resultInput.mvpParticipantId
+      ? participantAliases.get(resultInput.mvpParticipantId) ?? resultInput.mvpParticipantId
+      : null,
+    teamA,
+    teamB
   });
   const adjustments = calculateMatchRatingAdjustments({
     teamA: teamA.map((player) => ({ id: player.id, rating: player.current_rating })),
@@ -1111,6 +1356,9 @@ export async function saveMatchResult(params: {
       score_a: scoreA,
       score_b: scoreB,
       winner_team: winnerTeam,
+      mvp_player_id: mvpParticipant?.source === "player" ? mvpParticipant.entityId : null,
+      mvp_guest_id: mvpParticipant?.source === "guest" ? mvpParticipant.entityId : null,
+      mvp_display_name: mvpParticipant?.full_name ?? null,
       notes: notes ?? null
     },
     { onConflict: "match_id" }
@@ -1130,6 +1378,8 @@ export async function saveMatchResult(params: {
     })
     .filter((value): value is NonNullable<typeof value> => value !== null);
 
+  const historyRows = [];
+
   for (const adjustment of registeredPlayerAdjustments) {
     const { error: updatePlayerError } = await supabase
       .from("players")
@@ -1139,18 +1389,72 @@ export async function saveMatchResult(params: {
     if (updatePlayerError) {
       throw new Error(`No se pudo actualizar rendimiento de un jugador: ${updatePlayerError.message}`);
     }
-  }
 
-  if (registeredPlayerAdjustments.length) {
-    const historyRows = registeredPlayerAdjustments.map((adjustment) => ({
+    const seasonState = await applySeasonRatingDelta({
+      supabase,
+      organizationId: targetOrganizationId,
+      seasonId: season.id,
+      playerId: adjustment.playerId,
+      delta: adjustment.delta
+    });
+
+    historyRows.push({
       match_id: matchId,
       player_id: adjustment.playerId,
       rating_before: adjustment.ratingBefore,
       rating_after: adjustment.ratingAfter,
       delta: adjustment.delta,
+      season_id: season.id,
+      season_rating_before: seasonState.ratingBefore,
+      season_rating_after: seasonState.ratingAfter,
+      season_delta: seasonState.delta,
       reason: "match_result"
-    }));
+    });
+  }
 
+  if (mvpParticipant?.source === "player") {
+    const { data: playerRow, error: playerError } = await supabase
+      .from("players")
+      .select("current_rating")
+      .eq("id", mvpParticipant.entityId)
+      .single();
+    if (playerError || !playerRow) {
+      throw new Error("No se pudo leer el rendimiento del MVP.");
+    }
+
+    const ratingBefore = Number(playerRow.current_rating);
+    const ratingAfter = Math.round(ratingBefore + MVP_BONUS_POINTS);
+    const { error: updateMvpError } = await supabase
+      .from("players")
+      .update({ current_rating: ratingAfter })
+      .eq("id", mvpParticipant.entityId);
+    if (updateMvpError) {
+      throw new Error(`No se pudo aplicar el bonus de MVP: ${updateMvpError.message}`);
+    }
+
+    const seasonState = await applySeasonRatingDelta({
+      supabase,
+      organizationId: targetOrganizationId,
+      seasonId: season.id,
+      playerId: mvpParticipant.entityId,
+      delta: MVP_BONUS_POINTS
+    });
+
+    historyRows.push({
+      match_id: matchId,
+      player_id: mvpParticipant.entityId,
+      rating_before: ratingBefore,
+      rating_after: ratingAfter,
+      delta: MVP_BONUS_POINTS,
+      season_id: season.id,
+      season_rating_before: seasonState.ratingBefore,
+      season_rating_after: seasonState.ratingAfter,
+      season_delta: seasonState.delta,
+      reason: "mvp_bonus"
+    });
+  }
+
+  if (historyRows.length) {
     const { error: historyInsertError } = await supabase.from("rating_history").insert(historyRows);
     if (historyInsertError) {
       throw new Error(`No se pudo guardar historial de rendimiento: ${historyInsertError.message}`);
@@ -1160,6 +1464,7 @@ export async function saveMatchResult(params: {
   const { error: updateMatchError } = await supabase
     .from("matches")
     .update({
+      season_id: season.id,
       status: "finished",
       finished_at: new Date().toISOString()
     })

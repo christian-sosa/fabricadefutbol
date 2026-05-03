@@ -5,7 +5,7 @@ import { getPlayersWithStats } from "@/lib/queries/public";
 const PUBLIC_CACHE_HEADER = "public, s-maxage=60, stale-while-revalidate=300";
 
 export async function GET(
-  _: Request,
+  request: Request,
   context: {
     params: Promise<{ organizationId: string }>;
   }
@@ -16,7 +16,10 @@ export async function GET(
   }
 
   try {
-    const standings = await getPlayersWithStats(organizationId);
+    const { searchParams } = new URL(request.url);
+    const standings = await getPlayersWithStats(organizationId, {
+      season: searchParams.get("season") ?? "current"
+    });
     return NextResponse.json({
       organizationId,
       standings

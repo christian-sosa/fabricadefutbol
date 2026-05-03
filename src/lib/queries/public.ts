@@ -17,7 +17,7 @@ import { calculateGuestDisplayRating } from "@/lib/domain/skill-level";
 import { calculatePlayerStats, type MatchWithTeams } from "@/lib/domain/stats";
 import { getCurrentMatchDateTimeIso } from "@/lib/match-datetime";
 import { normalizeEmail } from "@/lib/org";
-import type { MatchHistoryItem, OrganizationMatchesResponse } from "@/lib/query/types";
+import type { MatchHistoryItem, OrganizationMatchesResponse, OrganizationSeasonOption } from "@/lib/query/types";
 import type { Database } from "@/types/database";
 import type { PlayerComputedStats } from "@/types/domain";
 
@@ -33,6 +33,11 @@ type PublicOrganization = {
   is_public: boolean;
   created_at: string;
 };
+
+type SeasonFilterInput = string | null | undefined;
+type ResolvedSeasonFilter =
+  | { mode: "all"; season: null }
+  | { mode: "season"; season: OrganizationSeasonOption };
 
 function findOrganizationByKey(organizations: PublicOrganization[], organizationKey?: string | null) {
   if (!organizationKey) return null;
@@ -52,6 +57,22 @@ function indexBy<T extends { id: string }>(rows: T[]) {
 
 function notNull<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined;
+}
+
+function normalizeSeasonFilter(value: SeasonFilterInput) {
+  const normalized = (value ?? "current").trim();
+  return normalized.length ? normalized : "current";
+}
+
+function normalizeSeasonOption(row: Database["public"]["Tables"]["organization_seasons"]["Row"]): OrganizationSeasonOption {
+  return {
+    id: row.id,
+    label: row.label,
+    durationMonths: Number(row.duration_months),
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    status: row.status
+  };
 }
 
 function isGuestSchemaMissing(error: { message: string } | null) {
@@ -128,6 +149,57 @@ export async function getPublicOrganizations(): Promise<PublicOrganization[]> {
 
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+export async function getOrganizationSeasons(organizationId: string | null): Promise<OrganizationSeasonOption[]> {
+  if (!organizationId) return [];
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("organization_seasons")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .order("starts_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(normalizeSeasonOption);
+}
+
+async function resolveSeasonFilter(
+  supabase: SupabaseServerClient,
+  organizationId: string,
+  seasonFilter: SeasonFilterInput
+): Promise<ResolvedSeasonFilter> {
+  const filter = normalizeSeasonFilter(seasonFilter);
+  if (filter === "all") {
+    return {
+      mode: "all",
+      season: null
+    };
+  }
+
+  const query = supabase
+    .from("organization_seasons")
+    .select("*")
+    .eq("organization_id", organizationId);
+
+  const { data, error } =
+    filter === "current"
+      ? await query.eq("status", "active").order("starts_at", { ascending: false }).limit(1).maybeSingle()
+      : await query.eq("id", filter).maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) {
+    return {
+      mode: "all",
+      season: null
+    };
+  }
+
+  return {
+    mode: "season",
+    season: normalizeSeasonOption(data)
+  };
 }
 
 export async function getViewerAdminOrganizations(): Promise<PublicOrganization[]> {
@@ -371,14 +443,16 @@ export async function getHomeSummary(organizationId: string | null) {
   if (!organizationId) return getHomeSummaryLive(null);
 
   const supabase = await createSupabaseServerClient();
-  const [summary, standings] = await Promise.all([
+  const [summary, currentStandings, snapshotStandings] = await Promise.all([
     readOrganizationPublicSummarySnapshot(supabase, organizationId),
+    getPlayersWithStatsLive(organizationId, { season: "current" }),
     readOrganizationPublicStandingsSnapshot(supabase, organizationId)
   ]);
   if (summary) {
+    const topStandings = currentStandings.length ? currentStandings : snapshotStandings ?? [];
     return {
       ...summary,
-      topPlayers: standings?.length ? buildTopPlayersFromStandings(standings) : summary.topPlayers,
+      topPlayers: topStandings.length ? buildTopPlayersFromStandings(topStandings) : summary.topPlayers,
       upcomingMatches: await getConfirmedMatchSummariesLive(supabase, organizationId)
     };
   }
@@ -403,10 +477,16 @@ export async function getRankingPlayers(organizationId: string | null) {
   return data ?? [];
 }
 
-async function getPlayersWithStatsLive(organizationId: string | null) {
+async function getPlayersWithStatsLive(
+  organizationId: string | null,
+  options?: {
+    season?: SeasonFilterInput;
+  }
+) {
   if (!organizationId) return [];
 
   const supabase = await createSupabaseServerClient();
+  const seasonFilter = await resolveSeasonFilter(supabase, organizationId, options?.season);
   const { data: players, error: playersError } = await supabase
     .from("players")
     .select("*")
@@ -418,16 +498,36 @@ async function getPlayersWithStatsLive(organizationId: string | null) {
     .order("full_name", { ascending: true });
   if (playersError) throw new Error(playersError.message);
 
-  const { data: finishedMatches, error: matchesError } = await supabase
+  let matchesQuery = supabase
     .from("matches")
     .select("*")
     .eq("organization_id", organizationId)
     .eq("status", "finished")
     .order("scheduled_at", { ascending: true });
+  if (seasonFilter.mode === "season") {
+    matchesQuery = matchesQuery.eq("season_id", seasonFilter.season.id);
+  }
+
+  const { data: finishedMatches, error: matchesError } = await matchesQuery;
   if (matchesError) throw new Error(matchesError.message);
 
   const matchIds = (finishedMatches ?? []).map((match) => match.id);
   const finishedWithTeams = await fetchMatchTeams(matchIds);
+
+  let playersForStats = players ?? [];
+  if (seasonFilter.mode === "season") {
+    const { data: seasonRatings, error: seasonRatingsError } = await supabase
+      .from("organization_season_player_ratings")
+      .select("player_id, current_rating")
+      .eq("season_id", seasonFilter.season.id);
+    if (seasonRatingsError) throw new Error(seasonRatingsError.message);
+
+    const ratingsByPlayerId = new Map((seasonRatings ?? []).map((row) => [row.player_id, Number(row.current_rating)]));
+    playersForStats = playersForStats.map((player) => ({
+      ...player,
+      current_rating: ratingsByPlayerId.get(player.id) ?? 1000
+    }));
+  }
 
   const { data: matchPlayerStats, error: statsError } = await supabase
     .from("match_player_stats")
@@ -436,20 +536,27 @@ async function getPlayersWithStatsLive(organizationId: string | null) {
   if (statsError && matchIds.length) throw new Error(statsError.message);
 
   return calculatePlayerStats({
-    players: players ?? [],
+    players: playersForStats,
     finishedMatches: finishedWithTeams,
     matchPlayerStats: matchPlayerStats ?? []
   });
 }
 
-export async function getPlayersWithStats(organizationId: string | null) {
+export async function getPlayersWithStats(
+  organizationId: string | null,
+  options?: {
+    season?: SeasonFilterInput;
+  }
+) {
   if (!organizationId) return [];
 
-  const supabase = await createSupabaseServerClient();
-  const standings = await readOrganizationPublicStandingsSnapshot(supabase, organizationId);
-  if (standings) return standings;
+  if (normalizeSeasonFilter(options?.season) === "all") {
+    const supabase = await createSupabaseServerClient();
+    const standings = await readOrganizationPublicStandingsSnapshot(supabase, organizationId);
+    if (standings) return standings;
+  }
 
-  return getPlayersWithStatsLive(organizationId);
+  return getPlayersWithStatsLive(organizationId, options);
 }
 
 export async function getPlayerDetails(playerId: string, organizationKey?: string | null) {
@@ -492,7 +599,9 @@ function normalizeMatchCard(match: MatchRow, result?: Database["public"]["Tables
     status: match.status,
     scoreA: result?.score_a ?? null,
     scoreB: result?.score_b ?? null,
-    winnerTeam: result?.winner_team ?? null
+    winnerTeam: result?.winner_team ?? null,
+    seasonId: match.season_id ?? null,
+    mvpDisplayName: result?.mvp_display_name ?? null
   };
 }
 
@@ -522,7 +631,7 @@ async function getMatchHistoryCardsForSnapshot(organizationId: string | null): P
   const supabase = await createSupabaseServerClient();
   const { data: finishedMatches, error } = await supabase
     .from("matches")
-    .select("id, scheduled_at, modality, status")
+    .select("id, scheduled_at, modality, status, season_id")
     .eq("organization_id", organizationId)
     .in("status", ["finished", "cancelled"])
     .order("scheduled_at", { ascending: false });
@@ -538,6 +647,7 @@ async function getMatchHistoryCardsPageLive(
   params?: {
     page?: number;
     pageSize?: number;
+    season?: SeasonFilterInput;
   }
 ): Promise<OrganizationMatchesResponse> {
   const page = normalizePositiveInteger(params?.page, 1);
@@ -553,15 +663,20 @@ async function getMatchHistoryCardsPageLive(
   }
 
   const supabase = await createSupabaseServerClient();
+  const seasonFilter = await resolveSeasonFilter(supabase, organizationId, params?.season);
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
-  const { data: finishedMatches, error, count } = await supabase
+  let matchesQuery = supabase
     .from("matches")
-    .select("id, scheduled_at, modality, status", { count: "exact" })
+    .select("id, scheduled_at, modality, status, season_id", { count: "exact" })
     .eq("organization_id", organizationId)
     .in("status", ["finished", "cancelled"])
-    .order("scheduled_at", { ascending: false })
-    .range(from, to);
+    .order("scheduled_at", { ascending: false });
+  if (seasonFilter.mode === "season") {
+    matchesQuery = matchesQuery.eq("season_id", seasonFilter.season.id);
+  }
+
+  const { data: finishedMatches, error, count } = await matchesQuery.range(from, to);
   if (error) throw new Error(error.message);
 
   const matches = (finishedMatches ?? []) as MatchRow[];
@@ -588,6 +703,7 @@ export async function getMatchHistoryCardsPage(
   params?: {
     page?: number;
     pageSize?: number;
+    season?: SeasonFilterInput;
   }
 ) {
   const page = normalizePositiveInteger(params?.page, 1);
@@ -602,18 +718,20 @@ export async function getMatchHistoryCardsPage(
     });
   }
 
-  const supabase = await createSupabaseServerClient();
-  const matchHistory = await readOrganizationPublicMatchHistorySnapshot(supabase, organizationId);
-  if (matchHistory) {
-    return buildSnapshotMatchHistoryPage({
-      organizationId,
-      matchHistory,
-      page,
-      pageSize
-    });
+  if (normalizeSeasonFilter(params?.season) === "all") {
+    const supabase = await createSupabaseServerClient();
+    const matchHistory = await readOrganizationPublicMatchHistorySnapshot(supabase, organizationId);
+    if (matchHistory) {
+      return buildSnapshotMatchHistoryPage({
+        organizationId,
+        matchHistory,
+        page,
+        pageSize
+      });
+    }
   }
 
-  return getMatchHistoryCardsPageLive(organizationId, { page, pageSize });
+  return getMatchHistoryCardsPageLive(organizationId, { page, pageSize, season: params?.season });
 }
 
 export async function getMatchHistoryCards(organizationId: string | null) {
@@ -625,18 +743,19 @@ export async function getMatchHistoryCards(organizationId: string | null) {
 }
 
 export async function refreshOrganizationPublicSnapshot(organizationId: string) {
-  const [summaryBase, standings, matchHistory] = await Promise.all([
+  const [summaryBase, currentStandings, allTimeStandings, matchHistory] = await Promise.all([
     getHomeSummaryBaseLive(organizationId),
-    getPlayersWithStatsLive(organizationId),
+    getPlayersWithStatsLive(organizationId, { season: "current" }),
+    getPlayersWithStatsLive(organizationId, { season: "all" }),
     getMatchHistoryCardsForSnapshot(organizationId)
   ]);
   const summary = {
     ...summaryBase,
-    topPlayers: buildTopPlayersFromStandings(standings)
+    topPlayers: buildTopPlayersFromStandings(currentStandings.length ? currentStandings : allTimeStandings)
   };
   const payload = buildOrganizationPublicSnapshotPayload({
     summary,
-    standings,
+    standings: allTimeStandings,
     matchHistory
   });
   const supabase = await createSupabaseServerClient();

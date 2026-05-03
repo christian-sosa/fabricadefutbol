@@ -45,10 +45,16 @@ const STAT_CARDS = [
     label: "Efectividad",
     value: (player: PlayerComputedStats) => formatPercent(player.winRate),
     className: "text-emerald-300"
+  },
+  {
+    key: "mvpCount",
+    label: "MVP",
+    value: (player: PlayerComputedStats) => player.mvpCount ?? 0,
+    className: "text-amber-200"
   }
 ] as const;
 
-type SortKey = "rank" | "player" | "rating" | "pj" | "pg" | "pe" | "pp" | "winRate";
+type SortKey = "rank" | "player" | "rating" | "pj" | "pg" | "pe" | "pp" | "winRate" | "mvp";
 type SortDirection = "asc" | "desc";
 
 const SORTABLE_COLUMNS: Array<{ key: SortKey; label: string }> = [
@@ -59,11 +65,13 @@ const SORTABLE_COLUMNS: Array<{ key: SortKey; label: string }> = [
   { key: "pg", label: "PG" },
   { key: "pe", label: "PE" },
   { key: "pp", label: "PP" },
-  { key: "winRate", label: "Efectividad" }
+  { key: "winRate", label: "Efectividad" },
+  { key: "mvp", label: "MVP" }
 ];
 
 type RankingTableQueryProps = {
   organizationId: string | null;
+  season?: string;
   initialPlayers?: PlayerComputedStats[];
 };
 
@@ -89,6 +97,8 @@ function readSortableValue(player: PlayerComputedStats, sortKey: SortKey) {
       return player.losses;
     case "winRate":
       return player.winRate;
+    case "mvp":
+      return player.mvpCount ?? 0;
   }
 }
 
@@ -130,9 +140,10 @@ function SortLabel({
   );
 }
 
-export function RankingTableQuery({ organizationId, initialPlayers }: RankingTableQueryProps) {
+export function RankingTableQuery({ organizationId, initialPlayers, season = "current" }: RankingTableQueryProps) {
   const { data, isFetching } = useOrganizationStandingsQuery({
     organizationId,
+    season,
     initialData: initialPlayers
   });
 

@@ -27,6 +27,7 @@ type MatchResultEditorQueryProps = {
   availablePlayers?: ReplacementPlayerOption[];
   defaultScoreA: number;
   defaultScoreB: number;
+  defaultMvpParticipantId?: string | null;
   defaultNotes?: string | null;
   submitLabel: string;
   teamALabel?: string;

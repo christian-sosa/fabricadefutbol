@@ -6,6 +6,7 @@ import {
   inviteOrganizationAdminAction,
   removeOrganizationAdminAction,
   revokeOrganizationInviteAction,
+  startOrganizationSeasonAction,
   uploadOrganizationImageAction
 } from "@/app/admin/(panel)/actions";
 import { TrackedLink } from "@/components/analytics/tracked-link";
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import {
   getAdminOrganizationContext,
   getAdminOrganizationCreationAccess,
@@ -27,6 +29,7 @@ import { GROWTH_EVENTS } from "@/lib/growth";
 import { getOrganizationImageUrl } from "@/lib/organization-images";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminDashboardData, getOrganizationAdminData } from "@/lib/queries/admin";
+import { getOrganizationSeasons } from "@/lib/queries/public";
 import { getAdminLeagueList } from "@/lib/queries/tournaments";
 
 type OrganizationEntry = {
@@ -366,7 +369,11 @@ export default async function AdminDashboardPage({
   const dashboardData = await getAdminDashboardData(selectedOrganization.id);
   const organizationWriteAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   const canWriteSelectedOrganization = organizationWriteAccess?.canWrite ?? false;
-  const organizationAdmins = await getOrganizationAdminData(selectedOrganization.id);
+  const [organizationAdmins, organizationSeasons] = await Promise.all([
+    getOrganizationAdminData(selectedOrganization.id),
+    getOrganizationSeasons(selectedOrganization.id)
+  ]);
+  const activeSeason = organizationSeasons.find((season) => season.status === "active") ?? null;
 
   return (
     <div className="space-y-4">
@@ -380,6 +387,35 @@ export default async function AdminDashboardPage({
         playersCount={dashboardData.playersCount}
         totalMatches={dashboardData.draftsCount + dashboardData.confirmedCount + dashboardData.finishedCount}
       />
+
+      <Card>
+        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <CardTitle>Temporada del grupo</CardTitle>
+            <CardDescription className="mt-2">
+              El ranking publico de temporada arranca en 1000. El acumulado historico se conserva para armar equipos.
+            </CardDescription>
+            <p className="mt-3 text-sm text-slate-300">
+              {activeSeason
+                ? `${activeSeason.label}: ${new Date(activeSeason.startsAt).toLocaleDateString("es-AR")} a ${new Date(activeSeason.endsAt).toLocaleDateString("es-AR")}`
+                : "Todavia no hay temporada activa. Se creara automaticamente al cargar un resultado."}
+            </p>
+          </div>
+          <form action={startOrganizationSeasonAction} className="flex flex-col gap-2 sm:min-w-72">
+            <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+            <Select defaultValue="6" name="durationMonths">
+              <option value="6">6 meses</option>
+              <option value="12">1 año</option>
+            </Select>
+            <ConfirmSubmitButton
+              confirmMessage="Esto cierra la temporada activa e inicia una nueva con ranking visible en 1000. El acumulado historico no se borra."
+              disabled={!canWriteSelectedOrganization}
+              label="Iniciar nueva temporada"
+              variant="ghost"
+            />
+          </form>
+        </div>
+      </Card>
 
       <Card>
         <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">

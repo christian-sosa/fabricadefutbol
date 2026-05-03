@@ -1,24 +1,34 @@
 import { GroupShareActions } from "@/components/groups/group-share-actions";
 import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
+import { SeasonFilterLinks } from "@/components/groups/season-filter-links";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { RankingTableQuery } from "@/components/ranking/ranking-table-query";
 import { withShareTracking } from "@/lib/growth";
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
-import { getPlayersWithStats, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
+import {
+  getOrganizationSeasons,
+  getPlayersWithStats,
+  getViewerAdminOrganizations,
+  resolvePublicOrganization
+} from "@/lib/queries/public";
 
 export default async function RankingPage({
   searchParams
 }: {
-  searchParams: Promise<{ org?: string }>;
+  searchParams: Promise<{ org?: string; season?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
+  const selectedSeason = resolvedSearchParams.season ?? "current";
   const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
     resolvePublicOrganization(resolvedSearchParams.org, { defaultContext: "ranking" }),
     getViewerAdminOrganizations()
   ]);
-  const initialPlayers = await getPlayersWithStats(selectedOrganization?.id ?? null);
+  const [initialPlayers, seasons] = await Promise.all([
+    getPlayersWithStats(selectedOrganization?.id ?? null, { season: selectedSeason }),
+    getOrganizationSeasons(selectedOrganization?.id ?? null)
+  ]);
   const rankingShareUrl = selectedOrganization
     ? buildAbsolutePublicUrl(withShareTracking(withOrgQuery("/ranking", selectedOrganization.slug), "ranking"))
     : null;
@@ -45,6 +55,15 @@ export default async function RankingPage({
         />
 
         {selectedOrganization ? (
+          <SeasonFilterLinks
+            basePath="/ranking"
+            currentSeason={selectedSeason}
+            organizationSlug={selectedOrganization.slug}
+            seasons={seasons}
+          />
+        ) : null}
+
+        {selectedOrganization ? (
           <GroupShareActions
             groupName={selectedOrganization.name}
             rankingUrl={rankingShareUrl ?? undefined}
@@ -65,7 +84,11 @@ export default async function RankingPage({
           </section>
         ) : null}
 
-        <RankingTableQuery initialPlayers={initialPlayers} organizationId={selectedOrganization?.id ?? null} />
+        <RankingTableQuery
+          initialPlayers={initialPlayers}
+          organizationId={selectedOrganization?.id ?? null}
+          season={selectedSeason}
+        />
 
         <PublicGroupGrowthCta source="ranking_page" />
       </div>

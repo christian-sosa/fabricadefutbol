@@ -21,10 +21,12 @@ export async function GET(
     const requestedPageSize = Number(searchParams.get("pageSize") ?? "10");
     const page = Number.isFinite(requestedPage) ? requestedPage : 1;
     const pageSize = Number.isFinite(requestedPageSize) ? requestedPageSize : 10;
+    const season = searchParams.get("season") ?? "current";
 
     const result = await getMatchHistoryCardsPage(organizationId, {
       page,
-      pageSize
+      pageSize,
+      season
     });
     return NextResponse.json(result, {
       headers: {

@@ -18,22 +18,25 @@ type MatchesHistoryQueryTableProps = {
   initialPage?: number;
   pageSize?: number;
   initialData?: OrganizationMatchesResponse;
+  season?: string;
 };
 
 export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) {
   const { organizationId, organizationSlug, initialData } = params;
   const pageSize = params.pageSize ?? 10;
+  const season = params.season ?? "current";
   const [page, setPage] = useState(params.initialPage ?? initialData?.pagination.page ?? 1);
   const initialPage = params.initialPage ?? initialData?.pagination.page ?? 1;
 
   useEffect(() => {
     setPage(initialPage);
-  }, [initialPage, organizationId]);
+  }, [initialPage, organizationId, season]);
 
   const { data, isFetching } = useOrganizationMatchesQuery({
     organizationId,
     page,
     pageSize,
+    season,
     initialData: page === initialPage ? initialData : undefined
   });
 
@@ -59,6 +62,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
               <p className="text-sm text-slate-300">
                 Resultado: {match.scoreA !== null && match.scoreB !== null ? `${match.scoreA} - ${match.scoreB}` : "Pendiente"}
               </p>
+              {match.mvpDisplayName ? <p className="text-xs text-amber-200">MVP: {match.mvpDisplayName}</p> : null}
               <Link
                 className="whitespace-nowrap text-sm font-semibold text-emerald-300 hover:underline"
                 href={withOrgQuery(`/matches/${match.id}`, organizationSlug)}
@@ -83,6 +87,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
               <TH>Fecha</TH>
               <TH>Modalidad</TH>
               <TH>Resultado</TH>
+              <TH>MVP</TH>
               <TH>Estado</TH>
               <TH></TH>
             </tr>
@@ -93,6 +98,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
                 <TD>{formatMatchDateTime(match.scheduledAt)}</TD>
                 <TD>{match.modality}</TD>
                 <TD>{match.scoreA !== null && match.scoreB !== null ? `${match.scoreA} - ${match.scoreB}` : "Pendiente"}</TD>
+                <TD>{match.mvpDisplayName ?? "-"}</TD>
                 <TD>
                   <MatchStatusBadge status={match.status} />
                 </TD>
@@ -109,7 +115,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
 
             {!matches.length ? (
               <tr>
-                <TD className="py-6 text-sm text-slate-400" colSpan={5}>
+                <TD className="py-6 text-sm text-slate-400" colSpan={6}>
                   {isFetching ? "Cargando historial..." : "No hay partidos para este grupo."}
                 </TD>
               </tr>

@@ -503,6 +503,129 @@ describe("resolvePublicOrganization", () => {
     expect(secondPage.pagination.hasPreviousPage).toBe(true);
   });
 
+  it("filtra ranking e historial por temporada sin usar el acumulado visible", async () => {
+    const fake = createFakeSupabase({
+      players: [
+        {
+          id: "player-1",
+          organization_id: ORG_ID,
+          full_name: "Acumulado Alto",
+          initial_rank: 1,
+          skill_level: 2,
+          display_order: 1,
+          current_rating: 1300,
+          active: true
+        },
+        {
+          id: "player-2",
+          organization_id: ORG_ID,
+          full_name: "Temporada Alto",
+          initial_rank: 2,
+          skill_level: 2,
+          display_order: 2,
+          current_rating: 990,
+          active: true
+        }
+      ],
+      organization_seasons: [
+        {
+          id: "season-current",
+          organization_id: ORG_ID,
+          label: "Temporada actual",
+          duration_months: 6,
+          starts_at: "2026-01-01",
+          ends_at: "2026-07-01",
+          status: "active"
+        },
+        {
+          id: "season-old",
+          organization_id: ORG_ID,
+          label: "Temporada vieja",
+          duration_months: 6,
+          starts_at: "2025-07-01",
+          ends_at: "2026-01-01",
+          status: "closed"
+        }
+      ],
+      organization_season_player_ratings: [
+        {
+          season_id: "season-current",
+          organization_id: ORG_ID,
+          player_id: "player-1",
+          current_rating: 1000
+        },
+        {
+          season_id: "season-current",
+          organization_id: ORG_ID,
+          player_id: "player-2",
+          current_rating: 1015
+        }
+      ],
+      matches: [
+        {
+          id: "match-current",
+          organization_id: ORG_ID,
+          season_id: "season-current",
+          scheduled_at: "2026-04-18T21:00:00.000Z",
+          modality: "5v5",
+          status: "finished"
+        },
+        {
+          id: "match-old",
+          organization_id: ORG_ID,
+          season_id: "season-old",
+          scheduled_at: "2025-10-18T21:00:00.000Z",
+          modality: "5v5",
+          status: "finished"
+        }
+      ],
+      team_options: [
+        {
+          id: "option-current",
+          match_id: "match-current",
+          option_number: 1,
+          is_confirmed: true,
+          rating_sum_a: 20,
+          rating_sum_b: 20,
+          rating_diff: 0,
+          created_by: "admin-1"
+        },
+        {
+          id: "option-old",
+          match_id: "match-old",
+          option_number: 1,
+          is_confirmed: true,
+          rating_sum_a: 20,
+          rating_sum_b: 20,
+          rating_diff: 0,
+          created_by: "admin-1"
+        }
+      ],
+      team_option_players: [
+        { team_option_id: "option-current", player_id: "player-2", team: "A" },
+        { team_option_id: "option-old", player_id: "player-1", team: "A" }
+      ],
+      match_result: [
+        { match_id: "match-current", score_a: 1, score_b: 0, winner_team: "A", created_by: "admin-1" },
+        { match_id: "match-old", score_a: 2, score_b: 0, winner_team: "A", created_by: "admin-1" }
+      ]
+    });
+
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    cookiesMock.mockResolvedValue({ get: () => undefined });
+
+    const standings = await getPlayersWithStats(ORG_ID, { season: "season-current" });
+    const history = await getMatchHistoryCardsPage(ORG_ID, { page: 1, pageSize: 10, season: "season-current" });
+    const allHistory = await getMatchHistoryCardsPage(ORG_ID, { page: 1, pageSize: 10, season: "all" });
+
+    expect(standings.map((player) => [player.playerId, player.currentRating, player.matchesPlayed])).toEqual([
+      ["player-2", 1015, 1],
+      ["player-1", 1000, 0]
+    ]);
+    expect(history.matches.map((match) => match.id)).toEqual(["match-current"]);
+    expect(allHistory.matches.map((match) => match.id)).toEqual(["match-current", "match-old"]);
+  });
+
   it("mezcla jugadores e invitados en proximos partidos y ordena invitados por nivel equivalente", async () => {
     const fake = createFakeSupabase({
       players: buildPlayers(),

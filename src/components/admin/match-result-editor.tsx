@@ -48,12 +48,14 @@ type MatchResultEditorProps = {
     scoreA: number;
     scoreB: number;
     notes?: string;
+    mvpParticipantId?: string | null;
     lineup?: {
       assignments: Array<{
         participantId: string;
         team: "A" | "B" | "OUT";
       }>;
       newGuests?: Array<{
+        clientId?: string;
         name: string;
         rating: number;
         team: "A" | "B";
@@ -69,6 +71,7 @@ type MatchResultEditorProps = {
   availablePlayers?: ReplacementPlayerOption[];
   defaultScoreA: number;
   defaultScoreB: number;
+  defaultMvpParticipantId?: string | null;
   defaultNotes?: string | null;
   submitLabel: string;
   teamALabel?: string;
@@ -86,6 +89,7 @@ export function MatchResultEditor({
   availablePlayers = [],
   defaultScoreA,
   defaultScoreB,
+  defaultMvpParticipantId = null,
   defaultNotes,
   submitLabel,
   teamALabel = DEFAULT_TEAM_A_LABEL,
@@ -105,6 +109,7 @@ export function MatchResultEditor({
   const [selectedReplacementTeam, setSelectedReplacementTeam] = useState<TeamSide>("A");
   const [handicapEnabled, setHandicapEnabled] = useState(false);
   const [handicapTeam, setHandicapTeam] = useState<TeamSide>("A");
+  const [selectedMvpParticipantId, setSelectedMvpParticipantId] = useState(defaultMvpParticipantId ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -147,6 +152,30 @@ export function MatchResultEditor({
   );
 
   const validNewGuests = useMemo(() => newGuests.filter((guest) => isValidGuest(guest)), [newGuests]);
+  const mvpOptions = useMemo(() => {
+    const existingOptions = existingParticipants
+      .filter((participant) => assignments[participant.participantId] !== "OUT")
+      .map((participant) => ({
+        participantId: participant.participantId,
+        label: participant.source === "guest" ? `${participant.fullName} (invitado)` : participant.fullName
+      }));
+    const replacementOptions = replacementPlayers
+      .map((player) => {
+        const playerData = playersById.get(player.playerId);
+        if (!playerData) return null;
+        return {
+          participantId: `player:${player.playerId}`,
+          label: playerData.fullName
+        };
+      })
+      .filter((value): value is { participantId: string; label: string } => value !== null);
+    const newGuestOptions = validNewGuests.map((guest) => ({
+      participantId: `newGuest:${guest.id}`,
+      label: `${guest.name.trim()} (invitado)`
+    }));
+
+    return [...existingOptions, ...replacementOptions, ...newGuestOptions];
+  }, [assignments, existingParticipants, playersById, replacementPlayers, validNewGuests]);
   const teamACount = useMemo(() => {
     const fromParticipants = existingParticipants.filter((participant) => assignments[participant.participantId] === "A").length;
     const fromReplacementPlayers = replacementPlayers.filter((player) => player.team === "A").length;
@@ -166,6 +195,12 @@ export function MatchResultEditor({
     setHandicapTeam(teamACount < teamBCount ? "A" : "B");
   }, [handicapEnabled, teamACount, teamBCount]);
 
+  useEffect(() => {
+    if (!selectedMvpParticipantId) return;
+    if (mvpOptions.some((option) => option.participantId === selectedMvpParticipantId)) return;
+    setSelectedMvpParticipantId("");
+  }, [mvpOptions, selectedMvpParticipantId]);
+
   const lineupPayload = useMemo(
     () =>
       JSON.stringify({
@@ -174,6 +209,7 @@ export function MatchResultEditor({
           team: assignments[participant.participantId] ?? "OUT"
         })),
         newGuests: validNewGuests.map((guest) => ({
+          clientId: String(guest.id),
           name: guest.name.trim(),
           rating: parseGuestSkillLevelValue(guest.rating) ?? 3,
           team: guest.team
@@ -208,12 +244,14 @@ export function MatchResultEditor({
         scoreA,
         scoreB,
         notes,
+        mvpParticipantId: selectedMvpParticipantId || null,
         lineup: {
           assignments: existingParticipants.map((participant) => ({
             participantId: participant.participantId,
             team: assignments[participant.participantId] ?? "OUT"
           })),
           newGuests: validNewGuests.map((guest) => ({
+            clientId: String(guest.id),
             name: guest.name.trim(),
             rating: parseGuestSkillLevelValue(guest.rating) ?? 3,
             team: guest.team
@@ -236,6 +274,7 @@ export function MatchResultEditor({
   return (
     <form action={onSubmit ? undefined : action} className="mt-4 space-y-4" onSubmit={onSubmit ? handleSubmit : undefined}>
       <input name="lineupPayload" type="hidden" value={lineupPayload} />
+      <input name="mvpParticipantId" type="hidden" value={selectedMvpParticipantId} />
 
       <div className="grid gap-3 md:grid-cols-4">
         <div>
@@ -257,6 +296,28 @@ export function MatchResultEditor({
           placeholder="Notas opcionales"
           rows={3}
         />
+      </div>
+
+      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+        <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="mvpParticipantIdSelect">
+          MVP del partido
+        </label>
+        <Select
+          disabled={!mvpOptions.length}
+          id="mvpParticipantIdSelect"
+          onChange={(event) => setSelectedMvpParticipantId(event.target.value)}
+          value={selectedMvpParticipantId}
+        >
+          <option value="">Sin MVP</option>
+          {mvpOptions.map((option) => (
+            <option key={option.participantId} value={option.participantId}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+        <p className="mt-1 text-xs text-slate-400">
+          Si el MVP es jugador registrado suma +5. Si es invitado queda registrado sin bonus.
+        </p>
       </div>
 
       <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
