@@ -269,7 +269,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
                   >
                     <button
                       className={cn(
-                        "inline-flex min-h-8 items-center gap-1 text-left uppercase transition hover:text-emerald-300",
+                        "inline-flex min-h-8 items-center gap-1 whitespace-nowrap text-left uppercase transition hover:text-emerald-300",
                         isActive ? "text-emerald-300" : "text-slate-400"
                       )}
                       onClick={() => onSort(column.key)}
