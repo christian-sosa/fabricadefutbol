@@ -341,8 +341,6 @@ export async function getPublicClubBySlug(slug: string) {
     .from("clubs")
     .select("id, name, slug, description, home_venue, is_public, status, created_at")
     .eq("slug", slug)
-    .eq("is_public", true)
-    .eq("status", "active")
     .maybeSingle();
 
   if (clubError) throw new Error(clubError.message);

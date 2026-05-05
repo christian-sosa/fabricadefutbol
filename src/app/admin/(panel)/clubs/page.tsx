@@ -33,7 +33,7 @@ export default async function AdminClubsPage() {
                     Gestionar
                   </Link>
                   <Link className="text-sm font-semibold text-sky-300 hover:underline" href={`/clubs/${club.slug}`}>
-                    Ver publica
+                    Vista por URL
                   </Link>
                 </div>
               </div>

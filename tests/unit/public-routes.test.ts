@@ -10,7 +10,7 @@ describe("public routes for crawlers", () => {
       rules: {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin", "/api", "/captain", "/invite", "/tournaments"]
+        disallow: ["/admin", "/api", "/captain", "/clubs", "/invite", "/tournaments"]
       }
     });
   });

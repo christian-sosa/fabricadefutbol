@@ -31,7 +31,7 @@ describeSupabaseSql("clubes sql", () => {
     }
   });
 
-  it("deja anon solo con clubes y snapshots publicos", () => {
+  it("mantiene tablas privadas de clubes fuera del grant anon directo", () => {
     expect(policiesSql).toContain("public.clubs, public.club_public_snapshots to anon, authenticated");
 
     for (const table of privateClubTables) {
@@ -39,11 +39,17 @@ describeSupabaseSql("clubes sql", () => {
     }
   });
 
-  it("protege lecturas crudas de club con membresia admin", () => {
+  it("protege lecturas crudas de club con membresia admin y bloquea altas comunes", () => {
     expect(policiesSql).toContain("create or replace function public.is_club_admin");
     expect(policiesSql).toContain("create or replace function public.can_read_club");
     expect(policiesSql).toContain("public.is_club_admin(club_id)");
     expect(policiesSql).toContain("public.can_read_club(club_id)");
+    expect(policiesSql).toMatch(
+      /create or replace function public\.can_read_club\(club_id uuid\)[\s\S]*select public\.is_club_admin\(club_id\);/
+    );
+    expect(policiesSql).toMatch(
+      /create policy clubs_insert_authenticated[\s\S]*with check \([\s\S]*created_by = auth\.uid\(\)[\s\S]*and public\.is_super_admin\(\)[\s\S]*\);/
+    );
   });
 
   it("incluye limites de admins, equipos y seed no-op de La Quinta", () => {

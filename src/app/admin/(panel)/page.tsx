@@ -22,6 +22,7 @@ import {
   getAdminOrganizationCreationAccess,
   getOrganizationWriteAccess
 } from "@/lib/auth/admin";
+import { getAdminClubs } from "@/lib/auth/clubs";
 import { getLeagueCreationAccess } from "@/lib/auth/tournaments";
 import { GROWTH_EVENTS } from "@/lib/growth";
 import { getOrganizationImageUrl } from "@/lib/organization-images";
@@ -39,6 +40,7 @@ type OrganizationEntry = {
 };
 
 type LeagueEntry = Awaited<ReturnType<typeof getAdminLeagueList>>[number];
+type ClubEntry = Awaited<ReturnType<typeof getAdminClubs>>[number];
 
 const groupActionLinkClass =
   "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-emerald-400/45 bg-emerald-500/10 px-3.5 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/15";
@@ -46,11 +48,17 @@ const groupActionLinkClass =
 const leagueActionLinkClass =
   "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-sky-400/45 bg-sky-500/10 px-3.5 py-2 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/15";
 
+const clubActionLinkClass =
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-indigo-400/45 bg-indigo-500/10 px-3.5 py-2 text-sm font-semibold text-indigo-200 transition hover:bg-indigo-500/15";
+
 const enterGroupLinkClass =
   "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-accent px-3.5 py-2 text-sm font-semibold text-white transition hover:brightness-110";
 
 const enterLeagueLinkClass =
   "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-sky-500 px-3.5 py-2 text-sm font-semibold text-white transition hover:brightness-110";
+
+const enterClubLinkClass =
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-indigo-500 px-3.5 py-2 text-sm font-semibold text-white transition hover:brightness-110";
 
 function findOrganizationByKey(organizations: OrganizationEntry[], organizationKey?: string | null) {
   if (!organizationKey) return null;
@@ -179,6 +187,7 @@ function AdminOnboardingCard({
 
 function AdminHomeHub({
   creationAccess,
+  clubs,
   checkout,
   error,
   leagueCreationAccess,
@@ -187,6 +196,7 @@ function AdminHomeHub({
   showTournaments
 }: {
   creationAccess: Awaited<ReturnType<typeof getAdminOrganizationCreationAccess>>;
+  clubs: ClubEntry[];
   checkout?: string;
   error?: string;
   leagueCreationAccess: Awaited<ReturnType<typeof getLeagueCreationAccess>>;
@@ -195,8 +205,11 @@ function AdminHomeHub({
   showTournaments: boolean;
 }) {
   const hasOrganizations = organizations.length > 0;
+  const hasClubs = clubs.length > 0;
   const hasLeagues = leagues.length > 0;
   const referenceOrganization = organizations[0] ?? null;
+  const visibleHubCards = 1 + (hasClubs ? 1 : 0) + (showTournaments ? 1 : 0);
+  const hubGridClass = visibleHubCards >= 3 ? "lg:grid-cols-2 xl:grid-cols-3" : visibleHubCards === 2 ? "lg:grid-cols-2" : "";
 
   return (
     <div className="space-y-4">
@@ -205,13 +218,13 @@ function AdminHomeHub({
       <Card className="p-5 sm:p-6">
         <CardTitle className="text-3xl">Que queres administrar?</CardTitle>
         <CardDescription className="mt-3 max-w-3xl text-base">
-          {showTournaments
-            ? "Elegi un grupo o una liga antes de cargar datos. Asi cada flujo mantiene sus jugadores, partidos, competencias y facturacion en el lugar correcto."
+          {showTournaments || hasClubs
+            ? "Elegi un espacio antes de cargar datos. Asi cada flujo mantiene jugadores, partidos, competencias y permisos en el lugar correcto."
             : "Elegi un grupo antes de cargar datos. Asi jugadores, partidos, rendimiento y facturacion quedan en el lugar correcto."}
         </CardDescription>
       </Card>
 
-      <section className={`grid gap-4 ${showTournaments ? "lg:grid-cols-2" : ""}`}>
+      <section className={`grid gap-4 ${hubGridClass}`}>
         <Card>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -276,6 +289,47 @@ function AdminHomeHub({
             )}
           </div>
         </Card>
+
+        {hasClubs ? (
+          <Card>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle>Tus clubes</CardTitle>
+                <CardDescription className="mt-2">
+                  Para planteles, equipos del club, partidos 11 vs 11, torneos internos y estadisticas privadas.
+                </CardDescription>
+              </div>
+              <Link
+                className={clubActionLinkClass}
+                href="/admin/clubs"
+              >
+                Ver clubes
+              </Link>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {clubs.map((club) => (
+                <div
+                  className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  key={club.id}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-100">{club.name}</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {club.status === "active" ? "Activo" : "Oculto"} - /clubs/{club.slug}
+                    </p>
+                  </div>
+                  <Link
+                    className={enterClubLinkClass}
+                    href={`/admin/clubs/${club.id}`}
+                  >
+                    Entrar al club
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </Card>
+        ) : null}
 
         {showTournaments ? (
           <Card>
@@ -365,10 +419,14 @@ export default async function AdminDashboardPage({
       };
 
   if (!selectedOrganization) {
-    const leagues = showTournaments ? await getAdminLeagueList() : [];
+    const [clubs, leagues] = await Promise.all([
+      getAdminClubs(admin),
+      showTournaments ? getAdminLeagueList() : Promise.resolve([])
+    ]);
 
     return (
       <AdminHomeHub
+        clubs={clubs}
         checkout={resolvedSearchParams.checkout}
         creationAccess={creationAccess}
         error={resolvedSearchParams.error}

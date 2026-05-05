@@ -140,7 +140,7 @@ function SummaryTab({
       <Card>
         <CardTitle>Configuracion general</CardTitle>
         <CardDescription className="mt-2">
-          Estos datos alimentan la vista publica del club.
+          Estos datos alimentan la vista por URL privada del club. Por ahora solo la pueden abrir el super admin y los admins del club.
         </CardDescription>
         <form action={updateClubAction.bind(null, clubId)} className="mt-4 grid gap-3 md:grid-cols-2">
           <div>
@@ -168,7 +168,7 @@ function SummaryTab({
           <div className="flex items-end">
             <label className="flex items-center gap-2 text-sm text-slate-200">
               <input className="h-4 w-4 accent-emerald-400" defaultChecked={details.club.is_public} name="isPublic" type="checkbox" />
-              Visible por URL
+              Publicable cuando se reabra la vista publica
             </label>
           </div>
           <div className="md:col-span-2">
@@ -674,7 +674,7 @@ export default async function AdminClubDetailPage({
               </Badge>
             </div>
             <CardDescription className="mt-2">
-              Club oculto: no aparece en navegacion, precios ni ayuda.
+              Club oculto al publico: no aparece en navegacion, precios, ayuda ni crawlers.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-3">
