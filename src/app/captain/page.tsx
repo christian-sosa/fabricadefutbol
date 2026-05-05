@@ -17,6 +17,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { getCaptainContext } from "@/lib/auth/captains";
+import { isCompetitionRosterFrozen } from "@/lib/auth/tournaments";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { getCaptainCompetitionTeamPanelData } from "@/lib/queries/tournaments";
@@ -105,6 +106,7 @@ export default async function CaptainPage({
 
   const upcomingMatches = panelData.teamMatches.filter((match) => match.status !== "played");
   const playedMatches = panelData.teamMatches.filter((match) => match.status === "played");
+  const isRosterFrozen = isCompetitionRosterFrozen(panelData.competition.status);
 
   return (
     <div className="space-y-4 py-6">
@@ -118,7 +120,9 @@ export default async function CaptainPage({
             </div>
             <p className="mt-2 text-sm font-semibold text-slate-200">Equipo asignado: {panelData.team.displayName}</p>
             <CardDescription className="mt-2">
-              Gestiona el plantel y las fotos de {panelData.team.displayName} dentro de {panelData.competition.name}.
+              {isRosterFrozen
+                ? `La competencia esta cerrada. El plantel de ${panelData.team.displayName} queda congelado como registro historico.`
+                : `Gestiona el plantel y las fotos de ${panelData.team.displayName} dentro de ${panelData.competition.name}.`}
             </CardDescription>
           </div>
 
@@ -181,6 +185,15 @@ export default async function CaptainPage({
         </Card>
       </section>
 
+      {isRosterFrozen ? (
+        <Card>
+          <CardTitle>Plantel congelado</CardTitle>
+          <CardDescription className="mt-2">
+            No se pueden agregar, editar, borrar jugadores ni cambiar fotos cuando la competencia esta cerrada.
+          </CardDescription>
+        </Card>
+      ) : null}
+
       <Card>
         <CardTitle>Agregar jugador</CardTitle>
         <CardDescription className="mt-2">
@@ -202,7 +215,7 @@ export default async function CaptainPage({
             <Input name="position" placeholder="Arquero / Defensor / ..." />
           </div>
           <div className="md:col-span-2">
-            <Button type="submit">Agregar jugador</Button>
+            <Button disabled={isRosterFrozen} type="submit">Agregar jugador</Button>
           </div>
         </form>
       </Card>
@@ -226,7 +239,7 @@ export default async function CaptainPage({
                   <input name="competitionId" type="hidden" value={panelData.competition.id} />
                   <input name="teamId" type="hidden" value={panelData.team.id} />
                   <input name="playerId" type="hidden" value={player.id} />
-                  <Button type="submit" variant="ghost">
+                  <Button disabled={isRosterFrozen} type="submit" variant="ghost">
                     Quitar del plantel
                   </Button>
                 </form>
@@ -249,7 +262,7 @@ export default async function CaptainPage({
                   <Input defaultValue={player.position ?? ""} name="position" />
                 </div>
                 <div className="md:col-span-2">
-                  <Button type="submit" variant="secondary">
+                  <Button disabled={isRosterFrozen} type="submit" variant="secondary">
                     Guardar jugador
                   </Button>
                 </div>
@@ -264,7 +277,7 @@ export default async function CaptainPage({
                   <PhotoUploadInput compact hint="Se optimiza automáticamente a WEBP." />
                 </div>
                 <div className="md:self-end">
-                  <Button type="submit" variant="secondary">
+                  <Button disabled={isRosterFrozen} type="submit" variant="secondary">
                     Guardar foto
                   </Button>
                 </div>

@@ -82,7 +82,6 @@ export type LeagueListItem = {
   locationNotes: string | null;
   logoUrl: string | null;
   photoUrl: string | null;
-  isPublic: boolean;
   status: LeagueStatus;
   createdAt: string;
   teamCount: number;
@@ -100,7 +99,6 @@ export type CompetitionListItem = {
   type: CompetitionType;
   coverageMode: CompetitionCoverageMode;
   playoffSize: CompetitionPlayoffSize | null;
-  isPublic: boolean;
   status: CompetitionStatus;
   createdAt: string;
   teamCount: number;

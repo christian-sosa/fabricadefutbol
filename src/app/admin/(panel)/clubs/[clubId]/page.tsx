@@ -260,7 +260,7 @@ function PlayersTab({ clubId, players }: { clubId: string; players: ClubPlayerRe
                   </TD>
                   <TD>
                     <div className="flex flex-col gap-2">
-                      <form action={uploadClubPlayerPhotoAction.bind(null, clubId)} className="flex flex-col gap-2" encType="multipart/form-data">
+                      <form action={uploadClubPlayerPhotoAction.bind(null, clubId)} className="flex flex-col gap-2">
                         <input name="playerId" type="hidden" value={player.id} />
                         <Input accept="image/jpeg,image/png,image/webp" className="max-w-48" name="photo" type="file" />
                         <Button className="h-8 w-fit px-3 text-xs" type="submit" variant="secondary">
@@ -338,7 +338,7 @@ function TeamsTab({
                   <CardDescription className="mt-1">
                     {team.short_name ? `${team.short_name} - ` : ""}{rosterIds.size} jugadores en el equipo
                   </CardDescription>
-                  <form action={uploadClubTeamLogoAction.bind(null, clubId)} className="mt-3 flex flex-col gap-2 sm:flex-row" encType="multipart/form-data">
+                  <form action={uploadClubTeamLogoAction.bind(null, clubId)} className="mt-3 flex flex-col gap-2 sm:flex-row">
                     <input name="teamId" type="hidden" value={team.id} />
                     <Input accept="image/jpeg,image/png,image/webp,image/svg+xml" className="max-w-60" name="logo" type="file" />
                     <Button className="h-9 w-fit px-3 text-xs" type="submit" variant="secondary">

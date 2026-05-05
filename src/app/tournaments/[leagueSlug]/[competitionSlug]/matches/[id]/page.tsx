@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { TournamentMatchStatusBadge } from "@/components/tournaments/tournament-badges";
@@ -8,8 +9,47 @@ import { formatMatchDateTime } from "@/lib/match-datetime";
 import { getPublicCompetitionMatchDetails } from "@/lib/queries/tournaments";
 import type { TournamentMatchStatus } from "@/types/domain";
 
+export const revalidate = 300;
+
 function formatScheduledAt(value: string | null) {
   return value ? formatMatchDateTime(value) : "Sin horario";
+}
+
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ leagueSlug: string; competitionSlug: string; id: string }>;
+}): Promise<Metadata> {
+  try {
+    const { leagueSlug, competitionSlug, id } = await params;
+    const data = await getPublicCompetitionMatchDetails({
+      leagueSlug,
+      competitionSlug,
+      matchId: id
+    });
+    if (!data) return { title: "Partido" };
+
+    const title = `${data.match.homeTeamName} vs ${data.match.awayTeamName}`;
+    const description = `${data.competition.name} · ${formatScheduledAt(data.match.scheduledAt)}. Resultado, acta y estadisticas del partido.`;
+
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        url: `/tournaments/${data.league.slug}/${data.competition.slug}/matches/${id}`,
+        images: data.league.photoUrl ? [{ url: data.league.photoUrl }] : undefined
+      },
+      twitter: {
+        title,
+        description,
+        images: data.league.photoUrl ? [data.league.photoUrl] : undefined
+      }
+    };
+  } catch {
+    return { title: "Partido" };
+  }
 }
 
 export default async function CompetitionMatchDetailPage({

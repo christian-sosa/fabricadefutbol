@@ -1,4 +1,4 @@
-import { unstable_noStore as noStore } from "next/cache";
+import { unstable_cache, unstable_noStore as noStore } from "next/cache";
 
 import { requireAdminSession } from "@/lib/auth/admin";
 import { getAdminLeagues } from "@/lib/auth/tournaments";
@@ -23,6 +23,11 @@ import { getLeagueLogoUrl } from "@/lib/league-logos";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getTeamLogoUrl } from "@/lib/team-logos";
+import {
+  PUBLIC_TOURNAMENT_CACHE_SECONDS,
+  PUBLIC_TOURNAMENT_CACHE_TAG
+} from "@/lib/tournament-cache";
+import { createSupabasePublicClient } from "@/lib/supabase/public";
 import type {
   CompetitionCoverageMode,
   CompetitionListItem,
@@ -34,6 +39,8 @@ import type {
   TournamentTopScorerRow
 } from "@/types/domain";
 
+type TournamentQueryClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
 type LeagueRecord = {
   id: string;
   name: string;
@@ -43,7 +50,6 @@ type LeagueRecord = {
   photo_path: string | null;
   venue_name: string | null;
   location_notes: string | null;
-  is_public: boolean;
   status: LeagueListItem["status"];
   created_at: string;
 };
@@ -59,7 +65,6 @@ type CompetitionRecord = {
   type: CompetitionListItem["type"];
   coverage_mode: CompetitionCoverageMode;
   playoff_size: number | null;
-  is_public: boolean;
   status: CompetitionListItem["status"];
   created_at: string;
 };
@@ -253,6 +258,20 @@ function isPublicTournamentStatus(status: string) {
   return status === "active" || status === "finished";
 }
 
+const LEAGUE_SELECT =
+  "id, name, slug, description, logo_path, photo_path, venue_name, location_notes, status, created_at";
+
+const COMPETITION_SELECT =
+  "id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, status, created_at";
+
+async function createPublicReadClient(): Promise<TournamentQueryClient> {
+  if (process.env.NODE_ENV === "test") {
+    return createSupabaseServerClient();
+  }
+
+  return createSupabasePublicClient() as TournamentQueryClient;
+}
+
 function isLeagueBillingSchemaMissing(message: string) {
   return /league_billing_subscriptions|league_billing_payments|purpose|period_start|period_end|subscription_applied_at/i.test(
     message
@@ -275,7 +294,6 @@ function normalizeLeagueRecord(
     photoUrl: record.photo_path ? getLeaguePhotoUrl(record.id) : null,
     venueName: record.venue_name,
     locationNotes: record.location_notes,
-    isPublic: record.is_public,
     status: record.status,
     createdAt: record.created_at,
     teamCount: counts?.teamCount ?? 0,
@@ -295,7 +313,6 @@ function normalizeCompetitionRecord(record: CompetitionRecord, teamCount = 0): C
     type: record.type,
     coverageMode: record.coverage_mode,
     playoffSize: normalizePlayoffSize(record.playoff_size),
-    isPublic: record.is_public,
     status: record.status,
     createdAt: record.created_at,
     teamCount
@@ -370,6 +387,7 @@ async function resolveAdminEmailsById(adminIds: string[]) {
 async function loadLeagueCounts(params: {
   leagueIds: string[];
   publicCompetitionsOnly?: boolean;
+  supabase?: TournamentQueryClient;
 }) {
   const { leagueIds, publicCompetitionsOnly = false } = params;
   const teamCounts = new Map<string, number>();
@@ -381,8 +399,11 @@ async function loadLeagueCounts(params: {
     };
   }
 
-  const supabase = await createSupabaseServerClient();
-  const competitionQuery = supabase.from("competitions").select("league_id, is_public, status").in("league_id", leagueIds);
+  const supabase = params.supabase ?? (await createSupabaseServerClient());
+  const competitionQuery = supabase
+    .from("competitions")
+    .select("league_id, status")
+    .in("league_id", leagueIds);
   const [{ data: leagueTeams, error: leagueTeamsError }, { data: competitions, error: competitionsError }] =
     await Promise.all([
       supabase.from("league_teams").select("league_id").in("league_id", leagueIds),
@@ -398,10 +419,7 @@ async function loadLeagueCounts(params: {
   }
 
   for (const row of competitions ?? []) {
-    if (
-      publicCompetitionsOnly &&
-      (!row.is_public || !isPublicTournamentStatus(String(row.status ?? "")))
-    ) {
+    if (publicCompetitionsOnly && !isPublicTournamentStatus(String(row.status ?? ""))) {
       continue;
     }
 
@@ -415,11 +433,14 @@ async function loadLeagueCounts(params: {
   };
 }
 
-async function loadCompetitionTeamCounts(competitionIds: string[]) {
+async function loadCompetitionTeamCounts(
+  competitionIds: string[],
+  supabaseClient?: TournamentQueryClient
+) {
   const counts = new Map<string, number>();
   if (!competitionIds.length) return counts;
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = supabaseClient ?? (await createSupabaseServerClient());
   const { data, error } = await supabase
     .from("competition_teams")
     .select("competition_id")
@@ -435,11 +456,11 @@ async function loadCompetitionTeamCounts(competitionIds: string[]) {
   return counts;
 }
 
-async function loadLeagueById(leagueId: string) {
-  const supabase = await createSupabaseServerClient();
+async function loadLeagueById(leagueId: string, supabaseClient?: TournamentQueryClient) {
+  const supabase = supabaseClient ?? (await createSupabaseServerClient());
   const { data, error } = await supabase
     .from("leagues")
-    .select("id, name, slug, description, logo_path, photo_path, venue_name, location_notes, is_public, status, created_at")
+    .select(LEAGUE_SELECT)
     .eq("id", leagueId)
     .maybeSingle();
 
@@ -447,11 +468,11 @@ async function loadLeagueById(leagueId: string) {
   return (data ?? null) as LeagueRecord | null;
 }
 
-async function loadLeagueBySlug(leagueSlug: string) {
-  const supabase = await createSupabaseServerClient();
+async function loadLeagueBySlug(leagueSlug: string, supabaseClient?: TournamentQueryClient) {
+  const supabase = supabaseClient ?? (await createSupabaseServerClient());
   const { data, error } = await supabase
     .from("leagues")
-    .select("id, name, slug, description, logo_path, photo_path, venue_name, location_notes, is_public, status, created_at")
+    .select(LEAGUE_SELECT)
     .eq("slug", leagueSlug)
     .maybeSingle();
 
@@ -462,12 +483,13 @@ async function loadLeagueBySlug(leagueSlug: string) {
 async function loadCompetitionById(params: {
   competitionId: string;
   leagueId?: string;
+  supabase?: TournamentQueryClient;
 }) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = params.supabase ?? (await createSupabaseServerClient());
   let query = supabase
     .from("competitions")
     .select(
-      "id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, is_public, status, created_at"
+      COMPETITION_SELECT
     )
     .eq("id", params.competitionId);
 
@@ -483,12 +505,13 @@ async function loadCompetitionById(params: {
 async function loadCompetitionBySlugs(params: {
   leagueId: string;
   competitionSlug: string;
+  supabase?: TournamentQueryClient;
 }) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = params.supabase ?? (await createSupabaseServerClient());
   const { data, error } = await supabase
     .from("competitions")
     .select(
-      "id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, is_public, status, created_at"
+      COMPETITION_SELECT
     )
     .eq("league_id", params.leagueId)
     .eq("slug", params.competitionSlug)
@@ -498,8 +521,8 @@ async function loadCompetitionBySlugs(params: {
   return (data ?? null) as CompetitionRecord | null;
 }
 
-async function loadLeagueTeams(leagueId: string) {
-  const supabase = await createSupabaseServerClient();
+async function loadLeagueTeams(leagueId: string, supabaseClient?: TournamentQueryClient) {
+  const supabase = supabaseClient ?? (await createSupabaseServerClient());
   const { data, error } = await supabase
     .from("league_teams")
     .select("id, league_id, name, short_name, slug, logo_path, notes, created_at")
@@ -567,9 +590,10 @@ async function loadLeagueAdminData(leagueId: string) {
 async function loadCompetitionCoreBundle(params: {
   competition: CompetitionRecord;
   league: LeagueRecord;
+  supabase?: TournamentQueryClient;
 }) {
   const { competition, league } = params;
-  const supabase = await createSupabaseServerClient();
+  const supabase = params.supabase ?? (await createSupabaseServerClient());
   const [
     { data: competitionTeams, error: competitionTeamsError },
     { data: rounds, error: roundsError },
@@ -812,12 +836,11 @@ async function loadCompetitionCaptainBundle(params: {
   } satisfies CompetitionBundleWithPlayers;
 }
 
-export async function getPublicLeagues(): Promise<LeagueListItem[]> {
-  const supabase = await createSupabaseServerClient();
+async function loadPublicLeagues(): Promise<LeagueListItem[]> {
+  const supabase = await createPublicReadClient();
   const { data, error } = await supabase
     .from("leagues")
-    .select("id, name, slug, description, logo_path, venue_name, location_notes, is_public, status, created_at")
-    .eq("is_public", true)
+    .select(LEAGUE_SELECT)
     .in("status", ["active", "finished"])
     .order("created_at", { ascending: false });
 
@@ -827,7 +850,8 @@ export async function getPublicLeagues(): Promise<LeagueListItem[]> {
   const leagueIds = leagues.map((league) => league.id);
   const { teamCounts, competitionCounts } = await loadLeagueCounts({
     leagueIds,
-    publicCompetitionsOnly: true
+    publicCompetitionsOnly: true,
+    supabase
   });
 
   return leagues.map((league) =>
@@ -838,30 +862,43 @@ export async function getPublicLeagues(): Promise<LeagueListItem[]> {
   );
 }
 
-export async function getPublicLeagueBySlug(leagueSlug: string) {
-  noStore();
+const getCachedPublicLeagues = unstable_cache(
+  loadPublicLeagues,
+  ["public-tournaments:leagues"],
+  {
+    revalidate: PUBLIC_TOURNAMENT_CACHE_SECONDS,
+    tags: [PUBLIC_TOURNAMENT_CACHE_TAG]
+  }
+);
 
-  const league = await loadLeagueBySlug(leagueSlug);
-  if (!league || !league.is_public || !isPublicTournamentStatus(league.status)) return null;
+export async function getPublicLeagues(): Promise<LeagueListItem[]> {
+  return getCachedPublicLeagues();
+}
 
-  const supabase = await createSupabaseServerClient();
+async function loadPublicLeagueBySlug(leagueSlug: string) {
+  const supabase = await createPublicReadClient();
+  const league = await loadLeagueBySlug(leagueSlug, supabase);
+  if (!league || !isPublicTournamentStatus(league.status)) return null;
+
   const [{ data: competitions, error: competitionsError }, leagueTeams] = await Promise.all([
     supabase
       .from("competitions")
       .select(
-        "id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, is_public, status, created_at"
+        COMPETITION_SELECT
       )
       .eq("league_id", league.id)
-      .eq("is_public", true)
       .in("status", ["active", "finished"])
       .order("created_at", { ascending: false }),
-    loadLeagueTeams(league.id)
+    loadLeagueTeams(league.id, supabase)
   ]);
 
   if (competitionsError) throw new Error(competitionsError.message);
 
   const competitionRows = (competitions ?? []) as CompetitionRecord[];
-  const competitionCounts = await loadCompetitionTeamCounts(competitionRows.map((row) => row.id));
+  const competitionCounts = await loadCompetitionTeamCounts(
+    competitionRows.map((row) => row.id),
+    supabase
+  );
 
   return {
     league: normalizeLeagueRecord(league, {
@@ -875,23 +912,52 @@ export async function getPublicLeagueBySlug(leagueSlug: string) {
   };
 }
 
+const getCachedPublicLeagueBySlug = unstable_cache(
+  loadPublicLeagueBySlug,
+  ["public-tournaments:league"],
+  {
+    revalidate: PUBLIC_TOURNAMENT_CACHE_SECONDS,
+    tags: [PUBLIC_TOURNAMENT_CACHE_TAG]
+  }
+);
+
+export async function getPublicLeagueBySlug(leagueSlug: string) {
+  return getCachedPublicLeagueBySlug(leagueSlug);
+}
+
+async function loadPublicCompetitionBySlugs(params: {
+  leagueSlug: string;
+  competitionSlug: string;
+}) {
+  const supabase = await createPublicReadClient();
+  const league = await loadLeagueBySlug(params.leagueSlug, supabase);
+  if (!league || !isPublicTournamentStatus(league.status)) return null;
+
+  const competition = await loadCompetitionBySlugs({
+    leagueId: league.id,
+    competitionSlug: params.competitionSlug,
+    supabase
+  });
+
+  if (!competition || !isPublicTournamentStatus(competition.status)) return null;
+
+  return loadCompetitionCoreBundle({ competition, league, supabase });
+}
+
+const getCachedPublicCompetitionBySlugs = unstable_cache(
+  loadPublicCompetitionBySlugs,
+  ["public-tournaments:competition"],
+  {
+    revalidate: PUBLIC_TOURNAMENT_CACHE_SECONDS,
+    tags: [PUBLIC_TOURNAMENT_CACHE_TAG]
+  }
+);
+
 export async function getPublicCompetitionBySlugs(params: {
   leagueSlug: string;
   competitionSlug: string;
 }) {
-  noStore();
-
-  const league = await loadLeagueBySlug(params.leagueSlug);
-  if (!league || !league.is_public || !isPublicTournamentStatus(league.status)) return null;
-
-  const competition = await loadCompetitionBySlugs({
-    leagueId: league.id,
-    competitionSlug: params.competitionSlug
-  });
-
-  if (!competition || !competition.is_public || !isPublicTournamentStatus(competition.status)) return null;
-
-  return loadCompetitionCoreBundle({ competition, league });
+  return getCachedPublicCompetitionBySlugs(params);
 }
 
 export async function getPublicCompetitionMatchDetails(params: {
@@ -968,7 +1034,7 @@ export async function getAdminLeagueDetails(leagueId: string) {
     supabase
       .from("competitions")
       .select(
-        "id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, is_public, status, created_at"
+        COMPETITION_SELECT
       )
       .eq("league_id", leagueId)
       .order("created_at", { ascending: false }),
@@ -1266,24 +1332,23 @@ export function findBestDefenseRows(rows: TournamentBestDefenseRow[]) {
 export const getPublicTournaments = getPublicLeagues;
 
 export async function getPublicTournamentBySlug(slug: string) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createPublicReadClient();
   const { data: competition, error: competitionError } = await supabase
     .from("competitions")
-    .select(
-      "id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, is_public, status, created_at"
-    )
+    .select(COMPETITION_SELECT)
     .eq("slug", slug)
     .maybeSingle();
 
   if (competitionError) throw new Error(competitionError.message);
-  if (!competition || !competition.is_public || !isPublicTournamentStatus(String(competition.status))) return null;
+  if (!competition || !isPublicTournamentStatus(String(competition.status))) return null;
 
-  const league = await loadLeagueById(String(competition.league_id));
-  if (!league || !league.is_public || !isPublicTournamentStatus(league.status)) return null;
+  const league = await loadLeagueById(String(competition.league_id), supabase);
+  if (!league || !isPublicTournamentStatus(league.status)) return null;
 
   return loadCompetitionCoreBundle({
     competition: competition as CompetitionRecord,
-    league
+    league,
+    supabase
   });
 }
 

@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createSupabaseServerClientMock, createSupabaseAdminClientMock, noStoreMock } = vi.hoisted(
+const { createSupabaseServerClientMock, createSupabaseAdminClientMock, noStoreMock, unstableCacheMock } = vi.hoisted(
   () => ({
     createSupabaseServerClientMock: vi.fn(),
     createSupabaseAdminClientMock: vi.fn(),
-    noStoreMock: vi.fn()
+    noStoreMock: vi.fn(),
+    unstableCacheMock: vi.fn((fn: unknown) => fn)
   })
 );
 
@@ -18,6 +19,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 vi.mock("next/cache", () => ({
   unstable_noStore: noStoreMock,
+  unstable_cache: unstableCacheMock,
   revalidatePath: vi.fn()
 }));
 

@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createSupabaseServerClientMock, noStoreMock } = vi.hoisted(() => ({
+const { createSupabaseServerClientMock, noStoreMock, unstableCacheMock } = vi.hoisted(() => ({
   createSupabaseServerClientMock: vi.fn(),
-  noStoreMock: vi.fn()
+  noStoreMock: vi.fn(),
+  unstableCacheMock: vi.fn((fn: unknown) => fn)
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -11,6 +12,7 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("next/cache", () => ({
   unstable_noStore: noStoreMock,
+  unstable_cache: unstableCacheMock,
   revalidatePath: vi.fn()
 }));
 
@@ -32,7 +34,34 @@ describe("league and competition public queries", () => {
     vi.clearAllMocks();
   });
 
-  it("lista solo ligas publicas con sus cantidades", async () => {
+  it("configura cache revalidable para consultas publicas de torneos", () => {
+    expect(unstableCacheMock).toHaveBeenCalledWith(
+      expect.any(Function),
+      ["public-tournaments:leagues"],
+      expect.objectContaining({
+        revalidate: 300,
+        tags: ["public-tournaments"]
+      })
+    );
+    expect(unstableCacheMock).toHaveBeenCalledWith(
+      expect.any(Function),
+      ["public-tournaments:league"],
+      expect.objectContaining({
+        revalidate: 300,
+        tags: ["public-tournaments"]
+      })
+    );
+    expect(unstableCacheMock).toHaveBeenCalledWith(
+      expect.any(Function),
+      ["public-tournaments:competition"],
+      expect.objectContaining({
+        revalidate: 300,
+        tags: ["public-tournaments"]
+      })
+    );
+  });
+
+  it("lista solo ligas activas o finalizadas con sus cantidades", async () => {
     const fake = createFakeSupabase({
       leagues: [
         {
@@ -49,7 +78,7 @@ describe("league and competition public queries", () => {
           id: "league-2",
           name: "Privada",
           slug: "privada",
-          is_public: false,
+          is_public: true,
           status: "draft",
           created_by: "admin-1",
           created_at: "2026-04-21T00:00:00.000Z"
@@ -92,9 +121,51 @@ describe("league and competition public queries", () => {
         venueName: "Parque Norte",
         teamCount: 2,
         competitionCount: 1,
-        isPublic: true
+        status: "active"
       })
     ]);
+  });
+
+  it("lista todas las ligas activas porque Torneos no tiene modo no listado", async () => {
+    const fake = createFakeSupabase({
+      leagues: [
+        {
+          id: "league-listed",
+          name: "Liga Listada",
+          slug: "liga-listada",
+          is_public: true,
+          status: "active",
+          created_at: "2026-04-20T00:00:00.000Z"
+        },
+        {
+          id: "league-client",
+          name: "Liga Cliente",
+          slug: "liga-cliente",
+          is_public: true,
+          status: "active",
+          created_at: "2026-04-21T00:00:00.000Z"
+        }
+      ]
+    });
+
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+
+    await expect(getPublicLeagues()).resolves.toEqual([
+      expect.objectContaining({
+        id: "league-client"
+      }),
+      expect.objectContaining({
+        id: "league-listed"
+      })
+    ]);
+
+    await expect(getPublicLeagueBySlug("liga-cliente")).resolves.toEqual(
+      expect.objectContaining({
+        league: expect.objectContaining({
+          id: "league-client"
+        })
+      })
+    );
   });
 
   it("muestra el resumen publico de una liga con sede y competencias", async () => {
@@ -185,6 +256,68 @@ describe("league and competition public queries", () => {
     );
   });
 
+  it("lista todas las competencias activas de una liga", async () => {
+    const fake = createFakeSupabase({
+      leagues: [
+        {
+          id: "league-1",
+          name: "LAFAB",
+          slug: "lafab",
+          is_public: true,
+          status: "active"
+        }
+      ],
+      competitions: [
+        {
+          id: "competition-listed",
+          league_id: "league-1",
+          name: "Viernes A",
+          slug: "viernes-a",
+          season_label: "2026",
+          is_public: true,
+          status: "active"
+        },
+        {
+          id: "competition-client",
+          league_id: "league-1",
+          name: "Copa Privada",
+          slug: "copa-privada",
+          season_label: "2026",
+          is_public: true,
+          status: "active"
+        }
+      ]
+    });
+
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+
+    await expect(getPublicLeagueBySlug("lafab")).resolves.toEqual(
+      expect.objectContaining({
+        competitions: [
+          expect.objectContaining({
+            id: "competition-listed"
+          }),
+          expect.objectContaining({
+            id: "competition-client"
+          })
+        ]
+      })
+    );
+
+    await expect(
+      getPublicCompetitionBySlugs({
+        leagueSlug: "lafab",
+        competitionSlug: "copa-privada"
+      })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        competition: expect.objectContaining({
+          id: "competition-client"
+        })
+      })
+    );
+  });
+
   it("oculta competencias en borrador aun si estan marcadas como publicas", async () => {
     const fake = createFakeSupabase({
       leagues: [
@@ -217,6 +350,27 @@ describe("league and competition public queries", () => {
         competitionSlug: "viernes-b"
       })
     ).resolves.toBeNull();
+  });
+
+  it("no fuerza noStore en consultas publicas cacheables de torneos", async () => {
+    const fake = createFakeSupabase({
+      leagues: [
+        {
+          id: "league-1",
+          name: "LAFAB",
+          slug: "lafab",
+          is_public: true,
+          status: "active"
+        }
+      ]
+    });
+
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+
+    await getPublicLeagues();
+    await getPublicLeagueBySlug("lafab");
+
+    expect(noStoreMock).not.toHaveBeenCalled();
   });
 
   it("arma el detalle publico de una competencia con tabla, fixture y leaderboards", async () => {

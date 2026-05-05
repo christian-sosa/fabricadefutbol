@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -29,6 +29,7 @@ import { normalizeEmail, slugifyTournamentName } from "@/lib/org";
 import { REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL } from "@/lib/storage-image-responses";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { PUBLIC_TOURNAMENT_CACHE_TAG } from "@/lib/tournament-cache";
 import {
   getTeamLogoObjectPath,
   isSupportedTeamLogoFile,
@@ -41,7 +42,6 @@ const updateLeagueSchema = z.object({
   description: z.string().max(500).optional(),
   venueName: z.string().max(120).optional(),
   locationNotes: z.string().max(300).optional(),
-  isPublic: z.boolean().default(false),
   status: z.enum(["draft", "active", "finished", "archived"])
 });
 
@@ -205,6 +205,7 @@ async function leagueAlreadyHasAdminWithEmail(params: {
 
 async function revalidateLeaguePaths(leagueId: string) {
   const slug = await getLeagueSlugById(leagueId);
+  revalidateTag(PUBLIC_TOURNAMENT_CACHE_TAG, { expire: 0 });
   revalidatePath("/admin/tournaments");
   revalidatePath(`/admin/tournaments/${leagueId}`);
   revalidatePath("/tournaments");
@@ -316,7 +317,6 @@ export async function updateLeagueAction(leagueId: string, formData: FormData) {
       description: formData.get("description"),
       venueName: formData.get("venueName"),
       locationNotes: formData.get("locationNotes"),
-      isPublic: formData.get("isPublic") === "on",
       status: formData.get("status")
     });
 
@@ -347,7 +347,7 @@ export async function updateLeagueAction(leagueId: string, formData: FormData) {
         description: parsed.data.description?.trim() || null,
         venue_name: parsed.data.venueName?.trim() || null,
         location_notes: parsed.data.locationNotes?.trim() || null,
-        is_public: parsed.data.isPublic,
+        is_public: true,
         status: parsed.data.status
       })
       .eq("id", leagueId);

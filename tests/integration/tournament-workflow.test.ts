@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   generateCompetitionCupPlayoff,
   generateCompetitionFixture,
+  resetCompetitionMatchSheet,
   saveCompetitionMatchSheet
 } from "@/lib/domain/tournament-workflow";
 import { createFakeSupabase } from "../helpers/fake-supabase";
@@ -175,6 +176,78 @@ describe("competition workflow", () => {
         notes: "Se jugo sin carga detallada"
       })
     );
+    expect(fake.table("competition_match_player_stats")).toEqual([]);
+  });
+
+  it("permite reabrir un partido jugado limpiando resultado y acta", async () => {
+    const fake = createFakeSupabase({
+      admins: [{ id: ADMIN_ID, display_name: "Admin Liga" }],
+      leagues: [{ id: LEAGUE_ID, name: "LAFAB", slug: "lafab", created_by: ADMIN_ID }],
+      competitions: [
+        {
+          id: COMPETITION_ID,
+          league_id: LEAGUE_ID,
+          name: "Viernes A",
+          slug: "viernes-a",
+          season_label: "2026",
+          type: "league",
+          created_by: ADMIN_ID
+        }
+      ],
+      competition_teams: [
+        { id: "team-home", competition_id: COMPETITION_ID, league_team_id: "league-team-home", display_name: "Locales", display_order: 1 },
+        { id: "team-away", competition_id: COMPETITION_ID, league_team_id: "league-team-away", display_name: "Visitantes", display_order: 2 }
+      ],
+      competition_matches: [
+        {
+          id: "match-1",
+          competition_id: COMPETITION_ID,
+          round_id: null,
+          home_team_id: "team-home",
+          away_team_id: "team-away",
+          phase: "league",
+          stage_label: "Fecha 1",
+          scheduled_at: "2026-04-25T20:00:00.000Z",
+          venue: "Cancha 1",
+          status: "played",
+          created_by: ADMIN_ID
+        }
+      ],
+      competition_match_results: [
+        {
+          match_id: "match-1",
+          home_score: 2,
+          away_score: 1,
+          mvp_player_id: null,
+          mvp_player_name: null
+        }
+      ],
+      competition_match_player_stats: [
+        {
+          match_id: "match-1",
+          team_id: "team-home",
+          player_id: null,
+          player_name: "Invitado",
+          goals: 2,
+          yellow_cards: 0,
+          red_cards: 0,
+          is_mvp: false
+        }
+      ]
+    });
+
+    await resetCompetitionMatchSheet({
+      supabase: fake.client as never,
+      competitionId: COMPETITION_ID,
+      matchId: "match-1"
+    });
+
+    expect(fake.find("competition_matches", (row) => row.id === "match-1")).toEqual(
+      expect.objectContaining({
+        status: "scheduled"
+      })
+    );
+    expect(fake.table("competition_match_results")).toEqual([]);
     expect(fake.table("competition_match_player_stats")).toEqual([]);
   });
 

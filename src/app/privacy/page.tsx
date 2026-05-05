@@ -4,7 +4,6 @@ import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS } from "@/lib/constants";
-import { isTournamentsEnabled } from "@/lib/features";
 import { resolvePublicModule, withPublicQuery } from "@/lib/org";
 
 const LAST_UPDATED = "2 de mayo de 2026";
@@ -38,7 +37,6 @@ export default async function PrivacyPage({
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
   const currentModule = resolvePublicModule(resolvedSearchParams.module);
-  const tournamentsEnabled = isTournamentsEnabled();
 
   return (
     <div className="space-y-5">
@@ -76,9 +74,7 @@ export default async function PrivacyPage({
               "Datos de cuenta y acceso: email, identificadores de usuario, sesiones, rol de administrador y fechas de alta.",
               "Datos de grupos: nombre, slug, configuracion, administradores, actividad e informacion publica asociada.",
               "Datos de jugadores: nombre, orden, nivel, ranking, rendimiento, estadisticas, asistencia a partidos, resultados y fotos si fueron cargadas.",
-              tournamentsEnabled
-                ? "Datos de torneos: ligas, competencias, equipos, capitanes, planteles, fixture, tablas, resultados y estadisticas."
-                : "Datos de torneos solo si el modulo se habilita o se usa en entornos internos de prueba.",
+              "Datos de torneos: ligas, competencias, equipos, capitanes, planteles, fixture, tablas, resultados y estadisticas.",
               "Datos de soporte: nombre, email, tema, mensaje, grupo o torneo referido y comunicaciones posteriores.",
               "Datos de publicidad y navegacion: cookies de terceros, direccion IP, identificadores tecnicos, informacion del navegador, impresiones y eventos publicitarios cuando se habilite Google AdSense.",
               "Datos de pago solo para Torneos, flujos historicos o integraciones futuras: identificadores de operacion, proveedor, estado, periodo abonado, moneda, importe y fechas relevantes. No almacenamos datos completos de tarjeta."

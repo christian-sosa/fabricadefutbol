@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
-import { isTournamentsEnabled } from "@/lib/features";
 import { cn } from "@/lib/utils";
 import { withOrgQuery } from "@/lib/org";
 
@@ -125,7 +124,6 @@ export function AdminSubnav({ scope = "all" }: AdminSubnavProps) {
   if (
     !pathname.startsWith("/admin") ||
     pathname.startsWith("/admin/super") ||
-    (isTournamentArea && !isTournamentsEnabled()) ||
     pathname === "/admin/new" ||
     pathname === "/admin/tournaments/new" ||
     (pathname === "/admin" && !organizationKey)

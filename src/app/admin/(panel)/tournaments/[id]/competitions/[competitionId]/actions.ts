@@ -1,10 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import {
+  assertCompetitionRosterEditableAction,
   assertCompetitionWriteAction,
   getCompetitionPublicPathById
 } from "@/lib/auth/tournaments";
@@ -12,6 +13,7 @@ import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import {
   generateCompetitionCupPlayoff,
   generateCompetitionFixture,
+  resetCompetitionMatchSheet,
   saveCompetitionMatchSheet,
   validateCompetitionMatchPair
 } from "@/lib/domain/tournament-workflow";
@@ -31,6 +33,7 @@ import {
 } from "@/lib/player-photos";
 import { REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL } from "@/lib/storage-image-responses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { PUBLIC_TOURNAMENT_CACHE_TAG } from "@/lib/tournament-cache";
 import type { CompetitionPhase, TournamentMatchSheetInput } from "@/types/domain";
 
 const updateCompetitionSchema = z.object({
@@ -118,6 +121,10 @@ const updateMatchSchema = z.object({
   scheduledAt: z.string().optional(),
   venue: z.string().max(120).optional(),
   status: z.enum(["draft", "scheduled", "cancelled"])
+});
+
+const resetMatchSheetSchema = z.object({
+  matchId: z.string().uuid()
 });
 
 const matchSheetSchema = z.object({
@@ -211,6 +218,7 @@ function buildInviteExpiresAt() {
 }
 
 async function revalidateCompetitionPaths(leagueId: string, competitionId: string) {
+  revalidateTag(PUBLIC_TOURNAMENT_CACHE_TAG, { expire: 0 });
   revalidatePath("/admin/tournaments");
   revalidatePath(`/admin/tournaments/${leagueId}`);
   revalidatePath(`/admin/tournaments/${leagueId}/competitions/${competitionId}`);
@@ -443,6 +451,7 @@ export async function syncCompetitionTeamsAction(
 ) {
   try {
     await assertCompetitionWriteAction(competitionId);
+    await assertCompetitionRosterEditableAction(competitionId);
     const selectedLeagueTeamIds = new Set(
       formData
         .getAll("leagueTeamIds")
@@ -541,6 +550,7 @@ export async function inviteCompetitionCaptainAction(
       redirect(buildCompetitionDetailPath({ leagueId, competitionId, tab: "teams", error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
+    await assertCompetitionRosterEditableAction(competitionId);
     const normalizedEmail = parsed.data.email.trim().toLowerCase();
     const supabase = await createSupabaseServerClient();
     const [{ data: team, error: teamError }, { data: currentCaptain, error: captainError }] = await Promise.all([
@@ -611,6 +621,7 @@ export async function deleteCompetitionCaptainInviteAction(
       redirect(buildCompetitionDetailPath({ leagueId, competitionId, tab: "teams", error: parsed.error.issues[0]?.message ?? "Falta la invitación a revocar." }));
     }
 
+    await assertCompetitionRosterEditableAction(competitionId);
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase
       .from("competition_captain_invites")
@@ -645,6 +656,7 @@ export async function removeCompetitionCaptainAction(
       redirect(buildCompetitionDetailPath({ leagueId, competitionId, tab: "teams", error: parsed.error.issues[0]?.message ?? "Falta el capitán a quitar." }));
     }
 
+    await assertCompetitionRosterEditableAction(competitionId);
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase
       .from("competition_team_captains")
@@ -683,6 +695,7 @@ export async function addCompetitionPlayerAction(
       redirect(buildCompetitionDetailPath({ leagueId, competitionId, tab: "rosters", error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
+    await assertCompetitionRosterEditableAction(competitionId);
     await assertCompetitionTeamPlayerCapacity(parsed.data.competitionTeamId);
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.from("competition_team_players").insert({
@@ -724,6 +737,7 @@ export async function updateCompetitionPlayerAction(
       redirect(buildCompetitionDetailPath({ leagueId, competitionId, tab: "rosters", error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
+    await assertCompetitionRosterEditableAction(competitionId);
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase
       .from("competition_team_players")
@@ -763,6 +777,7 @@ export async function deleteCompetitionPlayerAction(
       redirect(buildCompetitionDetailPath({ leagueId, competitionId, tab: "rosters", error: parsed.error.issues[0]?.message ?? "Falta el jugador a borrar." }));
     }
 
+    await assertCompetitionRosterEditableAction(competitionId);
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase
       .from("competition_team_players")
@@ -798,6 +813,7 @@ export async function uploadCompetitionPlayerPhotoAction(
       redirect(buildCompetitionDetailPath({ leagueId, competitionId, tab: "rosters", error: parsed.error.issues[0]?.message ?? "Datos inválidos." }));
     }
 
+    await assertCompetitionRosterEditableAction(competitionId);
     const file = formData.get("photo");
     if (!(file instanceof File) || file.size <= 0) {
       redirect(buildCompetitionDetailPath({ leagueId, competitionId, tab: "rosters", error: "Selecciona una imagen para subir." }));
@@ -1105,7 +1121,7 @@ export async function saveCompetitionMatchSheetAction(
       (penaltyHomeScore !== null && !Number.isFinite(penaltyHomeScore)) ||
       (penaltyAwayScore !== null && !Number.isFinite(penaltyAwayScore))
     ) {
-      redirect(buildMatchSheetPath({ leagueId, competitionId, matchId, error: "La tanda de penales enviada es invÃ¡lida." }));
+      redirect(buildMatchSheetPath({ leagueId, competitionId, matchId, error: "La tanda de penales enviada es inválida." }));
     }
 
     const input: TournamentMatchSheetInput = {
@@ -1139,5 +1155,57 @@ export async function saveCompetitionMatchSheetAction(
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildMatchSheetPath({ leagueId, competitionId, matchId, error: toUserMessage(error, "No se pudo guardar el acta.") }));
+  }
+}
+
+export async function resetCompetitionMatchSheetAction(
+  leagueId: string,
+  competitionId: string,
+  formData: FormData
+) {
+  try {
+    await assertCompetitionWriteAction(competitionId);
+    const parsed = resetMatchSheetSchema.safeParse({
+      matchId: formData.get("matchId")
+    });
+
+    if (!parsed.success) {
+      redirect(buildCompetitionDetailPath({
+        leagueId,
+        competitionId,
+        tab: "fixture",
+        error: parsed.error.issues[0]?.message ?? "Falta el partido a reabrir."
+      }));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    await resetCompetitionMatchSheet({
+      supabase: supabase as never,
+      competitionId,
+      matchId: parsed.data.matchId
+    });
+
+    await revalidateCompetitionPaths(leagueId, competitionId);
+    revalidatePath(`/admin/tournaments/${leagueId}/competitions/${competitionId}/matches/${parsed.data.matchId}`);
+
+    const publicPath = await getCompetitionPublicPathById(competitionId);
+    if (publicPath) {
+      revalidatePath(`/tournaments/${publicPath.leagueSlug}/${publicPath.competitionSlug}/matches/${parsed.data.matchId}`);
+    }
+
+    redirect(buildCompetitionDetailPath({
+      leagueId,
+      competitionId,
+      tab: "fixture",
+      success: "Partido reabierto. El resultado y el acta quedaron limpios."
+    }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildCompetitionDetailPath({
+      leagueId,
+      competitionId,
+      tab: "fixture",
+      error: toUserMessage(error, "No se pudo reabrir el partido.")
+    }));
   }
 }

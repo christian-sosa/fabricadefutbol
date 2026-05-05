@@ -9,6 +9,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import { getAdminOrganizationCreationAccess, getOrganizationWriteAccess } from "@/lib/auth/admin";
+import { assertCanCreateLeagueAction, getLeagueCreationAccess } from "@/lib/auth/tournaments";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 const ADMIN_SESSION = {
@@ -120,5 +121,30 @@ describe("admin group creation access", () => {
       playerPhotosRetentionExpired: false,
       playerPhotosPurgedAt: null
     });
+  });
+});
+
+describe("admin tournament creation access", () => {
+  it("permite crear ligas solo al super admin", async () => {
+    await expect(
+      getLeagueCreationAccess({
+        ...ADMIN_SESSION,
+        isSuperAdmin: true
+      })
+    ).resolves.toEqual({
+      canCreateLeague: true,
+      reason: null
+    });
+  });
+
+  it("bloquea altas de ligas para admins comunes", async () => {
+    await expect(getLeagueCreationAccess(ADMIN_SESSION)).resolves.toEqual({
+      canCreateLeague: false,
+      reason: "Solo el super admin puede crear ligas de Torneos por ahora."
+    });
+
+    await expect(assertCanCreateLeagueAction(ADMIN_SESSION)).rejects.toThrow(
+      "Solo el super admin puede crear ligas de Torneos por ahora."
+    );
   });
 });

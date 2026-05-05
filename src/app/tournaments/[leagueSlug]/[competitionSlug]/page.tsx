@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { TournamentFixtureTable } from "@/components/tournaments/tournament-fixture-table";
@@ -15,11 +16,48 @@ import type {
   TournamentFixtureRow
 } from "@/types/domain";
 
+export const revalidate = 300;
+
 function buildTabHref(leagueSlug: string, competitionSlug: string, tab: string, team: string | null) {
   const searchParams = new URLSearchParams();
   searchParams.set("tab", tab);
   if (team) searchParams.set("team", team);
   return `/tournaments/${leagueSlug}/${competitionSlug}?${searchParams.toString()}`;
+}
+
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ leagueSlug: string; competitionSlug: string }>;
+}): Promise<Metadata> {
+  try {
+    const { leagueSlug, competitionSlug } = await params;
+    const data = await getPublicCompetitionBySlugs({ leagueSlug, competitionSlug });
+    if (!data) return { title: "Competencia" };
+
+    const title = `${data.competition.name} | ${data.league.name}`;
+    const description =
+      data.competition.description ||
+      `Tabla, fixture y resultados de ${data.competition.name} en ${data.league.name}.`;
+
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        url: `/tournaments/${data.league.slug}/${data.competition.slug}`,
+        images: data.league.photoUrl ? [{ url: data.league.photoUrl }] : undefined
+      },
+      twitter: {
+        title,
+        description,
+        images: data.league.photoUrl ? [data.league.photoUrl] : undefined
+      }
+    };
+  } catch {
+    return { title: "Competencia" };
+  }
 }
 
 function getCompetitionTypeLabel(type: CompetitionType) {

@@ -2,13 +2,14 @@
 
 import { randomUUID } from "node:crypto";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { assertAdminAction } from "@/lib/auth/admin";
 import {
+  assertCanCreateLeagueAction,
   assertLeagueMembershipAction,
   assertLeagueWriteAction,
   getLeagueSlugById
@@ -16,7 +17,7 @@ import {
 import {
   ORGANIZATION_BILLING_CURRENCY,
   TEMP_SKIP_TOURNAMENT_CHECKOUT,
-  TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS
+  TOURNAMENT_MONTHLY_CHECKOUT_PRICE_ARS
 } from "@/lib/constants";
 import {
   getMercadoPagoWebhookBaseUrl,
@@ -32,6 +33,7 @@ import { slugifyTournamentName } from "@/lib/org";
 import { createCheckoutProPreference } from "@/lib/payments/mercadopago";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { PUBLIC_TOURNAMENT_CACHE_TAG } from "@/lib/tournament-cache";
 
 const createLeagueSchema = z.object({
   name: z.string().min(3, "El nombre de la liga debe tener al menos 3 caracteres.").max(100)
@@ -139,6 +141,7 @@ function parseNextSlug(baseSlug: string, existingSlugs: string[]) {
 }
 
 function revalidateLeaguePages(leagueSlug?: string | null) {
+  revalidateTag(PUBLIC_TOURNAMENT_CACHE_TAG, { expire: 0 });
   revalidatePath("/admin/tournaments");
   revalidatePath("/tournaments");
   revalidatePath("/admin");
@@ -190,6 +193,8 @@ async function assertUniqueLeagueName(params: {
 export async function createLeagueAction(formData: FormData) {
   try {
     const admin = await assertAdminAction();
+    await assertCanCreateLeagueAction(admin);
+
     const parsed = createLeagueSchema.safeParse({
       name: formData.get("name")
     });
@@ -239,7 +244,7 @@ export async function createLeagueAction(formData: FormData) {
         admin_id: admin.userId,
         requested_league_name: normalizedName,
         requested_league_slug: requestedSlug,
-        amount: TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS,
+        amount: TOURNAMENT_MONTHLY_CHECKOUT_PRICE_ARS,
         currency_id: ORGANIZATION_BILLING_CURRENCY,
         status: "pending",
         mp_external_reference: externalReference,
@@ -288,7 +293,7 @@ export async function createLeagueAction(formData: FormData) {
 
     const preference = await createCheckoutProPreference({
       title: `Crear liga (${normalizedName})`,
-      unitPrice: TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS,
+      unitPrice: TOURNAMENT_MONTHLY_CHECKOUT_PRICE_ARS,
       currencyId: ORGANIZATION_BILLING_CURRENCY,
       quantity: 1,
       externalReference,
@@ -391,7 +396,7 @@ export async function startLeagueCheckoutAction(formData: FormData) {
         requested_league_name: String(league.name),
         requested_league_slug: String(league.slug),
         created_league_id: league.id,
-        amount: TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS,
+        amount: TOURNAMENT_MONTHLY_CHECKOUT_PRICE_ARS,
         currency_id: ORGANIZATION_BILLING_CURRENCY,
         status: "pending",
         mp_external_reference: externalReference,
@@ -411,7 +416,7 @@ export async function startLeagueCheckoutAction(formData: FormData) {
 
     const preference = await createCheckoutProPreference({
       title: `Plan mensual ${league.name}`,
-      unitPrice: TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS,
+      unitPrice: TOURNAMENT_MONTHLY_CHECKOUT_PRICE_ARS,
       currencyId: ORGANIZATION_BILLING_CURRENCY,
       quantity: 1,
       externalReference,
