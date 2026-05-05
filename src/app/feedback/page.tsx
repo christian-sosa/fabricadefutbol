@@ -6,7 +6,6 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { isTournamentsEnabled } from "@/lib/features";
 import { resolvePublicModule, withPublicQuery } from "@/lib/org";
 
 type FeedbackPageProps = {
@@ -22,7 +21,6 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
   const currentModule = resolvePublicModule(resolvedSearchParams.module);
-  const tournamentsEnabled = isTournamentsEnabled();
   const submitAction = submitFeedbackAction.bind(null, organizationKey, currentModule);
   const homePath = withPublicQuery("/", {
     organizationKey,
@@ -33,11 +31,11 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
     module: currentModule
   });
   const moduleDescription =
-    tournamentsEnabled && currentModule === "tournaments"
+    currentModule === "tournaments"
       ? "Si tu consulta es por torneos, capitanes, fixture o resultados, la dejamos lista para soporte."
       : "Si tu consulta es por grupos, ranking o partidos equilibrados, la recibimos por aqui.";
   const targetPlaceholder =
-    tournamentsEnabled && currentModule === "tournaments" ? "Ej: Copa Apertura 2026" : "Ej: La Cantera de LQ";
+    currentModule === "tournaments" ? "Ej: Copa Apertura 2026" : "Ej: La Cantera de LQ";
 
   return (
     <div className="space-y-4">
@@ -125,7 +123,7 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
               </label>
               <Select defaultValue={currentModule} id="module" name="module">
                 <option value="organizations">Grupos</option>
-                {tournamentsEnabled ? <option value="tournaments">Torneos</option> : null}
+                <option value="tournaments">Torneos</option>
                 <option value="both">General</option>
               </Select>
             </div>
@@ -133,7 +131,7 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="organization">
-              {tournamentsEnabled ? "Grupo o torneo (opcional)" : "Grupo (opcional)"}
+              Grupo o torneo (opcional)
             </label>
             <Input id="organization" name="organization" placeholder={targetPlaceholder} />
           </div>

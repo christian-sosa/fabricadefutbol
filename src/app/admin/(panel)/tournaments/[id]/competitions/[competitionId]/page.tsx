@@ -12,6 +12,7 @@ import {
 import { TournamentStandingsTable } from "@/components/tournaments/tournament-standings-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
@@ -26,13 +27,17 @@ import {
   generateCompetitionPlayoffAction,
   inviteCompetitionCaptainAction,
   removeCompetitionCaptainAction,
+  resetCompetitionMatchSheetAction,
   syncCompetitionTeamsAction,
   updateCompetitionAction,
   updateCompetitionMatchAction,
   updateCompetitionPlayerAction,
   uploadCompetitionPlayerPhotoAction
 } from "@/app/admin/(panel)/tournaments/[id]/competitions/[competitionId]/actions";
-import { requireAdminCompetition } from "@/lib/auth/tournaments";
+import {
+  isCompetitionRosterFrozen,
+  requireAdminCompetition
+} from "@/lib/auth/tournaments";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import { formatMatchDateTime, matchIsoToDatetimeLocal } from "@/lib/match-datetime";
 import {
@@ -142,6 +147,7 @@ export default async function AdminCompetitionDetailPage({
   const byeCount = details.fixture.filter((row) => row.kind === "bye").length;
   const leagueMatchRows = details.fixture.filter((row) => row.kind === "match" && row.phase === "league");
   const canEditFormat = details.fixture.length === 0;
+  const isRosterFrozen = isCompetitionRosterFrozen(details.competition.status);
   const canGeneratePlayoff =
     details.competition.type === "league_and_cup" &&
     leagueMatchRows.length > 0 &&
@@ -332,7 +338,9 @@ export default async function AdminCompetitionDetailPage({
           <Card>
             <CardTitle>Equipos inscriptos</CardTitle>
             <CardDescription className="mt-2">
-              Selecciona que equipos de la liga participan de esta competencia. Cada inscripto mantiene plantel y capitan propios.
+              {isRosterFrozen
+                ? "La competencia esta cerrada. Los inscriptos, capitanes y planteles quedan congelados para conservar el historial."
+                : "Selecciona que equipos de la liga participan de esta competencia. Cada inscripto mantiene plantel y capitan propios."}
             </CardDescription>
             <form action={syncCompetitionTeamsAction.bind(null, id, competitionId)} className="mt-4 space-y-4">
               <div className="grid gap-2 md:grid-cols-2">
@@ -347,6 +355,7 @@ export default async function AdminCompetitionDetailPage({
                         <input
                           className="h-4 w-4 accent-emerald-400"
                           defaultChecked={selectedLeagueTeamIds.has(team.id)}
+                          disabled={isRosterFrozen}
                           name="leagueTeamIds"
                           type="checkbox"
                           value={team.id}
@@ -374,7 +383,7 @@ export default async function AdminCompetitionDetailPage({
                   );
                 })}
               </div>
-              <Button type="submit">Guardar inscriptos</Button>
+              <Button disabled={isRosterFrozen} type="submit">Guardar inscriptos</Button>
             </form>
           </Card>
 
@@ -391,7 +400,7 @@ export default async function AdminCompetitionDetailPage({
                         {captain ? `Capitan asignado: ${captain.displayName}` : "Sin capitan asignado"}
                       </CardDescription>
                     </div>
-                    {captain ? (
+                    {captain && !isRosterFrozen ? (
                       <form action={removeCompetitionCaptainAction.bind(null, id, competitionId)}>
                         <input name="competitionTeamId" type="hidden" value={team.id} />
                         <Button type="submit" variant="ghost">
@@ -401,7 +410,7 @@ export default async function AdminCompetitionDetailPage({
                     ) : null}
                   </div>
 
-                  {!captain ? (
+                  {!captain && !isRosterFrozen ? (
                     <form action={inviteCompetitionCaptainAction.bind(null, id, competitionId)} className="mt-4 flex flex-col gap-3 md:flex-row">
                       <input name="competitionTeamId" type="hidden" value={team.id} />
                       <Input name="email" placeholder="email@dominio.com" required type="email" />
@@ -417,12 +426,14 @@ export default async function AdminCompetitionDetailPage({
                       <Link className="mt-2 block break-all text-xs font-semibold text-emerald-300 hover:underline" href={buildCaptainInviteUrl(invite.inviteToken)} rel="noreferrer" target="_blank">
                         {buildCaptainInviteUrl(invite.inviteToken)}
                       </Link>
-                      <form action={deleteCompetitionCaptainInviteAction.bind(null, id, competitionId)} className="mt-2">
-                        <input name="inviteId" type="hidden" value={invite.id} />
-                        <Button type="submit" variant="ghost">
-                          Cancelar invitacion
-                        </Button>
-                      </form>
+                      {!isRosterFrozen ? (
+                        <form action={deleteCompetitionCaptainInviteAction.bind(null, id, competitionId)} className="mt-2">
+                          <input name="inviteId" type="hidden" value={invite.id} />
+                          <Button type="submit" variant="ghost">
+                            Cancelar invitacion
+                          </Button>
+                        </form>
+                      ) : null}
                     </div>
                   ) : null}
                 </Card>
@@ -440,41 +451,50 @@ export default async function AdminCompetitionDetailPage({
 
       {selectedTab === "rosters" ? (
         <div className="space-y-4">
-          <Card>
-            <CardTitle>Agregar jugador a la competencia</CardTitle>
-            <CardDescription className="mt-2">
-              Cada plantel admite hasta {MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores. El mismo equipo puede tener otro roster distinto en otra competencia.
-            </CardDescription>
-            <form action={addCompetitionPlayerAction.bind(null, id, competitionId)} className="mt-4 grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200">Equipo inscripto</label>
-                <Select defaultValue={details.competitionTeams[0]?.id ?? ""} name="competitionTeamId">
-                  {details.competitionTeams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.displayName}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre completo</label>
-                <Input name="fullName" required />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200">Numero</label>
-                <Input max={99} min={1} name="shirtNumber" type="number" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200">Posicion</label>
-                <Input name="position" placeholder="Arquero / Defensor / ..." />
-              </div>
-              <div className="md:col-span-2">
-                <Button disabled={!details.competitionTeams.length} type="submit">
-                  Agregar jugador
-                </Button>
-              </div>
-            </form>
-          </Card>
+          {isRosterFrozen ? (
+            <Card>
+              <CardTitle>Planteles congelados</CardTitle>
+              <CardDescription className="mt-2">
+                La competencia esta cerrada. La lista actual queda como registro historico y no se pueden agregar, editar, borrar jugadores ni cambiar fotos.
+              </CardDescription>
+            </Card>
+          ) : (
+            <Card>
+              <CardTitle>Agregar jugador a la competencia</CardTitle>
+              <CardDescription className="mt-2">
+                Cada plantel admite hasta {MAX_TOURNAMENT_PLAYERS_PER_TEAM} jugadores. El mismo equipo puede tener otro roster distinto en otra competencia.
+              </CardDescription>
+              <form action={addCompetitionPlayerAction.bind(null, id, competitionId)} className="mt-4 grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-200">Equipo inscripto</label>
+                  <Select defaultValue={details.competitionTeams[0]?.id ?? ""} name="competitionTeamId">
+                    {details.competitionTeams.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.displayName}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre completo</label>
+                  <Input name="fullName" required />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-200">Numero</label>
+                  <Input max={99} min={1} name="shirtNumber" type="number" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-200">Posicion</label>
+                  <Input name="position" placeholder="Arquero / Defensor / ..." />
+                </div>
+                <div className="md:col-span-2">
+                  <Button disabled={!details.competitionTeams.length} type="submit">
+                    Agregar jugador
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          )}
 
           <div className="space-y-4">
             {details.competitionTeams.map((team) => {
@@ -500,6 +520,7 @@ export default async function AdminCompetitionDetailPage({
                                 </p>
                               </div>
                             </div>
+                            {!isRosterFrozen ? (
                             <form action={deleteCompetitionPlayerAction.bind(null, id, competitionId)}>
                               <input name="competitionTeamId" type="hidden" value={team.id} />
                               <input name="playerId" type="hidden" value={player.id} />
@@ -507,8 +528,10 @@ export default async function AdminCompetitionDetailPage({
                                 Quitar del plantel
                               </Button>
                             </form>
+                            ) : null}
                           </div>
 
+                          {!isRosterFrozen ? (
                           <form action={updateCompetitionPlayerAction.bind(null, id, competitionId)} className="mt-4 grid gap-3 md:grid-cols-2">
                             <input name="competitionTeamId" type="hidden" value={team.id} />
                             <input name="playerId" type="hidden" value={player.id} />
@@ -530,7 +553,9 @@ export default async function AdminCompetitionDetailPage({
                               </Button>
                             </div>
                           </form>
+                          ) : null}
 
+                          {!isRosterFrozen ? (
                           <form action={uploadCompetitionPlayerPhotoAction.bind(null, id, competitionId)} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
                             <input name="competitionTeamId" type="hidden" value={team.id} />
                             <input name="playerId" type="hidden" value={player.id} />
@@ -544,6 +569,7 @@ export default async function AdminCompetitionDetailPage({
                               </Button>
                             </div>
                           </form>
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -733,6 +759,17 @@ export default async function AdminCompetitionDetailPage({
                               >
                                 Gestionar acta
                               </Link>
+                              {match.status === "played" ? (
+                                <form action={resetCompetitionMatchSheetAction.bind(null, id, competitionId)}>
+                                  <input name="matchId" type="hidden" value={match.id} />
+                                  <ConfirmSubmitButton
+                                    className="h-8 px-3 text-xs"
+                                    confirmMessage="Esto limpia el resultado y el acta del partido. ¿Quieres reabrirlo?"
+                                    label="Reabrir"
+                                    variant="ghost"
+                                  />
+                                </form>
+                              ) : null}
                             </div>
                           </div>
 

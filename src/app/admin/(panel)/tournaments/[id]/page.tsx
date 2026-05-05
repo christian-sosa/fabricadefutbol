@@ -99,11 +99,7 @@ export default async function AdminLeagueDetailPage({
                 Gestiona la liga, sus equipos maestros, las competencias que cuelgan de ella y el equipo administrador.
               </CardDescription>
               <div className="mt-3 space-y-1 text-xs text-slate-400">
-                <p>
-                  {details.league.isPublic
-                    ? "Marcada como publica. Se muestra afuera solo si esta activa o finalizada."
-                    : "Solo visible en admin por ahora."}
-                </p>
+                <p>La ficha publica se muestra cuando la liga esta activa o finalizada.</p>
                 <p>{details.league.venueName ? `Sede: ${details.league.venueName}` : "Sede general pendiente"}</p>
               </div>
             </div>
@@ -156,7 +152,7 @@ export default async function AdminLeagueDetailPage({
             <Card>
               <CardTitle>Configuracion general</CardTitle>
               <CardDescription className="mt-2">
-                La liga define la sede base, la visibilidad publica y el contexto comun para todas sus competencias.
+                La liga define la sede base y el contexto comun para todas sus competencias.
               </CardDescription>
               <form action={updateLeagueAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
                 <div>
@@ -195,12 +191,6 @@ export default async function AdminLeagueDetailPage({
                   </label>
                   <Textarea defaultValue={details.league.description ?? ""} id="description" name="description" rows={4} />
                 </div>
-                <div className="flex items-end">
-                  <label className="flex items-center gap-2 text-sm text-slate-200">
-                    <input className="h-4 w-4 accent-emerald-400" defaultChecked={details.league.isPublic} name="isPublic" type="checkbox" />
-                    Liga publica
-                  </label>
-                </div>
                 <div className="md:col-span-2">
                   <Button type="submit">Guardar resumen</Button>
                 </div>
@@ -218,7 +208,6 @@ export default async function AdminLeagueDetailPage({
                   <form
                     action={uploadLeagueLogoAction.bind(null, id)}
                     className="flex-1 space-y-3"
-                    encType="multipart/form-data"
                   >
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="logo">
@@ -256,7 +245,6 @@ export default async function AdminLeagueDetailPage({
                   <form
                     action={uploadLeaguePhotoAction.bind(null, id)}
                     className="space-y-3"
-                    encType="multipart/form-data"
                   >
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="photo">
@@ -290,7 +278,7 @@ export default async function AdminLeagueDetailPage({
             <CardDescription className="mt-2">
               Aqui cargas el catalogo base de equipos de la liga. Luego eliges cuales se inscriben en cada competencia.
             </CardDescription>
-            <form action={addLeagueTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2" encType="multipart/form-data">
+            <form action={addLeagueTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
                 <Input name="name" required />
@@ -341,7 +329,7 @@ export default async function AdminLeagueDetailPage({
                     </form>
                   </div>
 
-                  <form action={updateLeagueTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2" encType="multipart/form-data">
+                  <form action={updateLeagueTeamAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-2">
                     <input name="teamId" type="hidden" value={team.id} />
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>

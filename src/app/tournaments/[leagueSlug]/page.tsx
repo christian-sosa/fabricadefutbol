@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { LeaguePhoto } from "@/components/tournaments/league-photo";
@@ -6,6 +7,43 @@ import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getPublicLeagueBySlug } from "@/lib/queries/tournaments";
+
+export const revalidate = 300;
+
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ leagueSlug: string }>;
+}): Promise<Metadata> {
+  try {
+    const { leagueSlug } = await params;
+    const data = await getPublicLeagueBySlug(leagueSlug);
+    if (!data) return { title: "Liga" };
+
+    const title = data.league.name;
+    const description =
+      data.league.description ||
+      `Fixture, competencias y resultados de ${data.league.name} en Fabrica de Futbol.`;
+
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        url: `/tournaments/${data.league.slug}`,
+        images: data.league.photoUrl ? [{ url: data.league.photoUrl }] : undefined
+      },
+      twitter: {
+        title,
+        description,
+        images: data.league.photoUrl ? [data.league.photoUrl] : undefined
+      }
+    };
+  } catch {
+    return { title: "Liga" };
+  }
+}
 
 export default async function LeagueDetailPage({
   params

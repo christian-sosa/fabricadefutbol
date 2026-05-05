@@ -23,7 +23,6 @@ export type AdminLeague = {
   venue_name: string | null;
   location_notes: string | null;
   status: LeagueStatus;
-  is_public: boolean;
   created_at: string;
 };
 
@@ -39,7 +38,6 @@ export type AdminCompetition = {
   coverage_mode: CompetitionCoverageMode;
   playoff_size: number | null;
   status: CompetitionStatus;
-  is_public: boolean;
   created_at: string;
 };
 
@@ -53,17 +51,33 @@ export type LeagueWriteAccess = {
   subscriptionActive: boolean;
 };
 
+export type LeagueCreationAccess = {
+  canCreateLeague: boolean;
+  reason: string | null;
+};
+
+export const LEAGUE_CREATION_DISABLED_REASON =
+  "Solo el super admin puede crear ligas de Torneos por ahora.";
+export const COMPETITION_ROSTER_FROZEN_REASON =
+  "La competencia ya esta cerrada: equipos inscriptos, capitanes y planteles quedan congelados.";
+
 function isLeagueBillingSchemaMissing(message: string) {
   return /league_billing_subscriptions|league_billing_payments|purpose|period_start|period_end|subscription_applied_at/i.test(
     message
   );
 }
 
+const ADMIN_LEAGUE_SELECT =
+  "id, name, slug, logo_path, photo_path, venue_name, location_notes, status, created_at";
+
+const ADMIN_COMPETITION_SELECT =
+  "id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, status, created_at";
+
 async function loadLeagueById(leagueId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("leagues")
-    .select("id, name, slug, logo_path, photo_path, venue_name, location_notes, status, is_public, created_at")
+    .select(ADMIN_LEAGUE_SELECT)
     .eq("id", leagueId)
     .maybeSingle();
 
@@ -80,7 +94,7 @@ export async function getAdminLeagues(admin: AdminSession): Promise<AdminLeague[
   if (admin.isSuperAdmin) {
     const { data, error } = await supabase
       .from("leagues")
-      .select("id, name, slug, logo_path, photo_path, venue_name, location_notes, status, is_public, created_at")
+      .select(ADMIN_LEAGUE_SELECT)
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
@@ -107,7 +121,7 @@ export async function getAdminLeagues(admin: AdminSession): Promise<AdminLeague[
 
   const { data, error } = await supabase
     .from("leagues")
-    .select("id, name, slug, logo_path, photo_path, venue_name, location_notes, status, is_public, created_at")
+    .select(ADMIN_LEAGUE_SELECT)
     .in("id", leagueIds)
     .order("created_at", { ascending: false });
 
@@ -119,7 +133,7 @@ export async function getAdminCompetitionsForLeague(leagueId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("competitions")
-    .select("id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, status, is_public, created_at")
+    .select(ADMIN_COMPETITION_SELECT)
     .eq("league_id", leagueId)
     .order("created_at", { ascending: false });
 
@@ -199,6 +213,27 @@ async function assertLeagueMembership(leagueId: string) {
 
 export async function assertLeagueMembershipAction(leagueId: string) {
   return assertLeagueMembership(leagueId);
+}
+
+export async function getLeagueCreationAccess(admin: AdminSession): Promise<LeagueCreationAccess> {
+  if (admin.isSuperAdmin) {
+    return {
+      canCreateLeague: true,
+      reason: null
+    };
+  }
+
+  return {
+    canCreateLeague: false,
+    reason: LEAGUE_CREATION_DISABLED_REASON
+  };
+}
+
+export async function assertCanCreateLeagueAction(admin: AdminSession) {
+  const creationAccess = await getLeagueCreationAccess(admin);
+  if (!creationAccess.canCreateLeague) {
+    throw new Error(creationAccess.reason ?? LEAGUE_CREATION_DISABLED_REASON);
+  }
 }
 
 export async function getLeagueWriteAccess(
@@ -314,6 +349,31 @@ export async function assertCompetitionWriteAction(competitionId: string) {
   };
 }
 
+export function isCompetitionRosterFrozen(status: CompetitionStatus | string | null | undefined) {
+  return status === "finished" || status === "archived";
+}
+
+export async function assertCompetitionRosterEditableAction(competitionId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("competitions")
+    .select("status")
+    .eq("id", competitionId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error("No se encontro la competencia seleccionada.");
+  }
+
+  if (isCompetitionRosterFrozen(String(data.status))) {
+    throw new Error(COMPETITION_ROSTER_FROZEN_REASON);
+  }
+}
+
 export async function requireAdminLeague(leagueId: string) {
   await assertLeagueMembershipAction(leagueId);
 
@@ -344,7 +404,7 @@ export async function requireAdminCompetition(params: {
       const supabase = await createSupabaseServerClient();
       const { data, error } = await supabase
         .from("competitions")
-        .select("id, league_id, name, slug, season_label, description, venue_override, type, coverage_mode, playoff_size, status, is_public, created_at")
+        .select(ADMIN_COMPETITION_SELECT)
         .eq("id", competitionId)
         .eq("league_id", leagueId)
         .maybeSingle();

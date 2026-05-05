@@ -5,7 +5,10 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { assertCaptainTeamAction } from "@/lib/auth/captains";
-import { getCompetitionPublicPathById } from "@/lib/auth/tournaments";
+import {
+  assertCompetitionRosterEditableAction,
+  getCompetitionPublicPathById
+} from "@/lib/auth/tournaments";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
@@ -113,6 +116,7 @@ export async function addCaptainTournamentPlayerAction(formData: FormData) {
       competitionId: parsed.data.competitionId,
       competitionTeamId: parsed.data.teamId
     });
+    await assertCompetitionRosterEditableAction(parsed.data.competitionId);
     await assertCaptainTeamPlayerCapacity(parsed.data.teamId);
 
     const supabase = await createSupabaseServerClient();
@@ -158,6 +162,7 @@ export async function updateCaptainTournamentPlayerAction(formData: FormData) {
       competitionId: parsed.data.competitionId,
       competitionTeamId: parsed.data.teamId
     });
+    await assertCompetitionRosterEditableAction(parsed.data.competitionId);
 
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase
@@ -201,6 +206,7 @@ export async function deleteCaptainTournamentPlayerAction(formData: FormData) {
       competitionId: parsed.data.competitionId,
       competitionTeamId: parsed.data.teamId
     });
+    await assertCompetitionRosterEditableAction(parsed.data.competitionId);
 
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase
@@ -240,6 +246,7 @@ export async function uploadCaptainTournamentPlayerPhotoAction(formData: FormDat
       competitionId: parsed.data.competitionId,
       competitionTeamId: parsed.data.teamId
     });
+    await assertCompetitionRosterEditableAction(parsed.data.competitionId);
 
     const file = formData.get("photo");
     if (!(file instanceof File) || file.size <= 0) {

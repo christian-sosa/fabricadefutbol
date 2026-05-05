@@ -282,7 +282,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "Competencias públicas",
         description:
-          "No hay checkbox para ocultarlas. Si la competencia no debe verse todavía, usá estado draft; si ya terminó, usá finished."
+          "Podés dejar una competencia activa por URL directa y quitarla del listado público de la liga. Draft y archived no se muestran afuera."
       }
     ],
     highlightCards: [
@@ -306,7 +306,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         question: "¿Puedo ocultar una competencia?",
         answer:
-          "La competencia es pública por defecto. Para que no aparezca públicamente, mantenela en draft o archivá lo que ya no corresponda mostrar."
+          "Sí. Desactivá 'Mostrar en la ficha pública de la liga' para que no aparezca listada, pero siga accesible por URL si la liga y la competencia están activas."
       },
       {
         question: "¿Los torneos usan los mismos jugadores que Grupos?",

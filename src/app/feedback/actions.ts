@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { sendFeedbackEmail, type FeedbackModule } from "@/lib/feedback-email";
-import { isTournamentsEnabled } from "@/lib/features";
 import type { PublicModuleContext } from "@/lib/org";
 import { normalizeEmail, withPublicQuery } from "@/lib/org";
 import { checkRateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
@@ -96,9 +95,7 @@ export async function submitFeedbackAction(
   formData: FormData
 ) {
   const submittedModule = normalizeFeedbackModule(formData.get("module"), defaultModule);
-  const safeSubmittedModule =
-    submittedModule === "tournaments" && !isTournamentsEnabled() ? "organizations" : submittedModule;
-  const pageModule = toPageModule(safeSubmittedModule, defaultModule);
+  const pageModule = toPageModule(submittedModule, defaultModule);
 
   const parsed = feedbackSchema.safeParse({
     fullName: formData.get("fullName"),
@@ -154,7 +151,7 @@ export async function submitFeedbackAction(
       fullName: parsed.data.fullName,
       email: normalizeEmail(parsed.data.email),
       category: parsed.data.category,
-      module: parsed.data.module === "tournaments" && !isTournamentsEnabled() ? "organizations" : parsed.data.module,
+      module: parsed.data.module,
       organization: parsed.data.organization?.trim() || null,
       message: parsed.data.message,
       submittedAtIso: new Date().toISOString(),

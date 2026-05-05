@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { isTournamentsEnabled } from "@/lib/features";
 import { resolvePublicModule, withPublicQuery } from "@/lib/org";
 
 const LAST_UPDATED = "2 de mayo de 2026";
@@ -37,7 +36,6 @@ export default async function TermsPage({
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
   const currentModule = resolvePublicModule(resolvedSearchParams.module);
-  const tournamentsEnabled = isTournamentsEnabled();
 
   return (
     <div className="space-y-5">
@@ -72,9 +70,7 @@ export default async function TermsPage({
             equipos, resultados, rankings, historial, proximas fechas y vistas publicas del grupo.
           </p>
           <p>
-            {tournamentsEnabled
-              ? "Cuando el modulo de torneos este disponible, tambien podra incluir ligas, competencias, equipos, fixture, tablas, resultados y estadisticas."
-              : "El foco actual del servicio productivo esta en Grupos. Las funcionalidades de Torneos pueden estar ocultas, limitadas o en preparacion."}
+            Torneos incluye ligas, competencias, equipos, fixture, tablas, resultados y estadisticas, con altas de ligas restringidas por permisos operativos.
           </p>
         </LegalSection>
 
@@ -146,9 +142,7 @@ export default async function TermsPage({
             invitaciones o automatizaciones cuando sea necesario para sostener el servicio gratis.
           </p>
           <p>
-            {tournamentsEnabled
-              ? "Torneos puede tener reglas de facturacion separadas. En Torneos, la facturacion puede asociarse a la liga activa y no necesariamente a cada competencia creada."
-              : "Si mas adelante se habilitan nuevos modulos con contratacion, tendran reglas propias informadas antes de aceptarlos."}
+            Torneos tiene reglas de facturacion separadas. En Torneos, la facturacion puede asociarse a la liga activa y no necesariamente a cada competencia creada.
           </p>
         </LegalSection>
 

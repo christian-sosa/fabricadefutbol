@@ -807,7 +807,72 @@ export async function saveCompetitionMatchSheet(params: {
   });
 }
 
+export async function resetCompetitionMatchSheet(params: {
+  supabase: DbClient;
+  competitionId?: string;
+  tournamentId?: string;
+  matchId: string;
+}) {
+  const { supabase, matchId } = params;
+  const competitionId = params.competitionId ?? params.tournamentId;
+  if (!competitionId) {
+    throw new Error("Falta la competencia a procesar.");
+  }
+
+  const match = await assertMatchBelongsToCompetition({ supabase, competitionId, matchId });
+  if (match.status !== "played") {
+    throw new Error("Solo puedes reabrir partidos que ya fueron marcados como jugados.");
+  }
+
+  if (match.phase === "cup" && match.round_id) {
+    const rounds = await loadCompetitionRounds(supabase, competitionId);
+    const currentRound = rounds.find((round) => String(round.id) === String(match.round_id));
+    const laterCupRoundExists = rounds.some(
+      (round) =>
+        round.phase === "cup" &&
+        currentRound &&
+        Number(round.round_number) > Number(currentRound.round_number)
+    );
+
+    if (laterCupRoundExists) {
+      throw new Error("No puedes reabrir este cruce porque ya existe una ronda posterior de copa.");
+    }
+  }
+
+  const { error: deleteStatsError } = await supabase
+    .from("competition_match_player_stats")
+    .delete()
+    .eq("match_id", matchId);
+
+  if (deleteStatsError) {
+    throw new Error(`No se pudo limpiar el acta del partido: ${deleteStatsError.message}`);
+  }
+
+  const { error: deleteResultError } = await supabase
+    .from("competition_match_results")
+    .delete()
+    .eq("match_id", matchId);
+
+  if (deleteResultError) {
+    throw new Error(`No se pudo limpiar el resultado del partido: ${deleteResultError.message}`);
+  }
+
+  const resetStatus = match.scheduled_at ? "scheduled" : "draft";
+  const { error: updateMatchError } = await supabase
+    .from("competition_matches")
+    .update({
+      status: resetStatus
+    })
+    .eq("id", matchId)
+    .eq("competition_id", competitionId);
+
+  if (updateMatchError) {
+    throw new Error(`No se pudo reabrir el partido: ${updateMatchError.message}`);
+  }
+}
+
 export const generateTournamentFixture = generateCompetitionFixture;
 export const generateTournamentCupPlayoff = generateCompetitionCupPlayoff;
 export const validateTournamentMatchPair = validateCompetitionMatchPair;
 export const saveTournamentMatchSheet = saveCompetitionMatchSheet;
+export const resetTournamentMatchSheet = resetCompetitionMatchSheet;

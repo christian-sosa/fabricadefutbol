@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { getLeagueLogosBucket } from "@/lib/env";
-import { isTournamentsEnabled } from "@/lib/features";
 import {
   buildLeagueLogoPlaceholderSvg,
   LEAGUE_LOGO_CACHE_CONTROL,
@@ -28,10 +27,6 @@ export async function GET(
     params: Promise<{ id: string }>;
   }
 ) {
-  if (!isTournamentsEnabled()) {
-    return new NextResponse(null, { status: 404 });
-  }
-
   const { id: leagueId } = await context.params;
   const supabase = await createSupabaseServerClient();
   const { data: league, error } = await supabase

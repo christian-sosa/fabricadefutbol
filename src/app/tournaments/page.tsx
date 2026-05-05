@@ -1,9 +1,25 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getPublicLeagues } from "@/lib/queries/tournaments";
+
+export const revalidate = 300;
+
+export const metadata: Metadata = {
+  title: "Torneos",
+  description: "Ligas y competencias amateur con fixture, tablas, resultados y estadisticas publicas.",
+  openGraph: {
+    title: "Torneos | Fabrica de Futbol",
+    description: "Consulta ligas, competencias, fixture, tablas y resultados."
+  },
+  twitter: {
+    title: "Torneos | Fabrica de Futbol",
+    description: "Consulta ligas, competencias, fixture, tablas y resultados."
+  }
+};
 
 export default async function TournamentsPage() {
   const leagues = await getPublicLeagues();
