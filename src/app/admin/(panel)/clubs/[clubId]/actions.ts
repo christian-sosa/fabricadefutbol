@@ -119,12 +119,14 @@ const clubAdminInviteDeleteSchema = z.object({
 function buildClubDetailPath(params: {
   clubId: string;
   tab?: string;
+  teamId?: string;
   error?: string;
   success?: string;
 }) {
   const basePath = `/admin/clubs/${params.clubId}`;
   const searchParams = new URLSearchParams();
   if (params.tab) searchParams.set("tab", params.tab);
+  if (params.teamId) searchParams.set("teamId", params.teamId);
   if (params.error) searchParams.set("error", params.error);
   if (params.success) searchParams.set("success", params.success);
   const search = searchParams.toString();
@@ -690,7 +692,7 @@ export async function addClubTeamPlayersAction(clubId: string, formData: FormDat
         .filter(Boolean)
     ));
     if (!selectedPlayerIds.length) {
-      redirect(buildClubDetailPath({ clubId, tab: "teams", error: "Selecciona al menos un jugador para agregar." }));
+      redirect(buildClubDetailPath({ clubId, tab: "teams", teamId: parsed.data.teamId, error: "Selecciona al menos un jugador para agregar." }));
     }
 
     const supabase = await createSupabaseServerClient();
@@ -705,16 +707,16 @@ export async function addClubTeamPlayersAction(clubId: string, formData: FormDat
     ]);
 
     if (teamError || !team) {
-      redirect(buildClubDetailPath({ clubId, tab: "teams", error: "No se encontro el equipo dentro de este club." }));
+      redirect(buildClubDetailPath({ clubId, tab: "teams", teamId: parsed.data.teamId, error: "No se encontro el equipo dentro de este club." }));
     }
     if (validPlayersError) {
-      redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(validPlayersError, "No se pudieron validar los jugadores.") }));
+      redirect(buildClubDetailPath({ clubId, tab: "teams", teamId: parsed.data.teamId, error: toUserMessage(validPlayersError, "No se pudieron validar los jugadores.") }));
     }
     if ((validPlayers ?? []).length !== selectedPlayerIds.length) {
-      redirect(buildClubDetailPath({ clubId, tab: "teams", error: "Solo puedes agregar jugadores activos de este club." }));
+      redirect(buildClubDetailPath({ clubId, tab: "teams", teamId: parsed.data.teamId, error: "Solo puedes agregar jugadores activos de este club." }));
     }
     if (existingError) {
-      redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(existingError, "No se pudo leer el plantel actual.") }));
+      redirect(buildClubDetailPath({ clubId, tab: "teams", teamId: parsed.data.teamId, error: toUserMessage(existingError, "No se pudo leer el plantel actual.") }));
     }
 
     const existingPlayerIds = new Set((existingRows ?? []).map((row) => String(row.club_player_id)));
@@ -726,18 +728,18 @@ export async function addClubTeamPlayersAction(clubId: string, formData: FormDat
       }));
 
     if (!rowsToInsert.length) {
-      redirect(buildClubDetailPath({ clubId, tab: "teams", success: "No habia jugadores nuevos para agregar." }));
+      redirect(buildClubDetailPath({ clubId, tab: "teams", teamId: parsed.data.teamId, success: "No habia jugadores nuevos para agregar." }));
     }
 
     if (rowsToInsert.length) {
       const { error } = await supabase.from("club_team_players").insert(rowsToInsert);
       if (error) {
-        redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(error, "No se pudieron agregar jugadores al equipo.") }));
+        redirect(buildClubDetailPath({ clubId, tab: "teams", teamId: parsed.data.teamId, error: toUserMessage(error, "No se pudieron agregar jugadores al equipo.") }));
       }
     }
 
     await refreshAndRevalidate(clubId);
-    redirect(buildClubDetailPath({ clubId, tab: "teams", success: "Jugadores agregados al equipo." }));
+    redirect(buildClubDetailPath({ clubId, tab: "teams", teamId: parsed.data.teamId, success: "Jugadores agregados al equipo." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(error, "No se pudieron agregar jugadores al equipo.") }));
@@ -765,7 +767,7 @@ export async function removeClubTeamPlayerAction(clubId: string, formData: FormD
       .maybeSingle();
 
     if (teamError || !team) {
-      redirect(buildClubDetailPath({ clubId, tab: "teams", error: "No se encontro el equipo dentro de este club." }));
+      redirect(buildClubDetailPath({ clubId, tab: "teams", teamId: parsed.data.teamId, error: "No se encontro el equipo dentro de este club." }));
     }
 
     const { error } = await supabase
@@ -775,11 +777,11 @@ export async function removeClubTeamPlayerAction(clubId: string, formData: FormD
       .eq("club_player_id", parsed.data.playerId);
 
     if (error) {
-      redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(error, "No se pudo quitar el jugador del equipo.") }));
+      redirect(buildClubDetailPath({ clubId, tab: "teams", teamId: parsed.data.teamId, error: toUserMessage(error, "No se pudo quitar el jugador del equipo.") }));
     }
 
     await refreshAndRevalidate(clubId);
-    redirect(buildClubDetailPath({ clubId, tab: "teams", success: "Jugador quitado del equipo." }));
+    redirect(buildClubDetailPath({ clubId, tab: "teams", teamId: parsed.data.teamId, success: "Jugador quitado del equipo." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(error, "No se pudo quitar el jugador del equipo.") }));

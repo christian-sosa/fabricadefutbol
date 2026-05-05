@@ -33,6 +33,7 @@ import { requireAdminClub } from "@/lib/auth/clubs";
 import {
   CLUB_PLAYER_POSITIONS,
   buildClubTeamRosterOptions,
+  filterClubPlayersForRosterManagement,
   formatClubPlayerPosition,
   normalizeClubPlayerPosition,
   type ClubCompetitionRecord,
@@ -71,6 +72,121 @@ function formatPlayerMeta(player: ClubPlayerRecord) {
     player.shirt_number ? `#${player.shirt_number}` : null,
     player.notes
   ].filter(Boolean).join(" - ");
+}
+
+type TeamRosterFilters = {
+  availablePosition: ClubPlayerPosition | null;
+  availableSearch: string;
+  rosterPosition: ClubPlayerPosition | null;
+  rosterSearch: string;
+};
+
+function buildTeamRosterPath({
+  availablePosition,
+  availableSearch,
+  clubId,
+  rosterPosition,
+  rosterSearch,
+  teamId
+}: TeamRosterFilters & {
+  clubId: string;
+  teamId: string;
+}) {
+  const searchParams = new URLSearchParams({
+    tab: "teams",
+    teamId
+  });
+  if (rosterPosition) searchParams.set("rosterPosition", rosterPosition);
+  if (availablePosition) searchParams.set("availablePosition", availablePosition);
+  if (rosterSearch.trim()) searchParams.set("rosterSearch", rosterSearch.trim());
+  if (availableSearch.trim()) searchParams.set("availableSearch", availableSearch.trim());
+  return `/admin/clubs/${clubId}?${searchParams.toString()}`;
+}
+
+function PositionFilterLinks({
+  clubId,
+  filters,
+  selectedPosition,
+  target,
+  teamId
+}: {
+  clubId: string;
+  filters: TeamRosterFilters;
+  selectedPosition: ClubPlayerPosition | null;
+  target: "available" | "roster";
+  teamId: string;
+}) {
+  const buildHref = (position: ClubPlayerPosition | null) =>
+    buildTeamRosterPath({
+      ...filters,
+      availablePosition: target === "available" ? position : filters.availablePosition,
+      clubId,
+      rosterPosition: target === "roster" ? position : filters.rosterPosition,
+      teamId
+    });
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Link
+        className={
+          selectedPosition
+            ? "rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-300"
+            : "rounded-full border border-emerald-400/60 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-200"
+        }
+        href={buildHref(null)}
+      >
+        Todos
+      </Link>
+      {CLUB_PLAYER_POSITIONS.map((position) => (
+        <Link
+          className={
+            selectedPosition === position
+              ? "rounded-full border border-emerald-400/60 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-200"
+              : "rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-300"
+          }
+          href={buildHref(position)}
+          key={position}
+        >
+          {formatClubPlayerPosition(position)}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function RosterSearchForm({
+  fieldName,
+  filters,
+  placeholder,
+  teamId
+}: {
+  fieldName: "availableSearch" | "rosterSearch";
+  filters: TeamRosterFilters;
+  placeholder: string;
+  teamId: string;
+}) {
+  return (
+    <form className="flex flex-col gap-2 sm:flex-row" method="get">
+      <input name="tab" type="hidden" value="teams" />
+      <input name="teamId" type="hidden" value={teamId} />
+      {filters.rosterPosition ? <input name="rosterPosition" type="hidden" value={filters.rosterPosition} /> : null}
+      {filters.availablePosition ? <input name="availablePosition" type="hidden" value={filters.availablePosition} /> : null}
+      {fieldName === "availableSearch" && filters.rosterSearch.trim() ? (
+        <input name="rosterSearch" type="hidden" value={filters.rosterSearch.trim()} />
+      ) : null}
+      {fieldName === "rosterSearch" && filters.availableSearch.trim() ? (
+        <input name="availableSearch" type="hidden" value={filters.availableSearch.trim()} />
+      ) : null}
+      <Input
+        defaultValue={fieldName === "availableSearch" ? filters.availableSearch : filters.rosterSearch}
+        name={fieldName}
+        placeholder={placeholder}
+      />
+      <Button className="sm:w-fit" type="submit" variant="secondary">
+        Buscar
+      </Button>
+    </form>
+  );
 }
 
 function Feedback({ error, success }: { error?: string; success?: string }) {
@@ -402,154 +518,222 @@ function TeamsTab({
         </form>
       </details>
 
-      {teams.map((team) => {
-        const rosterOptions = buildClubTeamRosterOptions({
-          players,
-          teamId: team.id,
-          teamPlayers
-        });
-        const hasAvailablePlayers = rosterOptions.availablePlayers.length > 0;
-        return (
-          <Card key={team.id}>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex items-start gap-3">
-                <LeagueLogo
-                  alt={`Escudo de ${team.name}`}
-                  src={getClubLogoUrl(clubId)}
-                />
-                <div>
-                  <CardTitle>{team.name}</CardTitle>
-                  <CardDescription className="mt-1">
-                    {team.short_name ? `${team.short_name} - ` : ""}{rosterOptions.rosterPlayers.length} jugadores en el equipo. Usa el escudo del club.
-                  </CardDescription>
-                </div>
-              </div>
-              <Badge className={team.active ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}>
-                {team.active ? "Activo" : "Inactivo"}
-              </Badge>
-            </div>
-
-            <section className="mt-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-slate-200">Plantel actual</p>
-                <p className="text-xs text-slate-500">{rosterOptions.rosterPlayers.length} jugadores</p>
-              </div>
-              {rosterOptions.rosterPlayers.length ? (
-                <div className="grid gap-2 md:grid-cols-2">
-                  {rosterOptions.rosterPlayers.map((player) => (
-                    <div
-                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2"
-                      key={player.id}
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-100">{player.full_name}</p>
-                        <p className="truncate text-xs text-slate-400">{formatPlayerMeta(player) || "Sin detalle"}</p>
-                      </div>
-                      <form action={removeClubTeamPlayerAction.bind(null, clubId)}>
-                        <input name="teamId" type="hidden" value={team.id} />
-                        <input name="playerId" type="hidden" value={player.id} />
-                        <Button className="h-8 px-3 text-xs" type="submit" variant="ghost">
-                          Quitar
-                        </Button>
-                      </form>
+      <section className="grid gap-3 lg:grid-cols-2">
+        {teams.map((team) => {
+          const rosterOptions = buildClubTeamRosterOptions({
+            players,
+            teamId: team.id,
+            teamPlayers
+          });
+          return (
+            <Card key={team.id}>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <LeagueLogo
+                    alt={`Escudo de ${team.name}`}
+                    src={getClubLogoUrl(clubId)}
+                  />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CardTitle className="truncate">{team.name}</CardTitle>
+                      <Badge className={team.active ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}>
+                        {team.active ? "Activo" : "Inactivo"}
+                      </Badge>
                     </div>
-                  ))}
+                    <CardDescription className="mt-1">
+                      {team.short_name ? `${team.short_name} - ` : ""}{rosterOptions.rosterPlayers.length} jugadores. Usa el escudo del club.
+                    </CardDescription>
+                  </div>
                 </div>
+                <Link
+                  className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                  href={`/admin/clubs/${clubId}?tab=teams&teamId=${team.id}`}
+                >
+                  Gestionar plantel
+                </Link>
+              </div>
+            </Card>
+          );
+        })}
+      </section>
+    </div>
+  );
+}
+
+function TeamRosterTab({
+  clubId,
+  filters,
+  players,
+  team,
+  teamPlayers
+}: {
+  clubId: string;
+  filters: TeamRosterFilters;
+  players: ClubPlayerRecord[];
+  team: ClubTeamRecord;
+  teamPlayers: ClubTeamPlayerRecord[];
+}) {
+  const rosterOptions = buildClubTeamRosterOptions({
+    players,
+    teamId: team.id,
+    teamPlayers
+  });
+  const filteredRosterPlayers = filterClubPlayersForRosterManagement(rosterOptions.rosterPlayers, {
+    position: filters.rosterPosition,
+    search: filters.rosterSearch
+  });
+  const filteredAvailablePlayers = filterClubPlayersForRosterManagement(rosterOptions.availablePlayers, {
+    position: filters.availablePosition,
+    search: filters.availableSearch
+  });
+  const hasAvailablePlayers = filteredAvailablePlayers.length > 0;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
+            <LeagueLogo
+              alt={`Escudo de ${team.name}`}
+              src={getClubLogoUrl(clubId)}
+            />
+            <div>
+              <CardTitle>{team.name}</CardTitle>
+              <CardDescription className="mt-1">
+                {team.short_name ? `${team.short_name} - ` : ""}{rosterOptions.rosterPlayers.length} jugadores en el plantel.
+              </CardDescription>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge className={team.active ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}>
+              {team.active ? "Activo" : "Inactivo"}
+            </Badge>
+            <Link
+              className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
+              href={`/admin/clubs/${clubId}?tab=teams`}
+            >
+              Volver a equipos
+            </Link>
+          </div>
+        </div>
+      </Card>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Plantel actual</CardTitle>
+              <CardDescription className="mt-1">
+                Quita jugadores solo desde el plantel de este equipo.
+              </CardDescription>
+            </div>
+            <p className="text-sm font-semibold text-slate-400">
+              {filteredRosterPlayers.length}/{rosterOptions.rosterPlayers.length}
+            </p>
+          </div>
+          <div className="mt-4 space-y-3">
+            <RosterSearchForm
+              fieldName="rosterSearch"
+              filters={filters}
+              placeholder="Buscar en este plantel"
+              teamId={team.id}
+            />
+            <PositionFilterLinks
+              clubId={clubId}
+              filters={filters}
+              selectedPosition={filters.rosterPosition}
+              target="roster"
+              teamId={team.id}
+            />
+          </div>
+          <div className="mt-4 max-h-[560px] space-y-2 overflow-y-auto pr-1">
+            {filteredRosterPlayers.length ? (
+              filteredRosterPlayers.map((player) => (
+                <div
+                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2"
+                  key={player.id}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-100">{player.full_name}</p>
+                    <p className="truncate text-xs text-slate-400">{formatPlayerMeta(player) || "Sin detalle"}</p>
+                  </div>
+                  <form action={removeClubTeamPlayerAction.bind(null, clubId)}>
+                    <input name="teamId" type="hidden" value={team.id} />
+                    <input name="playerId" type="hidden" value={player.id} />
+                    <Button className="h-8 px-3 text-xs" type="submit" variant="ghost">
+                      Quitar
+                    </Button>
+                  </form>
+                </div>
+              ))
+            ) : (
+              <p className="rounded-lg border border-dashed border-slate-800 bg-slate-950/50 px-3 py-2 text-sm text-slate-400">
+                No hay jugadores que coincidan con el filtro.
+              </p>
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Agregar jugadores</CardTitle>
+              <CardDescription className="mt-1">
+                Solo aparecen jugadores activos del club que todavia no estan en este equipo.
+              </CardDescription>
+            </div>
+            <p className="text-sm font-semibold text-slate-400">
+              {filteredAvailablePlayers.length}/{rosterOptions.availablePlayers.length}
+            </p>
+          </div>
+          <div className="mt-4 space-y-3">
+            <RosterSearchForm
+              fieldName="availableSearch"
+              filters={filters}
+              placeholder="Buscar para agregar"
+              teamId={team.id}
+            />
+            <PositionFilterLinks
+              clubId={clubId}
+              filters={filters}
+              selectedPosition={filters.availablePosition}
+              target="available"
+              teamId={team.id}
+            />
+          </div>
+          <form action={addClubTeamPlayersAction.bind(null, clubId)} className="mt-4 space-y-4">
+            <input name="teamId" type="hidden" value={team.id} />
+            <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
+              {filteredAvailablePlayers.length ? (
+                filteredAvailablePlayers.map((player) => (
+                  <label
+                    className="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-200"
+                    key={player.id}
+                  >
+                    <input
+                      className="mt-0.5 h-4 w-4 accent-emerald-400"
+                      name="playerIds"
+                      type="checkbox"
+                      value={player.id}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold">{player.full_name}</span>
+                      <span className="block truncate text-xs text-slate-500">{formatPlayerMeta(player) || "Sin detalle"}</span>
+                    </span>
+                  </label>
+                ))
               ) : (
                 <p className="rounded-lg border border-dashed border-slate-800 bg-slate-950/50 px-3 py-2 text-sm text-slate-400">
-                  Todavia no hay jugadores en este equipo.
+                  No hay jugadores disponibles que coincidan con el filtro.
                 </p>
               )}
-            </section>
-
-            <details className="mt-4 rounded-xl border border-slate-800 bg-slate-950/55 p-3">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-100">Agregar jugadores</p>
-                  <p className="text-xs text-slate-500">
-                    Solo aparecen jugadores activos que todavia no estan en este equipo.
-                  </p>
-                </div>
-                <span className="inline-flex items-center justify-center rounded-md border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200">
-                  Agregar
-                </span>
-              </summary>
-              <form action={addClubTeamPlayersAction.bind(null, clubId)} className="mt-4 space-y-3">
-                <input name="teamId" type="hidden" value={team.id} />
-                {hasAvailablePlayers ? (
-                  <div className="space-y-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Filtrar por posicion
-                    </p>
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                      {CLUB_PLAYER_POSITIONS.map((position) => {
-                        const candidates = rosterOptions.availableByPosition[position];
-                        return (
-                          <fieldset className="rounded-lg border border-slate-800 bg-slate-950/70 p-3" key={position}>
-                            <legend className="px-1 text-xs font-semibold text-slate-300">
-                              {formatClubPlayerPosition(position)} ({candidates.length})
-                            </legend>
-                            {candidates.length ? (
-                              <div className="mt-2 space-y-2">
-                                {candidates.map((player) => (
-                                  <label className="flex items-start gap-2 text-sm text-slate-200" key={player.id}>
-                                    <input
-                                      className="mt-0.5 h-4 w-4 accent-emerald-400"
-                                      name="playerIds"
-                                      type="checkbox"
-                                      value={player.id}
-                                    />
-                                    <span className="min-w-0">
-                                      <span className="block truncate font-semibold">{player.full_name}</span>
-                                      <span className="block truncate text-xs text-slate-500">{formatPlayerMeta(player) || "Sin detalle"}</span>
-                                    </span>
-                                  </label>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="mt-2 text-xs text-slate-500">Sin jugadores disponibles.</p>
-                            )}
-                          </fieldset>
-                        );
-                      })}
-                    </div>
-                    {rosterOptions.availableWithoutPosition.length ? (
-                      <fieldset className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
-                        <legend className="px-1 text-xs font-semibold text-slate-300">
-                          Sin posicion ({rosterOptions.availableWithoutPosition.length})
-                        </legend>
-                        <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                          {rosterOptions.availableWithoutPosition.map((player) => (
-                            <label className="flex items-start gap-2 text-sm text-slate-200" key={player.id}>
-                              <input
-                                className="mt-0.5 h-4 w-4 accent-emerald-400"
-                                name="playerIds"
-                                type="checkbox"
-                                value={player.id}
-                              />
-                              <span className="min-w-0">
-                                <span className="block truncate font-semibold">{player.full_name}</span>
-                                <span className="block truncate text-xs text-slate-500">{formatPlayerMeta(player) || "Sin detalle"}</span>
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      </fieldset>
-                    ) : null}
-                  </div>
-                ) : (
-                  <p className="rounded-lg border border-dashed border-slate-800 bg-slate-950/50 px-3 py-2 text-sm text-slate-400">
-                    No hay jugadores activos fuera de este equipo.
-                  </p>
-                )}
-                <Button disabled={!hasAvailablePlayers} type="submit" variant="secondary">
-                  Agregar seleccionados
-                </Button>
-              </form>
-            </details>
-          </Card>
-        );
-      })}
+            </div>
+            <Button disabled={!hasAvailablePlayers} type="submit" variant="secondary">
+              Agregar seleccionados
+            </Button>
+          </form>
+        </Card>
+      </section>
     </div>
   );
 }
@@ -805,7 +989,17 @@ export default async function AdminClubDetailPage({
   searchParams
 }: {
   params: Promise<{ clubId: string }>;
-  searchParams: Promise<{ tab?: string; position?: string; error?: string; success?: string }>;
+  searchParams: Promise<{
+    availablePosition?: string;
+    availableSearch?: string;
+    error?: string;
+    position?: string;
+    rosterPosition?: string;
+    rosterSearch?: string;
+    success?: string;
+    tab?: string;
+    teamId?: string;
+  }>;
 }) {
   const [{ clubId }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   await requireAdminClub(clubId);
@@ -815,6 +1009,16 @@ export default async function AdminClubDetailPage({
 
   const selectedTab = resolvedSearchParams.tab ?? "summary";
   const selectedPosition = normalizeClubPlayerPosition(resolvedSearchParams.position);
+  const selectedTeam = selectedTab === "teams" && resolvedSearchParams.teamId
+    ? details.teams.find((team) => team.id === resolvedSearchParams.teamId)
+    : null;
+  if (selectedTab === "teams" && resolvedSearchParams.teamId && !selectedTeam) notFound();
+  const teamRosterFilters: TeamRosterFilters = {
+    availablePosition: normalizeClubPlayerPosition(resolvedSearchParams.availablePosition),
+    availableSearch: resolvedSearchParams.availableSearch ?? "",
+    rosterPosition: normalizeClubPlayerPosition(resolvedSearchParams.rosterPosition),
+    rosterSearch: resolvedSearchParams.rosterSearch ?? ""
+  };
   const tabs = [
     { key: "summary", label: "Resumen" },
     { key: "players", label: "Jugadores" },
@@ -861,7 +1065,16 @@ export default async function AdminClubDetailPage({
       {selectedTab === "players" ? (
         <PlayersTab clubId={clubId} players={details.players} selectedPosition={selectedPosition} />
       ) : null}
-      {selectedTab === "teams" ? (
+      {selectedTab === "teams" && selectedTeam ? (
+        <TeamRosterTab
+          clubId={clubId}
+          filters={teamRosterFilters}
+          players={details.players}
+          team={selectedTeam}
+          teamPlayers={details.teamPlayers}
+        />
+      ) : null}
+      {selectedTab === "teams" && !selectedTeam ? (
         <TeamsTab clubId={clubId} players={details.players} teamPlayers={details.teamPlayers} teams={details.teams} />
       ) : null}
       {selectedTab === "competitions" ? (

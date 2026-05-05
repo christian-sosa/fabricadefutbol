@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildClubPublicSnapshot,
   buildClubTeamRosterOptions,
+  filterClubPlayersForRosterManagement,
   validateClubMatchSheet
 } from "@/lib/domain/clubs";
 
@@ -192,6 +193,54 @@ describe("club team roster options", () => {
     expect(options.availableByPosition.arquero).toEqual([]);
     expect(options.availableByPosition.volante).toEqual([]);
     expect(options.availableWithoutPosition).toEqual([]);
+  });
+
+  it("filtra listas de plantel por busqueda y posicion", () => {
+    const players = [
+      {
+        id: "player-1",
+        club_id: "club-1",
+        full_name: "Gonzalo Salvador Pefumo",
+        nickname: "Cogote",
+        position: "defensor" as const,
+        shirt_number: 2,
+        photo_path: null,
+        active: true
+      },
+      {
+        id: "player-2",
+        club_id: "club-1",
+        full_name: "Federico Estevez",
+        nickname: null,
+        position: "delantero" as const,
+        shirt_number: 9,
+        photo_path: null,
+        active: true
+      },
+      {
+        id: "player-3",
+        club_id: "club-1",
+        full_name: "Nicolas Gomez",
+        nickname: "Nico",
+        position: "arquero" as const,
+        shirt_number: 1,
+        photo_path: null,
+        active: true
+      }
+    ];
+
+    expect(
+      filterClubPlayersForRosterManagement(players, {
+        position: "defensor",
+        search: "cogo"
+      }).map((player) => player.id)
+    ).toEqual(["player-1"]);
+    expect(
+      filterClubPlayersForRosterManagement(players, {
+        position: null,
+        search: "estevez"
+      }).map((player) => player.id)
+    ).toEqual(["player-2"]);
   });
 });
 

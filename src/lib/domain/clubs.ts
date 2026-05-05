@@ -289,6 +289,28 @@ export function buildClubTeamRosterOptions({
   };
 }
 
+export function filterClubPlayersForRosterManagement(
+  players: ClubPlayerRecord[],
+  filters: {
+    position: ClubPlayerPosition | null;
+    search?: string | null;
+  }
+) {
+  const search = normalizeKey(filters.search ?? "");
+  return players.filter((player) => {
+    if (filters.position && player.position !== filters.position) return false;
+    if (!search) return true;
+    return [
+      player.full_name,
+      player.nickname,
+      player.notes,
+      player.shirt_number ? String(player.shirt_number) : null
+    ]
+      .filter(Boolean)
+      .some((value) => normalizeKey(String(value)).includes(search));
+  });
+}
+
 function compareByValueThenName(left: ClubPublicStatRow, right: ClubPublicStatRow) {
   if (right.value !== left.value) return right.value - left.value;
   return left.name.localeCompare(right.name, "es");
