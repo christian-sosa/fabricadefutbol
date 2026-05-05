@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildClubPublicSnapshot, validateClubMatchSheet } from "@/lib/domain/clubs";
+import {
+  buildClubPublicSnapshot,
+  buildClubTeamRosterOptions,
+  validateClubMatchSheet
+} from "@/lib/domain/clubs";
 
 const club = {
   id: "club-1",
@@ -123,6 +127,71 @@ describe("club match sheet validation", () => {
     });
 
     expect(errors).toContain("Un jugador que fue pero no entro no puede tener goles, asistencias ni figura.");
+  });
+});
+
+describe("club team roster options", () => {
+  it("separa plantel actual de jugadores disponibles y agrupa candidatos por posicion", () => {
+    const options = buildClubTeamRosterOptions({
+      teamId: "team-1",
+      players: [
+        {
+          id: "player-1",
+          club_id: "club-1",
+          full_name: "Arquero Titular",
+          nickname: null,
+          position: "arquero",
+          shirt_number: 1,
+          photo_path: null,
+          active: true
+        },
+        {
+          id: "player-2",
+          club_id: "club-1",
+          full_name: "Defensor Libre",
+          nickname: null,
+          position: "defensor",
+          shirt_number: 4,
+          photo_path: null,
+          active: true
+        },
+        {
+          id: "player-3",
+          club_id: "club-1",
+          full_name: "Volante Inactivo",
+          nickname: null,
+          position: "volante",
+          shirt_number: 8,
+          photo_path: null,
+          active: false
+        },
+        {
+          id: "player-4",
+          club_id: "club-1",
+          full_name: "Delantero Libre",
+          nickname: null,
+          position: "delantero",
+          shirt_number: 9,
+          photo_path: null,
+          active: true
+        }
+      ],
+      teamPlayers: [
+        {
+          id: "roster-1",
+          club_team_id: "team-1",
+          club_player_id: "player-1"
+        }
+      ]
+    });
+
+    expect(options.rosterPlayers.map((player) => player.id)).toEqual(["player-1"]);
+    expect(options.availablePlayers.map((player) => player.id)).toEqual(["player-2", "player-4"]);
+    expect(options.availableByPosition.defensor.map((player) => player.id)).toEqual(["player-2"]);
+    expect(options.availableByPosition.delantero.map((player) => player.id)).toEqual(["player-4"]);
+    expect(options.availableByPosition.arquero).toEqual([]);
+    expect(options.availableByPosition.volante).toEqual([]);
+    expect(options.availableWithoutPosition).toEqual([]);
   });
 });
 
@@ -377,6 +446,25 @@ describe("club public snapshot", () => {
         name: "La Quinta Reserva",
         shortName: "LQR",
         logoPath: null,
+        players: [
+          {
+            id: "player-2",
+            name: "Nacho",
+            position: null,
+            shirtNumber: null
+          }
+        ],
+        matches: [
+          {
+            id: "match-4",
+            playedAt: "2026-04-19T20:00:00Z",
+            competitionName: "LAFAB",
+            opponentName: "Rival D",
+            venue: null,
+            goalsFor: 0,
+            goalsAgainst: 2
+          }
+        ],
         playerCount: 1,
         matchesPlayed: 1,
         wins: 0,
@@ -391,6 +479,40 @@ describe("club public snapshot", () => {
         name: "La Quinta Senior",
         shortName: "LQ",
         logoPath: null,
+        players: [
+          {
+            id: "player-2",
+            name: "Nacho",
+            position: null,
+            shirtNumber: null
+          },
+          {
+            id: "player-1",
+            name: "Sosa",
+            position: null,
+            shirtNumber: null
+          }
+        ],
+        matches: [
+          {
+            id: "match-3",
+            playedAt: "2026-04-22T20:00:00Z",
+            competitionName: "LAFAB",
+            opponentName: "Rival C",
+            venue: null,
+            goalsFor: 1,
+            goalsAgainst: 1
+          },
+          {
+            id: "match-1",
+            playedAt: "2026-04-20T20:00:00Z",
+            competitionName: "LAFAB",
+            opponentName: "Rival A",
+            venue: null,
+            goalsFor: 2,
+            goalsAgainst: 1
+          }
+        ],
         playerCount: 2,
         matchesPlayed: 2,
         wins: 1,

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
+import { formatClubPlayerPosition } from "@/lib/domain/clubs";
 import { getPublicClubBySlug } from "@/lib/queries/clubs";
 import { getClubLogoUrl } from "@/lib/team-logos";
 import type { ClubPublicActivity, ClubPublicPlayerStat } from "@/lib/domain/clubs";
@@ -96,15 +98,18 @@ function RecordCard({ label, row, value }: { label: string; row: ClubPublicPlaye
 }
 
 export default async function PublicClubPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ team?: string }>;
 }) {
-  const { slug } = await params;
+  const [{ slug }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   const data = await getPublicClubBySlug(slug);
   if (!data) notFound();
 
   const { club, snapshot } = data;
+  const selectedTeam = snapshot.teams.find((team) => team.id === resolvedSearchParams.team) ?? null;
   const hasSummaryData =
     snapshot.summary.teamCount > 0 ||
     snapshot.summary.playerCount > 0 ||
@@ -243,7 +248,9 @@ export default async function PublicClubPage({
                       src={getClubLogoUrl(club.id)}
                     />
                     <div>
-                      <p className="font-semibold text-slate-100">{team.name}</p>
+                      <Link className="font-semibold text-slate-100 hover:text-emerald-200" href={`/clubs/${club.slug}?team=${team.id}`}>
+                        {team.name}
+                      </Link>
                       <p className="mt-1 text-sm text-slate-400">
                         {team.playerCount} jugadores - {team.matchesPlayed} partidos
                       </p>
@@ -255,11 +262,76 @@ export default async function PublicClubPage({
                   <div className="text-left text-sm text-slate-300 sm:text-right">
                     <p>{team.wins} G / {team.draws} E / {team.losses} P</p>
                     <p className="mt-1">{team.goalsFor} GF / {team.goalsAgainst} GC</p>
+                    <Link className="mt-2 inline-block font-semibold text-emerald-300 hover:underline" href={`/clubs/${club.slug}?team=${team.id}`}>
+                      Ver equipo
+                    </Link>
                   </div>
                 </div>
               </div>
             ))}
           </div>
+        </Card>
+      ) : null}
+
+      {selectedTeam ? (
+        <Card>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>{selectedTeam.name}</CardTitle>
+              <CardDescription className="mt-2">
+                {selectedTeam.playerCount} jugadores - {selectedTeam.matchesPlayed} partidos
+              </CardDescription>
+            </div>
+            <Link className="text-sm font-semibold text-slate-300 hover:underline" href={`/clubs/${club.slug}`}>
+              Ver todos
+            </Link>
+          </div>
+
+          <section className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+            <div>
+              <p className="text-sm font-semibold text-slate-200">Jugadores</p>
+              <div className="mt-2 space-y-2">
+                {selectedTeam.players.length ? (
+                  selectedTeam.players.map((player) => (
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm" key={player.id}>
+                      <p className="font-semibold text-slate-100">
+                        {player.shirtNumber ? `#${player.shirtNumber} ` : ""}{player.name}
+                      </p>
+                      {player.position ? (
+                        <p className="mt-1 text-slate-400">{formatClubPlayerPosition(player.position)}</p>
+                      ) : null}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400">Todavia no hay jugadores asignados a este equipo.</p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-slate-200">Partidos</p>
+              <div className="mt-2 space-y-2">
+                {selectedTeam.matches.length ? (
+                  selectedTeam.matches.map((match) => (
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm" key={match.id}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-100">vs {match.opponentName}</p>
+                          <p className="mt-1 text-slate-400">
+                            {formatDate(match.playedAt)} - {match.competitionName}
+                          </p>
+                          {match.venue ? <p className="mt-1 text-xs text-slate-500">{match.venue}</p> : null}
+                        </div>
+                        <p className="shrink-0 font-black text-white">{match.goalsFor} - {match.goalsAgainst}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400">Todavia no hay partidos cargados para este equipo.</p>
+                )}
+              </div>
+            </div>
+          </section>
         </Card>
       ) : null}
 

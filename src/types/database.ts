@@ -738,7 +738,7 @@ export type Database = {
           created_at: string;
           full_name: string;
           id: string;
-          position: string | null;
+          position: "arquero" | "defensor" | "volante" | "delantero" | null;
           shirt_number: number | null;
           team_id: string;
           tournament_id: string;
@@ -749,7 +749,7 @@ export type Database = {
           created_at?: string;
           full_name: string;
           id?: string;
-          position?: string | null;
+          position?: "arquero" | "defensor" | "volante" | "delantero" | null;
           shirt_number?: number | null;
           team_id: string;
           tournament_id: string;
@@ -760,7 +760,7 @@ export type Database = {
           created_at?: string;
           full_name?: string;
           id?: string;
-          position?: string | null;
+          position?: "arquero" | "defensor" | "volante" | "delantero" | null;
           shirt_number?: number | null;
           team_id?: string;
           tournament_id?: string;

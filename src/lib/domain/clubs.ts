@@ -1,6 +1,15 @@
 export type ClubStatus = "draft" | "active" | "archived";
 export type ClubMatchStatus = "draft" | "played" | "cancelled";
 export type ClubLineupRole = "starter" | "substitute" | "present";
+export const CLUB_PLAYER_POSITIONS = ["arquero", "defensor", "volante", "delantero"] as const;
+export type ClubPlayerPosition = (typeof CLUB_PLAYER_POSITIONS)[number];
+
+const CLUB_PLAYER_POSITION_LABELS: Record<ClubPlayerPosition, string> = {
+  arquero: "Arquero",
+  defensor: "Defensor",
+  volante: "Volante",
+  delantero: "Delantero"
+};
 
 export type ClubRecord = {
   id: string;
@@ -19,7 +28,7 @@ export type ClubPlayerRecord = {
   club_id: string;
   full_name: string;
   nickname: string | null;
-  position: string | null;
+  position: ClubPlayerPosition | null;
   shirt_number: number | null;
   photo_path: string | null;
   notes?: string | null;
@@ -107,6 +116,8 @@ export type ClubPublicTeam = {
   name: string;
   shortName: string | null;
   logoPath: string | null;
+  players: ClubPublicTeamPlayer[];
+  matches: ClubPublicTeamMatch[];
   playerCount: number;
   matchesPlayed: number;
   wins: number;
@@ -115,6 +126,23 @@ export type ClubPublicTeam = {
   goalsFor: number;
   goalsAgainst: number;
   lastMatchDate: string | null;
+};
+
+export type ClubPublicTeamPlayer = {
+  id: string;
+  name: string;
+  position: ClubPlayerPosition | null;
+  shirtNumber: number | null;
+};
+
+export type ClubPublicTeamMatch = {
+  id: string;
+  playedAt: string;
+  competitionName: string;
+  opponentName: string;
+  venue: string | null;
+  goalsFor: number;
+  goalsAgainst: number;
 };
 
 export type ClubPublicMatch = {
@@ -209,6 +237,56 @@ export type ClubMatchSheetInput = {
 
 function normalizeKey(value: string) {
   return value.trim().toLowerCase();
+}
+
+export function normalizeClubPlayerPosition(value: unknown): ClubPlayerPosition | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  return CLUB_PLAYER_POSITIONS.includes(normalized as ClubPlayerPosition)
+    ? (normalized as ClubPlayerPosition)
+    : null;
+}
+
+export function formatClubPlayerPosition(value: string | null | undefined) {
+  const normalized = normalizeClubPlayerPosition(value);
+  return normalized ? CLUB_PLAYER_POSITION_LABELS[normalized] : value?.trim() || "";
+}
+
+export function buildClubTeamRosterOptions({
+  players,
+  teamId,
+  teamPlayers
+}: {
+  players: ClubPlayerRecord[];
+  teamId: string;
+  teamPlayers: ClubTeamPlayerRecord[];
+}) {
+  const rosterIds = new Set(
+    teamPlayers
+      .filter((row) => row.club_team_id === teamId)
+      .map((row) => row.club_player_id)
+  );
+  const rosterPlayers = players
+    .filter((player) => rosterIds.has(player.id))
+    .sort((left, right) => left.full_name.localeCompare(right.full_name, "es"));
+  const availablePlayers = players
+    .filter((player) => player.active && !rosterIds.has(player.id))
+    .sort((left, right) => left.full_name.localeCompare(right.full_name, "es"));
+  const availableByPosition = Object.fromEntries(
+    CLUB_PLAYER_POSITIONS.map((position) => [
+      position,
+      availablePlayers.filter((player) => player.position === position)
+    ])
+  ) as Record<ClubPlayerPosition, ClubPlayerRecord[]>;
+  const availableWithoutPosition = availablePlayers.filter((player) => !player.position);
+
+  return {
+    rosterIds,
+    rosterPlayers,
+    availablePlayers,
+    availableByPosition,
+    availableWithoutPosition
+  };
 }
 
 function compareByValueThenName(left: ClubPublicStatRow, right: ClubPublicStatRow) {
@@ -410,11 +488,23 @@ export function buildClubPublicSnapshot(params: {
 
   const playerCountByTeam = new Map<string, number>();
   const rosterTeamNamesByPlayerId = new Map<string, Set<string>>();
+  const playersByTeam = new Map<string, ClubPublicTeamPlayer[]>();
   for (const teamPlayer of params.teamPlayers) {
-    playerCountByTeam.set(
-      teamPlayer.club_team_id,
-      (playerCountByTeam.get(teamPlayer.club_team_id) ?? 0) + 1
-    );
+    const player = playersById.get(teamPlayer.club_player_id);
+    if (player?.active) {
+      playerCountByTeam.set(
+        teamPlayer.club_team_id,
+        (playerCountByTeam.get(teamPlayer.club_team_id) ?? 0) + 1
+      );
+      const teamPlayers = playersByTeam.get(teamPlayer.club_team_id) ?? [];
+      teamPlayers.push({
+        id: player.id,
+        name: player.full_name,
+        position: normalizeClubPlayerPosition(player.position),
+        shirtNumber: player.shirt_number
+      });
+      playersByTeam.set(teamPlayer.club_team_id, teamPlayers);
+    }
     const teamName = teamsById.get(teamPlayer.club_team_id)?.name;
     if (teamName) {
       const teamNames = rosterTeamNamesByPlayerId.get(teamPlayer.club_player_id) ?? new Set<string>();
@@ -678,6 +768,20 @@ export function buildClubPublicSnapshot(params: {
           name: team.name,
           shortName: team.short_name,
           logoPath: params.club.logo_path,
+          players: (playersByTeam.get(team.id) ?? []).sort((left, right) => left.name.localeCompare(right.name, "es")),
+          matches: playedMatches
+            .filter((match) => match.club_team_id === team.id)
+            .map((match) => ({
+              id: match.id,
+              playedAt: match.played_at,
+              competitionName: match.club_competition_id
+                ? competitionsById.get(match.club_competition_id)?.name ?? "Torneo"
+                : "Sin torneo",
+              opponentName: match.opponent_name,
+              venue: match.venue,
+              goalsFor: Number(match.goals_for),
+              goalsAgainst: Number(match.goals_against)
+            })),
           playerCount: playerCountByTeam.get(team.id) ?? 0,
           ...metrics
         };

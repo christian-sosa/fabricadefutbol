@@ -156,7 +156,9 @@ function normalizeSnapshot(row: ClubSnapshotRow | null, clubName: string): ClubP
     activity: row.activity ?? [],
     teams: (row.teams ?? []).map((team) => ({
       ...team,
-      logoPath: team.logoPath ?? null
+      logoPath: team.logoPath ?? null,
+      players: team.players ?? [],
+      matches: team.matches ?? []
     })),
     recentMatches: row.recent_matches ?? [],
     playerStats: (row.player_stats ?? []).map(normalizePlayerStat),

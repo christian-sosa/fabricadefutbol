@@ -5,7 +5,13 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { assertClubWriteAction, getClubSlugById } from "@/lib/auth/clubs";
-import { validateClubMatchSheet, type ClubLineupRole, type ClubMatchSheetParticipantInput } from "@/lib/domain/clubs";
+import {
+  CLUB_PLAYER_POSITIONS,
+  normalizeClubPlayerPosition,
+  validateClubMatchSheet,
+  type ClubLineupRole,
+  type ClubMatchSheetParticipantInput
+} from "@/lib/domain/clubs";
 import { getPlayerPhotosBucket, getSupabaseDbSchema, getTeamLogosBucket } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
 import { datetimeLocalToMatchIso } from "@/lib/match-datetime";
@@ -35,14 +41,23 @@ import {
 const updateClubSchema = z.object({
   name: z.string().min(2, "El nombre del club debe tener al menos 2 caracteres.").max(100),
   description: z.string().max(500).optional(),
-  homeVenue: z.string().max(120).optional(),
-  isPublic: z.boolean().default(false)
+  homeVenue: z.string().max(120).optional()
 });
+
+function normalizePlayerPositionForSchema(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  return normalizeClubPlayerPosition(value) ?? "__invalid_position__";
+}
+
+const playerPositionSchema = z.preprocess(
+  normalizePlayerPositionForSchema,
+  z.enum(CLUB_PLAYER_POSITIONS).nullable()
+);
 
 const playerSchema = z.object({
   fullName: z.string().min(2, "El jugador debe tener al menos 2 caracteres.").max(80),
   nickname: z.string().max(40).optional(),
-  position: z.string().max(30).optional(),
+  position: playerPositionSchema,
   shirtNumber: z.preprocess(
     (value) => (typeof value === "string" && value.trim() ? Number(value) : null),
     z.number().int().min(1).max(99).nullable()
@@ -72,6 +87,10 @@ const playerPhotoSchema = z.object({
 
 const rosterSchema = z.object({
   teamId: z.string().uuid()
+});
+
+const teamPlayerSchema = rosterSchema.extend({
+  playerId: z.string().uuid()
 });
 
 const matchSchema = z.object({
@@ -128,8 +147,8 @@ function parseStatValue(value: FormDataEntryValue | null) {
 }
 
 function parseBulkPlayerLine(line: string, lineNumber: number) {
-  const columns = line.includes("|")
-    ? line.split("|").map((column) => column.trim())
+  const columns = line.includes(";")
+    ? line.split(";").map((column) => column.trim())
     : [line.trim(), "", "", "", ""];
   const [fullName = "", nickname = "", position = "", shirtNumber = "", ...notesParts] = columns;
   const parsed = playerSchema.safeParse({
@@ -137,12 +156,16 @@ function parseBulkPlayerLine(line: string, lineNumber: number) {
     nickname,
     position,
     shirtNumber,
-    notes: notesParts.join(" | ")
+    notes: notesParts.join(";")
   });
 
   if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const message = issue?.path[0] === "position"
+      ? "La posicion debe ser arquero, defensor, volante o delantero."
+      : issue?.message ?? "formato invalido.";
     return {
-      error: `Linea ${lineNumber}: ${parsed.error.issues[0]?.message ?? "formato invalido."}`,
+      error: `Linea ${lineNumber}: ${message}`,
       row: null
     };
   }
@@ -271,8 +294,7 @@ export async function updateClubAction(clubId: string, formData: FormData) {
     const parsed = updateClubSchema.safeParse({
       name: formData.get("name"),
       description: formData.get("description"),
-      homeVenue: formData.get("homeVenue"),
-      isPublic: formData.get("isPublic") === "on"
+      homeVenue: formData.get("homeVenue")
     });
 
     if (!parsed.success) {
@@ -285,8 +307,7 @@ export async function updateClubAction(clubId: string, formData: FormData) {
       .update({
         name: parsed.data.name.trim(),
         description: parsed.data.description?.trim() || null,
-        home_venue: parsed.data.homeVenue?.trim() || null,
-        is_public: parsed.data.isPublic
+        home_venue: parsed.data.homeVenue?.trim() || null
       })
       .eq("id", clubId);
 
@@ -314,7 +335,11 @@ export async function addClubPlayerAction(clubId: string, formData: FormData) {
     });
 
     if (!parsed.success) {
-      redirect(buildClubDetailPath({ clubId, tab: "players", error: parsed.error.issues[0]?.message ?? "Datos invalidos." }));
+      const issue = parsed.error.issues[0];
+      const message = issue?.path[0] === "position"
+        ? "La posicion debe ser arquero, defensor, volante o delantero."
+        : issue?.message ?? "Datos invalidos.";
+      redirect(buildClubDetailPath({ clubId, tab: "players", error: message }));
     }
 
     const supabase = await createSupabaseServerClient();
@@ -647,7 +672,7 @@ export async function uploadClubLogoAction(clubId: string, formData: FormData) {
   }
 }
 
-export async function syncClubTeamRosterAction(clubId: string, formData: FormData) {
+export async function addClubTeamPlayersAction(clubId: string, formData: FormData) {
   try {
     await assertClubWriteAction(clubId);
     const parsed = rosterSchema.safeParse({
@@ -658,33 +683,51 @@ export async function syncClubTeamRosterAction(clubId: string, formData: FormDat
       redirect(buildClubDetailPath({ clubId, tab: "teams", error: "Falta el equipo." }));
     }
 
-    const selectedPlayerIds = new Set(
+    const selectedPlayerIds = Array.from(new Set(
       formData
         .getAll("playerIds")
         .map((value) => String(value))
         .filter(Boolean)
-    );
+    ));
+    if (!selectedPlayerIds.length) {
+      redirect(buildClubDetailPath({ clubId, tab: "teams", error: "Selecciona al menos un jugador para agregar." }));
+    }
+
     const supabase = await createSupabaseServerClient();
-    const [{ data: team, error: teamError }, { data: existingRows, error: existingError }] = await Promise.all([
+    const [
+      { data: team, error: teamError },
+      { data: validPlayers, error: validPlayersError },
+      { data: existingRows, error: existingError }
+    ] = await Promise.all([
       supabase.from("club_teams").select("id").eq("id", parsed.data.teamId).eq("club_id", clubId).maybeSingle(),
+      supabase.from("club_players").select("id").eq("club_id", clubId).eq("active", true).in("id", selectedPlayerIds),
       supabase.from("club_team_players").select("id, club_player_id").eq("club_team_id", parsed.data.teamId)
     ]);
 
     if (teamError || !team) {
       redirect(buildClubDetailPath({ clubId, tab: "teams", error: "No se encontro el equipo dentro de este club." }));
     }
+    if (validPlayersError) {
+      redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(validPlayersError, "No se pudieron validar los jugadores.") }));
+    }
+    if ((validPlayers ?? []).length !== selectedPlayerIds.length) {
+      redirect(buildClubDetailPath({ clubId, tab: "teams", error: "Solo puedes agregar jugadores activos de este club." }));
+    }
     if (existingError) {
       redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(existingError, "No se pudo leer el plantel actual.") }));
     }
 
-    const existingByPlayerId = new Map((existingRows ?? []).map((row) => [String(row.club_player_id), String(row.id)]));
+    const existingPlayerIds = new Set((existingRows ?? []).map((row) => String(row.club_player_id)));
     const rowsToInsert = Array.from(selectedPlayerIds)
-      .filter((playerId) => !existingByPlayerId.has(playerId))
+      .filter((playerId) => !existingPlayerIds.has(playerId))
       .map((playerId) => ({
         club_team_id: parsed.data.teamId,
         club_player_id: playerId
       }));
-    const rowsToDelete = (existingRows ?? []).filter((row) => !selectedPlayerIds.has(String(row.club_player_id)));
+
+    if (!rowsToInsert.length) {
+      redirect(buildClubDetailPath({ clubId, tab: "teams", success: "No habia jugadores nuevos para agregar." }));
+    }
 
     if (rowsToInsert.length) {
       const { error } = await supabase.from("club_team_players").insert(rowsToInsert);
@@ -693,21 +736,53 @@ export async function syncClubTeamRosterAction(clubId: string, formData: FormDat
       }
     }
 
-    if (rowsToDelete.length) {
-      const { error } = await supabase
-        .from("club_team_players")
-        .delete()
-        .in("id", rowsToDelete.map((row) => row.id));
-      if (error) {
-        redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(error, "No se pudo actualizar el plantel.") }));
-      }
+    await refreshAndRevalidate(clubId);
+    redirect(buildClubDetailPath({ clubId, tab: "teams", success: "Jugadores agregados al equipo." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(error, "No se pudieron agregar jugadores al equipo.") }));
+  }
+}
+
+export async function removeClubTeamPlayerAction(clubId: string, formData: FormData) {
+  try {
+    await assertClubWriteAction(clubId);
+    const parsed = teamPlayerSchema.safeParse({
+      playerId: formData.get("playerId"),
+      teamId: formData.get("teamId")
+    });
+
+    if (!parsed.success) {
+      redirect(buildClubDetailPath({ clubId, tab: "teams", error: "Falta el jugador o el equipo." }));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { data: team, error: teamError } = await supabase
+      .from("club_teams")
+      .select("id")
+      .eq("id", parsed.data.teamId)
+      .eq("club_id", clubId)
+      .maybeSingle();
+
+    if (teamError || !team) {
+      redirect(buildClubDetailPath({ clubId, tab: "teams", error: "No se encontro el equipo dentro de este club." }));
+    }
+
+    const { error } = await supabase
+      .from("club_team_players")
+      .delete()
+      .eq("club_team_id", parsed.data.teamId)
+      .eq("club_player_id", parsed.data.playerId);
+
+    if (error) {
+      redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(error, "No se pudo quitar el jugador del equipo.") }));
     }
 
     await refreshAndRevalidate(clubId);
-    redirect(buildClubDetailPath({ clubId, tab: "teams", success: "Plantel actualizado." }));
+    redirect(buildClubDetailPath({ clubId, tab: "teams", success: "Jugador quitado del equipo." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(error, "No se pudo actualizar el plantel.") }));
+    redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(error, "No se pudo quitar el jugador del equipo.") }));
   }
 }
 

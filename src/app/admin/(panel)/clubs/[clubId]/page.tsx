@@ -6,11 +6,12 @@ import {
   addClubMatchAction,
   addClubPlayerAction,
   addClubTeamAction,
+  addClubTeamPlayersAction,
   bulkAddClubPlayersAction,
   inviteClubAdminAction,
+  removeClubTeamPlayerAction,
   removeClubAdminAction,
   revokeClubAdminInviteAction,
-  syncClubTeamRosterAction,
   toggleClubPlayerAction,
   updateClubAction,
   uploadClubLogoAction,
@@ -29,9 +30,20 @@ import { Select } from "@/components/ui/select";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { requireAdminClub } from "@/lib/auth/clubs";
+import {
+  CLUB_PLAYER_POSITIONS,
+  buildClubTeamRosterOptions,
+  formatClubPlayerPosition,
+  normalizeClubPlayerPosition,
+  type ClubCompetitionRecord,
+  type ClubMatchRecord,
+  type ClubPlayerPosition,
+  type ClubPlayerRecord,
+  type ClubTeamPlayerRecord,
+  type ClubTeamRecord
+} from "@/lib/domain/clubs";
 import { getAdminClubDetails } from "@/lib/queries/clubs";
 import { getClubLogoUrl } from "@/lib/team-logos";
-import type { ClubCompetitionRecord, ClubMatchRecord, ClubPlayerRecord, ClubTeamPlayerRecord, ClubTeamRecord } from "@/lib/domain/clubs";
 
 function buildAdminInviteUrl(inviteToken: string) {
   const pathname = `/admin/clubs/invite/${inviteToken}`;
@@ -48,16 +60,17 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function getRosterIds(teamId: string, teamPlayers: ClubTeamPlayerRecord[]) {
-  return new Set(
-    teamPlayers
-      .filter((row) => row.club_team_id === teamId)
-      .map((row) => row.club_player_id)
-  );
-}
-
 function getTeamName(teamId: string, teams: ClubTeamRecord[]) {
   return teams.find((team) => team.id === teamId)?.name ?? "Equipo";
+}
+
+function formatPlayerMeta(player: ClubPlayerRecord) {
+  return [
+    player.nickname,
+    formatClubPlayerPosition(player.position),
+    player.shirt_number ? `#${player.shirt_number}` : null,
+    player.notes
+  ].filter(Boolean).join(" - ");
 }
 
 function Feedback({ error, success }: { error?: string; success?: string }) {
@@ -166,12 +179,6 @@ function SummaryTab({
             </label>
             <Input defaultValue={details.club.home_venue ?? ""} id="homeVenue" name="homeVenue" />
           </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 text-sm text-slate-200">
-              <input className="h-4 w-4 accent-emerald-400" defaultChecked={details.club.is_public} name="isPublic" type="checkbox" />
-              Publicable cuando se reabra la vista publica
-            </label>
-          </div>
           <div className="md:col-span-2">
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="description">
               Descripcion
@@ -187,7 +194,19 @@ function SummaryTab({
   );
 }
 
-function PlayersTab({ clubId, players }: { clubId: string; players: ClubPlayerRecord[] }) {
+function PlayersTab({
+  clubId,
+  players,
+  selectedPosition
+}: {
+  clubId: string;
+  players: ClubPlayerRecord[];
+  selectedPosition: ClubPlayerPosition | null;
+}) {
+  const filteredPlayers = selectedPosition
+    ? players.filter((player) => player.position === selectedPosition)
+    : players;
+
   return (
     <div className="space-y-4">
       <section className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
@@ -204,7 +223,14 @@ function PlayersTab({ clubId, players }: { clubId: string; players: ClubPlayerRe
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold text-slate-200">Posicion</label>
-              <Input name="position" />
+              <Select name="position">
+                <option value="">Sin posicion</option>
+                {CLUB_PLAYER_POSITIONS.map((position) => (
+                  <option key={position} value={position}>
+                    {formatClubPlayerPosition(position)}
+                  </option>
+                ))}
+              </Select>
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold text-slate-200">Numero</label>
@@ -223,22 +249,24 @@ function PlayersTab({ clubId, players }: { clubId: string; players: ClubPlayerRe
         <Card>
           <CardTitle>Carga masiva</CardTitle>
           <CardDescription className="mt-2">
-            Escribe un jugador por linea. Puedes cargar solo nombre o completar columnas separadas por |.
+            Cada salto de linea crea otro jugador. Dentro de cada linea, separa los datos con <span className="font-mono">;</span>.
           </CardDescription>
           <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950/70 p-3 text-sm text-slate-300">
             <p className="font-semibold text-slate-100">Formato</p>
-            <p className="mt-1 text-xs text-slate-400">Nombre | Apodo | Posicion | Numero | Nota</p>
+            <p className="mt-1 text-xs text-slate-400">Nombre;Apodo;Posicion;Numero;Nota</p>
             <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-slate-400">
-{`Juan Perez | Juani | Delantero | 9 | Zurdo
-Nicolas Gomez | Nico | Arquero | 1 |
+{`Juan Perez;Juani;Delantero;9;Zurdo
+Nicolas Gomez;Nico;Arquero;1;
 Martin Alvarez`}
             </pre>
-            <p className="mt-2 text-xs text-slate-500">Si repites un nombre que ya existe en el club, se ignora.</p>
+            <p className="mt-2 text-xs text-slate-500">
+              El salto de linea cambia de jugador; el punto y coma separa campos. Posicion solo puede ser Arquero, Defensor, Volante o Delantero.
+            </p>
           </div>
           <form action={bulkAddClubPlayersAction.bind(null, clubId)} className="mt-4 space-y-3">
             <Textarea
               name="players"
-              placeholder={"Juan Perez | Juani | Delantero | 9 | Zurdo\nNicolas Gomez | Nico | Arquero | 1 |\nMartin Alvarez"}
+              placeholder={"Juan Perez;Juani;Delantero;9;Zurdo\nNicolas Gomez;Nico;Arquero;1;\nMartin Alvarez"}
               rows={8}
             />
             <Button type="submit" variant="secondary">
@@ -250,6 +278,34 @@ Martin Alvarez`}
 
       <Card>
         <CardTitle>Pool del club</CardTitle>
+        <CardDescription className="mt-2">
+          Desactivar no borra al jugador: lo deja fuera del pool activo y puedes volver a activarlo.
+        </CardDescription>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            className={
+              selectedPosition
+                ? "rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-slate-300"
+                : "rounded-full border border-emerald-400/60 bg-emerald-500/15 px-3 py-1.5 text-sm font-semibold text-emerald-200"
+            }
+            href={`/admin/clubs/${clubId}?tab=players`}
+          >
+            Todos
+          </Link>
+          {CLUB_PLAYER_POSITIONS.map((position) => (
+            <Link
+              className={
+                selectedPosition === position
+                  ? "rounded-full border border-emerald-400/60 bg-emerald-500/15 px-3 py-1.5 text-sm font-semibold text-emerald-200"
+                  : "rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-slate-300"
+              }
+              href={`/admin/clubs/${clubId}?tab=players&position=${position}`}
+              key={position}
+            >
+              {formatClubPlayerPosition(position)}
+            </Link>
+          ))}
+        </div>
         <div className="mt-4 overflow-x-auto">
           <Table>
             <THead>
@@ -262,14 +318,14 @@ Martin Alvarez`}
               </tr>
             </THead>
             <TBody>
-              {players.map((player) => (
+              {filteredPlayers.map((player) => (
                 <tr key={player.id}>
                   <TD>
                     <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
                   </TD>
                   <TD className="font-semibold">{player.full_name}</TD>
                   <TD className="text-slate-300">
-                    {[player.nickname, player.position, player.shirt_number ? `#${player.shirt_number}` : null, player.notes].filter(Boolean).join(" - ") || "Sin detalle"}
+                    {formatPlayerMeta(player) || "Sin detalle"}
                   </TD>
                   <TD>
                     <Badge className={player.active ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}>
@@ -315,8 +371,6 @@ function TeamsTab({
   teamPlayers: ClubTeamPlayerRecord[];
   teams: ClubTeamRecord[];
 }) {
-  const activePlayers = players.filter((player) => player.active);
-
   return (
     <div className="space-y-4">
       <details className="rounded-2xl border border-slate-800 bg-slate-950/75 p-4">
@@ -349,7 +403,12 @@ function TeamsTab({
       </details>
 
       {teams.map((team) => {
-        const rosterIds = getRosterIds(team.id, teamPlayers);
+        const rosterOptions = buildClubTeamRosterOptions({
+          players,
+          teamId: team.id,
+          teamPlayers
+        });
+        const hasAvailablePlayers = rosterOptions.availablePlayers.length > 0;
         return (
           <Card key={team.id}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -361,7 +420,7 @@ function TeamsTab({
                 <div>
                   <CardTitle>{team.name}</CardTitle>
                   <CardDescription className="mt-1">
-                    {team.short_name ? `${team.short_name} - ` : ""}{rosterIds.size} jugadores en el equipo. Usa el escudo del club.
+                    {team.short_name ? `${team.short_name} - ` : ""}{rosterOptions.rosterPlayers.length} jugadores en el equipo. Usa el escudo del club.
                   </CardDescription>
                 </div>
               </div>
@@ -369,29 +428,125 @@ function TeamsTab({
                 {team.active ? "Activo" : "Inactivo"}
               </Badge>
             </div>
-            <form action={syncClubTeamRosterAction.bind(null, clubId)} className="mt-4 space-y-3">
-              <input name="teamId" type="hidden" value={team.id} />
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {activePlayers.map((player) => (
-                  <label
-                    className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-200"
-                    key={player.id}
-                  >
-                    <input
-                      className="h-4 w-4 accent-emerald-400"
-                      defaultChecked={rosterIds.has(player.id)}
-                      name="playerIds"
-                      type="checkbox"
-                      value={player.id}
-                    />
-                    <span>{player.full_name}</span>
-                  </label>
-                ))}
+
+            <section className="mt-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-slate-200">Plantel actual</p>
+                <p className="text-xs text-slate-500">{rosterOptions.rosterPlayers.length} jugadores</p>
               </div>
-              <Button type="submit" variant="secondary">
-                Guardar plantel
-              </Button>
-            </form>
+              {rosterOptions.rosterPlayers.length ? (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {rosterOptions.rosterPlayers.map((player) => (
+                    <div
+                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2"
+                      key={player.id}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-100">{player.full_name}</p>
+                        <p className="truncate text-xs text-slate-400">{formatPlayerMeta(player) || "Sin detalle"}</p>
+                      </div>
+                      <form action={removeClubTeamPlayerAction.bind(null, clubId)}>
+                        <input name="teamId" type="hidden" value={team.id} />
+                        <input name="playerId" type="hidden" value={player.id} />
+                        <Button className="h-8 px-3 text-xs" type="submit" variant="ghost">
+                          Quitar
+                        </Button>
+                      </form>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-lg border border-dashed border-slate-800 bg-slate-950/50 px-3 py-2 text-sm text-slate-400">
+                  Todavia no hay jugadores en este equipo.
+                </p>
+              )}
+            </section>
+
+            <details className="mt-4 rounded-xl border border-slate-800 bg-slate-950/55 p-3">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-100">Agregar jugadores</p>
+                  <p className="text-xs text-slate-500">
+                    Solo aparecen jugadores activos que todavia no estan en este equipo.
+                  </p>
+                </div>
+                <span className="inline-flex items-center justify-center rounded-md border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200">
+                  Agregar
+                </span>
+              </summary>
+              <form action={addClubTeamPlayersAction.bind(null, clubId)} className="mt-4 space-y-3">
+                <input name="teamId" type="hidden" value={team.id} />
+                {hasAvailablePlayers ? (
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Filtrar por posicion
+                    </p>
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      {CLUB_PLAYER_POSITIONS.map((position) => {
+                        const candidates = rosterOptions.availableByPosition[position];
+                        return (
+                          <fieldset className="rounded-lg border border-slate-800 bg-slate-950/70 p-3" key={position}>
+                            <legend className="px-1 text-xs font-semibold text-slate-300">
+                              {formatClubPlayerPosition(position)} ({candidates.length})
+                            </legend>
+                            {candidates.length ? (
+                              <div className="mt-2 space-y-2">
+                                {candidates.map((player) => (
+                                  <label className="flex items-start gap-2 text-sm text-slate-200" key={player.id}>
+                                    <input
+                                      className="mt-0.5 h-4 w-4 accent-emerald-400"
+                                      name="playerIds"
+                                      type="checkbox"
+                                      value={player.id}
+                                    />
+                                    <span className="min-w-0">
+                                      <span className="block truncate font-semibold">{player.full_name}</span>
+                                      <span className="block truncate text-xs text-slate-500">{formatPlayerMeta(player) || "Sin detalle"}</span>
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="mt-2 text-xs text-slate-500">Sin jugadores disponibles.</p>
+                            )}
+                          </fieldset>
+                        );
+                      })}
+                    </div>
+                    {rosterOptions.availableWithoutPosition.length ? (
+                      <fieldset className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
+                        <legend className="px-1 text-xs font-semibold text-slate-300">
+                          Sin posicion ({rosterOptions.availableWithoutPosition.length})
+                        </legend>
+                        <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                          {rosterOptions.availableWithoutPosition.map((player) => (
+                            <label className="flex items-start gap-2 text-sm text-slate-200" key={player.id}>
+                              <input
+                                className="mt-0.5 h-4 w-4 accent-emerald-400"
+                                name="playerIds"
+                                type="checkbox"
+                                value={player.id}
+                              />
+                              <span className="min-w-0">
+                                <span className="block truncate font-semibold">{player.full_name}</span>
+                                <span className="block truncate text-xs text-slate-500">{formatPlayerMeta(player) || "Sin detalle"}</span>
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="rounded-lg border border-dashed border-slate-800 bg-slate-950/50 px-3 py-2 text-sm text-slate-400">
+                    No hay jugadores activos fuera de este equipo.
+                  </p>
+                )}
+                <Button disabled={!hasAvailablePlayers} type="submit" variant="secondary">
+                  Agregar seleccionados
+                </Button>
+              </form>
+            </details>
           </Card>
         );
       })}
@@ -650,7 +805,7 @@ export default async function AdminClubDetailPage({
   searchParams
 }: {
   params: Promise<{ clubId: string }>;
-  searchParams: Promise<{ tab?: string; error?: string; success?: string }>;
+  searchParams: Promise<{ tab?: string; position?: string; error?: string; success?: string }>;
 }) {
   const [{ clubId }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   await requireAdminClub(clubId);
@@ -659,6 +814,7 @@ export default async function AdminClubDetailPage({
   if (!details) notFound();
 
   const selectedTab = resolvedSearchParams.tab ?? "summary";
+  const selectedPosition = normalizeClubPlayerPosition(resolvedSearchParams.position);
   const tabs = [
     { key: "summary", label: "Resumen" },
     { key: "players", label: "Jugadores" },
@@ -702,7 +858,9 @@ export default async function AdminClubDetailPage({
       <Feedback error={resolvedSearchParams.error} success={resolvedSearchParams.success} />
 
       {selectedTab === "summary" ? <SummaryTab clubId={clubId} details={details} /> : null}
-      {selectedTab === "players" ? <PlayersTab clubId={clubId} players={details.players} /> : null}
+      {selectedTab === "players" ? (
+        <PlayersTab clubId={clubId} players={details.players} selectedPosition={selectedPosition} />
+      ) : null}
       {selectedTab === "teams" ? (
         <TeamsTab clubId={clubId} players={details.players} teamPlayers={details.teamPlayers} teams={details.teams} />
       ) : null}
