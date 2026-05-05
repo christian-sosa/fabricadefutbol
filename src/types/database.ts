@@ -932,6 +932,7 @@ export type Database = {
           home_venue: string | null;
           id: string;
           is_public: boolean;
+          logo_path: string | null;
           name: string;
           slug: string;
           status: "draft" | "active" | "archived";
@@ -944,6 +945,7 @@ export type Database = {
           home_venue?: string | null;
           id?: string;
           is_public?: boolean;
+          logo_path?: string | null;
           name: string;
           slug: string;
           status?: "draft" | "active" | "archived";
@@ -956,6 +958,7 @@ export type Database = {
           home_venue?: string | null;
           id?: string;
           is_public?: boolean;
+          logo_path?: string | null;
           name?: string;
           slug?: string;
           status?: "draft" | "active" | "archived";

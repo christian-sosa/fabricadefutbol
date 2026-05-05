@@ -32,6 +32,14 @@ export function getClubTeamLogoUrl(clubTeamId: string) {
   return `/api/club-team-logo/${clubTeamId}`;
 }
 
+export function getClubLogoObjectPath(schemaName: string, clubId: string) {
+  return `${schemaName}/clubs/${clubId}.webp`;
+}
+
+export function getClubLogoUrl(clubId: string) {
+  return `/api/club-logo/${clubId}`;
+}
+
 export async function optimizeTeamLogoImage(file: File) {
   const sourceBuffer = Buffer.from(await file.arrayBuffer());
 

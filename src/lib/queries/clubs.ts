@@ -210,12 +210,12 @@ async function loadClubPrivateData(clubId: string) {
   ] = await Promise.all([
     supabase
       .from("clubs")
-      .select("id, name, slug, description, home_venue, is_public, status, created_at")
+      .select("id, name, slug, description, home_venue, logo_path, is_public, status, created_at")
       .eq("id", clubId)
       .maybeSingle(),
     supabase
       .from("club_players")
-      .select("id, club_id, full_name, nickname, position, shirt_number, photo_path, active, created_at")
+      .select("id, club_id, full_name, nickname, position, shirt_number, photo_path, notes, active, created_at")
       .eq("club_id", clubId)
       .order("full_name", { ascending: true }),
     supabase
@@ -369,7 +369,7 @@ export async function getPublicClubBySlug(slug: string) {
   const supabase = await createSupabaseServerClient();
   const { data: club, error: clubError } = await supabase
     .from("clubs")
-    .select("id, name, slug, description, home_venue, is_public, status, created_at")
+    .select("id, name, slug, description, home_venue, logo_path, is_public, status, created_at")
     .eq("slug", slug)
     .maybeSingle();
 

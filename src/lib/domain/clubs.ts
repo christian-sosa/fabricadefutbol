@@ -8,6 +8,7 @@ export type ClubRecord = {
   slug: string;
   description: string | null;
   home_venue: string | null;
+  logo_path: string | null;
   is_public: boolean;
   status: ClubStatus;
   created_at: string;
@@ -21,6 +22,7 @@ export type ClubPlayerRecord = {
   position: string | null;
   shirt_number: number | null;
   photo_path: string | null;
+  notes?: string | null;
   active: boolean;
   created_at?: string;
 };
@@ -675,7 +677,7 @@ export function buildClubPublicSnapshot(params: {
           id: team.id,
           name: team.name,
           shortName: team.short_name,
-          logoPath: team.logo_path,
+          logoPath: params.club.logo_path,
           playerCount: playerCountByTeam.get(team.id) ?? 0,
           ...metrics
         };

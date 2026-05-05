@@ -8,6 +8,7 @@ const club = {
   slug: "la-quinta",
   description: null,
   home_venue: null,
+  logo_path: null,
   is_public: true,
   status: "active" as const,
   created_at: "2026-04-01T00:00:00Z"

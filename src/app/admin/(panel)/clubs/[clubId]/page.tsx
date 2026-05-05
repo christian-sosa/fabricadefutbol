@@ -13,9 +13,10 @@ import {
   syncClubTeamRosterAction,
   toggleClubPlayerAction,
   updateClubAction,
+  uploadClubLogoAction,
   uploadClubPlayerPhotoAction,
-  uploadClubTeamLogoAction
 } from "@/app/admin/(panel)/clubs/[clubId]/actions";
+import { MatchGuestFields } from "@/app/admin/(panel)/clubs/[clubId]/match-guest-fields";
 import { MatchPlayerPicker } from "@/app/admin/(panel)/clubs/[clubId]/match-player-picker";
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,7 @@ import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { requireAdminClub } from "@/lib/auth/clubs";
 import { getAdminClubDetails } from "@/lib/queries/clubs";
-import { getClubTeamLogoUrl } from "@/lib/team-logos";
+import { getClubLogoUrl } from "@/lib/team-logos";
 import type { ClubCompetitionRecord, ClubMatchRecord, ClubPlayerRecord, ClubTeamPlayerRecord, ClubTeamRecord } from "@/lib/domain/clubs";
 
 function buildAdminInviteUrl(inviteToken: string) {
@@ -103,7 +104,7 @@ function SummaryTab({
 
   return (
     <div className="space-y-4">
-      <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+      <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
         <Card>
           <CardDescription>Equipos</CardDescription>
           <CardTitle className="mt-1 text-3xl">{snapshot.summary.teamCount}</CardTitle>
@@ -117,10 +118,6 @@ function SummaryTab({
           <CardTitle className="mt-1 text-3xl">{snapshot.summary.playedMatches}</CardTitle>
         </Card>
         <Card>
-          <CardDescription>Presentes sin jugar</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{snapshot.summary.presentNotPlayedCount ?? 0}</CardTitle>
-        </Card>
-        <Card>
           <CardDescription>Goles a favor</CardDescription>
           <CardTitle className="mt-1 text-3xl">{snapshot.summary.goalsFor}</CardTitle>
         </Card>
@@ -129,6 +126,27 @@ function SummaryTab({
           <CardTitle className="mt-1 text-3xl">{snapshot.summary.goalsAgainst}</CardTitle>
         </Card>
       </section>
+
+      <Card>
+        <CardTitle>Escudo del club</CardTitle>
+        <CardDescription className="mt-2">
+          Este escudo lo heredan todos los equipos del club.
+        </CardDescription>
+        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/70 p-3 sm:flex-row sm:items-center">
+          <LeagueLogo
+            alt={`Escudo de ${details.club.name}`}
+            size={64}
+            src={getClubLogoUrl(clubId)}
+          />
+          <form action={uploadClubLogoAction.bind(null, clubId)} className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+            <Input accept="image/jpeg,image/png,image/webp,image/svg+xml" className="max-w-72" name="logo" type="file" />
+            <Button className="w-fit" type="submit" variant="secondary">
+              Guardar escudo
+            </Button>
+          </form>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">JPG, PNG, WEBP o SVG.</p>
+      </Card>
 
       <Card>
         <CardTitle>Configuracion general</CardTitle>
@@ -205,18 +223,24 @@ function PlayersTab({ clubId, players }: { clubId: string; players: ClubPlayerRe
         <Card>
           <CardTitle>Carga masiva</CardTitle>
           <CardDescription className="mt-2">
-            Escribe un jugador por linea. Si repites un nombre que ya existe en el club, se ignora.
+            Escribe un jugador por linea. Puedes cargar solo nombre o completar columnas separadas por |.
           </CardDescription>
           <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950/70 p-3 text-sm text-slate-300">
             <p className="font-semibold text-slate-100">Formato</p>
+            <p className="mt-1 text-xs text-slate-400">Nombre | Apodo | Posicion | Numero | Nota</p>
             <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-slate-400">
-{`Juan Perez
-Nicolas Gomez
+{`Juan Perez | Juani | Delantero | 9 | Zurdo
+Nicolas Gomez | Nico | Arquero | 1 |
 Martin Alvarez`}
             </pre>
+            <p className="mt-2 text-xs text-slate-500">Si repites un nombre que ya existe en el club, se ignora.</p>
           </div>
           <form action={bulkAddClubPlayersAction.bind(null, clubId)} className="mt-4 space-y-3">
-            <Textarea name="players" placeholder={"Juan Perez\nNicolas Gomez\nMartin Alvarez"} rows={8} />
+            <Textarea
+              name="players"
+              placeholder={"Juan Perez | Juani | Delantero | 9 | Zurdo\nNicolas Gomez | Nico | Arquero | 1 |\nMartin Alvarez"}
+              rows={8}
+            />
             <Button type="submit" variant="secondary">
               Cargar jugadores
             </Button>
@@ -245,7 +269,7 @@ Martin Alvarez`}
                   </TD>
                   <TD className="font-semibold">{player.full_name}</TD>
                   <TD className="text-slate-300">
-                    {[player.nickname, player.position, player.shirt_number ? `#${player.shirt_number}` : null].filter(Boolean).join(" - ") || "Sin detalle"}
+                    {[player.nickname, player.position, player.shirt_number ? `#${player.shirt_number}` : null, player.notes].filter(Boolean).join(" - ") || "Sin detalle"}
                   </TD>
                   <TD>
                     <Badge className={player.active ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}>
@@ -295,11 +319,16 @@ function TeamsTab({
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle>Nuevo equipo</CardTitle>
-        <CardDescription className="mt-2">
-          Cada club puede tener hasta 5 equipos activos. El escudo se carga desde la tarjeta del equipo una vez creado.
-        </CardDescription>
+      <details className="rounded-2xl border border-slate-800 bg-slate-950/75 p-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <div>
+            <CardTitle>Equipos</CardTitle>
+            <CardDescription className="mt-1">Cada club puede tener hasta 5 equipos activos.</CardDescription>
+          </div>
+          <span className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white">
+            Nuevo equipo
+          </span>
+        </summary>
         <form action={addClubTeamAction.bind(null, clubId)} className="mt-4 grid gap-3 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
@@ -317,7 +346,7 @@ function TeamsTab({
             <Button type="submit">Agregar equipo</Button>
           </div>
         </form>
-      </Card>
+      </details>
 
       {teams.map((team) => {
         const rosterIds = getRosterIds(team.id, teamPlayers);
@@ -326,33 +355,14 @@ function TeamsTab({
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex items-start gap-3">
                 <LeagueLogo
-                  alt={`Logo de ${team.name}`}
-                  src={team.logo_path ? getClubTeamLogoUrl(team.id) : null}
+                  alt={`Escudo de ${team.name}`}
+                  src={getClubLogoUrl(clubId)}
                 />
                 <div>
                   <CardTitle>{team.name}</CardTitle>
                   <CardDescription className="mt-1">
-                    {team.short_name ? `${team.short_name} - ` : ""}{rosterIds.size} jugadores en el equipo
+                    {team.short_name ? `${team.short_name} - ` : ""}{rosterIds.size} jugadores en el equipo. Usa el escudo del club.
                   </CardDescription>
-                  <form action={uploadClubTeamLogoAction.bind(null, clubId)} className="mt-3 space-y-2 rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                    <input name="teamId" type="hidden" value={team.id} />
-                    <label className="block text-sm font-semibold text-slate-200" htmlFor={`team-logo-${team.id}`}>
-                      Escudo / logo del equipo
-                    </label>
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <Input
-                        accept="image/jpeg,image/png,image/webp,image/svg+xml"
-                        className="max-w-64"
-                        id={`team-logo-${team.id}`}
-                        name="logo"
-                        type="file"
-                      />
-                      <Button className="h-9 w-fit px-3 text-xs" type="submit" variant="secondary">
-                        Guardar escudo
-                      </Button>
-                    </div>
-                    <p className="text-xs text-slate-500">JPG, PNG, WEBP o SVG.</p>
-                  </form>
                 </div>
               </div>
               <Badge className={team.active ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}>
@@ -398,11 +408,18 @@ function CompetitionsTab({
 }) {
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle>Torneos del club</CardTitle>
-        <CardDescription className="mt-2">
-          Usa estos torneos para clasificar partidos como Copa Premier, LAFAB o amistosos.
-        </CardDescription>
+      <details className="rounded-2xl border border-slate-800 bg-slate-950/75 p-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <div>
+            <CardTitle>Torneos del club</CardTitle>
+            <CardDescription className="mt-1">
+              Usa estos torneos para clasificar partidos como Copa Premier, LAFAB o amistosos.
+            </CardDescription>
+          </div>
+          <span className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white">
+            Nuevo torneo
+          </span>
+        </summary>
         <form action={addClubCompetitionAction.bind(null, clubId)} className="mt-4 grid gap-3 md:grid-cols-[1fr_1.4fr_auto]">
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
@@ -416,7 +433,7 @@ function CompetitionsTab({
             <Button type="submit">Agregar</Button>
           </div>
         </form>
-      </Card>
+      </details>
 
       <Card>
         <CardTitle>Actuales</CardTitle>
@@ -514,27 +531,7 @@ function MatchesTab({
 
           <MatchPlayerPicker players={players} teamPlayers={teamPlayers} teams={activeTeams} />
 
-          <section>
-            <p className="text-sm font-semibold text-slate-200">Invitados</p>
-            <div className="mt-2 grid gap-3">
-              {Array.from({ length: 6 }, (_, index) => index + 1).map((slot) => (
-                <div className="grid gap-2 rounded-xl border border-slate-800 bg-slate-950/70 p-3 md:grid-cols-[1fr_150px_90px_90px_80px]" key={slot}>
-                  <Input name={`guestName:${slot}`} placeholder="Nombre" />
-                  <Select defaultValue="starter" name={`guestRole:${slot}`}>
-                    <option value="starter">Titular</option>
-                    <option value="substitute">Suplente</option>
-                    <option value="present">Presente, no entro</option>
-                  </Select>
-                  <Input min={0} name={`guestGoals:${slot}`} placeholder="Goles" type="number" />
-                  <Input min={0} name={`guestAssists:${slot}`} placeholder="Asist." type="number" />
-                  <label className="flex items-center gap-2 text-sm text-slate-200">
-                    <input className="h-4 w-4 accent-emerald-400" name="mvp" type="radio" value={`guest:${slot}`} />
-                    Figura
-                  </label>
-                </div>
-              ))}
-            </div>
-          </section>
+          <MatchGuestFields />
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200">Notas</label>

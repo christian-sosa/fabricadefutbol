@@ -5,7 +5,7 @@ import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { getPublicClubBySlug } from "@/lib/queries/clubs";
-import { getClubTeamLogoUrl } from "@/lib/team-logos";
+import { getClubLogoUrl } from "@/lib/team-logos";
 import type { ClubPublicActivity, ClubPublicPlayerStat } from "@/lib/domain/clubs";
 
 export async function generateMetadata({
@@ -156,12 +156,15 @@ export default async function PublicClubPage({
     <div className="space-y-5">
       <section className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5 shadow-[0_24px_70px_-48px_rgba(16,185,129,0.9)] sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Club</p>
-            <h1 className="mt-2 text-4xl font-black text-white sm:text-5xl">{club.name}</h1>
-            {club.description ? (
-              <p className="mt-3 max-w-3xl text-base text-slate-300">{club.description}</p>
-            ) : null}
+          <div className="flex items-start gap-4">
+            <LeagueLogo alt={`Escudo de ${club.name}`} size={72} src={getClubLogoUrl(club.id)} />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Club</p>
+              <h1 className="mt-2 text-4xl font-black text-white sm:text-5xl">{club.name}</h1>
+              {club.description ? (
+                <p className="mt-3 max-w-3xl text-base text-slate-300">{club.description}</p>
+              ) : null}
+            </div>
           </div>
           {club.home_venue ? (
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm text-slate-300">
@@ -175,15 +178,11 @@ export default async function PublicClubPage({
         <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
           <Card>
             <CardDescription>Jugadores</CardDescription>
-            <CardTitle className="mt-1 text-3xl">{snapshot.summary.totalPlayersDistinct}</CardTitle>
+            <CardTitle className="mt-1 text-3xl">{snapshot.summary.playerCount}</CardTitle>
           </Card>
           <Card>
             <CardDescription>Partidos</CardDescription>
             <CardTitle className="mt-1 text-3xl">{snapshot.summary.totalMatches}</CardTitle>
-          </Card>
-          <Card>
-            <CardDescription>Presentes sin jugar</CardDescription>
-            <CardTitle className="mt-1 text-3xl">{snapshot.summary.presentNotPlayedCount ?? 0}</CardTitle>
           </Card>
           <Card>
             <CardDescription>Goles</CardDescription>
@@ -241,7 +240,7 @@ export default async function PublicClubPage({
                     <LeagueLogo
                       alt={`Escudo de ${team.name}`}
                       size={48}
-                      src={team.logoPath ? getClubTeamLogoUrl(team.id) : null}
+                      src={getClubLogoUrl(club.id)}
                     />
                     <div>
                       <p className="font-semibold text-slate-100">{team.name}</p>

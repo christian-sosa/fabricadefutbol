@@ -26,7 +26,7 @@ import { REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL } from "@/lib/storage-image-resp
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
-  getClubTeamLogoObjectPath,
+  getClubLogoObjectPath,
   isSupportedTeamLogoFile,
   MAX_TEAM_LOGO_SIZE_MB,
   optimizeTeamLogoImage
@@ -68,10 +68,6 @@ const competitionSchema = z.object({
 
 const playerPhotoSchema = z.object({
   playerId: z.string().uuid()
-});
-
-const teamLogoSchema = z.object({
-  teamId: z.string().uuid()
 });
 
 const rosterSchema = z.object({
@@ -129,6 +125,38 @@ function parseOptionalRole(value: FormDataEntryValue | null): ClubLineupRole | n
 function parseStatValue(value: FormDataEntryValue | null) {
   const raw = typeof value === "string" && value.trim() ? Number(value) : 0;
   return Number.isInteger(raw) && raw >= 0 ? raw : 0;
+}
+
+function parseBulkPlayerLine(line: string, lineNumber: number) {
+  const columns = line.includes("|")
+    ? line.split("|").map((column) => column.trim())
+    : [line.trim(), "", "", "", ""];
+  const [fullName = "", nickname = "", position = "", shirtNumber = "", ...notesParts] = columns;
+  const parsed = playerSchema.safeParse({
+    fullName,
+    nickname,
+    position,
+    shirtNumber,
+    notes: notesParts.join(" | ")
+  });
+
+  if (!parsed.success) {
+    return {
+      error: `Linea ${lineNumber}: ${parsed.error.issues[0]?.message ?? "formato invalido."}`,
+      row: null
+    };
+  }
+
+  return {
+    error: null,
+    row: {
+      fullName: parsed.data.fullName.trim(),
+      nickname: parsed.data.nickname?.trim() || null,
+      position: parsed.data.position?.trim() || null,
+      shirtNumber: parsed.data.shirtNumber,
+      notes: parsed.data.notes?.trim() || null
+    }
+  };
 }
 
 function buildInviteExpiresAt() {
@@ -193,14 +221,14 @@ function validateClubPlayerPhotoFile(file: File, clubId: string) {
   }
 }
 
-function validateClubTeamLogoFile(file: File, clubId: string) {
+function validateClubLogoFile(file: File, clubId: string) {
   const sizeLimitBytes = MAX_TEAM_LOGO_SIZE_MB * 1024 * 1024;
   if (file.size > sizeLimitBytes) {
-    redirect(buildClubDetailPath({ clubId, tab: "teams", error: `El logo no puede superar ${MAX_TEAM_LOGO_SIZE_MB} MB.` }));
+    redirect(buildClubDetailPath({ clubId, tab: "summary", error: `El escudo no puede superar ${MAX_TEAM_LOGO_SIZE_MB} MB.` }));
   }
 
   if (!isSupportedTeamLogoFile(file)) {
-    redirect(buildClubDetailPath({ clubId, tab: "teams", error: "Formato no soportado para el logo. Usa JPG, PNG, WEBP o SVG." }));
+    redirect(buildClubDetailPath({ clubId, tab: "summary", error: "Formato no soportado para el escudo. Usa JPG, PNG, WEBP o SVG." }));
   }
 }
 
@@ -317,16 +345,25 @@ export async function bulkAddClubPlayersAction(clubId: string, formData: FormDat
   try {
     await assertClubWriteAction(clubId);
     const raw = String(formData.get("players") ?? "");
-    const names = Array.from(
-      new Set(
-        raw
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter((line) => line.length >= 2)
-      )
-    );
+    const parsedRows = raw
+      .split(/\r?\n/)
+      .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
+      .filter(({ line }) => line.length > 0)
+      .map(({ line, lineNumber }) => parseBulkPlayerLine(line, lineNumber));
+    const firstError = parsedRows.find((result) => result.error)?.error;
+    if (firstError) {
+      redirect(buildClubDetailPath({ clubId, tab: "players", error: firstError }));
+    }
 
-    if (!names.length) {
+    const uniqueRowsByName = new Map(
+      parsedRows
+        .map((result) => result.row)
+        .filter((row): row is NonNullable<typeof row> => Boolean(row))
+        .map((row) => [row.fullName.toLowerCase(), row])
+    );
+    const rows = Array.from(uniqueRowsByName.values());
+
+    if (!rows.length) {
       redirect(buildClubDetailPath({ clubId, tab: "players", error: "Carga al menos un jugador." }));
     }
 
@@ -341,11 +378,15 @@ export async function bulkAddClubPlayersAction(clubId: string, formData: FormDat
     }
 
     const existingNames = new Set((existingPlayers ?? []).map((player) => String(player.full_name).trim().toLowerCase()));
-    const rowsToInsert = names
-      .filter((name) => !existingNames.has(name.toLowerCase()))
-      .map((name) => ({
+    const rowsToInsert = rows
+      .filter((row) => !existingNames.has(row.fullName.toLowerCase()))
+      .map((row) => ({
         club_id: clubId,
-        full_name: name,
+        full_name: row.fullName,
+        nickname: row.nickname,
+        position: row.position,
+        shirt_number: row.shirtNumber,
+        notes: row.notes,
         active: true
       }));
 
@@ -554,37 +595,28 @@ export async function addClubTeamAction(clubId: string, formData: FormData) {
   }
 }
 
-export async function uploadClubTeamLogoAction(clubId: string, formData: FormData) {
+export async function uploadClubLogoAction(clubId: string, formData: FormData) {
   try {
     await assertClubWriteAction(clubId);
-    const parsed = teamLogoSchema.safeParse({
-      teamId: formData.get("teamId")
-    });
-
-    if (!parsed.success) {
-      redirect(buildClubDetailPath({ clubId, tab: "teams", error: "Falta el equipo." }));
-    }
-
     const file = getRequiredFile(formData, "logo");
     if (!file) {
-      redirect(buildClubDetailPath({ clubId, tab: "teams", error: "Selecciona una imagen para subir." }));
+      redirect(buildClubDetailPath({ clubId, tab: "summary", error: "Selecciona una imagen para subir." }));
     }
-    validateClubTeamLogoFile(file, clubId);
+    validateClubLogoFile(file, clubId);
 
     const supabase = await createSupabaseServerClient();
-    const { data: team, error: teamError } = await supabase
-      .from("club_teams")
+    const { data: club, error: clubError } = await supabase
+      .from("clubs")
       .select("id")
-      .eq("id", parsed.data.teamId)
-      .eq("club_id", clubId)
+      .eq("id", clubId)
       .maybeSingle();
 
-    if (teamError || !team) {
-      redirect(buildClubDetailPath({ clubId, tab: "teams", error: "No se encontro el equipo en este club." }));
+    if (clubError || !club) {
+      redirect(buildClubDetailPath({ clubId, tab: "summary", error: "No se encontro el club." }));
     }
 
     const optimizedBuffer = await optimizeTeamLogoImage(file);
-    const objectPath = getClubTeamLogoObjectPath(getSupabaseDbSchema(), parsed.data.teamId);
+    const objectPath = getClubLogoObjectPath(getSupabaseDbSchema(), clubId);
     const { error: uploadError } = await supabase.storage
       .from(getTeamLogosBucket())
       .upload(objectPath, optimizedBuffer, {
@@ -594,25 +626,24 @@ export async function uploadClubTeamLogoAction(clubId: string, formData: FormDat
       });
 
     if (uploadError) {
-      redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(uploadError, "No se pudo guardar el logo.") }));
+      redirect(buildClubDetailPath({ clubId, tab: "summary", error: toUserMessage(uploadError, "No se pudo guardar el escudo.") }));
     }
 
     const { error: updateError } = await supabase
-      .from("club_teams")
+      .from("clubs")
       .update({ logo_path: objectPath })
-      .eq("id", parsed.data.teamId)
-      .eq("club_id", clubId);
+      .eq("id", clubId);
 
     if (updateError) {
-      redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(updateError, "No se pudo vincular el logo al equipo.") }));
+      redirect(buildClubDetailPath({ clubId, tab: "summary", error: toUserMessage(updateError, "No se pudo vincular el escudo al club.") }));
     }
 
-    revalidatePath(`/api/club-team-logo/${parsed.data.teamId}`);
+    revalidatePath(`/api/club-logo/${clubId}`);
     await refreshAndRevalidate(clubId);
-    redirect(buildClubDetailPath({ clubId, tab: "teams", success: "Logo subido correctamente." }));
+    redirect(buildClubDetailPath({ clubId, tab: "summary", success: "Escudo subido correctamente." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(error, "No se pudo subir el logo.") }));
+    redirect(buildClubDetailPath({ clubId, tab: "summary", error: toUserMessage(error, "No se pudo subir el escudo.") }));
   }
 }
 
