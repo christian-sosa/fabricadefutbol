@@ -36,8 +36,7 @@ function PlayerRows({
           <THead>
             <tr>
               <TH>Jugador</TH>
-              <TH>Titular</TH>
-              <TH>Suplente</TH>
+              <TH>Rol</TH>
               <TH>Goles</TH>
               <TH>Asist.</TH>
               <TH>Figura</TH>
@@ -48,10 +47,12 @@ function PlayerRows({
               <tr key={player.id}>
                 <TD className="font-semibold">{player.full_name}</TD>
                 <TD>
-                  <input className="h-4 w-4 accent-emerald-400" name="starterPlayerIds" type="checkbox" value={player.id} />
-                </TD>
-                <TD>
-                  <input className="h-4 w-4 accent-emerald-400" name="substitutePlayerIds" type="checkbox" value={player.id} />
+                  <Select className="w-40" name={`playerRole:${player.id}`}>
+                    <option value="">No estuvo</option>
+                    <option value="starter">Titular</option>
+                    <option value="substitute">Suplente</option>
+                    <option value="present">Presente, no entro</option>
+                  </Select>
                 </TD>
                 <TD>
                   <Input className="w-20" min={0} name={`playerGoals:${player.id}`} type="number" />

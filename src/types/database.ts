@@ -1392,7 +1392,7 @@ export type Database = {
       tournament_status: "draft" | "active" | "finished" | "archived";
       club_status: "draft" | "active" | "archived";
       club_match_status: "draft" | "played" | "cancelled";
-      club_lineup_role: "starter" | "substitute";
+      club_lineup_role: "starter" | "substitute" | "present";
       winner_team: "A" | "B" | "DRAW";
     };
     CompositeTypes: {

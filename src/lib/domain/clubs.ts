@@ -1,6 +1,6 @@
 export type ClubStatus = "draft" | "active" | "archived";
 export type ClubMatchStatus = "draft" | "played" | "cancelled";
-export type ClubLineupRole = "starter" | "substitute";
+export type ClubLineupRole = "starter" | "substitute" | "present";
 
 export type ClubRecord = {
   id: string;
@@ -94,6 +94,8 @@ export type ClubPublicSummary = {
   totalGoals: number;
   avgGoalsPerMatch: number;
   totalPlayersDistinct: number;
+  totalAttendances: number;
+  presentNotPlayedCount: number;
   firstMatchDate: string | null;
   lastMatchDate: string | null;
 };
@@ -102,6 +104,7 @@ export type ClubPublicTeam = {
   id: string;
   name: string;
   shortName: string | null;
+  logoPath: string | null;
   playerCount: number;
   matchesPlayed: number;
   wins: number;
@@ -156,6 +159,8 @@ export type ClubPublicPlayerStat = {
   playerId: string;
   name: string;
   teamNames: string[];
+  attendances: number;
+  presentNotPlayed: number;
   matchesPlayed: number;
   goals: number;
   assists: number;
@@ -167,6 +172,7 @@ export type ClubPublicRecords = {
   topScorerAllTime: ClubPublicPlayerStat | null;
   topAssistsAllTime: ClubPublicPlayerStat | null;
   mostMvps: ClubPublicPlayerStat | null;
+  mostAttendances: ClubPublicPlayerStat | null;
   mostMatchesPlayed: ClubPublicPlayerStat | null;
   bestWinStreak: null;
 };
@@ -234,7 +240,7 @@ function comparePlayerStats(left: ClubPublicPlayerStat, right: ClubPublicPlayerS
 
 function pickRecord(
   rows: ClubPublicPlayerStat[],
-  metric: "goals" | "assists" | "mvps" | "matchesPlayed"
+  metric: "goals" | "assists" | "mvps" | "attendances" | "matchesPlayed"
 ) {
   const [record] = rows
     .filter((row) => row[metric] > 0)
@@ -313,6 +319,12 @@ export function validateClubMatchSheet(input: ClubMatchSheetInput) {
 
     if (!Number.isInteger(participant.assists) || participant.assists < 0) {
       errors.push("Las asistencias de cada participante deben ser enteros mayores o iguales a 0.");
+    }
+
+    if (participant.role === "present") {
+      if (participant.goals > 0 || participant.assists > 0 || participant.isMvp) {
+        errors.push("Un jugador que fue pero no entro no puede tener goles, asistencias ni figura.");
+      }
     }
 
     goalsTotal += Math.max(0, participant.goals);
@@ -415,10 +427,10 @@ export function buildClubPublicSnapshot(params: {
     string,
     ClubPublicPlayerStat & {
       matchIds: Set<string>;
+      attendanceMatchIds: Set<string>;
       teamNamesSet: Set<string>;
     }
   >();
-  const playedPersistentPlayerIds = new Set<string>();
   const scorers = createStatAccumulator();
   const assisters = createStatAccumulator();
   const figures = createStatAccumulator();
@@ -459,7 +471,6 @@ export function buildClubPublicSnapshot(params: {
   function getPlayerAccumulator(lineup: ClubLineupRecord, match: ClubMatchRecord) {
     if (!lineup.club_player_id) return null;
     const playerId = lineup.club_player_id;
-    playedPersistentPlayerIds.add(playerId);
     const player = playersById.get(playerId);
     const existing = playerStatsById.get(playerId);
     if (existing) return existing;
@@ -470,6 +481,9 @@ export function buildClubPublicSnapshot(params: {
       teamNames: [],
       teamNamesSet: new Set<string>(),
       matchIds: new Set<string>(),
+      attendanceMatchIds: new Set<string>(),
+      attendances: 0,
+      presentNotPlayed: 0,
       matchesPlayed: 0,
       goals: 0,
       assists: 0,
@@ -498,7 +512,13 @@ export function buildClubPublicSnapshot(params: {
     if (!match || !lineup.club_player_id) continue;
     const playerStats = getPlayerAccumulator(lineup, match);
     if (!playerStats) continue;
-    if (!playerStats.matchIds.has(match.id)) {
+    if (!playerStats.attendanceMatchIds.has(match.id)) {
+      playerStats.attendanceMatchIds.add(match.id);
+      playerStats.attendances += 1;
+    }
+    if (lineup.role === "present") {
+      playerStats.presentNotPlayed += 1;
+    } else if (!playerStats.matchIds.has(match.id)) {
       playerStats.matchIds.add(match.id);
       playerStats.matchesPlayed += 1;
     }
@@ -514,6 +534,7 @@ export function buildClubPublicSnapshot(params: {
     const lineup = lineupById.get(stat.lineup_id);
     const match = matchById.get(stat.match_id);
     if (!lineup || !match) continue;
+    if (lineup.role === "present") continue;
     const teamName = teamsById.get(match.club_team_id)?.name ?? "Equipo";
     const competitionStats = getCompetitionAccumulator(match);
     const playerStats = getPlayerAccumulator(lineup, match);
@@ -566,6 +587,8 @@ export function buildClubPublicSnapshot(params: {
       playerId: row.playerId,
       name: row.name,
       teamNames: Array.from(row.teamNamesSet).sort((left, right) => left.localeCompare(right, "es")),
+      attendances: row.attendances,
+      presentNotPlayed: row.presentNotPlayed,
       matchesPlayed: row.matchesPlayed,
       goals: row.goals,
       assists: row.assists,
@@ -588,6 +611,8 @@ export function buildClubPublicSnapshot(params: {
         ? Number((playedMatches.reduce((total, match) => total + Number(match.goals_for), 0) / playedMatches.length).toFixed(2))
         : 0,
     totalPlayersDistinct: activePlayers.length,
+    totalAttendances: playerStats.reduce((total, player) => total + player.attendances, 0),
+    presentNotPlayedCount: playerStats.reduce((total, player) => total + player.presentNotPlayed, 0),
     firstMatchDate: playedMatchDatesAscending[0] ?? null,
     lastMatchDate: playedMatches[0]?.played_at ?? null
   };
@@ -626,6 +651,7 @@ export function buildClubPublicSnapshot(params: {
     topScorerAllTime: pickRecord(playerStats, "goals"),
     topAssistsAllTime: pickRecord(playerStats, "assists"),
     mostMvps: pickRecord(playerStats, "mvps"),
+    mostAttendances: pickRecord(playerStats, "attendances"),
     mostMatchesPlayed: pickRecord(playerStats, "matchesPlayed"),
     bestWinStreak: null
   };
@@ -649,6 +675,7 @@ export function buildClubPublicSnapshot(params: {
           id: team.id,
           name: team.name,
           shortName: team.short_name,
+          logoPath: team.logo_path,
           playerCount: playerCountByTeam.get(team.id) ?? 0,
           ...metrics
         };

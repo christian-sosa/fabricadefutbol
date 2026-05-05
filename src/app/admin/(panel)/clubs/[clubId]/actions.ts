@@ -36,8 +36,7 @@ const updateClubSchema = z.object({
   name: z.string().min(2, "El nombre del club debe tener al menos 2 caracteres.").max(100),
   description: z.string().max(500).optional(),
   homeVenue: z.string().max(120).optional(),
-  isPublic: z.boolean().default(false),
-  status: z.enum(["draft", "active", "archived"])
+  isPublic: z.boolean().default(false)
 });
 
 const playerSchema = z.object({
@@ -118,7 +117,13 @@ function buildClubDetailPath(params: {
 }
 
 function parseRole(value: FormDataEntryValue | null): ClubLineupRole {
-  return value === "substitute" ? "substitute" : "starter";
+  if (value === "substitute" || value === "present") return value;
+  return "starter";
+}
+
+function parseOptionalRole(value: FormDataEntryValue | null): ClubLineupRole | null {
+  if (value === "starter" || value === "substitute" || value === "present") return value;
+  return null;
 }
 
 function parseStatValue(value: FormDataEntryValue | null) {
@@ -239,8 +244,7 @@ export async function updateClubAction(clubId: string, formData: FormData) {
       name: formData.get("name"),
       description: formData.get("description"),
       homeVenue: formData.get("homeVenue"),
-      isPublic: formData.get("isPublic") === "on",
-      status: formData.get("status")
+      isPublic: formData.get("isPublic") === "on"
     });
 
     if (!parsed.success) {
@@ -254,8 +258,7 @@ export async function updateClubAction(clubId: string, formData: FormData) {
         name: parsed.data.name.trim(),
         description: parsed.data.description?.trim() || null,
         home_venue: parsed.data.homeVenue?.trim() || null,
-        is_public: parsed.data.isPublic,
-        status: parsed.data.status
+        is_public: parsed.data.isPublic
       })
       .eq("id", clubId);
 
@@ -695,12 +698,15 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
       redirect(buildClubDetailPath({ clubId, tab: "matches", error: parsed.error.issues[0]?.message ?? "Datos invalidos." }));
     }
 
-    const selectedPlayerIds = Array.from(
-      new Set([
-        ...formData.getAll("starterPlayerIds").map(String),
-        ...formData.getAll("substitutePlayerIds").map(String)
-      ])
-    ).filter(Boolean);
+    const playerRolesById = new Map<string, ClubLineupRole>();
+    for (const [key, value] of formData.entries()) {
+      if (!key.startsWith("playerRole:")) continue;
+      const playerId = key.slice("playerRole:".length);
+      const role = parseOptionalRole(value);
+      if (playerId && role) playerRolesById.set(playerId, role);
+    }
+
+    const selectedPlayerIds = Array.from(playerRolesById.keys());
     const supabase = await createSupabaseServerClient();
     const { data: players, error: playersError } = selectedPlayerIds.length
       ? await supabase
@@ -715,20 +721,15 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
     }
 
     const playersById = new Map((players ?? []).map((player) => [String(player.id), String(player.full_name)]));
-    const starterPlayerIds = new Set(formData.getAll("starterPlayerIds").map(String));
-    const substitutePlayerIds = new Set(formData.getAll("substitutePlayerIds").map(String));
     const mvpKey = String(formData.get("mvp") ?? "");
     const participants: Array<ClubMatchSheetParticipantInput & { displayName: string }> = [];
 
     for (const playerId of selectedPlayerIds) {
       if (!playersById.has(playerId)) continue;
-      if (starterPlayerIds.has(playerId) && substitutePlayerIds.has(playerId)) {
-        redirect(buildClubDetailPath({ clubId, tab: "matches", error: "Un jugador no puede ser titular y suplente a la vez." }));
-      }
 
       participants.push({
         playerId,
-        role: substitutePlayerIds.has(playerId) ? "substitute" : "starter",
+        role: playerRolesById.get(playerId) ?? "starter",
         goals: parseStatValue(formData.get(`playerGoals:${playerId}`)),
         assists: parseStatValue(formData.get(`playerAssists:${playerId}`)),
         isMvp: mvpKey === `player:${playerId}`,

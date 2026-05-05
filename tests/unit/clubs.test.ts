@@ -99,6 +99,30 @@ describe("club match sheet validation", () => {
     expect(errors).toContain("La suma de goleadores no puede superar los goles a favor.");
     expect(errors).toContain("La suma de asistencias no puede superar los goles a favor.");
   });
+
+  it("rechaza estadisticas para presentes que no entraron", () => {
+    const errors = validateClubMatchSheet({
+      goalsFor: 1,
+      goalsAgainst: 0,
+      participants: [
+        ...Array.from({ length: 11 }, (_, index) => ({
+          playerId: `player-${index + 1}`,
+          role: "starter" as const,
+          goals: index === 0 ? 1 : 0,
+          assists: 0
+        })),
+        {
+          playerId: "player-12",
+          role: "present" as const,
+          goals: 1,
+          assists: 1,
+          isMvp: true
+        }
+      ]
+    });
+
+    expect(errors).toContain("Un jugador que fue pero no entro no puede tener goles, asistencias ni figura.");
+  });
 });
 
 describe("club public snapshot", () => {
@@ -235,6 +259,14 @@ describe("club public snapshot", () => {
           role: "starter"
         },
         {
+          id: "lineup-1c",
+          match_id: "match-1",
+          club_player_id: "player-3",
+          guest_name: null,
+          display_name: "Sin jugar",
+          role: "present"
+        },
+        {
           id: "lineup-2",
           match_id: "match-2",
           club_player_id: "player-1",
@@ -327,6 +359,8 @@ describe("club public snapshot", () => {
       totalGoals: 3,
       avgGoalsPerMatch: 1,
       totalPlayersDistinct: 3,
+      totalAttendances: 6,
+      presentNotPlayedCount: 1,
       firstMatchDate: "2026-04-19T20:00:00Z",
       lastMatchDate: "2026-04-22T20:00:00Z"
     });
@@ -341,6 +375,7 @@ describe("club public snapshot", () => {
         id: "team-2",
         name: "La Quinta Reserva",
         shortName: "LQR",
+        logoPath: null,
         playerCount: 1,
         matchesPlayed: 1,
         wins: 0,
@@ -354,6 +389,7 @@ describe("club public snapshot", () => {
         id: "team-1",
         name: "La Quinta Senior",
         shortName: "LQ",
+        logoPath: null,
         playerCount: 2,
         matchesPlayed: 2,
         wins: 1,
@@ -369,6 +405,8 @@ describe("club public snapshot", () => {
         playerId: "player-1",
         name: "Sosa",
         teamNames: ["La Quinta Senior"],
+        attendances: 2,
+        presentNotPlayed: 0,
         matchesPlayed: 2,
         goals: 2,
         assists: 1,
@@ -379,16 +417,31 @@ describe("club public snapshot", () => {
         playerId: "player-2",
         name: "Nacho",
         teamNames: ["La Quinta Reserva", "La Quinta Senior"],
+        attendances: 3,
+        presentNotPlayed: 0,
         matchesPlayed: 3,
         goals: 1,
         assists: 1,
         mvps: 1,
         lastMatchDate: "2026-04-22T20:00:00Z"
+      },
+      {
+        playerId: "player-3",
+        name: "Sin jugar",
+        teamNames: ["La Quinta Senior"],
+        attendances: 1,
+        presentNotPlayed: 1,
+        matchesPlayed: 0,
+        goals: 0,
+        assists: 0,
+        mvps: 0,
+        lastMatchDate: "2026-04-20T20:00:00Z"
       }
     ]);
     expect(snapshot.records.topScorerAllTime?.playerId).toBe("player-1");
     expect(snapshot.records.topAssistsAllTime?.playerId).toBe("player-1");
     expect(snapshot.records.mostMvps?.playerId).toBe("player-1");
+    expect(snapshot.records.mostAttendances?.playerId).toBe("player-2");
     expect(snapshot.records.mostMatchesPlayed?.playerId).toBe("player-2");
     expect(snapshot.records.bestWinStreak).toBeNull();
     expect(snapshot.topScorers).toEqual([

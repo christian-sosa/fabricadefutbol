@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { getPublicClubBySlug } from "@/lib/queries/clubs";
+import { getClubTeamLogoUrl } from "@/lib/team-logos";
 import type { ClubPublicActivity, ClubPublicPlayerStat } from "@/lib/domain/clubs";
 
 export async function generateMetadata({
@@ -54,8 +56,10 @@ function PlayerStatsTable({ rows }: { rows: ClubPublicPlayerStat[] }) {
               <TH>Jugador</TH>
               <TH>Equipos</TH>
               <TH>PJ</TH>
+              <TH>Asistio</TH>
+              <TH>No entro</TH>
               <TH>Goles</TH>
-              <TH>Asist.</TH>
+              <TH>Pases gol</TH>
               <TH>Figuras</TH>
               <TH>Ultimo</TH>
             </tr>
@@ -66,6 +70,8 @@ function PlayerStatsTable({ rows }: { rows: ClubPublicPlayerStat[] }) {
                 <TD className="font-semibold">{row.name}</TD>
                 <TD>{row.teamNames.join(" / ")}</TD>
                 <TD>{row.matchesPlayed}</TD>
+                <TD>{row.attendances ?? row.matchesPlayed}</TD>
+                <TD>{row.presentNotPlayed ?? 0}</TD>
                 <TD>{row.goals}</TD>
                 <TD>{row.assists}</TD>
                 <TD>{row.mvps}</TD>
@@ -128,10 +134,18 @@ export default async function PublicClubPage({
           value: snapshot.records.mostMvps.mvps
         }
       : null,
+    snapshot.records.mostAttendances
+      ? {
+          key: "mostAttendances",
+          label: "Mas presencias",
+          row: snapshot.records.mostAttendances,
+          value: snapshot.records.mostAttendances.attendances
+        }
+      : null,
     snapshot.records.mostMatchesPlayed
       ? {
           key: "mostMatchesPlayed",
-          label: "Mas presencias",
+          label: "Mas PJ",
           row: snapshot.records.mostMatchesPlayed,
           value: snapshot.records.mostMatchesPlayed.matchesPlayed
         }
@@ -166,6 +180,10 @@ export default async function PublicClubPage({
           <Card>
             <CardDescription>Partidos</CardDescription>
             <CardTitle className="mt-1 text-3xl">{snapshot.summary.totalMatches}</CardTitle>
+          </Card>
+          <Card>
+            <CardDescription>Presentes sin jugar</CardDescription>
+            <CardTitle className="mt-1 text-3xl">{snapshot.summary.presentNotPlayedCount ?? 0}</CardTitle>
           </Card>
           <Card>
             <CardDescription>Goles</CardDescription>
@@ -219,14 +237,21 @@ export default async function PublicClubPage({
             {snapshot.teams.map((team) => (
               <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4" key={team.id}>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-100">{team.name}</p>
-                    <p className="mt-1 text-sm text-slate-400">
-                      {team.playerCount} jugadores - {team.matchesPlayed} partidos
-                    </p>
-                    {team.lastMatchDate ? (
-                      <p className="mt-1 text-xs text-slate-500">Ultimo: {formatDate(team.lastMatchDate)}</p>
-                    ) : null}
+                  <div className="flex items-start gap-3">
+                    <LeagueLogo
+                      alt={`Escudo de ${team.name}`}
+                      size={48}
+                      src={team.logoPath ? getClubTeamLogoUrl(team.id) : null}
+                    />
+                    <div>
+                      <p className="font-semibold text-slate-100">{team.name}</p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        {team.playerCount} jugadores - {team.matchesPlayed} partidos
+                      </p>
+                      {team.lastMatchDate ? (
+                        <p className="mt-1 text-xs text-slate-500">Ultimo: {formatDate(team.lastMatchDate)}</p>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="text-left text-sm text-slate-300 sm:text-right">
                     <p>{team.wins} G / {team.draws} E / {team.losses} P</p>

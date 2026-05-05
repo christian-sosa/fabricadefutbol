@@ -47,17 +47,6 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function getStatusLabel(status: string) {
-  switch (status) {
-    case "active":
-      return "Activo";
-    case "archived":
-      return "Archivado";
-    default:
-      return "Borrador";
-  }
-}
-
 function getRosterIds(teamId: string, teamPlayers: ClubTeamPlayerRecord[]) {
   return new Set(
     teamPlayers
@@ -114,7 +103,7 @@ function SummaryTab({
 
   return (
     <div className="space-y-4">
-      <section className="grid gap-4 md:grid-cols-5">
+      <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
         <Card>
           <CardDescription>Equipos</CardDescription>
           <CardTitle className="mt-1 text-3xl">{snapshot.summary.teamCount}</CardTitle>
@@ -126,6 +115,10 @@ function SummaryTab({
         <Card>
           <CardDescription>Partidos</CardDescription>
           <CardTitle className="mt-1 text-3xl">{snapshot.summary.playedMatches}</CardTitle>
+        </Card>
+        <Card>
+          <CardDescription>Presentes sin jugar</CardDescription>
+          <CardTitle className="mt-1 text-3xl">{snapshot.summary.presentNotPlayedCount ?? 0}</CardTitle>
         </Card>
         <Card>
           <CardDescription>Goles a favor</CardDescription>
@@ -148,16 +141,6 @@ function SummaryTab({
               Nombre
             </label>
             <Input defaultValue={details.club.name} id="name" name="name" required />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="status">
-              Estado
-            </label>
-            <Select defaultValue={details.club.status} id="status" name="status">
-              <option value="draft">Borrador</option>
-              <option value="active">Activo</option>
-              <option value="archived">Archivado</option>
-            </Select>
           </div>
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="homeVenue">
@@ -221,8 +204,19 @@ function PlayersTab({ clubId, players }: { clubId: string; players: ClubPlayerRe
 
         <Card>
           <CardTitle>Carga masiva</CardTitle>
+          <CardDescription className="mt-2">
+            Escribe un jugador por linea. Si repites un nombre que ya existe en el club, se ignora.
+          </CardDescription>
+          <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950/70 p-3 text-sm text-slate-300">
+            <p className="font-semibold text-slate-100">Formato</p>
+            <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-slate-400">
+{`Juan Perez
+Nicolas Gomez
+Martin Alvarez`}
+            </pre>
+          </div>
           <form action={bulkAddClubPlayersAction.bind(null, clubId)} className="mt-4 space-y-3">
-            <Textarea name="players" placeholder={"Un jugador por linea"} rows={8} />
+            <Textarea name="players" placeholder={"Juan Perez\nNicolas Gomez\nMartin Alvarez"} rows={8} />
             <Button type="submit" variant="secondary">
               Cargar jugadores
             </Button>
@@ -303,7 +297,9 @@ function TeamsTab({
     <div className="space-y-4">
       <Card>
         <CardTitle>Nuevo equipo</CardTitle>
-        <CardDescription className="mt-2">Cada club puede tener hasta 5 equipos activos.</CardDescription>
+        <CardDescription className="mt-2">
+          Cada club puede tener hasta 5 equipos activos. El escudo se carga desde la tarjeta del equipo una vez creado.
+        </CardDescription>
         <form action={addClubTeamAction.bind(null, clubId)} className="mt-4 grid gap-3 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
@@ -338,12 +334,24 @@ function TeamsTab({
                   <CardDescription className="mt-1">
                     {team.short_name ? `${team.short_name} - ` : ""}{rosterIds.size} jugadores en el equipo
                   </CardDescription>
-                  <form action={uploadClubTeamLogoAction.bind(null, clubId)} className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <form action={uploadClubTeamLogoAction.bind(null, clubId)} className="mt-3 space-y-2 rounded-xl border border-slate-800 bg-slate-950/70 p-3">
                     <input name="teamId" type="hidden" value={team.id} />
-                    <Input accept="image/jpeg,image/png,image/webp,image/svg+xml" className="max-w-60" name="logo" type="file" />
-                    <Button className="h-9 w-fit px-3 text-xs" type="submit" variant="secondary">
-                      Subir logo
-                    </Button>
+                    <label className="block text-sm font-semibold text-slate-200" htmlFor={`team-logo-${team.id}`}>
+                      Escudo / logo del equipo
+                    </label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Input
+                        accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                        className="max-w-64"
+                        id={`team-logo-${team.id}`}
+                        name="logo"
+                        type="file"
+                      />
+                      <Button className="h-9 w-fit px-3 text-xs" type="submit" variant="secondary">
+                        Guardar escudo
+                      </Button>
+                    </div>
+                    <p className="text-xs text-slate-500">JPG, PNG, WEBP o SVG.</p>
                   </form>
                 </div>
               </div>
@@ -515,6 +523,7 @@ function MatchesTab({
                   <Select defaultValue="starter" name={`guestRole:${slot}`}>
                     <option value="starter">Titular</option>
                     <option value="substitute">Suplente</option>
+                    <option value="present">Presente, no entro</option>
                   </Select>
                   <Input min={0} name={`guestGoals:${slot}`} placeholder="Goles" type="number" />
                   <Input min={0} name={`guestAssists:${slot}`} placeholder="Asist." type="number" />
@@ -667,14 +676,9 @@ export default async function AdminClubDetailPage({
       <Card>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle>{details.club.name}</CardTitle>
-              <Badge className="border border-emerald-500/40 bg-emerald-500/15 text-emerald-200">
-                {getStatusLabel(details.club.status)}
-              </Badge>
-            </div>
+            <CardTitle>{details.club.name}</CardTitle>
             <CardDescription className="mt-2">
-              Club oculto al publico: no aparece en navegacion, precios, ayuda ni crawlers.
+              Gestion privada del club para admins autorizados.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -682,7 +686,7 @@ export default async function AdminClubDetailPage({
               Volver
             </Link>
             <Link className="text-sm font-semibold text-sky-300 hover:underline" href={`/clubs/${details.club.slug}`}>
-              Ver publica
+              Vista del club
             </Link>
           </div>
         </div>

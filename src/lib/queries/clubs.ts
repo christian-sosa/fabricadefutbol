@@ -100,6 +100,8 @@ function emptySnapshot(clubName: string): ClubPublicSnapshot {
       totalGoals: 0,
       avgGoalsPerMatch: 0,
       totalPlayersDistinct: 0,
+      totalAttendances: 0,
+      presentNotPlayedCount: 0,
       firstMatchDate: null,
       lastMatchDate: null
     },
@@ -111,6 +113,7 @@ function emptySnapshot(clubName: string): ClubPublicSnapshot {
       topScorerAllTime: null,
       topAssistsAllTime: null,
       mostMvps: null,
+      mostAttendances: null,
       mostMatchesPlayed: null,
       bestWinStreak: null
     },
@@ -121,16 +124,43 @@ function emptySnapshot(clubName: string): ClubPublicSnapshot {
   };
 }
 
+function normalizePlayerStat(row: ClubPublicPlayerStat): ClubPublicPlayerStat {
+  return {
+    ...row,
+    attendances: row.attendances ?? row.matchesPlayed ?? 0,
+    presentNotPlayed: row.presentNotPlayed ?? 0
+  };
+}
+
 function normalizeSnapshot(row: ClubSnapshotRow | null, clubName: string): ClubPublicSnapshot {
-  if (!row) return emptySnapshot(clubName);
+  const base = emptySnapshot(clubName);
+  if (!row) return base;
+
+  const records = row.records
+    ? {
+        ...base.records,
+        ...row.records,
+        topScorerAllTime: row.records.topScorerAllTime ? normalizePlayerStat(row.records.topScorerAllTime) : null,
+        topAssistsAllTime: row.records.topAssistsAllTime ? normalizePlayerStat(row.records.topAssistsAllTime) : null,
+        mostMvps: row.records.mostMvps ? normalizePlayerStat(row.records.mostMvps) : null,
+        mostAttendances: row.records.mostAttendances ? normalizePlayerStat(row.records.mostAttendances) : null,
+        mostMatchesPlayed: row.records.mostMatchesPlayed ? normalizePlayerStat(row.records.mostMatchesPlayed) : null
+      }
+    : base.records;
 
   return {
-    summary: row.summary ?? emptySnapshot(clubName).summary,
+    summary: {
+      ...base.summary,
+      ...(row.summary ?? {})
+    },
     activity: row.activity ?? [],
-    teams: row.teams ?? [],
+    teams: (row.teams ?? []).map((team) => ({
+      ...team,
+      logoPath: team.logoPath ?? null
+    })),
     recentMatches: row.recent_matches ?? [],
-    playerStats: row.player_stats ?? [],
-    records: row.records ?? emptySnapshot(clubName).records,
+    playerStats: (row.player_stats ?? []).map(normalizePlayerStat),
+    records,
     topScorers: row.top_scorers ?? [],
     topAssisters: row.top_assisters ?? [],
     topFigures: row.top_figures ?? [],
