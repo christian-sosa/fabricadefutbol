@@ -38,11 +38,17 @@ function FooterSectionTitle({
   );
 }
 
-export function SiteFooter() {
+function filterTournamentNavItems<T extends { href: string }>(items: readonly T[], canAccessTournaments: boolean) {
+  return canAccessTournaments ? items : items.filter((item) => item.href !== "/tournaments");
+}
+
+export function SiteFooter({ canAccessTournaments = false }: { canAccessTournaments?: boolean }) {
   const searchParams = useSearchParams();
   const organizationId = searchParams.get("org");
-  const publicModule = parsePublicModule(searchParams.get("module"));
+  const requestedPublicModule = parsePublicModule(searchParams.get("module"));
+  const publicModule = canAccessTournaments ? requestedPublicModule : "organizations";
   const year = new Date().getFullYear();
+  const primaryNavItems = filterTournamentNavItems(PRIMARY_PUBLIC_NAV_ITEMS, canAccessTournaments);
   return (
     <footer className="relative mt-10 border-t border-slate-800/90 bg-slate-950/95">
       <div
@@ -73,7 +79,7 @@ export function SiteFooter() {
           <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
             <FooterSectionTitle>Navegación</FooterSectionTitle>
             <nav className="mt-4 space-y-2">
-              {PRIMARY_PUBLIC_NAV_ITEMS.map((item) => (
+              {primaryNavItems.map((item) => (
                 <Link
                   className="block rounded-xl border border-transparent px-3 py-2 text-sm text-slate-300 transition hover:border-slate-700 hover:bg-slate-950/70 hover:text-slate-100"
                   href={withPublicQuery(item.href, {
@@ -156,7 +162,7 @@ export function SiteFooter() {
         <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/55 px-4 py-4 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
           <p>Copyright {year} Fábrica de Fútbol. Todos los derechos reservados.</p>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Ranking real para grupos y torneos
+            {canAccessTournaments ? "Ranking real para grupos y torneos" : "Ranking real para grupos"}
           </p>
         </div>
       </div>

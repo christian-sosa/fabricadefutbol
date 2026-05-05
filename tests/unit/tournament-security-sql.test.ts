@@ -16,6 +16,15 @@ describeSupabaseSql("tournament security sql", () => {
     );
   });
 
+  it("bloquea lectura publica de Torneos para anonimos y usuarios comunes", () => {
+    expect(policiesSql).toMatch(
+      /create or replace function public\.can_read_league\(league_id uuid\)[\s\S]*select public\.is_super_admin\(\)[\s\S]*and \([\s\S]*l\.status in \('active', 'finished'\)[\s\S]*or public\.is_league_admin\(league_id\)[\s\S]*\);/
+    );
+    expect(policiesSql).toMatch(
+      /create or replace function public\.can_read_competition\(competition_id uuid\)[\s\S]*select public\.is_super_admin\(\)[\s\S]*and \([\s\S]*c\.status in \('active', 'finished'\)[\s\S]*or exists[\s\S]*public\.is_league_admin\(c\.league_id\)[\s\S]*ctc\.captain_id = auth\.uid\(\)[\s\S]*\);/
+    );
+  });
+
   it("bloquea cambios directos de planteles en competencias cerradas", () => {
     expect(policiesSql).toMatch(
       /create policy competition_teams_admin_write[\s\S]*c\.status not in \('finished', 'archived'\)[\s\S]*with check[\s\S]*c\.status not in \('finished', 'archived'\)/

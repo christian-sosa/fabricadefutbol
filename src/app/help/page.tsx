@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { PublicModuleToggle } from "@/components/layout/public-module-toggle";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { getCurrentUserIsSuperAdmin } from "@/lib/auth/super-admin";
 import { type PublicModuleContext, resolvePublicModule, withPublicQuery } from "@/lib/org";
 
 type HelpSectionItem = {
@@ -332,7 +333,9 @@ export default async function HelpPage({
 }) {
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
-  const currentModule = resolvePublicModule(resolvedSearchParams.module);
+  const canAccessTournaments = await getCurrentUserIsSuperAdmin();
+  const requestedModule = resolvePublicModule(resolvedSearchParams.module);
+  const currentModule = canAccessTournaments ? requestedModule : "organizations";
   const content = helpContentByModule[currentModule];
   const panelPath =
     currentModule === "tournaments"
@@ -367,6 +370,7 @@ export default async function HelpPage({
         <p className="mt-4 max-w-4xl text-base leading-7 text-slate-300 md:text-lg">{content.description}</p>
         <PublicModuleToggle
           basePath="/help"
+          canAccessTournaments={canAccessTournaments}
           className="mt-5"
           currentModule={currentModule}
           organizationKey={organizationKey}

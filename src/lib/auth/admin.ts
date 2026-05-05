@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
+import { isSuperAdminEmail } from "@/lib/auth/super-admin";
 import { deriveDisplayName } from "@/lib/auth/profile";
 import { maskEmail, maskUserId } from "@/lib/log-pii";
 import { normalizeEmail } from "@/lib/org";
@@ -104,16 +104,6 @@ async function ensureAdminProfile(params: {
   }
 
   return inserted;
-}
-
-function isSuperAdminEmail(email: string) {
-  // Si no hay super admin configurado via env, ninguna cuenta debe obtener
-  // privilegios elevados (aunque tanto normalizeEmail como SUPER_ADMIN_EMAIL
-  // pudieran evaluarse a string vacio).
-  if (!SUPER_ADMIN_EMAIL) return false;
-  const normalized = normalizeEmail(email);
-  if (!normalized) return false;
-  return normalized === SUPER_ADMIN_EMAIL;
 }
 
 async function getAdminFreeTrialStatus(userId: string): Promise<FreeTrialStatus> {

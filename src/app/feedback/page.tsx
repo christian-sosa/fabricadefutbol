@@ -6,6 +6,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { getCurrentUserIsSuperAdmin } from "@/lib/auth/super-admin";
 import { resolvePublicModule, withPublicQuery } from "@/lib/org";
 
 type FeedbackPageProps = {
@@ -20,7 +21,9 @@ type FeedbackPageProps = {
 export default async function FeedbackPage({ searchParams }: FeedbackPageProps) {
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
-  const currentModule = resolvePublicModule(resolvedSearchParams.module);
+  const canAccessTournaments = await getCurrentUserIsSuperAdmin();
+  const requestedModule = resolvePublicModule(resolvedSearchParams.module);
+  const currentModule = canAccessTournaments ? requestedModule : "organizations";
   const submitAction = submitFeedbackAction.bind(null, organizationKey, currentModule);
   const homePath = withPublicQuery("/", {
     organizationKey,
@@ -123,7 +126,7 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
               </label>
               <Select defaultValue={currentModule} id="module" name="module">
                 <option value="organizations">Grupos</option>
-                <option value="tournaments">Torneos</option>
+                {canAccessTournaments ? <option value="tournaments">Torneos</option> : null}
                 <option value="both">General</option>
               </Select>
             </div>
@@ -131,7 +134,7 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="organization">
-              Grupo o torneo (opcional)
+              {canAccessTournaments ? "Grupo o torneo (opcional)" : "Grupo (opcional)"}
             </label>
             <Input id="organization" name="organization" placeholder={targetPlaceholder} />
           </div>

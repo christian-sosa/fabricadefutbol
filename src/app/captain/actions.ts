@@ -9,6 +9,7 @@ import {
   assertCompetitionRosterEditableAction,
   getCompetitionPublicPathById
 } from "@/lib/auth/tournaments";
+import { getCurrentUserIsSuperAdmin } from "@/lib/auth/super-admin";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
@@ -95,11 +96,20 @@ async function assertCaptainTeamPlayerCapacity(teamId: string) {
   }
 }
 
+async function assertCanUseCaptainTournamentActions() {
+  const canAccessTournaments = await getCurrentUserIsSuperAdmin();
+  if (!canAccessTournaments) {
+    throw new Error("Torneos esta disponible solo para el super admin por ahora.");
+  }
+}
+
 export async function addCaptainTournamentPlayerAction(formData: FormData) {
   const rawCompetitionId = String(formData.get("competitionId") ?? "");
   const rawTeamId = String(formData.get("teamId") ?? "");
 
   try {
+    await assertCanUseCaptainTournamentActions();
+
     const parsed = captainPlayerSchema.safeParse({
       competitionId: formData.get("competitionId"),
       teamId: formData.get("teamId"),
@@ -145,6 +155,8 @@ export async function updateCaptainTournamentPlayerAction(formData: FormData) {
   const rawTeamId = String(formData.get("teamId") ?? "");
 
   try {
+    await assertCanUseCaptainTournamentActions();
+
     const parsed = captainPlayerUpdateSchema.safeParse({
       competitionId: formData.get("competitionId"),
       teamId: formData.get("teamId"),
@@ -192,6 +204,8 @@ export async function deleteCaptainTournamentPlayerAction(formData: FormData) {
   const rawTeamId = String(formData.get("teamId") ?? "");
 
   try {
+    await assertCanUseCaptainTournamentActions();
+
     const parsed = captainPlayerDeleteSchema.safeParse({
       competitionId: formData.get("competitionId"),
       teamId: formData.get("teamId"),
@@ -232,6 +246,8 @@ export async function uploadCaptainTournamentPlayerPhotoAction(formData: FormDat
   const rawTeamId = String(formData.get("teamId") ?? "");
 
   try {
+    await assertCanUseCaptainTournamentActions();
+
     const parsed = captainPlayerPhotoSchema.safeParse({
       competitionId: formData.get("competitionId"),
       teamId: formData.get("teamId"),

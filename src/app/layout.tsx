@@ -10,6 +10,7 @@ import { BetaNotice } from "@/components/layout/beta-notice";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ReactQueryProvider } from "@/components/providers/react-query-provider";
+import { isSuperAdminEmail } from "@/lib/auth/super-admin";
 import { getAdsenseClientId, shouldRenderAds, shouldRenderSpeedInsights } from "@/lib/env";
 import { getPublicAppUrl } from "@/lib/public-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -71,6 +72,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     data: { user }
   } = await supabase.auth.getUser();
   const initialIsAuthenticated = Boolean(user);
+  const initialCanAccessTournaments = isSuperAdminEmail(user?.email);
   const adsenseClientId = getAdsenseClientId();
   const adsEnabled = shouldRenderAds() && Boolean(adsenseClientId);
   const speedInsightsEnabled = shouldRenderSpeedInsights();
@@ -92,14 +94,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             Saltar al contenido
           </a>
           <Suspense fallback={<div className="sticky top-0 z-30 h-[57px] border-b border-slate-800 bg-slate-950/85" />}>
-            <SiteHeader initialIsAuthenticated={initialIsAuthenticated} />
+            <SiteHeader
+              initialCanAccessTournaments={initialCanAccessTournaments}
+              initialIsAuthenticated={initialIsAuthenticated}
+            />
           </Suspense>
           <BetaNotice />
           <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8" id="contenido-principal">
             {children}
           </main>
           <Suspense fallback={<div className="h-[280px] border-t border-slate-800 bg-slate-950/80" />}>
-            <SiteFooter />
+            <SiteFooter canAccessTournaments={initialCanAccessTournaments} />
           </Suspense>
         </ReactQueryProvider>
         <Suspense fallback={null}>

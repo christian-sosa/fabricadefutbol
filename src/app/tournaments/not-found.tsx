@@ -7,16 +7,13 @@ export default function TournamentsNotFound() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardTitle>No encontramos esa liga o competencia</CardTitle>
+        <CardTitle>No encontramos esa pagina</CardTitle>
         <CardDescription className="mt-2">
-          Puede que no exista, que siga en borrador o que ya no este disponible publicamente.
+          Puede que no exista o que ya no este disponible.
         </CardDescription>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Link href="/tournaments">
-            <Button>Volver a torneos</Button>
-          </Link>
           <Link href="/">
-            <Button variant="secondary">Ir al inicio</Button>
+            <Button>Ir al inicio</Button>
           </Link>
         </div>
       </Card>

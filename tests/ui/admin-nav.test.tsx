@@ -19,7 +19,7 @@ describe("AdminNav", () => {
     navigationState.searchParams = new URLSearchParams();
   });
 
-  it("mantiene el grupo solo en la navegacion de Grupos", () => {
+  it("oculta Torneos a admins comunes", () => {
     navigationState.searchParams = new URLSearchParams({ org: "grupo-a" });
 
     render(<AdminNav isSuperAdmin={false} />);
@@ -28,6 +28,12 @@ describe("AdminNav", () => {
       "href",
       "/admin?org=grupo-a"
     );
+    expect(screen.queryByRole("link", { name: "Torneos" })).not.toBeInTheDocument();
+  });
+
+  it("muestra Torneos solo al super admin", () => {
+    render(<AdminNav isSuperAdmin />);
+
     expect(screen.getByRole("link", { name: "Torneos" })).toHaveAttribute(
       "href",
       "/admin/tournaments"

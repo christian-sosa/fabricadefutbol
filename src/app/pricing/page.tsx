@@ -7,6 +7,7 @@ import {
   ORGANIZATION_MONTHLY_PRICE_ARS,
   TOURNAMENT_MONTHLY_PRICE_ARS
 } from "@/lib/constants";
+import { getCurrentUserIsSuperAdmin } from "@/lib/auth/super-admin";
 import { GROWTH_EVENTS } from "@/lib/growth";
 
 function formatArs(amount: number) {
@@ -16,7 +17,8 @@ function formatArs(amount: number) {
   }).format(amount);
 }
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const canAccessTournaments = await getCurrentUserIsSuperAdmin();
   const groupPlan = {
     title: "Grupos",
     eyebrow: "Para partidos recurrentes",
@@ -53,22 +55,30 @@ export default function PricingPage() {
       "Tabla, resultados, goleadores y figuras"
     ]
   };
-  const plans = [groupPlan, tournamentPlan];
-  const pricingNotes = [
-    "Grupos y Torneos se facturan por separado porque resuelven necesidades distintas.",
-    "La informacion publica sigue visible para jugadores y visitantes.",
-    "Cuando un periodo vence, el espacio queda protegido en modo lectura hasta reactivar el plan."
-  ];
+  const plans = canAccessTournaments ? [groupPlan, tournamentPlan] : [groupPlan];
+  const pricingNotes = canAccessTournaments
+    ? [
+        "Grupos y Torneos se facturan por separado porque resuelven necesidades distintas.",
+        "La informacion publica sigue visible para jugadores y visitantes.",
+        "Cuando un periodo vence, el espacio queda protegido en modo lectura hasta reactivar el plan."
+      ]
+    : [
+        "La informacion publica sigue visible para jugadores y visitantes.",
+        "Cuando un periodo vence, el grupo queda protegido en modo lectura hasta reactivar el plan.",
+        "Puedes empezar con un grupo y ordenar la operacion sin mezclar herramientas externas."
+      ];
 
   return (
     <div className="space-y-6">
       <section className="rounded-[2rem] border border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.18),transparent_32%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-6 shadow-[0_28px_60px_-34px_rgba(16,185,129,0.7)] md:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Precios</p>
         <h1 className="mt-2 text-3xl font-black text-white md:text-5xl">
-          Elige el pack segun como organizas tu futbol.
+          {canAccessTournaments ? "Elige el pack segun como organizas tu futbol." : "Un plan simple para ordenar tu grupo."}
         </h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-          Puedes empezar con un grupo, sumar una liga cuando el proyecto crezca o usar ambos modulos sin mezclar datos ni flujos.
+          {canAccessTournaments
+            ? "Puedes empezar con un grupo, sumar una liga cuando el proyecto crezca o usar ambos modulos sin mezclar datos ni flujos."
+            : "Empieza con jugadores, partidos, rendimiento, ranking publico e historial claro para todos."}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <TrackedLink
@@ -88,7 +98,7 @@ export default function PricingPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className={`grid gap-4 ${canAccessTournaments ? "lg:grid-cols-2" : ""}`}>
         {plans.map((plan) => (
           <Card className="p-5" key={plan.title}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -150,7 +160,9 @@ export default function PricingPage() {
         <Card>
           <CardTitle>Necesitas algo mas grande?</CardTitle>
           <CardDescription className="mt-3">
-            Si organizas varias ligas, muchos grupos o necesitas una configuracion especial, escribenos y lo revisamos contigo antes de que la operacion crezca sin control.
+            {canAccessTournaments
+              ? "Si organizas varias ligas, muchos grupos o necesitas una configuracion especial, escribenos y lo revisamos contigo antes de que la operacion crezca sin control."
+              : "Si organizas muchos grupos o necesitas una configuracion especial, escribenos y lo revisamos contigo antes de que la operacion crezca sin control."}
           </CardDescription>
           <div className="mt-4">
             <Link

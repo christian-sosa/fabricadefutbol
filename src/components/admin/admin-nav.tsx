@@ -16,7 +16,7 @@ export function AdminNav({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const [mounted, setMounted] = useState(false);
   const navItems = isSuperAdmin
     ? [...ADMIN_NAV_ITEMS, { href: "/admin/super", label: "Super Admin" }]
-    : ADMIN_NAV_ITEMS;
+    : ADMIN_NAV_ITEMS.filter((item) => item.href !== "/admin/tournaments");
 
   useEffect(() => {
     setMounted(true);

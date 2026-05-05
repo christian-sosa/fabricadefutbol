@@ -13,6 +13,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type SiteHeaderProps = {
   initialIsAuthenticated?: boolean;
+  initialCanAccessTournaments?: boolean;
 };
 
 const ORGANIZATION_SECTION_PATHS = ["/groups", "/organizations", "/ranking", "/matches", "/upcoming"] as const;
@@ -70,19 +71,28 @@ function MenuToggleIcon({ open }: { open: boolean }) {
   );
 }
 
-export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) {
+function filterTournamentNavItems<T extends { href: string }>(items: readonly T[], canAccessTournaments: boolean) {
+  return canAccessTournaments ? items : items.filter((item) => item.href !== "/tournaments");
+}
+
+export function SiteHeader({
+  initialCanAccessTournaments = false,
+  initialIsAuthenticated = false
+}: SiteHeaderProps) {
   const pathname = usePathname();
   const safePathname = pathname ?? "";
   const router = useRouter();
   const searchParams = useSearchParams();
   const organizationKey = searchParams.get("org");
-  const publicModule = parsePublicModule(searchParams.get("module"));
+  const requestedPublicModule = parsePublicModule(searchParams.get("module"));
   const searchKey = searchParams.toString();
   const [mounted, setMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(initialIsAuthenticated);
+  const [canAccessTournaments, setCanAccessTournaments] = useState(initialCanAccessTournaments);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentOrganizationName, setCurrentOrganizationName] = useState<string | null>(null);
 
+  const publicModule = canAccessTournaments ? requestedPublicModule : "organizations";
   const isOrganizationSection = isOrganizationSectionPath(safePathname);
   const shouldShowOrganizationSubnav = mounted && isOrganizationSection;
   const shouldShowMobileOrganizationSubnav = shouldShowOrganizationSubnav && !isActivePath(safePathname, "/groups");
@@ -91,6 +101,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
     module: publicModule
   });
   const currentOrganizationLabel = currentOrganizationName ?? humanizeOrganizationKey(organizationKey);
+  const primaryNavItems = filterTournamentNavItems(PRIMARY_PUBLIC_NAV_ITEMS, canAccessTournaments);
 
   useEffect(() => {
     setMounted(true);
@@ -101,18 +112,24 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
   }, [initialIsAuthenticated]);
 
   useEffect(() => {
+    setCanAccessTournaments(initialCanAccessTournaments);
+  }, [initialCanAccessTournaments]);
+
+  useEffect(() => {
     const supabase = createSupabaseBrowserClient();
 
     let active = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
       setIsAuthenticated(Boolean(data.session?.user));
+      if (!data.session?.user) setCanAccessTournaments(false);
     });
 
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(Boolean(session?.user));
+      if (!session?.user) setCanAccessTournaments(false);
     });
 
     return () => {
@@ -172,6 +189,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
     const supabase = createSupabaseBrowserClient();
     await supabase.auth.signOut();
     setIsAuthenticated(false);
+    setCanAccessTournaments(false);
     router.refresh();
   };
 
@@ -235,7 +253,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
 
           <div className="hidden min-w-0 flex-1 items-center justify-center px-4 lg:flex">
             <nav className="flex min-w-0 items-center gap-1 xl:gap-2">
-              {PRIMARY_PUBLIC_NAV_ITEMS.map((item) => {
+              {primaryNavItems.map((item) => {
                 const active =
                   mounted &&
                   (item.href === "/groups"
@@ -310,7 +328,7 @@ export function SiteHeader({ initialIsAuthenticated = false }: SiteHeaderProps) 
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Navegacion</p>
               <nav className="grid gap-2">
-                {PRIMARY_PUBLIC_NAV_ITEMS.map((item) => {
+                {primaryNavItems.map((item) => {
                   const active =
                     mounted &&
                     (item.href === "/groups"

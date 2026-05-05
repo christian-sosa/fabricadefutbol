@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { getCurrentUserIsSuperAdmin } from "@/lib/auth/super-admin";
 import { resolvePublicModule, withPublicQuery } from "@/lib/org";
 
 const LAST_UPDATED = "2 de mayo de 2026";
@@ -35,7 +36,9 @@ export default async function TermsPage({
 }) {
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
-  const currentModule = resolvePublicModule(resolvedSearchParams.module);
+  const canAccessTournaments = await getCurrentUserIsSuperAdmin();
+  const requestedModule = resolvePublicModule(resolvedSearchParams.module);
+  const currentModule = canAccessTournaments ? requestedModule : "organizations";
 
   return (
     <div className="space-y-5">
@@ -55,7 +58,7 @@ export default async function TermsPage({
         <LegalSection title="1. Aceptacion">
           <p>
             Al navegar el sitio, crear una cuenta, administrar un grupo, cargar informacion o contratar un plan, aceptas
-            estos terminos. Si usas el servicio en nombre de un grupo, equipo, liga u organizacion, declaras tener
+            estos terminos. Si usas el servicio en nombre de {canAccessTournaments ? "un grupo, equipo, liga u organizacion" : "un grupo u organizacion"}, declaras tener
             autorizacion suficiente para hacerlo.
           </p>
           <p>
@@ -70,7 +73,9 @@ export default async function TermsPage({
             equipos, resultados, rankings, historial, proximas fechas y vistas publicas del grupo.
           </p>
           <p>
-            Torneos incluye ligas, competencias, equipos, fixture, tablas, resultados y estadisticas, con altas de ligas restringidas por permisos operativos.
+            {canAccessTournaments
+              ? "Torneos incluye ligas, competencias, equipos, fixture, tablas, resultados y estadisticas, con altas de ligas restringidas por permisos operativos."
+              : "El foco publico actual del servicio esta en Grupos: jugadores, partidos, rankings, historial y vistas publicas del grupo."}
           </p>
         </LegalSection>
 
@@ -124,7 +129,9 @@ export default async function TermsPage({
           <p>El servicio debe usarse de buena fe y para fines vinculados con organizacion deportiva amateur.</p>
           <LegalList
             items={[
-              "No intentar acceder a cuentas, grupos, ligas o datos que no te correspondan.",
+              canAccessTournaments
+                ? "No intentar acceder a cuentas, grupos, ligas o datos que no te correspondan."
+                : "No intentar acceder a cuentas, grupos o datos que no te correspondan.",
               "No interferir con la seguridad, disponibilidad, infraestructura, API o Storage del servicio.",
               "No cargar contenido ilegal, violento, discriminatorio, difamatorio, acosador o que exponga datos sensibles innecesarios.",
               "No usar automatizaciones abusivas, scraping no autorizado ni acciones que degraden el servicio para otros usuarios."
@@ -142,7 +149,9 @@ export default async function TermsPage({
             invitaciones o automatizaciones cuando sea necesario para sostener el servicio gratis.
           </p>
           <p>
-            Torneos tiene reglas de facturacion separadas. En Torneos, la facturacion puede asociarse a la liga activa y no necesariamente a cada competencia creada.
+            {canAccessTournaments
+              ? "Torneos tiene reglas de facturacion separadas. En Torneos, la facturacion puede asociarse a la liga activa y no necesariamente a cada competencia creada."
+              : "Si mas adelante se habilitan nuevos modulos publicos con contratacion, tendran reglas propias informadas antes de aceptarlos."}
           </p>
         </LegalSection>
 

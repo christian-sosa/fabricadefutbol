@@ -183,7 +183,8 @@ function AdminHomeHub({
   error,
   leagueCreationAccess,
   leagues,
-  organizations
+  organizations,
+  showTournaments
 }: {
   creationAccess: Awaited<ReturnType<typeof getAdminOrganizationCreationAccess>>;
   checkout?: string;
@@ -191,6 +192,7 @@ function AdminHomeHub({
   leagueCreationAccess: Awaited<ReturnType<typeof getLeagueCreationAccess>>;
   leagues: LeagueEntry[];
   organizations: OrganizationEntry[];
+  showTournaments: boolean;
 }) {
   const hasOrganizations = organizations.length > 0;
   const hasLeagues = leagues.length > 0;
@@ -203,11 +205,13 @@ function AdminHomeHub({
       <Card className="p-5 sm:p-6">
         <CardTitle className="text-3xl">Que queres administrar?</CardTitle>
         <CardDescription className="mt-3 max-w-3xl text-base">
-          Elegi un grupo o una liga antes de cargar datos. Asi cada flujo mantiene sus jugadores, partidos, competencias y facturacion en el lugar correcto.
+          {showTournaments
+            ? "Elegi un grupo o una liga antes de cargar datos. Asi cada flujo mantiene sus jugadores, partidos, competencias y facturacion en el lugar correcto."
+            : "Elegi un grupo antes de cargar datos. Asi jugadores, partidos, rendimiento y facturacion quedan en el lugar correcto."}
         </CardDescription>
       </Card>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className={`grid gap-4 ${showTournaments ? "lg:grid-cols-2" : ""}`}>
         <Card>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -273,68 +277,70 @@ function AdminHomeHub({
           </div>
         </Card>
 
-        <Card>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <CardTitle>Tus ligas</CardTitle>
-              <CardDescription className="mt-2">
-                Para torneos con equipos maestros, competencias, fixture, tabla y resultados publicos.
-              </CardDescription>
-            </div>
-            {leagueCreationAccess.canCreateLeague ? (
-              <Link
-                className={leagueActionLinkClass}
-                href="/admin/tournaments/new"
-              >
-                Nueva liga
-              </Link>
-            ) : null}
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {hasLeagues ? (
-              leagues.map((league) => (
-                <div
-                  className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 sm:flex-row sm:items-center sm:justify-between"
-                  key={league.id}
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate font-semibold text-slate-100">{league.name}</p>
-                      <TournamentStatusBadge status={league.status} />
-                    </div>
-                    <p className="mt-1 text-xs text-slate-400">
-                      {league.teamCount} equipos - {league.competitionCount} competencias
-                    </p>
-                  </div>
-                  <Link
-                    className={enterLeagueLinkClass}
-                    href={`/admin/tournaments/${league.id}`}
-                  >
-                    Entrar a la liga
-                  </Link>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                <p className="text-sm font-semibold text-slate-100">Todavia no administras ligas.</p>
-                <p className="mt-1 text-sm text-slate-400">
-                  {leagueCreationAccess.canCreateLeague
-                    ? "Crea una liga cuando necesites competencias, equipos inscriptos y tabla publica."
-                    : (leagueCreationAccess.reason ?? "Por ahora las altas de ligas estan habilitadas manualmente.")}
-                </p>
-                {leagueCreationAccess.canCreateLeague ? (
-                  <Link
-                    className={`${enterLeagueLinkClass} mt-4`}
-                    href="/admin/tournaments/new"
-                  >
-                    Crear liga
-                  </Link>
-                ) : null}
+        {showTournaments ? (
+          <Card>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle>Tus ligas</CardTitle>
+                <CardDescription className="mt-2">
+                  Para torneos con equipos maestros, competencias, fixture, tabla y resultados publicos.
+                </CardDescription>
               </div>
-            )}
-          </div>
-        </Card>
+              {leagueCreationAccess.canCreateLeague ? (
+                <Link
+                  className={leagueActionLinkClass}
+                  href="/admin/tournaments/new"
+                >
+                  Nueva liga
+                </Link>
+              ) : null}
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {hasLeagues ? (
+                leagues.map((league) => (
+                  <div
+                    className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 sm:flex-row sm:items-center sm:justify-between"
+                    key={league.id}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-semibold text-slate-100">{league.name}</p>
+                        <TournamentStatusBadge status={league.status} />
+                      </div>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {league.teamCount} equipos - {league.competitionCount} competencias
+                      </p>
+                    </div>
+                    <Link
+                      className={enterLeagueLinkClass}
+                      href={`/admin/tournaments/${league.id}`}
+                    >
+                      Entrar a la liga
+                    </Link>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                  <p className="text-sm font-semibold text-slate-100">Todavia no administras ligas.</p>
+                  <p className="mt-1 text-sm text-slate-400">
+                    {leagueCreationAccess.canCreateLeague
+                      ? "Crea una liga cuando necesites competencias, equipos inscriptos y tabla publica."
+                      : (leagueCreationAccess.reason ?? "Por ahora las altas de ligas estan habilitadas manualmente.")}
+                  </p>
+                  {leagueCreationAccess.canCreateLeague ? (
+                    <Link
+                      className={`${enterLeagueLinkClass} mt-4`}
+                      href="/admin/tournaments/new"
+                    >
+                      Crear liga
+                    </Link>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          </Card>
+        ) : null}
       </section>
     </div>
   );
@@ -350,10 +356,16 @@ export default async function AdminDashboardPage({
 
   const creationAccess = await getAdminOrganizationCreationAccess(admin);
   const selectedOrganization = findOrganizationByKey(organizations, resolvedSearchParams.org);
-  const leagueCreationAccess = await getLeagueCreationAccess(admin);
+  const showTournaments = admin.isSuperAdmin;
+  const leagueCreationAccess = showTournaments
+    ? await getLeagueCreationAccess(admin)
+    : {
+        canCreateLeague: false,
+        reason: null
+      };
 
   if (!selectedOrganization) {
-    const leagues = await getAdminLeagueList();
+    const leagues = showTournaments ? await getAdminLeagueList() : [];
 
     return (
       <AdminHomeHub
@@ -363,6 +375,7 @@ export default async function AdminDashboardPage({
         leagueCreationAccess={leagueCreationAccess}
         leagues={leagues}
         organizations={organizations}
+        showTournaments={showTournaments}
       />
     );
   }

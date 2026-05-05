@@ -176,39 +176,14 @@ export async function getCompetitionPublicPathById(competitionId: string) {
 }
 
 async function assertLeagueMembership(leagueId: string) {
+  void leagueId;
   const admin = await assertAdminAction();
 
   if (admin.isSuperAdmin) {
     return admin;
   }
 
-  const supabase = await createSupabaseServerClient();
-  const [{ data: membership, error: membershipError }, { data: createdLeague, error: creatorError }] =
-    await Promise.all([
-      supabase
-        .from("league_admins")
-        .select("id")
-        .eq("league_id", leagueId)
-        .eq("admin_id", admin.userId)
-        .maybeSingle(),
-      supabase
-        .from("leagues")
-        .select("id")
-        .eq("id", leagueId)
-        .eq("created_by", admin.userId)
-        .maybeSingle()
-    ]);
-
-  const hasAccess = Boolean(membership || createdLeague);
-  if (!hasAccess && (membershipError || creatorError)) {
-    throw new Error(membershipError?.message ?? creatorError?.message ?? "No autorizado para administrar esta liga.");
-  }
-
-  if (!hasAccess) {
-    throw new Error("No autorizado para administrar esta liga.");
-  }
-
-  return admin;
+  throw new Error("Torneos esta disponible solo para el super admin por ahora.");
 }
 
 export async function assertLeagueMembershipAction(leagueId: string) {

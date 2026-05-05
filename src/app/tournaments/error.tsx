@@ -19,14 +19,14 @@ export default function TournamentsError({
       <Card>
         <CardTitle>No pudimos cargar esta seccion</CardTitle>
         <CardDescription className="mt-2">
-          Hubo un problema al traer la informacion publica. Puedes reintentar o volver al listado de ligas.
+          Hubo un problema al traer la informacion. Puedes reintentar o volver al inicio.
         </CardDescription>
         <div className="mt-4 flex flex-wrap gap-3">
           <Button onClick={reset} type="button">
             Reintentar
           </Button>
-          <Link href="/tournaments">
-            <Button variant="secondary">Volver a torneos</Button>
+          <Link href="/">
+            <Button variant="secondary">Ir al inicio</Button>
           </Link>
         </div>
       </Card>

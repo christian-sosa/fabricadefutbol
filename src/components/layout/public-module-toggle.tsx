@@ -22,6 +22,7 @@ const MODULE_OPTIONS = [
 
 type PublicModuleToggleProps = {
   basePath: string;
+  canAccessTournaments?: boolean;
   currentModule: PublicModuleContext;
   organizationKey?: string | null;
   className?: string;
@@ -29,10 +30,15 @@ type PublicModuleToggleProps = {
 
 export function PublicModuleToggle({
   basePath,
+  canAccessTournaments = false,
   currentModule,
   organizationKey,
   className
 }: PublicModuleToggleProps) {
+  const moduleOptions = canAccessTournaments
+    ? MODULE_OPTIONS
+    : MODULE_OPTIONS.filter((option) => option.value !== "tournaments");
+
   return (
     <div
       className={cn(
@@ -40,7 +46,7 @@ export function PublicModuleToggle({
         className
       )}
     >
-      {MODULE_OPTIONS.map((option) => {
+      {moduleOptions.map((option) => {
         const active = option.value === currentModule;
 
         return (

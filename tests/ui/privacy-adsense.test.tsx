@@ -7,6 +7,10 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams()
 }));
 
+vi.mock("@/lib/auth/super-admin", () => ({
+  getCurrentUserIsSuperAdmin: vi.fn(async () => false)
+}));
+
 import PrivacyPage from "@/app/privacy/page";
 
 describe("privacy adsense disclosure", () => {
