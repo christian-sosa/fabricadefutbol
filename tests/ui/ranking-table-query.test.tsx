@@ -69,6 +69,12 @@ function getBodyRows() {
 }
 
 describe("RankingTableQuery", () => {
+  it("no muestra una barra de estado arriba del encabezado cuando la tabla esta al dia", () => {
+    render(<RankingTableQuery initialPlayers={players} organizationId="org-1" />);
+
+    expect(screen.queryByText("Tabla al dia")).not.toBeInTheDocument();
+  });
+
   it("permite ordenar por estadisticas sin perder el ranking actual", async () => {
     const user = userEvent.setup();
     render(<RankingTableQuery initialPlayers={players} organizationId="org-1" />);

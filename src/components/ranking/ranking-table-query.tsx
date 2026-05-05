@@ -168,9 +168,11 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
 
   return (
     <Card className="overflow-hidden border-slate-800 bg-slate-900/85 p-0 shadow-[0_18px_45px_-20px_rgba(16,185,129,0.55)]">
-      <div className="border-b border-slate-800 px-4 py-2 text-xs text-slate-400">
-        {isFetching ? "Actualizando tabla..." : "Tabla al dia"}
-      </div>
+      {isFetching ? (
+        <p aria-live="polite" className="sr-only">
+          Actualizando tabla...
+        </p>
+      ) : null}
 
       <div className="space-y-3 p-3 md:hidden">
         <div className="scrollbar-none flex gap-2 overflow-x-auto pb-1">
