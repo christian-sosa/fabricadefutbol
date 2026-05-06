@@ -118,15 +118,14 @@ export default async function AdminPlayersPage({
                   </option>
                 ))}
               </Select>
-              <Input
-                defaultValue={formatRendimiento(player.current_rating)}
-                form={bulkFormId}
-                inputMode="numeric"
-                name="currentRating"
-                placeholder="1000"
-                required
-                type="text"
-              />
+              <div className="rounded-md border border-slate-800 bg-slate-950/70 px-3 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Automatico
+                </p>
+                <p className="mt-1 text-sm font-semibold text-emerald-300">
+                  {formatRendimiento(player.current_rating)}
+                </p>
+              </div>
               <form action={uploadPlayerPhotoAction} className="space-y-2 lg:self-start">
                 <input name="organizationId" type="hidden" value={selectedOrganization.id} />
                 <input name="playerId" type="hidden" value={player.id} />

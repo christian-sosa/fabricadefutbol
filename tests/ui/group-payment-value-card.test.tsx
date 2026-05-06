@@ -18,7 +18,7 @@ describe("GroupActivityValueCard", () => {
       />
     );
 
-    expect(screen.getByText("Tu grupo ya tiene valor acumulado")).toBeInTheDocument();
+    expect(screen.getByText("Resumen del grupo")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Activar plan/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/trial|prueba|plan mensual|pago/i)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Ir a partidos" })).toHaveAttribute(

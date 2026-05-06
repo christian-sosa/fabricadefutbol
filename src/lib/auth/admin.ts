@@ -146,13 +146,6 @@ async function hasAdminMembershipInAnyOrganization(userId: string) {
 }
 
 export async function getAdminOrganizationCreationAccess(admin: AdminSession) {
-  if (admin.isSuperAdmin) {
-    return {
-      canCreateOrganization: true,
-      reason: null as string | null
-    };
-  }
-
   const freeTrialStatus = await getAdminFreeTrialStatus(admin.userId);
   if (!freeTrialStatus.hasCreatedOrganization) {
     const hasMembership = await hasAdminMembershipInAnyOrganization(admin.userId);
@@ -178,8 +171,6 @@ export async function getAdminOrganizationCreationAccess(admin: AdminSession) {
 }
 
 export async function assertCanCreateOrganization(admin: AdminSession) {
-  if (admin.isSuperAdmin) return;
-
   const creationAccess = await getAdminOrganizationCreationAccess(admin);
   if (creationAccess.canCreateOrganization) return;
   throw new Error(

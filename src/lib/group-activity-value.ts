@@ -22,21 +22,21 @@ function getStageCopy(stage: GroupActivityValueStage) {
   switch (stage) {
     case "proven":
       return {
-        headline: "Tu grupo ya tiene valor acumulado",
+        headline: "Resumen del grupo",
         description:
-          "Ya hay resultados que alimentan ranking, historial y rendimiento. Segui cargando partidos para que el grupo conserve su memoria deportiva."
+          "Jugadores, partidos y resultados en un solo lugar. Estos numeros te ayudan a ver si el grupo esta al dia antes de cargar el proximo partido."
       };
     case "first_match":
       return {
-        headline: "Tu grupo ya empezo a tomar forma",
+        headline: "Grupo en preparacion",
         description:
-          "El siguiente salto es cerrar resultados y compartir ranking. Cuando el grupo lo usa cada semana, el historial empieza a ordenar discusiones."
+          "Ya hay jugadores o partidos cargados. El siguiente paso es cerrar un resultado para que ranking e historial empiecen a mostrarse completos."
       };
     case "setup":
       return {
-        headline: "Deja listo el grupo antes del proximo partido",
+        headline: "Primeros datos del grupo",
         description:
-          "Carga jugadores, arma el primer partido y comparti el ranking. El valor aparece cuando el grupo deja de depender solo del chat."
+          "Carga jugadores y arma el primer partido. Cuando haya resultados, esta tarjeta va a mostrar el estado real del grupo."
       };
   }
 }

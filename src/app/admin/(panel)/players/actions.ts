@@ -44,17 +44,8 @@ const photoSchema = z.object({
 const rowSchema = z.object({
   id: z.string().uuid(),
   fullName: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
-  skillLevel: z.number().int().min(1, "El nivel debe estar entre 1 y 5.").max(5, "El nivel debe estar entre 1 y 5."),
-  currentRating: z.number().positive("El rendimiento debe ser un numero positivo.")
+  skillLevel: z.number().int().min(1, "El nivel debe estar entre 1 y 5.").max(5, "El nivel debe estar entre 1 y 5.")
 });
-
-function parseDecimalField(value: FormDataEntryValue | null) {
-  const normalized = String(value ?? "")
-    .trim()
-    .replace(",", ".");
-
-  return Number(normalized);
-}
 
 function withMessage(organizationId: string, error: string | null) {
   const basePath = withOrgQuery("/admin/players", organizationId);
@@ -256,13 +247,11 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
     const playerIds = formData.getAll("playerId").map((value) => String(value));
     const fullNames = formData.getAll("fullName").map((value) => String(value));
     const skillLevels = formData.getAll("skillLevel").map((value) => Number(value));
-    const currentRatings = formData.getAll("currentRating").map((value) => parseDecimalField(value));
 
     if (
       !playerIds.length ||
       playerIds.length !== fullNames.length ||
-      playerIds.length !== skillLevels.length ||
-      playerIds.length !== currentRatings.length
+      playerIds.length !== skillLevels.length
     ) {
       redirect(withMessage(organizationQueryKey, "La planilla enviada es invalida o incompleta."));
     }
@@ -271,8 +260,7 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
       const parsedRow = rowSchema.safeParse({
         id,
         fullName: fullNames[index],
-        skillLevel: skillLevels[index],
-        currentRating: currentRatings[index]
+        skillLevel: skillLevels[index]
       });
 
       if (!parsedRow.success) {
@@ -317,8 +305,7 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
         .from("players")
         .update({
           full_name: row.fullName,
-          skill_level: normalizeSkillLevel(row.skillLevel),
-          current_rating: Math.round(row.currentRating)
+          skill_level: normalizeSkillLevel(row.skillLevel)
         })
         .eq("id", row.id)
         .eq("organization_id", organizationId);

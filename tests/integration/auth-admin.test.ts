@@ -89,6 +89,32 @@ describe("admin group creation access", () => {
     });
   });
 
+  it("bloquea crear otro grupo al super admin cuando ya administra uno", async () => {
+    const fake = createFakeSupabase({
+      organizations: [
+        {
+          id: "org-1",
+          name: "Liga A",
+          slug: "liga-a",
+          created_by: ADMIN_SESSION.userId,
+          created_at: "2026-04-10T00:00:00.000Z"
+        }
+      ]
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+
+    await expect(
+      getAdminOrganizationCreationAccess({
+        ...ADMIN_SESSION,
+        isSuperAdmin: true
+      })
+    ).resolves.toEqual({
+      canCreateOrganization: false,
+      reason:
+        "Ya tenés un grupo para administrar. Si querés sumar otro, escribinos y lo habilitamos manualmente."
+    });
+  });
+
   it("habilita escritura en grupos existentes aunque ya no haya trial o suscripcion activa", async () => {
     const fake = createFakeSupabase({
       organizations: [

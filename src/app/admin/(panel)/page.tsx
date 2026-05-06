@@ -41,9 +41,7 @@ type OrganizationEntry = {
 
 type LeagueEntry = Awaited<ReturnType<typeof getAdminLeagueList>>[number];
 type ClubEntry = Awaited<ReturnType<typeof getAdminClubs>>[number];
-
-const groupActionLinkClass =
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-emerald-400/45 bg-emerald-500/10 px-3.5 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/15";
+type OrganizationSeasonEntry = Awaited<ReturnType<typeof getOrganizationSeasons>>[number];
 
 const leagueActionLinkClass =
   "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-sky-400/45 bg-sky-500/10 px-3.5 py-2 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/15";
@@ -70,6 +68,22 @@ function findOrganizationByKey(organizations: OrganizationEntry[], organizationK
       (organization) => organization.slug.toLowerCase() === normalizedKey || organization.id === organizationKey
     ) ?? null
   );
+}
+
+function formatDateOnlyEs(value: string) {
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value;
+  return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
+}
+
+function getAnnualSeasonDisplayStart(season: OrganizationSeasonEntry) {
+  const yearFromLabel = season.label.match(/\b(\d{4})\b/)?.[1];
+  const yearFromEnd = season.endsAt.slice(0, 4);
+  return `${yearFromLabel ?? yearFromEnd}-01-01`;
+}
+
+function formatOrganizationSeasonRange(season: OrganizationSeasonEntry) {
+  return `${season.label}: ${formatDateOnlyEs(getAnnualSeasonDisplayStart(season))} a ${formatDateOnlyEs(season.endsAt)}`;
 }
 
 function AdminFeedback({
@@ -207,7 +221,6 @@ function AdminHomeHub({
   const hasOrganizations = organizations.length > 0;
   const hasClubs = clubs.length > 0;
   const hasLeagues = leagues.length > 0;
-  const referenceOrganization = organizations[0] ?? null;
   const visibleHubCards = 1 + (hasClubs ? 1 : 0) + (showTournaments ? 1 : 0);
   const hubGridClass = visibleHubCards >= 3 ? "lg:grid-cols-2 xl:grid-cols-3" : visibleHubCards === 2 ? "lg:grid-cols-2" : "";
 
@@ -233,14 +246,6 @@ function AdminHomeHub({
                 Para partidos recurrentes, niveles de habilidad, rendimiento, historial y proximas fechas.
               </CardDescription>
             </div>
-            {hasOrganizations ? (
-              <Link
-                className={groupActionLinkClass}
-                href={withOrgQuery("/admin/new", referenceOrganization?.slug)}
-              >
-                Nuevo grupo
-              </Link>
-            ) : null}
           </div>
 
           <div className="mt-4 space-y-3">
@@ -469,7 +474,7 @@ export default async function AdminDashboardPage({
             </CardDescription>
             <p className="mt-3 text-sm text-slate-300">
               {activeSeason
-                ? `${activeSeason.label}: ${new Date(activeSeason.startsAt).toLocaleDateString("es-AR")} a ${new Date(activeSeason.endsAt).toLocaleDateString("es-AR")}`
+                ? formatOrganizationSeasonRange(activeSeason)
                 : "Todavia no hay temporada activa. Se creara automaticamente al cargar un resultado."}
             </p>
           </div>

@@ -14,6 +14,10 @@ export function getAnnualOrganizationSeasonEndDate(now = new Date()) {
   return `${now.getUTCFullYear()}-12-31`;
 }
 
+export function getAnnualOrganizationSeasonStartDate(now = new Date()) {
+  return `${now.getUTCFullYear()}-01-01`;
+}
+
 function parseDateOnly(value: string) {
   if (!DATE_ONLY_PATTERN.test(value)) return null;
   const date = new Date(`${value}T00:00:00.000Z`);
@@ -47,12 +51,18 @@ export function buildOrganizationSeasonLabel(startsAt: Date, endsAt: string) {
 }
 
 export function buildOrganizationSeasonInsert({ organizationId, createdBy, startsAt }: SeasonInsertInput) {
+  const startsAtDateOnly = getAnnualOrganizationSeasonStartDate(startsAt);
+  const seasonStart = parseDateOnly(startsAtDateOnly);
+  if (!seasonStart) {
+    throw new Error("La fecha de inicio de temporada es invalida.");
+  }
+
   const endsAt = getAnnualOrganizationSeasonEndDate(startsAt);
   return {
     organization_id: organizationId,
-    label: buildOrganizationSeasonLabel(startsAt, endsAt),
-    duration_months: calculateOrganizationSeasonDurationMonths(startsAt, endsAt),
-    starts_at: toDateOnly(startsAt),
+    label: buildOrganizationSeasonLabel(seasonStart, endsAt),
+    duration_months: calculateOrganizationSeasonDurationMonths(seasonStart, endsAt),
+    starts_at: startsAtDateOnly,
     ends_at: endsAt,
     status: "active" as const,
     created_by: createdBy ?? null

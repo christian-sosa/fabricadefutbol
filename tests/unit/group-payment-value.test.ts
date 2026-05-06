@@ -24,7 +24,8 @@ describe("group activity value helpers", () => {
     });
 
     expect(state.stage).toBe("proven");
-    expect(state.headline).toBe("Tu grupo ya tiene valor acumulado");
+    expect(state.headline).toBe("Resumen del grupo");
+    expect(state.description).toMatch(/Jugadores, partidos y resultados/i);
     expect(state.description).not.toMatch(/trial|prueba|plan|pago|reactivar/i);
   });
 
