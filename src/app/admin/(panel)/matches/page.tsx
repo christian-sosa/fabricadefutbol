@@ -25,10 +25,16 @@ export default async function AdminMatchesPage({
     : null;
   const showLoadedMatches = resolvedSearchParams.view === "edit";
   const editExistingHref = withOrgQuery("/admin/matches?view=edit", selectedOrganization.slug);
+  const matchStatusCounts = {
+    draft: matches.filter((match) => match.status === "draft").length,
+    confirmed: matches.filter((match) => match.status === "confirmed").length,
+    finished: matches.filter((match) => match.status === "finished").length,
+    cancelled: matches.filter((match) => match.status === "cancelled").length
+  };
 
   return (
     <div className="space-y-4">
-      <AdminCurrentGroupCard organization={selectedOrganization} />
+      <AdminCurrentGroupCard admin={admin} organization={selectedOrganization} />
 
       <Card>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -78,67 +84,86 @@ export default async function AdminMatchesPage({
         ) : null}
       </Card>
 
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardDescription>Borradores</CardDescription>
+          <CardTitle className="mt-1 text-3xl">{matchStatusCounts.draft}</CardTitle>
+        </Card>
+        <Card>
+          <CardDescription>Confirmados</CardDescription>
+          <CardTitle className="mt-1 text-3xl">{matchStatusCounts.confirmed}</CardTitle>
+        </Card>
+        <Card>
+          <CardDescription>Finalizados</CardDescription>
+          <CardTitle className="mt-1 text-3xl">{matchStatusCounts.finished}</CardTitle>
+        </Card>
+        <Card>
+          <CardDescription>Cancelados</CardDescription>
+          <CardTitle className="mt-1 text-3xl">{matchStatusCounts.cancelled}</CardTitle>
+        </Card>
+      </section>
+
       {showLoadedMatches ? (
-      <Card>
-        <CardTitle id="partidos-cargados">Partidos cargados</CardTitle>
-        <CardDescription>
-          Revisa partidos en borrador, confirmados o finalizados y entra a cada uno para editarlo.
-        </CardDescription>
+        <Card>
+          <CardTitle id="partidos-cargados">Partidos cargados</CardTitle>
+          <CardDescription>
+            Revisa partidos en borrador, confirmados o finalizados y entra a cada uno para editarlo.
+          </CardDescription>
 
-        <div className="mt-4 space-y-3">
-          {matches.length ? (
-            matches.map((match) => {
-              const editHref = withOrgQuery(`/admin/matches/${match.id}`, selectedOrganization.slug);
-              const resultHref = withOrgQuery(`/admin/matches/${match.id}/result`, selectedOrganization.slug);
-              const { canLoadResult } = getAdminMatchListActions(match.status);
+          <div className="mt-4 space-y-3">
+            {matches.length ? (
+              matches.map((match) => {
+                const editHref = withOrgQuery(`/admin/matches/${match.id}`, selectedOrganization.slug);
+                const resultHref = withOrgQuery(`/admin/matches/${match.id}/result`, selectedOrganization.slug);
+                const { canLoadResult } = getAdminMatchListActions(match.status);
 
-              return (
-                <div
-                  className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4 md:flex-row md:items-center md:justify-between"
-                  key={match.id}
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-100">
-                      {formatMatchDateTime(match.scheduled_at)} - {match.modality}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      {match.location?.trim() ? match.location : "Sin ubicacion cargada"}
-                    </p>
-                  </div>
+                return (
+                  <div
+                    className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4 md:flex-row md:items-center md:justify-between"
+                    key={match.id}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-100">
+                        {formatMatchDateTime(match.scheduled_at)} - {match.modality}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {match.location?.trim() ? match.location : "Sin ubicacion cargada"}
+                      </p>
+                    </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <MatchStatusBadge status={match.status} />
-                    {writeAccess.canWrite ? (
-                      <>
-                        {canLoadResult ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <MatchStatusBadge status={match.status} />
+                      {writeAccess.canWrite ? (
+                        <>
+                          {canLoadResult ? (
+                            <Link
+                              className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                              href={resultHref}
+                            >
+                              Cargar resultado
+                            </Link>
+                          ) : null}
                           <Link
-                            className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
-                            href={resultHref}
+                            className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
+                            href={editHref}
                           >
-                            Cargar resultado
+                            Editar
                           </Link>
-                        ) : null}
-                        <Link
-                          className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
-                          href={editHref}
-                        >
-                          Editar
-                        </Link>
-                      </>
-                    ) : (
-                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Solo lectura
-                      </span>
-                    )}
+                        </>
+                      ) : (
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Solo lectura
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          ) : (
-            <p className="text-sm text-slate-400">Todavia no hay partidos cargados para este grupo.</p>
-          )}
-        </div>
-      </Card>
+                );
+              })
+            ) : (
+              <p className="text-sm text-slate-400">Todavia no hay partidos cargados para este grupo.</p>
+            )}
+          </div>
+        </Card>
       ) : null}
     </div>
   );

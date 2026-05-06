@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import {
@@ -18,12 +19,17 @@ import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth
 import { formatSkillLevelLabel, SKILL_LEVEL_OPTIONS } from "@/lib/domain/skill-level";
 import { getAdminPlayers } from "@/lib/queries/admin";
 import { withOrgQuery } from "@/lib/org";
-import { formatRendimiento } from "@/lib/utils";
+
+const primaryActionLinkClass =
+  "inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110";
+
+const secondaryActionLinkClass =
+  "inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300";
 
 export default async function AdminPlayersPage({
   searchParams
 }: {
-  searchParams: Promise<{ org?: string; error?: string; success?: string; refresh?: string }>;
+  searchParams: Promise<{ org?: string; error?: string; success?: string; refresh?: string; view?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const { admin, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
@@ -38,120 +44,137 @@ export default async function AdminPlayersPage({
   const success = resolvedSearchParams.success;
   const formRenderKey = `${selectedOrganization.id}:${resolvedSearchParams.refresh ?? "base"}`;
   const bulkFormId = `bulk-players-form-${selectedOrganization.id}`;
+  const showCreateForm = resolvedSearchParams.view === "new";
+  const showEditRoster = resolvedSearchParams.view === "edit";
+  const createHref = withOrgQuery("/admin/players?view=new", selectedOrganization.slug);
+  const editHref = withOrgQuery("/admin/players?view=edit", selectedOrganization.slug);
 
   return (
     <div className="space-y-4">
-      <AdminCurrentGroupCard organization={selectedOrganization} />
+      <AdminCurrentGroupCard admin={admin} organization={selectedOrganization} />
 
       <Card>
-        <CardTitle>Alta de jugador</CardTitle>
-        <CardDescription>
-          Carga jugadores nuevos para el grupo seleccionado. El nivel es la base manual; el rendimiento aprende con
-          los partidos y ayuda a armar equipos mas parejos.
-        </CardDescription>
-        <form action={createPlayerAction} className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_220px_1.2fr_auto] lg:items-start">
-          <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-          <Input name="fullName" placeholder="Nombre completo" required />
-          <Select aria-label="Nivel de habilidad" defaultValue="3" name="skillLevel" required>
-            {SKILL_LEVEL_OPTIONS.map((level) => (
-              <option key={level} value={level}>
-                {formatSkillLevelLabel(level)}
-              </option>
-            ))}
-          </Select>
-          <PhotoUploadInput hint="Foto opcional. JPG, PNG o WEBP." required={false} />
-          <Button className="lg:self-start" type="submit">
-            Crear jugador
-          </Button>
-        </form>
-      </Card>
-
-      <Card>
-        <CardTitle>Editar planilla de jugadores</CardTitle>
-        <CardDescription>
-          Modifica la planilla y guarda una sola vez. La lista se ordena por nivel despues de guardar, de Nivel 1 a Nivel 5.
-          La foto se actualiza en la fila de cada jugador.
-        </CardDescription>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <CardTitle>Gestion de jugadores</CardTitle>
+            <CardDescription className="mt-1">
+              {players.length} jugadores cargados en {selectedOrganization.name}.
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link className={showCreateForm ? primaryActionLinkClass : secondaryActionLinkClass} href={createHref}>
+              Alta de jugador
+            </Link>
+            <Link className={showEditRoster ? primaryActionLinkClass : secondaryActionLinkClass} href={editHref}>
+              Editar planilla
+            </Link>
+          </div>
+        </div>
 
         {error ? <p className="mt-3 text-sm font-semibold text-danger">{error}</p> : null}
         {success ? <p className="mt-3 text-sm font-semibold text-emerald-300">{success}</p> : null}
-
-        <form action={bulkUpdatePlayersAction} id={bulkFormId} key={formRenderKey}>
-          <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-        </form>
-
-        <div className="mt-4 space-y-3">
-          <div className="hidden grid-cols-[minmax(220px,2fr)_minmax(170px,0.9fr)_minmax(120px,0.75fr)_minmax(260px,1.6fr)_auto] gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 lg:grid">
-            <span>Jugador</span>
-            <span>Nivel</span>
-            <span>Rendimiento</span>
-            <span>Foto</span>
-            <span>Acciones</span>
-          </div>
-
-          {players.map((player) => (
-            <div
-              className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3 lg:grid-cols-[minmax(220px,2fr)_minmax(170px,0.9fr)_minmax(120px,0.75fr)_minmax(260px,1.6fr)_auto] lg:items-start"
-              key={player.id}
-            >
-              <input form={bulkFormId} name="playerId" type="hidden" value={player.id} />
-              <div className="min-w-0 space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
-                  <Input className="min-w-0" defaultValue={player.full_name} form={bulkFormId} name="fullName" required />
-                </div>
-                <p className="text-xs text-slate-400">
-                  Creado {new Date(player.created_at).toLocaleDateString("es-AR")}
-                </p>
-              </div>
-              <Select
-                aria-label={`Nivel de habilidad de ${player.full_name}`}
-                className="min-w-[170px]"
-                defaultValue={String(player.skill_level)}
-                form={bulkFormId}
-                name="skillLevel"
-                required
-              >
-                {SKILL_LEVEL_OPTIONS.map((level) => (
-                  <option key={level} value={level}>
-                    {formatSkillLevelLabel(level)}
-                  </option>
-                ))}
-              </Select>
-              <div className="rounded-md border border-slate-800 bg-slate-950/70 px-3 py-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Automatico
-                </p>
-                <p className="mt-1 text-sm font-semibold text-emerald-300">
-                  {formatRendimiento(player.current_rating)}
-                </p>
-              </div>
-              <form action={uploadPlayerPhotoAction} className="space-y-2 lg:self-start">
-                <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-                <input name="playerId" type="hidden" value={player.id} />
-                <PhotoUploadInput compact hint="JPG, PNG o WEBP. Reemplaza la foto actual." />
-                <Button className="w-full" type="submit" variant="secondary">
-                  Subir foto
-                </Button>
-              </form>
-              <form action={deletePlayerAction} className="lg:self-start lg:justify-self-end">
-                <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-                <input name="deletePlayerId" type="hidden" value={player.id} />
-                <ConfirmSubmitButton
-                  className="h-8 px-3 text-xs"
-                  confirmMessage={`Estas seguro de eliminar a ${player.full_name}?`}
-                  label="Eliminar"
-                  variant="danger"
-                />
-              </form>
-            </div>
-          ))}
-
-          <Button form={bulkFormId} type="submit">
-            Guardar toda la planilla
-          </Button>
-        </div>
       </Card>
+
+      {showCreateForm ? (
+        <Card>
+          <CardTitle>Alta de jugador</CardTitle>
+          <CardDescription>
+            Carga jugadores nuevos para el grupo seleccionado. El nivel manual se usa como base para ordenar la planilla.
+          </CardDescription>
+          <form action={createPlayerAction} className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_220px_1.2fr_auto] lg:items-start">
+            <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+            <Input name="fullName" placeholder="Nombre completo" required />
+            <Select aria-label="Nivel de habilidad" defaultValue="3" name="skillLevel" required>
+              {SKILL_LEVEL_OPTIONS.map((level) => (
+                <option key={level} value={level}>
+                  {formatSkillLevelLabel(level)}
+                </option>
+              ))}
+            </Select>
+            <PhotoUploadInput hint="Foto opcional. JPG, PNG o WEBP." required={false} />
+            <Button className="lg:self-start" type="submit">
+              Crear jugador
+            </Button>
+          </form>
+        </Card>
+      ) : null}
+
+      {showEditRoster ? (
+        <Card>
+          <CardTitle>Editar planilla de jugadores</CardTitle>
+          <CardDescription>
+            Modifica la planilla y guarda una sola vez. La lista se ordena por nivel despues de guardar, de Nivel 1 a Nivel 5.
+            La foto se actualiza en la fila de cada jugador.
+          </CardDescription>
+
+          <form action={bulkUpdatePlayersAction} id={bulkFormId} key={formRenderKey}>
+            <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+          </form>
+
+          <div className="mt-4 space-y-3">
+            <div className="hidden grid-cols-[minmax(220px,2fr)_minmax(170px,0.9fr)_minmax(260px,1.6fr)_auto] gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 lg:grid">
+              <span>Jugador</span>
+              <span>Nivel</span>
+              <span>Foto</span>
+              <span>Acciones</span>
+            </div>
+
+            {players.map((player) => (
+              <div
+                className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3 lg:grid-cols-[minmax(220px,2fr)_minmax(170px,0.9fr)_minmax(260px,1.6fr)_auto] lg:items-start"
+                key={player.id}
+              >
+                <input form={bulkFormId} name="playerId" type="hidden" value={player.id} />
+                <div className="min-w-0 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
+                    <Input className="min-w-0" defaultValue={player.full_name} form={bulkFormId} name="fullName" required />
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Creado {new Date(player.created_at).toLocaleDateString("es-AR")}
+                  </p>
+                </div>
+                <Select
+                  aria-label={`Nivel de habilidad de ${player.full_name}`}
+                  className="min-w-[170px]"
+                  defaultValue={String(player.skill_level)}
+                  form={bulkFormId}
+                  name="skillLevel"
+                  required
+                >
+                  {SKILL_LEVEL_OPTIONS.map((level) => (
+                    <option key={level} value={level}>
+                      {formatSkillLevelLabel(level)}
+                    </option>
+                  ))}
+                </Select>
+                <form action={uploadPlayerPhotoAction} className="space-y-2 lg:self-start">
+                  <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+                  <input name="playerId" type="hidden" value={player.id} />
+                  <PhotoUploadInput compact hint="JPG, PNG o WEBP. Reemplaza la foto actual." />
+                  <Button className="w-full" type="submit" variant="secondary">
+                    Subir foto
+                  </Button>
+                </form>
+                <form action={deletePlayerAction} className="lg:self-start lg:justify-self-end">
+                  <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+                  <input name="deletePlayerId" type="hidden" value={player.id} />
+                  <ConfirmSubmitButton
+                    className="h-8 px-3 text-xs"
+                    confirmMessage={`Estas seguro de eliminar a ${player.full_name}?`}
+                    label="Eliminar"
+                    variant="danger"
+                  />
+                </form>
+              </div>
+            ))}
+
+            <Button form={bulkFormId} type="submit">
+              Guardar toda la planilla
+            </Button>
+          </div>
+        </Card>
+      ) : null}
     </div>
   );
 }

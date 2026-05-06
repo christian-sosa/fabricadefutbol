@@ -125,6 +125,13 @@ function buildBillingPath(organizationKey?: string, error?: string) {
   return `${basePath}${separator}error=${encodeURIComponent(error)}`;
 }
 
+function buildAdminAdminsPath(organizationKey?: string, error?: string) {
+  const basePath = withOrgQuery("/admin/admins", organizationKey ?? null);
+  if (!error) return basePath;
+  const separator = basePath.includes("?") ? "&" : "?";
+  return `${basePath}${separator}error=${encodeURIComponent(error)}`;
+}
+
 function stripTrailingSlashes(value: string) {
   return value.replace(/\/+$/, "");
 }
@@ -698,11 +705,11 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
     });
 
     if (!inviteRateLimit.allowed) {
-      redirect(buildAdminPath(organizationQueryKey, formatActionRateLimitMessage(inviteRateLimit)));
+      redirect(buildAdminAdminsPath(organizationQueryKey, formatActionRateLimitMessage(inviteRateLimit)));
     }
 
     if (normalizedEmail === admin.email) {
-      redirect(buildAdminPath(organizationQueryKey, "Tu usuario ya administra este grupo."));
+      redirect(buildAdminAdminsPath(organizationQueryKey, "Tu usuario ya administra este grupo."));
     }
 
     if (
@@ -711,7 +718,7 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
         normalizedEmail
       })
     ) {
-      redirect(buildAdminPath(organizationQueryKey, "Ese email ya administra este grupo."));
+      redirect(buildAdminAdminsPath(organizationQueryKey, "Ese email ya administra este grupo."));
     }
 
     const supabase = await createSupabaseServerClient();
@@ -729,15 +736,15 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
       ]);
 
     if (adminCountError) {
-      redirect(buildAdminPath(organizationQueryKey, toUserMessage(adminCountError, "No se pudo verificar los admins actuales.")));
+      redirect(buildAdminAdminsPath(organizationQueryKey, toUserMessage(adminCountError, "No se pudo verificar los admins actuales.")));
     }
     if (inviteCountError) {
-      redirect(buildAdminPath(organizationQueryKey, toUserMessage(inviteCountError, "No se pudo verificar invitaciones pendientes.")));
+      redirect(buildAdminAdminsPath(organizationQueryKey, toUserMessage(inviteCountError, "No se pudo verificar invitaciones pendientes.")));
     }
 
     const slotsUsed = (currentAdmins ?? 0) + (pendingInvites ?? 0);
     if (slotsUsed >= 4) {
-      redirect(buildAdminPath(organizationQueryKey, "Este grupo ya alcanzo el maximo de 4 administradores."));
+      redirect(buildAdminAdminsPath(organizationQueryKey, "Este grupo ya alcanzo el maximo de 4 administradores."));
     }
 
     const { data: invite, error: inviteError } = await supabase
@@ -754,7 +761,7 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
     if (inviteError) {
       const alreadyInvited = inviteError.code === "23505";
       redirect(
-        buildAdminPath(
+        buildAdminAdminsPath(
           organizationQueryKey,
           alreadyInvited
             ? "Ese email ya tiene una invitacion pendiente."
@@ -774,10 +781,11 @@ export async function inviteOrganizationAdminAction(formData: FormData) {
     });
 
     revalidatePath("/admin");
-    redirect(withOrgQuery("/admin", organizationQueryKey));
+    revalidatePath("/admin/admins");
+    redirect(buildAdminAdminsPath(organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo generar la invitacion.")));
+    redirect(buildAdminAdminsPath(undefined, toUserMessage(error, "No se pudo generar la invitacion.")));
   }
 }
 
@@ -819,10 +827,11 @@ export async function revokeOrganizationInviteAction(formData: FormData) {
     });
 
     revalidatePath("/admin");
-    redirect(withOrgQuery("/admin", organizationQueryKey));
+    revalidatePath("/admin/admins");
+    redirect(buildAdminAdminsPath(organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo cancelar la invitacion.")));
+    redirect(buildAdminAdminsPath(undefined, toUserMessage(error, "No se pudo cancelar la invitacion.")));
   }
 }
 
@@ -842,7 +851,7 @@ export async function removeOrganizationAdminAction(formData: FormData) {
     const supabase = await createSupabaseServerClient();
 
     if (actingAdmin.userId === parsed.data.adminId) {
-      redirect(buildAdminPath(organizationQueryKey, "No puedes quitarte a ti mismo como admin de este grupo."));
+      redirect(buildAdminAdminsPath(organizationQueryKey, "No puedes quitarte a ti mismo como admin de este grupo."));
     }
 
     const { count: adminsCount, error: adminsCountError } = await supabase
@@ -851,11 +860,11 @@ export async function removeOrganizationAdminAction(formData: FormData) {
       .eq("organization_id", parsed.data.organizationId);
 
     if (adminsCountError) {
-      redirect(buildAdminPath(organizationQueryKey, toUserMessage(adminsCountError, "No se pudo contar los admins actuales.")));
+      redirect(buildAdminAdminsPath(organizationQueryKey, toUserMessage(adminsCountError, "No se pudo contar los admins actuales.")));
     }
 
     if ((adminsCount ?? 0) <= 1) {
-      redirect(buildAdminPath(organizationQueryKey, "El grupo debe mantener al menos 1 admin activo."));
+      redirect(buildAdminAdminsPath(organizationQueryKey, "El grupo debe mantener al menos 1 admin activo."));
     }
 
     const targetEmail = await resolveAdminEmailById(parsed.data.adminId);
@@ -866,7 +875,7 @@ export async function removeOrganizationAdminAction(formData: FormData) {
       .eq("admin_id", parsed.data.adminId);
 
     if (deleteError) {
-      redirect(buildAdminPath(organizationQueryKey, toUserMessage(deleteError, "No se pudo quitar al administrador.")));
+      redirect(buildAdminAdminsPath(organizationQueryKey, toUserMessage(deleteError, "No se pudo quitar al administrador.")));
     }
 
     await recordOrganizationAuditEvent({
@@ -881,10 +890,11 @@ export async function removeOrganizationAdminAction(formData: FormData) {
     });
 
     revalidatePath("/admin");
-    redirect(withOrgQuery("/admin", organizationQueryKey));
+    revalidatePath("/admin/admins");
+    redirect(buildAdminAdminsPath(organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo quitar al administrador.")));
+    redirect(buildAdminAdminsPath(undefined, toUserMessage(error, "No se pudo quitar al administrador.")));
   }
 }
 

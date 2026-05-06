@@ -27,7 +27,7 @@ export default async function NewMatchPage({
 
   return (
     <div className="space-y-4">
-      <AdminCurrentGroupCard organization={selectedOrganization} />
+      <AdminCurrentGroupCard admin={admin} organization={selectedOrganization} />
 
       <Card>
         <CardTitle>Crear partido</CardTitle>

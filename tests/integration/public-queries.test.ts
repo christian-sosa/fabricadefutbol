@@ -234,10 +234,6 @@ describe("resolvePublicOrganization", () => {
         expect.objectContaining({
           id: "match-upcoming",
           status: "confirmed"
-        }),
-        expect.objectContaining({
-          id: "match-past-confirmed",
-          status: "confirmed"
         })
       ],
       topPlayers: [
@@ -375,7 +371,7 @@ describe("resolvePublicOrganization", () => {
     expect(summary.topPlayers.map((player) => player.id)).toEqual(["player-lucas", "player-gonza"]);
   });
 
-  it("interpreta los confirmados de hoy contra la hora de cancha, no contra UTC del servidor", async () => {
+  it("excluye confirmados vencidos usando la hora de cancha, no UTC del servidor", async () => {
     vi.setSystemTime(new Date("2026-04-27T21:00:00.000Z")); // 18:00 en Argentina.
     const fake = createFakeSupabase({
       matches: [
@@ -401,7 +397,35 @@ describe("resolvePublicOrganization", () => {
 
     const summary = await getHomeSummary(ORG_ID);
 
-    expect(summary.upcomingMatches.map((match) => match.id)).toEqual(["match-tonight", "match-overdue"]);
+    expect(summary.upcomingMatches.map((match) => match.id)).toEqual(["match-tonight"]);
+  });
+
+  it("no devuelve confirmados vencidos en la pagina publica de proximos", async () => {
+    const fake = createFakeSupabase({
+      matches: [
+        {
+          id: "match-upcoming",
+          organization_id: ORG_ID,
+          scheduled_at: "2026-04-20T20:00:00.000Z",
+          modality: "5v5",
+          status: "confirmed"
+        },
+        {
+          id: "match-past-confirmed",
+          organization_id: ORG_ID,
+          scheduled_at: "2026-04-10T20:00:00.000Z",
+          modality: "5v5",
+          status: "confirmed"
+        }
+      ]
+    });
+
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    cookiesMock.mockResolvedValue({ get: () => undefined });
+
+    const matches = await getUpcomingConfirmedMatches(ORG_ID);
+
+    expect(matches.map((match) => match.match.id)).toEqual(["match-upcoming"]);
   });
 
   it("pagina el historial de partidos y normaliza score y ganador", async () => {

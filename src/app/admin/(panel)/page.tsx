@@ -3,9 +3,6 @@ import Link from "next/link";
 import {
   createOrganizationAction,
   deleteOrganizationAction,
-  inviteOrganizationAdminAction,
-  removeOrganizationAdminAction,
-  revokeOrganizationInviteAction,
   uploadOrganizationImageAction
 } from "@/app/admin/(panel)/actions";
 import { TrackedLink } from "@/components/analytics/tracked-link";
@@ -27,7 +24,7 @@ import { getLeagueCreationAccess } from "@/lib/auth/tournaments";
 import { GROWTH_EVENTS } from "@/lib/growth";
 import { getOrganizationImageUrl } from "@/lib/organization-images";
 import { withOrgQuery } from "@/lib/org";
-import { getAdminDashboardData, getOrganizationAdminData } from "@/lib/queries/admin";
+import { getAdminDashboardData } from "@/lib/queries/admin";
 import { getOrganizationSeasons } from "@/lib/queries/public";
 import { getAdminLeagueList } from "@/lib/queries/tournaments";
 
@@ -446,17 +443,14 @@ export default async function AdminDashboardPage({
   const dashboardData = await getAdminDashboardData(selectedOrganization.id);
   const organizationWriteAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   const canWriteSelectedOrganization = organizationWriteAccess?.canWrite ?? false;
-  const [organizationAdmins, organizationSeasons] = await Promise.all([
-    getOrganizationAdminData(selectedOrganization.id),
-    getOrganizationSeasons(selectedOrganization.id)
-  ]);
+  const organizationSeasons = await getOrganizationSeasons(selectedOrganization.id);
   const activeSeason = organizationSeasons.find((season) => season.status === "active") ?? null;
 
   return (
     <div className="space-y-4">
       <AdminFeedback checkout={resolvedSearchParams.checkout} error={resolvedSearchParams.error} />
 
-      <AdminCurrentGroupCard organization={selectedOrganization} />
+      <AdminCurrentGroupCard admin={admin} organization={selectedOrganization} />
 
       <GroupActivityValueCard
         finishedCount={dashboardData.finishedCount}
@@ -510,21 +504,6 @@ export default async function AdminDashboardPage({
         </div>
       </Card>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardDescription>Partidos en borrador</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{dashboardData?.draftsCount ?? 0}</CardTitle>
-        </Card>
-        <Card>
-          <CardDescription>Partidos confirmados</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{dashboardData?.confirmedCount ?? 0}</CardTitle>
-        </Card>
-        <Card>
-          <CardDescription>Partidos finalizados</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{dashboardData?.finishedCount ?? 0}</CardTitle>
-        </Card>
-      </section>
-
       {admin.isSuperAdmin ? (
         <Card className="border-danger/40 bg-danger/10">
           <CardTitle className="text-danger">Zona super admin</CardTitle>
@@ -548,89 +527,6 @@ export default async function AdminDashboardPage({
         dashboardData={dashboardData}
         organizationSlug={selectedOrganization.slug}
       />
-
-      <Card>
-        <CardTitle>Equipo administrador (maximo 4)</CardTitle>
-        <CardDescription>
-          Invita por email y comparte el link. La persona se registra, abre el link y queda como admin.
-        </CardDescription>
-
-        <form action={inviteOrganizationAdminAction} className="mt-4 flex flex-col gap-3 md:flex-row">
-          <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-          <Input name="email" placeholder="email@dominio.com" required type="email" />
-          <Button disabled={!canWriteSelectedOrganization} type="submit" variant="secondary">
-            Invitar admin
-          </Button>
-        </form>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Admins activos</p>
-            <div className="space-y-2">
-              {organizationAdmins.admins.map((member) => (
-                <div
-                  className="flex items-start justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm"
-                  key={member.id}
-                >
-                  <div>
-                    <p className="font-semibold text-slate-100">{member.email ?? member.displayName}</p>
-                    <p className="text-xs text-slate-400">Desde {new Date(member.createdAt).toLocaleDateString("es-AR")}</p>
-                  </div>
-                  {member.id === admin.userId ? (
-                    <span className="rounded-md border border-slate-700 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-                      Tu cuenta
-                    </span>
-                  ) : (
-                    <form action={removeOrganizationAdminAction}>
-                      <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-                      <input name="adminId" type="hidden" value={member.id} />
-                      <ConfirmSubmitButton
-                        className="h-7 min-w-7 px-2 text-xs"
-                        confirmMessage={`Estas seguro de quitar a ${member.email ?? member.displayName} como admin de ${selectedOrganization.name}?`}
-                        disabled={!canWriteSelectedOrganization}
-                        label="X"
-                        variant="ghost"
-                      />
-                    </form>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Invitaciones pendientes</p>
-            <div className="space-y-2">
-              {organizationAdmins.pendingInvites.length ? (
-                organizationAdmins.pendingInvites.map((invite) => (
-                  <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm" key={invite.id}>
-                    <p className="font-semibold text-slate-100">{invite.email}</p>
-                    <p className="text-xs text-slate-400">
-                      Enviada {new Date(invite.createdAt).toLocaleDateString("es-AR")}
-                    </p>
-                    <p className="mt-2 text-xs text-slate-400">Link de invitacion:</p>
-                    <Link
-                      className="break-all text-xs font-semibold text-emerald-300 hover:underline"
-                      href={`/invite/${invite.inviteToken}`}
-                    >
-                      /invite/{invite.inviteToken}
-                    </Link>
-                    <form action={revokeOrganizationInviteAction} className="mt-2">
-                      <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-                      <input name="inviteId" type="hidden" value={invite.id} />
-                      <Button disabled={!canWriteSelectedOrganization} type="submit" variant="ghost">
-                        Cancelar invitacion
-                      </Button>
-                    </form>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-400">No hay invitaciones pendientes.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 }

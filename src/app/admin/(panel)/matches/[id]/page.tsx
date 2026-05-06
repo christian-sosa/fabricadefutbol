@@ -55,7 +55,7 @@ export default async function AdminMatchDetailPage({
 
   return (
     <div className="space-y-4">
-      <AdminCurrentGroupCard organization={selectedOrganization} />
+      <AdminCurrentGroupCard admin={admin} organization={selectedOrganization} />
 
       {resolvedSearchParams.error ? (
         <p className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">

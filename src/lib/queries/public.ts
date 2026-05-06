@@ -286,34 +286,21 @@ async function getConfirmedMatchSummariesLive(
   limit = 5
 ): Promise<OrganizationPublicSummary["upcomingMatches"]> {
   const now = getCurrentMatchDateTimeIso();
-  const [futureRes, overdueRes] = await Promise.all([
-    supabase
-      .from("matches")
-      .select("id, scheduled_at, modality, status")
-      .eq("organization_id", organizationId)
-      .eq("status", "confirmed")
-      .gt("scheduled_at", now)
-      .order("scheduled_at", { ascending: true })
-      .limit(limit),
-    supabase
-      .from("matches")
-      .select("id, scheduled_at, modality, status")
-      .eq("organization_id", organizationId)
-      .eq("status", "confirmed")
-      .lte("scheduled_at", now)
-      .order("scheduled_at", { ascending: false })
-      .limit(limit)
-  ]);
+  const { data, error } = await supabase
+    .from("matches")
+    .select("id, scheduled_at, modality, status")
+    .eq("organization_id", organizationId)
+    .eq("status", "confirmed")
+    .gt("scheduled_at", now)
+    .order("scheduled_at", { ascending: true })
+    .limit(limit);
 
-  if (futureRes.error) throw new Error(futureRes.error.message);
-  if (overdueRes.error) throw new Error(overdueRes.error.message);
+  if (error) throw new Error(error.message);
 
-  const matches = [...(futureRes.data ?? []), ...(overdueRes.data ?? [])].filter(
+  return (data ?? []).filter(
     (match): match is { id: string; scheduled_at: string; modality: string; status: string } =>
       typeof match.scheduled_at === "string"
   );
-
-  return matches.slice(0, limit);
 }
 
 async function fetchMatchTeams(matchIds: string[]) {
@@ -813,11 +800,13 @@ export async function getUpcomingConfirmedMatches(organizationId: string | null)
   if (!organizationId) return [];
 
   const supabase = await createSupabaseServerClient();
+  const now = getCurrentMatchDateTimeIso();
   const { data, error } = await supabase
     .from("matches")
     .select("*")
     .eq("organization_id", organizationId)
     .eq("status", "confirmed")
+    .gt("scheduled_at", now)
     .order("scheduled_at", { ascending: true });
   if (error) throw new Error(error.message);
 

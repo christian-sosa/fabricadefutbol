@@ -30,6 +30,7 @@ function buildCompetitionTabHref(tournamentId: string, competitionId: string, ta
 
 function buildOrganizationItems(pathname: string, organizationKey: string | null): AdminSubnavItem[] {
   const isMatchArea = pathname === "/admin/matches" || pathname.startsWith("/admin/matches/");
+  const isAdminsArea = pathname === "/admin/admins";
 
   return [
     {
@@ -46,6 +47,11 @@ function buildOrganizationItems(pathname: string, organizationKey: string | null
       href: withOrgQuery("/admin/matches", organizationKey),
       label: "Partidos",
       active: isMatchArea
+    },
+    {
+      href: withOrgQuery("/admin/admins", organizationKey),
+      label: "Admins",
+      active: isAdminsArea
     }
   ];
 }

@@ -42,8 +42,25 @@ describe("AdminSubnav", () => {
       "href",
       "/admin/matches?org=grupo-a"
     );
+    expect(screen.getByRole("link", { name: "Admins" })).toHaveAttribute(
+      "href",
+      "/admin/admins?org=grupo-a"
+    );
     expect(screen.queryByRole("link", { name: "Nuevo partido" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Facturacion" })).not.toBeInTheDocument();
+  });
+
+  it("mantiene Admins activo en la pantalla de equipo administrador", () => {
+    navigationState.pathname = "/admin/admins";
+    navigationState.searchParams = new URLSearchParams({ org: "grupo-a" });
+
+    render(<AdminSubnav />);
+
+    expect(screen.getByRole("link", { name: "Admins" })).toHaveAttribute(
+      "href",
+      "/admin/admins?org=grupo-a"
+    );
+    expect(screen.getByRole("link", { name: "Admins" }).className).toContain("border-emerald");
   });
 
   it("mantiene Partidos activo cuando se crea un partido nuevo", () => {

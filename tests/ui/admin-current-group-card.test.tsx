@@ -5,13 +5,33 @@ import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-ca
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/admin",
-  useSearchParams: () => new URLSearchParams("org=la-banda")
+  useSearchParams: () => new URLSearchParams("org=la-banda"),
+  useRouter: () => ({
+    push: vi.fn(),
+    refresh: vi.fn()
+  })
+}));
+
+vi.mock("@/lib/supabase/client", () => ({
+  createSupabaseBrowserClient: () => ({
+    auth: {
+      signOut: vi.fn()
+    }
+  })
 }));
 
 describe("AdminCurrentGroupCard", () => {
-  it("no ofrece crear otro grupo desde el grupo actual", () => {
+  const admin = {
+    userId: "admin-1",
+    displayName: "Christian Sosa",
+    email: "sosa.christian.agustin@gmail.com",
+    isSuperAdmin: true
+  };
+
+  it("unifica datos de admin, grupo actual y acciones de contexto", () => {
     render(
       <AdminCurrentGroupCard
+        admin={admin}
         organization={{
           name: "La Banda",
           slug: "la-banda"
@@ -19,7 +39,13 @@ describe("AdminCurrentGroupCard", () => {
       />
     );
 
+    expect(screen.getByText("Modo administrador / Christian Sosa")).toBeInTheDocument();
+    expect(screen.getByText("sosa.christian.agustin@gmail.com")).toBeInTheDocument();
+    expect(screen.getByText("Grupo actual")).toBeInTheDocument();
+    expect(screen.getByText("La Banda")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Super Admin" })).toHaveAttribute("href", "/admin/super");
     expect(screen.getByRole("link", { name: "Cambiar espacio" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("button", { name: "Cerrar sesion" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Nuevo grupo" })).not.toBeInTheDocument();
   });
 });
