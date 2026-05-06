@@ -1,0 +1,68 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+const root = process.cwd();
+
+const adminLandingPath = path.join(root, "src", "app", "admin", "(panel)", "page.tsx");
+const clubDetailPath = path.join(root, "src", "app", "admin", "(panel)", "clubs", "[clubId]", "page.tsx");
+const clubsListPath = path.join(root, "src", "app", "admin", "(panel)", "clubs", "page.tsx");
+const groupCardPath = path.join(root, "src", "components", "admin", "admin-current-group-card.tsx");
+const leagueDetailPath = path.join(root, "src", "app", "admin", "(panel)", "tournaments", "[id]", "page.tsx");
+const panelShellPath = path.join(root, "src", "components", "admin", "admin-panel-shell.tsx");
+const tournamentsListPath = path.join(root, "src", "app", "admin", "(panel)", "tournaments", "page.tsx");
+
+describe("admin context navigation source", () => {
+  it("no muestra facturacion como parte de Grupos", () => {
+    const groupCardSource = readFileSync(groupCardPath, "utf8");
+    const adminLandingSource = readFileSync(adminLandingPath, "utf8");
+
+    expect(groupCardSource).toContain("configuracion se guardan aca");
+    expect(adminLandingSource).toContain("rendimiento y configuracion quedan");
+    expect(groupCardSource).not.toContain("facturacion");
+    expect(adminLandingSource).not.toContain("facturacion");
+  });
+
+  it("trata grupos, clubs y ligas como contextos admin enfocados", () => {
+    const source = readFileSync(panelShellPath, "utf8");
+
+    expect(source).toContain("isGroupContext");
+    expect(source).toContain("isClubDetailContext");
+    expect(source).toContain("isTournamentStandalonePage");
+    expect(source).toContain("isLeagueDetailContext");
+    expect(source).toContain("isLeagueRootContext");
+    expect(source).toContain("isFocusedAdminContext");
+    expect(source).toContain("!isFocusedAdminContext");
+    expect(source).toContain("!isLeagueRootContext");
+  });
+
+  it("usa acciones de contexto compartidas en admin Clubs", () => {
+    const clubDetailSource = readFileSync(clubDetailPath, "utf8");
+    const clubsListSource = readFileSync(clubsListPath, "utf8");
+
+    expect(clubDetailSource).toContain("const { admin } = await requireAdminClub(clubId);");
+    expect(clubDetailSource).toContain("Modo administrador / {admin.displayName}");
+    expect(clubDetailSource).toContain("Vista del club");
+    expect(clubDetailSource).toContain("SignOutButton");
+    expect(clubDetailSource).toContain("adminContextActionLinkClass");
+    expect(clubDetailSource).toContain("adminContextPrimaryActionLinkClass");
+    expect(clubsListSource).toContain("adminContextActionLinkClass");
+    expect(clubsListSource).toContain("adminContextPrimaryActionLinkClass");
+  });
+
+  it("usa acciones de contexto compartidas en admin Ligas", () => {
+    const leagueDetailSource = readFileSync(leagueDetailPath, "utf8");
+    const tournamentsListSource = readFileSync(tournamentsListPath, "utf8");
+
+    expect(leagueDetailSource).toContain("const { admin } = await requireAdminLeague(id);");
+    expect(leagueDetailSource).toContain("Modo administrador / {admin.displayName}");
+    expect(leagueDetailSource).toContain("Ver publica");
+    expect(leagueDetailSource).toContain("<AdminSubnav scope=\"tournaments\" />");
+    expect(leagueDetailSource).toContain("SignOutButton");
+    expect(leagueDetailSource).toContain("adminContextActionLinkClass");
+    expect(leagueDetailSource).toContain("adminContextPrimaryActionLinkClass");
+    expect(tournamentsListSource).toContain("adminContextActionLinkClass");
+    expect(tournamentsListSource).toContain("adminContextPrimaryActionLinkClass");
+  });
+});

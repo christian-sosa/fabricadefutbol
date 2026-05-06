@@ -11,11 +11,17 @@ import {
   updateLeagueAction,
   updateLeagueTeamAction,
   uploadLeagueLogoAction,
-  uploadLeaguePhotoAction
+  uploadLeaguePhotoAction,
 } from "@/app/admin/(panel)/tournaments/[id]/actions";
+import {
+  adminContextActionLinkClass,
+  adminContextPrimaryActionLinkClass,
+} from "@/components/admin/admin-context-actions";
+import { AdminSubnav } from "@/components/admin/admin-subnav";
 import { CreateCompetitionCard } from "@/components/admin/create-competition-card";
-import { LeaguePhoto } from "@/components/tournaments/league-photo";
+import { SignOutButton } from "@/components/admin/sign-out-button";
 import { LeagueLogo } from "@/components/tournaments/league-logo";
+import { LeaguePhoto } from "@/components/tournaments/league-photo";
 import { TOURNAMENT_STATUS_LABELS, TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -71,7 +77,7 @@ export default async function AdminLeagueDetailPage({
   searchParams: Promise<{ tab?: string; error?: string; success?: string }>;
 }) {
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
-  await requireAdminLeague(id);
+  const { admin } = await requireAdminLeague(id);
   const details = await getAdminLeagueDetails(id);
 
   if (!details) notFound();
@@ -88,33 +94,47 @@ export default async function AdminLeagueDetailPage({
     <div className="space-y-4">
       <Card>
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="flex items-start gap-4">
-            <LeagueLogo alt={`Logo de ${details.league.name}`} size={88} src={details.league.logoUrl} />
+          <div className="space-y-3">
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle>{details.league.name}</CardTitle>
-                <TournamentStatusBadge status={details.league.status} />
-              </div>
-              <CardDescription className="mt-2">
-                Gestiona la liga, sus equipos maestros, las competencias que cuelgan de ella y el equipo administrador.
-              </CardDescription>
-              <div className="mt-3 space-y-1 text-xs text-slate-400">
-                <p>La ficha publica se muestra cuando la liga esta activa o finalizada.</p>
-                <p>{details.league.venueName ? `Sede: ${details.league.venueName}` : "Sede general pendiente"}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-400">
+                Modo administrador / {admin.displayName}
+              </p>
+              <p className="text-sm text-slate-400">{admin.email}</p>
+            </div>
+            <div className="flex items-start gap-4">
+              <LeagueLogo alt={`Logo de ${details.league.name}`} size={88} src={details.league.logoUrl} />
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle>{details.league.name}</CardTitle>
+                  <TournamentStatusBadge status={details.league.status} />
+                </div>
+                <CardDescription className="mt-2">
+                  Gestiona la liga, sus equipos maestros, las competencias que cuelgan de ella y el equipo administrador.
+                </CardDescription>
+                <div className="mt-3 space-y-1 text-xs text-slate-400">
+                  <p>La ficha publica se muestra cuando la liga esta activa o finalizada.</p>
+                  <p>{details.league.venueName ? `Sede: ${details.league.venueName}` : "Sede general pendiente"}</p>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/admin">
+          <div className="flex flex-wrap gap-2">
+            {admin.isSuperAdmin ? (
+              <Link className={adminContextActionLinkClass} href="/admin/super">
+                Super Admin
+              </Link>
+            ) : null}
+            <Link className={adminContextActionLinkClass} href="/admin">
               Menu admin
             </Link>
-            <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/admin/tournaments">
+            <Link className={adminContextActionLinkClass} href="/admin/tournaments">
               Volver a ligas
             </Link>
-            <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={`/tournaments/${details.league.slug}`}>
+            <Link className={adminContextPrimaryActionLinkClass} href={`/tournaments/${details.league.slug}`}>
               Ver publica
             </Link>
+            <SignOutButton />
             <form action={deleteLeagueAction}>
               <input name="leagueId" type="hidden" value={id} />
               <ConfirmSubmitButton
@@ -129,6 +149,8 @@ export default async function AdminLeagueDetailPage({
         {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
         {resolvedSearchParams.success ? <p className="mt-3 text-sm font-semibold text-emerald-300">{resolvedSearchParams.success}</p> : null}
       </Card>
+
+      <AdminSubnav scope="tournaments" />
 
       {selectedTab === "summary" ? (
         <>
@@ -384,7 +406,7 @@ export default async function AdminLeagueDetailPage({
                   </CardDescription>
                 </div>
                 <Link
-                  className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
+                  className={adminContextActionLinkClass}
                   href={`/admin/tournaments/${id}/competitions/new`}
                 >
                   Nueva competencia
@@ -411,15 +433,15 @@ export default async function AdminLeagueDetailPage({
                         {competition.playoffSize ? <p>Playoff configurado: top {competition.playoffSize}</p> : null}
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex flex-wrap gap-2">
                       <Link
-                        className="text-sm font-semibold text-emerald-300 hover:underline"
+                        className={adminContextPrimaryActionLinkClass}
                         href={`/admin/tournaments/${id}/competitions/${competition.id}`}
                       >
                         Gestionar
                       </Link>
                       <Link
-                        className="text-sm font-semibold text-sky-300 hover:underline"
+                        className={adminContextActionLinkClass}
                         href={`/tournaments/${details.league.slug}/${competition.slug}`}
                       >
                         Ver publica

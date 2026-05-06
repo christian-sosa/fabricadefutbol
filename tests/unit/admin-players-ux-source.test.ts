@@ -33,6 +33,6 @@ describe("admin players UX source", () => {
 
     expect(source).toContain("isGroupContext");
     expect(source).toContain("searchParams.get(\"org\")");
-    expect(source).toContain("!isGroupContext");
+    expect(source).toContain("!isFocusedAdminContext");
   });
 });

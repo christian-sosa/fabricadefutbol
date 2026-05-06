@@ -230,7 +230,7 @@ function AdminHomeHub({
         <CardDescription className="mt-3 max-w-3xl text-base">
           {showTournaments || hasClubs
             ? "Elegi un espacio antes de cargar datos. Asi cada flujo mantiene jugadores, partidos, competencias y permisos en el lugar correcto."
-            : "Elegi un grupo antes de cargar datos. Asi jugadores, partidos, rendimiento y facturacion quedan en el lugar correcto."}
+            : "Elegi un grupo antes de cargar datos. Asi jugadores, partidos, rendimiento y configuracion quedan en el lugar correcto."}
         </CardDescription>
       </Card>
 

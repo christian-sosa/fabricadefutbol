@@ -6,6 +6,10 @@ import {
   createLeagueAction,
   deleteLeagueAction
 } from "@/app/admin/(panel)/tournaments/actions";
+import {
+  adminContextActionLinkClass,
+  adminContextPrimaryActionLinkClass,
+} from "@/components/admin/admin-context-actions";
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Button } from "@/components/ui/button";
@@ -161,21 +165,15 @@ export default async function AdminTournamentsPage({
               Cada liga concentra equipos maestros y una o varias competencias como Viernes A, Viernes B o Copa Clausura.
             </CardDescription>
           </div>
-          <div className="flex flex-wrap gap-3">
-          <Link
-            className="text-sm font-semibold text-slate-300 hover:underline"
-            href="/admin"
-          >
-            Menu admin
-          </Link>
-          {hasLeagues && creationAccess.canCreateLeague ? (
-            <Link
-              className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
-              href="/admin/tournaments/new"
-            >
-              Nueva liga
+          <div className="flex flex-wrap gap-2">
+            <Link className={adminContextActionLinkClass} href="/admin">
+              Menu admin
             </Link>
-          ) : null}
+            {hasLeagues && creationAccess.canCreateLeague ? (
+              <Link className={adminContextActionLinkClass} href="/admin/tournaments/new">
+                Nueva liga
+              </Link>
+            ) : null}
           </div>
         </div>
 
@@ -206,15 +204,15 @@ export default async function AdminTournamentsPage({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <Link
-                    className="text-sm font-semibold text-emerald-300 hover:underline"
+                    className={adminContextPrimaryActionLinkClass}
                     href={`/admin/tournaments/${league.id}`}
                   >
                     Gestionar
                   </Link>
                   <Link
-                    className="text-sm font-semibold text-sky-300 hover:underline"
+                    className={adminContextActionLinkClass}
                     href={`/tournaments/${league.slug}`}
                   >
                     Ver publica

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { adminContextActionLinkClass } from "@/components/admin/admin-context-actions";
 import { AdminSubnav } from "@/components/admin/admin-subnav";
 import { SignOutButton } from "@/components/admin/sign-out-button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -12,9 +13,6 @@ type AdminCurrentGroupCardProps = {
     slug: string;
   };
 };
-
-const secondaryActionLinkClass =
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-slate-700 bg-slate-900 px-3.5 py-2 text-sm font-semibold text-slate-100 transition hover:border-slate-500 hover:bg-slate-800";
 
 export function AdminCurrentGroupCard({ admin, organization }: AdminCurrentGroupCardProps) {
   return (
@@ -35,17 +33,17 @@ export function AdminCurrentGroupCard({ admin, organization }: AdminCurrentGroup
               <CardTitle className="mt-2">{organization.name}</CardTitle>
               <CardDescription className="mt-2">
                 Estas administrando este grupo. Los jugadores, partidos, rendimiento, imagen y
-                facturacion se guardan aca.
+                configuracion se guardan aca.
               </CardDescription>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {admin.isSuperAdmin ? (
-              <Link className={secondaryActionLinkClass} href="/admin/super">
+              <Link className={adminContextActionLinkClass} href="/admin/super">
                 Super Admin
               </Link>
             ) : null}
-            <Link className={secondaryActionLinkClass} href="/admin">
+            <Link className={adminContextActionLinkClass} href="/admin">
               Cambiar espacio
             </Link>
             <SignOutButton />

@@ -23,10 +23,18 @@ export function AdminPanelShell({ admin, children }: AdminPanelShellProps) {
     !pathname.startsWith("/admin/tournaments") &&
     !pathname.startsWith("/admin/clubs") &&
     !pathname.startsWith("/admin/super");
+  const isClubDetailContext = /^\/admin\/clubs\/[^/]+/.test(pathname);
+  const isTournamentStandalonePage =
+    pathname === "/admin/tournaments/billing" ||
+    pathname === "/admin/tournaments/new" ||
+    pathname.startsWith("/admin/tournaments/invite/");
+  const isLeagueDetailContext = /^\/admin\/tournaments\/[^/]+/.test(pathname) && !isTournamentStandalonePage;
+  const isLeagueRootContext = isLeagueDetailContext && /^\/admin\/tournaments\/[^/]+$/.test(pathname);
+  const isFocusedAdminContext = isGroupContext || isClubDetailContext || isLeagueDetailContext;
 
   return (
     <div className="space-y-4">
-      {!isGroupContext ? (
+      {!isFocusedAdminContext ? (
         <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-[0_18px_40px_-28px_rgba(16,185,129,0.65)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -50,7 +58,7 @@ export function AdminPanelShell({ admin, children }: AdminPanelShellProps) {
         </section>
       ) : null}
 
-      <AdminSubnav scope="tournaments" />
+      {!isLeagueRootContext ? <AdminSubnav scope="tournaments" /> : null}
 
       {children}
     </div>

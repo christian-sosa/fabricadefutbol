@@ -18,9 +18,14 @@ import {
   uploadClubLogoAction,
   uploadClubPlayerPhotoAction,
 } from "@/app/admin/(panel)/clubs/[clubId]/actions";
-import { MatchDateTimeFields } from "@/components/admin/match-date-time-fields";
+import {
+  adminContextActionLinkClass,
+  adminContextPrimaryActionLinkClass,
+} from "@/components/admin/admin-context-actions";
 import { MatchGuestFields } from "@/app/admin/(panel)/clubs/[clubId]/match-guest-fields";
 import { MatchPlayerPicker } from "@/app/admin/(panel)/clubs/[clubId]/match-player-picker";
+import { MatchDateTimeFields } from "@/components/admin/match-date-time-fields";
+import { SignOutButton } from "@/components/admin/sign-out-button";
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1043,7 +1048,7 @@ export default async function AdminClubDetailPage({
   }>;
 }) {
   const [{ clubId }, resolvedSearchParams] = await Promise.all([params, searchParams]);
-  await requireAdminClub(clubId);
+  const { admin } = await requireAdminClub(clubId);
   const details = await getAdminClubDetails(clubId);
 
   if (!details) notFound();
@@ -1073,19 +1078,33 @@ export default async function AdminClubDetailPage({
     <div className="space-y-4">
       <Card>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle>{details.club.name}</CardTitle>
-            <CardDescription className="mt-2">
-              Gestion privada del club para admins autorizados.
-            </CardDescription>
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-400">
+                Modo administrador / {admin.displayName}
+              </p>
+              <p className="text-sm text-slate-400">{admin.email}</p>
+            </div>
+            <div>
+              <CardTitle>{details.club.name}</CardTitle>
+              <CardDescription className="mt-2">
+                Gestion privada del club para admins autorizados.
+              </CardDescription>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/admin">
+          <div className="flex flex-wrap gap-2">
+            {admin.isSuperAdmin ? (
+              <Link className={adminContextActionLinkClass} href="/admin/super">
+                Super Admin
+              </Link>
+            ) : null}
+            <Link className={adminContextActionLinkClass} href="/admin">
               Menu admin
             </Link>
-            <Link className="text-sm font-semibold text-sky-300 hover:underline" href={`/clubs/${details.club.slug}`}>
+            <Link className={adminContextPrimaryActionLinkClass} href={`/clubs/${details.club.slug}`}>
               Vista del club
             </Link>
+            <SignOutButton />
           </div>
         </div>
       </Card>

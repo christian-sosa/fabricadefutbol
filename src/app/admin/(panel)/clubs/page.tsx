@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import {
+  adminContextActionLinkClass,
+  adminContextPrimaryActionLinkClass,
+} from "@/components/admin/admin-context-actions";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getAdminClubList } from "@/lib/queries/clubs";
 
@@ -16,7 +20,7 @@ export default async function AdminClubsPage() {
       <Card>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <CardTitle>Clubes</CardTitle>
-          <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/admin">
+          <Link className={adminContextActionLinkClass} href="/admin">
             Menu admin
           </Link>
         </div>
@@ -33,11 +37,11 @@ export default async function AdminClubsPage() {
                     /clubs/{club.slug} - {club.status === "active" ? "Activo" : "Oculto"}
                   </CardDescription>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                  <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={`/admin/clubs/${club.id}`}>
+                <div className="flex flex-wrap gap-2">
+                  <Link className={adminContextPrimaryActionLinkClass} href={`/admin/clubs/${club.id}`}>
                     Gestionar
                   </Link>
-                  <Link className="text-sm font-semibold text-sky-300 hover:underline" href={`/clubs/${club.slug}`}>
+                  <Link className={adminContextActionLinkClass} href={`/clubs/${club.slug}`}>
                     Vista por URL
                   </Link>
                 </div>
