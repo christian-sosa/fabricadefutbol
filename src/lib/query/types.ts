@@ -51,6 +51,7 @@ export type UpdateMatchResultPayload = {
       participantId: string;
       team: "A" | "B" | "OUT";
     }>;
+    absencePenaltyParticipantIds?: string[];
     newGuests?: Array<{
       clientId?: string;
       name: string;

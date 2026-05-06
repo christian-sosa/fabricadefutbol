@@ -47,16 +47,17 @@ type MatchResultEditorProps = {
   onSubmit?: (payload: {
     scoreA: number;
     scoreB: number;
-    notes?: string;
-    mvpParticipantId?: string | null;
-    lineup?: {
-      assignments: Array<{
-        participantId: string;
-        team: "A" | "B" | "OUT";
-      }>;
-      newGuests?: Array<{
-        clientId?: string;
-        name: string;
+      notes?: string;
+      mvpParticipantId?: string | null;
+      lineup?: {
+        assignments: Array<{
+          participantId: string;
+          team: "A" | "B" | "OUT";
+        }>;
+        absencePenaltyParticipantIds?: string[];
+        newGuests?: Array<{
+          clientId?: string;
+          name: string;
         rating: number;
         team: "A" | "B";
       }>;
@@ -105,6 +106,7 @@ export function MatchResultEditor({
   const [guestSequence, setGuestSequence] = useState(1);
   const [newGuests, setNewGuests] = useState<GuestDraft[]>([]);
   const [replacementPlayers, setReplacementPlayers] = useState<ReplacementPlayerDraft[]>([]);
+  const [absencePenalties, setAbsencePenalties] = useState<Set<string>>(() => new Set());
   const [selectedReplacementPlayerId, setSelectedReplacementPlayerId] = useState("");
   const [selectedReplacementTeam, setSelectedReplacementTeam] = useState<TeamSide>("A");
   const [handicapEnabled, setHandicapEnabled] = useState(false);
@@ -196,6 +198,19 @@ export function MatchResultEditor({
   }, [handicapEnabled, teamACount, teamBCount]);
 
   useEffect(() => {
+    setAbsencePenalties((current) => {
+      const next = new Set<string>();
+      for (const participantId of current) {
+        const participant = existingParticipants.find((item) => item.participantId === participantId);
+        if (!participant || participant.source !== "player") continue;
+        if (assignments[participantId] !== "OUT") continue;
+        next.add(participantId);
+      }
+      return next.size === current.size ? current : next;
+    });
+  }, [assignments, existingParticipants]);
+
+  useEffect(() => {
     if (!selectedMvpParticipantId) return;
     if (mvpOptions.some((option) => option.participantId === selectedMvpParticipantId)) return;
     setSelectedMvpParticipantId("");
@@ -208,6 +223,7 @@ export function MatchResultEditor({
           participantId: participant.participantId,
           team: assignments[participant.participantId] ?? "OUT"
         })),
+        absencePenaltyParticipantIds: Array.from(absencePenalties),
         newGuests: validNewGuests.map((guest) => ({
           clientId: String(guest.id),
           name: guest.name.trim(),
@@ -220,7 +236,7 @@ export function MatchResultEditor({
         })),
         handicapTeam: handicapEnabled ? handicapTeam : null
       }),
-    [assignments, existingParticipants, handicapEnabled, handicapTeam, replacementPlayers, validNewGuests]
+    [absencePenalties, assignments, existingParticipants, handicapEnabled, handicapTeam, replacementPlayers, validNewGuests]
   );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -250,6 +266,7 @@ export function MatchResultEditor({
             participantId: participant.participantId,
             team: assignments[participant.participantId] ?? "OUT"
           })),
+          absencePenaltyParticipantIds: Array.from(absencePenalties),
           newGuests: validNewGuests.map((guest) => ({
             clientId: String(guest.id),
             name: guest.name.trim(),
@@ -275,6 +292,15 @@ export function MatchResultEditor({
     <form action={onSubmit ? undefined : action} className="mt-4 space-y-4" onSubmit={onSubmit ? handleSubmit : undefined}>
       <input name="lineupPayload" type="hidden" value={lineupPayload} />
       <input name="mvpParticipantId" type="hidden" value={selectedMvpParticipantId} />
+
+      <section className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          Resultado final
+        </p>
+        <p className="mt-1 text-xl font-black text-white">
+          {teamALabel} vs {teamBLabel}
+        </p>
+      </section>
 
       <div className="grid gap-3 md:grid-cols-4">
         <div>
@@ -320,15 +346,22 @@ export function MatchResultEditor({
         </p>
       </div>
 
-      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-        <p className="text-sm font-semibold text-slate-100">Formacion final</p>
-        <p className="mt-1 text-xs text-slate-400">
-          {teamALabel}: {teamACount} | {teamBLabel}: {teamBCount}
-        </p>
+      <details className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+        <summary className="flex cursor-pointer list-none flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            <span className="block text-sm font-semibold text-slate-100">Formacion final</span>
+            <span className="mt-1 block text-xs text-slate-400">
+              Cambia equipos, marca quien no asistio y aplica penalizacion solo si corresponde. {teamALabel}: {teamACount} | {teamBLabel}: {teamBCount}
+            </span>
+          </span>
+          <span className="inline-flex w-fit items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-100">
+            Editar formacion
+          </span>
+        </summary>
         <div className="mt-3 space-y-2">
           {existingParticipants.map((participant) => (
             <div
-              className="grid gap-2 rounded-lg border border-slate-800 bg-slate-900/80 p-2 md:grid-cols-[1fr_170px]"
+              className="grid gap-2 rounded-lg border border-slate-800 bg-slate-900/80 p-2 md:grid-cols-[1fr_180px_minmax(190px,auto)]"
               key={participant.participantId}
             >
               <div className="text-sm text-slate-200">
@@ -349,15 +382,56 @@ export function MatchResultEditor({
               >
                 <option value="A">{teamALabel}</option>
                 <option value="B">{teamBLabel}</option>
-                <option value="OUT">No juega</option>
+                <option value="OUT">No asistio / no juega</option>
               </Select>
+              {participant.source === "player" && assignments[participant.participantId] === "OUT" ? (
+                <label className="flex items-center gap-2 text-xs font-semibold text-amber-200">
+                  <input
+                    checked={absencePenalties.has(participant.participantId)}
+                    className="h-4 w-4 accent-amber-400"
+                    onChange={(event) =>
+                      setAbsencePenalties((current) => {
+                        const next = new Set(current);
+                        if (event.target.checked) {
+                          next.add(participant.participantId);
+                        } else {
+                          next.delete(participant.participantId);
+                        }
+                        return next;
+                      })
+                    }
+                    type="checkbox"
+                  />
+                  Restar 20 a {participant.fullName} por ausencia
+                </label>
+              ) : (
+                <span className="text-xs text-slate-500 md:self-center">
+                  Sin penalizacion
+                </span>
+              )}
             </div>
           ))}
         </div>
-      </div>
+      </details>
 
-      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+      <details className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+        <summary className="flex cursor-pointer list-none flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            <span className="block text-sm font-semibold text-slate-100">Invitados y reemplazos</span>
+            <span className="mt-1 block text-xs text-slate-400">
+              Usa reemplazos para jugadores del grupo que entraron al partido; usa invitados para personas que no estan cargadas.
+            </span>
+          </span>
+          <span className="inline-flex w-fit items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-100">
+            Agregar cambios
+          </span>
+        </summary>
+
+        <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/60 p-3">
         <p className="text-sm font-semibold text-slate-100">Reemplazos de plantilla</p>
+        <p className="mt-1 text-xs text-slate-400">
+          Agrega jugadores ya cargados en el grupo que reemplazaron a alguien en la formacion confirmada.
+        </p>
         <div className="mt-3 grid gap-2 md:grid-cols-[1fr_130px_auto]">
           <Select
             aria-label="Jugador de reemplazo"
@@ -445,13 +519,15 @@ export function MatchResultEditor({
             <p className="text-xs text-slate-500">No hay reemplazos agregados.</p>
           ) : null}
         </div>
-      </div>
+        </div>
 
-      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+        <div className="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-sm font-semibold text-slate-100">Invitados de reemplazo</p>
-            <p className="text-xs text-slate-400">{GUEST_SKILL_LEVEL_HELP_TEXT}</p>
+            <p className="text-xs text-slate-400">
+              Carga aca a quien jugo pero no existe en el pool del grupo. {GUEST_SKILL_LEVEL_HELP_TEXT}
+            </p>
           </div>
           <Button
             onClick={() => {
@@ -532,7 +608,8 @@ export function MatchResultEditor({
           ))}
           {!newGuests.length ? <p className="text-xs text-slate-500">No hay invitados nuevos.</p> : null}
         </div>
-      </div>
+        </div>
+      </details>
 
       <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
         <label className="flex items-center gap-2 text-sm text-slate-200">
@@ -544,6 +621,9 @@ export function MatchResultEditor({
           />
           Aplicar regla de desventaja numerica
         </label>
+        <p className="mt-2 text-xs text-slate-400">
+          Usala solo si un equipo jugo con menos participantes. Si ese equipo gana, el ajuste se duplica (+20/-20). Si pierde, no se lo castiga y el ganador suma normal (+10).
+        </p>
         {handicapEnabled ? (
           <div className="mt-3">
             <p className="mb-1 text-xs text-slate-400">

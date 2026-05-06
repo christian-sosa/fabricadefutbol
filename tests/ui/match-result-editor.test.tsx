@@ -32,6 +32,7 @@ function getLineupPayload(container: HTMLElement) {
   const input = container.querySelector('input[name="lineupPayload"]') as HTMLInputElement;
   return JSON.parse(input.value) as {
     assignments: Array<{ participantId: string; team: "A" | "B" | "OUT" }>;
+    absencePenaltyParticipantIds: string[];
     newGuests: Array<{ clientId?: string; name: string; rating: number; team: "A" | "B" }>;
     newPlayers: Array<{ playerId: string; team: "A" | "B" }>;
     handicapTeam: "A" | "B" | null;
@@ -54,6 +55,9 @@ describe("MatchResultEditor", () => {
 
     expect(screen.getByLabelText("Goles de TEST1")).toHaveAttribute("name", "scoreA");
     expect(screen.getByLabelText("Goles de TEST2")).toHaveAttribute("name", "scoreB");
+    expect(screen.getByText("TEST1 vs TEST2")).toBeInTheDocument();
+    expect(screen.getByText("Formacion final")).toBeInTheDocument();
+    expect(screen.getByText("Invitados y reemplazos")).toBeInTheDocument();
   });
 
   it("actualiza el payload de lineup, invitados y handicap", async () => {
@@ -80,6 +84,7 @@ describe("MatchResultEditor", () => {
       participantId: "player:player-2",
       team: "OUT"
     });
+    expect(payload.absencePenaltyParticipantIds).toEqual([]);
     expect(payload.newGuests).toEqual([
       {
         clientId: "1",
@@ -90,6 +95,24 @@ describe("MatchResultEditor", () => {
     ]);
     expect(payload.newPlayers).toEqual([]);
     expect(payload.handicapTeam).toBe("A");
+  });
+
+  it("permite marcar penalizacion opcional por ausencia", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <MatchResultEditor
+        defaultNotes=""
+        defaultScoreA={0}
+        defaultScoreB={0}
+        existingParticipants={existingParticipants}
+        submitLabel="Guardar"
+      />
+    );
+
+    await user.selectOptions(screen.getByLabelText("Equipo de Jugador 2"), "OUT");
+    await user.click(screen.getByLabelText("Restar 20 a Jugador 2 por ausencia"));
+
+    expect(getLineupPayload(container).absencePenaltyParticipantIds).toEqual(["player:player-2"]);
   });
 
   it("envia el payload correcto al guardar", async () => {
@@ -127,6 +150,7 @@ describe("MatchResultEditor", () => {
             { participantId: "player:player-2", team: "OUT" },
             { participantId: "player:player-3", team: "B" }
           ],
+          absencePenaltyParticipantIds: [],
           newGuests: [{ clientId: "1", name: "Refuerzo", rating: 2, team: "B" }],
           newPlayers: [],
           handicapTeam: "A"

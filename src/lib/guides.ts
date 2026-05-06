@@ -251,6 +251,43 @@ export const GUIDES: Guide[] = [
         ]
       }
     ]
+  },
+  {
+    slug: "cargar-resultados-ausencias-reemplazos",
+    title: "Como cargar resultados, ausencias y reemplazos",
+    description:
+      "Una guia practica para cerrar el partido sin ensuciar el ranking: marcador, formacion final, invitados, reemplazos y ausencias con criterio.",
+    readingTime: "4 min",
+    sections: [
+      {
+        title: "Empeza por el marcador",
+        body: [
+          "Carga los goles mirando siempre el enfrentamiento equipo vs equipo. Esto evita invertir el resultado cuando los nombres del equipo cambiaron despues del armado.",
+          "Si el partido ya estaba confirmado, revisa primero que la opcion elegida sea la que finalmente se jugo."
+        ]
+      },
+      {
+        title: "Ajusta la formacion final",
+        body: [
+          "La formacion final sirve para corregir lo que paso en cancha: jugadores que cambiaron de equipo, jugadores que no asistieron, reemplazos del pool e invitados.",
+          "No hace falta mirar todo el listado cada vez. Abrilo solo cuando hubo cambios contra el armado confirmado."
+        ]
+      },
+      {
+        title: "Penaliza ausencias solo si corresponde",
+        body: [
+          "Marcar a alguien como no asistio no descuenta rendimiento por si solo. El admin decide si aplica -20 cuando hubo ausencia sin aviso o una regla interna del grupo.",
+          "Usa esa penalizacion como criterio claro y consistente. Si el jugador aviso bien o el reemplazo quedo resuelto, puede quedar sin descuento."
+        ]
+      },
+      {
+        title: "Usa la desventaja numerica con cuidado",
+        body: [
+          "La regla de desventaja aplica cuando un equipo jugo con menos participantes. Si ese equipo gana, el ajuste se duplica; si pierde, no se lo castiga extra.",
+          "No la uses para diferencias de nivel: para eso ya esta el rendimiento y el armado de equipos."
+        ]
+      }
+    ]
   }
 ];
 

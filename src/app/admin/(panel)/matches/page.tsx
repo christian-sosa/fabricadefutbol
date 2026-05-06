@@ -12,7 +12,7 @@ import { getAdminMatches } from "@/lib/queries/admin";
 export default async function AdminMatchesPage({
   searchParams
 }: {
-  searchParams: Promise<{ org?: string }>;
+  searchParams: Promise<{ org?: string; view?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const { admin, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
@@ -23,6 +23,8 @@ export default async function AdminMatchesPage({
   const pendingResultHref = pendingResultMatch
     ? withOrgQuery(`/admin/matches/${pendingResultMatch.id}/result`, selectedOrganization.slug)
     : null;
+  const showLoadedMatches = resolvedSearchParams.view === "edit";
+  const editExistingHref = withOrgQuery("/admin/matches?view=edit", selectedOrganization.slug);
 
   return (
     <div className="space-y-4">
@@ -55,7 +57,7 @@ export default async function AdminMatchesPage({
               {matches.length ? (
                 <Link
                   className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
-                  href="#partidos-cargados"
+                  href={editExistingHref}
                 >
                   Editar existentes
                 </Link>
@@ -76,6 +78,7 @@ export default async function AdminMatchesPage({
         ) : null}
       </Card>
 
+      {showLoadedMatches ? (
       <Card>
         <CardTitle id="partidos-cargados">Partidos cargados</CardTitle>
         <CardDescription>
@@ -136,6 +139,7 @@ export default async function AdminMatchesPage({
           )}
         </div>
       </Card>
+      ) : null}
     </div>
   );
 }

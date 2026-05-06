@@ -1080,8 +1080,8 @@ export default async function AdminClubDetailPage({
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/admin/clubs">
-              Volver
+            <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/admin">
+              Menu admin
             </Link>
             <Link className="text-sm font-semibold text-sky-300 hover:underline" href={`/clubs/${details.club.slug}`}>
               Vista del club

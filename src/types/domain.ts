@@ -59,6 +59,7 @@ export type MatchResultInput = {
       participantId: string;
       team: ResultAssignmentTeam;
     }>;
+    absencePenaltyParticipantIds?: string[];
     newGuests?: Array<{
       clientId?: string;
       name: string;

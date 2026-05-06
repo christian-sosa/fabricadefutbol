@@ -492,6 +492,43 @@ describe("match workflow", () => {
     );
   });
 
+  it("resta rendimiento al ausente solo cuando el admin marca la penalizacion", async () => {
+    const { fake } = seedConfirmedMatch();
+
+    await saveMatchResult({
+      supabase: fake.client as never,
+      adminId: ADMIN_ID,
+      matchId: "match-1",
+      organizationId: ORG_ID,
+      resultInput: {
+        scoreA: 1,
+        scoreB: 0,
+        lineup: {
+          assignments: [
+            { participantId: "player:player-1", team: "A" },
+            { participantId: "player:player-2", team: "OUT" },
+            { participantId: "player:player-3", team: "B" },
+            { participantId: "player:player-4", team: "B" }
+          ],
+          absencePenaltyParticipantIds: ["player:player-2"]
+        }
+      }
+    });
+
+    expect(fake.find("players", (row) => row.id === "player-2")).toEqual(
+      expect.objectContaining({ current_rating: 980 })
+    );
+    expect(fake.table("rating_history")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          player_id: "player-2",
+          reason: "absence_penalty",
+          delta: -20
+        })
+      ])
+    );
+  });
+
   it("suma bonus de MVP registrado al acumulado y a la temporada activa", async () => {
     const { fake } = seedConfirmedMatchWith({
       organization_seasons: [

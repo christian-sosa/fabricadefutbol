@@ -106,6 +106,9 @@ export default async function AdminLeagueDetailPage({
           </div>
 
           <div className="flex flex-wrap gap-3">
+            <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/admin">
+              Menu admin
+            </Link>
             <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/admin/tournaments">
               Volver a ligas
             </Link>

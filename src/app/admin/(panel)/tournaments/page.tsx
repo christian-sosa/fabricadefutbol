@@ -161,6 +161,13 @@ export default async function AdminTournamentsPage({
               Cada liga concentra equipos maestros y una o varias competencias como Viernes A, Viernes B o Copa Clausura.
             </CardDescription>
           </div>
+          <div className="flex flex-wrap gap-3">
+          <Link
+            className="text-sm font-semibold text-slate-300 hover:underline"
+            href="/admin"
+          >
+            Menu admin
+          </Link>
           {hasLeagues && creationAccess.canCreateLeague ? (
             <Link
               className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
@@ -169,6 +176,7 @@ export default async function AdminTournamentsPage({
               Nueva liga
             </Link>
           ) : null}
+          </div>
         </div>
 
         <div className="mt-4 space-y-3">

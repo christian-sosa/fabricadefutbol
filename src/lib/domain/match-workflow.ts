@@ -75,6 +75,7 @@ type ResolvedMatchLineup = {
   optionId: string;
   teamA: ConfirmedParticipant[];
   teamB: ConfirmedParticipant[];
+  absencePenaltyParticipants: ConfirmedParticipant[];
   handicapTeam: TeamSide | null;
   participantAliases: Map<string, string>;
 };
@@ -97,6 +98,7 @@ const PLAYER_PREFIX = "player:";
 const GUEST_PREFIX = "guest:";
 const SEASON_STARTING_RATING = 1000;
 const MVP_BONUS_POINTS = 5;
+const ABSENCE_PENALTY_POINTS = -20;
 
 type OrganizationSeasonRow = {
   id: string;
@@ -972,6 +974,27 @@ function normalizeLineupAssignments(
   return assignmentMap;
 }
 
+function normalizeAbsencePenaltyParticipants(params: {
+  rawParticipantIds: string[] | undefined;
+  assignments: Map<string, ResultAssignmentTeam>;
+  participantsById: Map<string, ConfirmedParticipant>;
+}) {
+  const normalizedIds = Array.from(new Set(params.rawParticipantIds ?? []));
+  return normalizedIds.map((participantId) => {
+    const participant = params.participantsById.get(participantId);
+    if (!participant) {
+      throw new Error("La penalizacion por ausencia incluye un participante inexistente.");
+    }
+    if (participant.source !== "player") {
+      throw new Error("La penalizacion por ausencia solo aplica a jugadores registrados.");
+    }
+    if ((params.assignments.get(participantId) ?? "OUT") !== "OUT") {
+      throw new Error("Solo se puede penalizar por ausencia a jugadores que no quedaron en la formacion final.");
+    }
+    return participant;
+  });
+}
+
 function normalizeLineupGuests(rawGuests: NewGuestLineupInput[] | undefined) {
   return (rawGuests ?? []).map((guest) => {
     const normalizedName = guest.name.trim();
@@ -1183,12 +1206,18 @@ async function resolveLineupForResult(params: {
       optionId: confirmed.optionId,
       teamA: confirmed.teamA,
       teamB: confirmed.teamB,
+      absencePenaltyParticipants: [],
       handicapTeam: null,
       participantAliases: new Map<string, string>()
     } satisfies ResolvedMatchLineup;
   }
 
   const assignmentMap = normalizeLineupAssignments(lineupInput.assignments, participantsById);
+  const absencePenaltyParticipants = normalizeAbsencePenaltyParticipants({
+    rawParticipantIds: lineupInput.absencePenaltyParticipantIds,
+    assignments: assignmentMap,
+    participantsById
+  });
   const teamA: ConfirmedParticipant[] = [];
   const teamB: ConfirmedParticipant[] = [];
 
@@ -1253,6 +1282,7 @@ async function resolveLineupForResult(params: {
     optionId: confirmed.optionId,
     teamA,
     teamB,
+    absencePenaltyParticipants,
     handicapTeam,
     participantAliases
   } satisfies ResolvedMatchLineup;
@@ -1302,7 +1332,7 @@ export async function saveMatchResult(params: {
   const winnerTeam = deriveWinnerTeam(scoreA, scoreB);
 
   await rollbackPreviousRatingHistory(supabase, matchId);
-  const { teamA, teamB, handicapTeam, participantAliases } = await resolveLineupForResult({
+  const { teamA, teamB, absencePenaltyParticipants, handicapTeam, participantAliases } = await resolveLineupForResult({
     supabase,
     matchId,
     resultInput,
@@ -1431,6 +1461,49 @@ export async function saveMatchResult(params: {
       season_rating_after: seasonState.ratingAfter,
       season_delta: seasonState.delta,
       reason: "mvp_bonus"
+    });
+  }
+
+  for (const participant of absencePenaltyParticipants) {
+    const { data: playerRow, error: playerError } = await supabase
+      .from("players")
+      .select("current_rating")
+      .eq("id", participant.entityId)
+      .single();
+    if (playerError || !playerRow) {
+      throw new Error("No se pudo leer el rendimiento del ausente.");
+    }
+
+    const ratingBefore = Number(playerRow.current_rating);
+    const ratingAfter = Math.max(1, Math.round(ratingBefore + ABSENCE_PENALTY_POINTS));
+    const delta = ratingAfter - ratingBefore;
+    const { error: updateAbsenceError } = await supabase
+      .from("players")
+      .update({ current_rating: ratingAfter })
+      .eq("id", participant.entityId);
+    if (updateAbsenceError) {
+      throw new Error(`No se pudo aplicar la penalizacion por ausencia: ${updateAbsenceError.message}`);
+    }
+
+    const seasonState = await applySeasonRatingDelta({
+      supabase,
+      organizationId: targetOrganizationId,
+      seasonId: season.id,
+      playerId: participant.entityId,
+      delta
+    });
+
+    historyRows.push({
+      match_id: matchId,
+      player_id: participant.entityId,
+      rating_before: ratingBefore,
+      rating_after: ratingAfter,
+      delta,
+      season_id: season.id,
+      season_rating_before: seasonState.ratingBefore,
+      season_rating_after: seasonState.ratingAfter,
+      season_delta: seasonState.delta,
+      reason: "absence_penalty"
     });
   }
 

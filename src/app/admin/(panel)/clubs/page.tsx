@@ -14,7 +14,12 @@ export default async function AdminClubsPage() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardTitle>Clubes</CardTitle>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <CardTitle>Clubes</CardTitle>
+          <Link className="text-sm font-semibold text-slate-300 hover:underline" href="/admin">
+            Menu admin
+          </Link>
+        </div>
       </Card>
 
       <div className="space-y-3">

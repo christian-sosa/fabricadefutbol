@@ -49,6 +49,7 @@ const requestSchema = z.object({
           })
         )
         .optional(),
+      absencePenaltyParticipantIds: z.array(z.string().min(1)).optional(),
       handicapTeam: z.union([z.enum(["A", "B"]), z.null()]).optional()
     })
     .optional()

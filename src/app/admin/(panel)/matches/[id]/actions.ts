@@ -69,6 +69,7 @@ const lineupSchema = z.object({
       })
     )
     .optional(),
+  absencePenaltyParticipantIds: z.array(z.string().min(1)).optional(),
   handicapTeam: z.union([z.enum(["A", "B"]), z.null()]).optional()
 });
 
@@ -104,8 +105,7 @@ const lineupAdjustmentSchema = z.object({
 const updateMatchSchema = z.object({
   scheduledDate: z.string().optional(),
   scheduledTime: z.string().min(1, "La hora es obligatoria."),
-  location: z.string().optional(),
-  status: z.enum(["draft", "confirmed", "finished", "cancelled"])
+  location: z.string().optional()
 });
 
 const updateTeamLabelsSchema = z.object({
@@ -303,8 +303,7 @@ export async function updateMatchAction(matchId: string, organizationId: string,
     const parsed = updateMatchSchema.safeParse({
       scheduledDate: String(formData.get("scheduledDate") ?? ""),
       scheduledTime: String(formData.get("scheduledTime") ?? ""),
-      location: formData.get("location"),
-      status: formData.get("status")
+      location: formData.get("location")
     });
 
     if (!parsed.success) {
@@ -315,21 +314,10 @@ export async function updateMatchAction(matchId: string, organizationId: string,
     const payload: {
       scheduled_at: string;
       location: string | null;
-      status: "draft" | "confirmed" | "finished" | "cancelled";
-      finished_at?: string | null;
     } = {
       scheduled_at: matchDateAndTimeToIso(parsed.data.scheduledDate, parsed.data.scheduledTime),
-      location: parsed.data.location || null,
-      status: parsed.data.status
+      location: parsed.data.location || null
     };
-
-    if (parsed.data.status === "finished") {
-      payload.finished_at = new Date().toISOString();
-    }
-
-    if (parsed.data.status === "cancelled") {
-      payload.finished_at = null;
-    }
 
     const { error } = await supabase
       .from("matches")
