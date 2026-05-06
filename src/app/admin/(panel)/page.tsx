@@ -116,8 +116,8 @@ function AdminOnboardingCard({
       title: "Armá el primer partido",
       description: "Elegí modalidad, convocados, invitados y arqueros.",
       done: totalMatches > 0,
-      href: withOrgQuery("/admin/matches/new", organizationSlug),
-      cta: "Crear partido"
+      href: withOrgQuery("/admin/matches", organizationSlug),
+      cta: "Ir a partidos"
     },
     {
       title: "Cargá el resultado",

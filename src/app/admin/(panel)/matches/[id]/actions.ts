@@ -12,7 +12,7 @@ import {
   saveMatchResult
 } from "@/lib/domain/match-workflow";
 import { parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
-import { datetimeLocalToMatchIso } from "@/lib/match-datetime";
+import { matchDateAndTimeToIso } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
 import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
@@ -102,7 +102,8 @@ const lineupAdjustmentSchema = z.object({
 });
 
 const updateMatchSchema = z.object({
-  scheduledAt: z.string().min(1, "La fecha es obligatoria."),
+  scheduledDate: z.string().optional(),
+  scheduledTime: z.string().min(1, "La hora es obligatoria."),
   location: z.string().optional(),
   status: z.enum(["draft", "confirmed", "finished", "cancelled"])
 });
@@ -300,7 +301,8 @@ export async function updateMatchAction(matchId: string, organizationId: string,
   try {
     await assertOrganizationAdminAction(organizationId);
     const parsed = updateMatchSchema.safeParse({
-      scheduledAt: formData.get("scheduledAt"),
+      scheduledDate: String(formData.get("scheduledDate") ?? ""),
+      scheduledTime: String(formData.get("scheduledTime") ?? ""),
       location: formData.get("location"),
       status: formData.get("status")
     });
@@ -316,7 +318,7 @@ export async function updateMatchAction(matchId: string, organizationId: string,
       status: "draft" | "confirmed" | "finished" | "cancelled";
       finished_at?: string | null;
     } = {
-      scheduled_at: datetimeLocalToMatchIso(parsed.data.scheduledAt),
+      scheduled_at: matchDateAndTimeToIso(parsed.data.scheduledDate, parsed.data.scheduledTime),
       location: parsed.data.location || null,
       status: parsed.data.status
     };

@@ -18,13 +18,66 @@ export default async function AdminMatchesPage({
   const { admin, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
   const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   const matches = await getAdminMatches(selectedOrganization.id);
+  const createHref = withOrgQuery("/admin/matches/new", selectedOrganization.slug);
+  const pendingResultMatch = matches.find((match) => getAdminMatchListActions(match.status).canLoadResult) ?? null;
+  const pendingResultHref = pendingResultMatch
+    ? withOrgQuery(`/admin/matches/${pendingResultMatch.id}/result`, selectedOrganization.slug)
+    : null;
 
   return (
     <div className="space-y-4">
       <AdminCurrentGroupCard organization={selectedOrganization} />
 
       <Card>
-        <CardTitle>Gestionar partidos</CardTitle>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <CardTitle>Partidos</CardTitle>
+            <CardDescription className="mt-1">
+              Gestiona altas, resultados y cambios sobre los partidos del grupo.
+            </CardDescription>
+          </div>
+          {writeAccess.canWrite ? (
+            <div className="flex flex-wrap gap-2">
+              <Link
+                className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                href={createHref}
+              >
+                Crear partido
+              </Link>
+              {pendingResultHref && pendingResultMatch ? (
+                <Link
+                  className="inline-flex items-center justify-center rounded-md border border-emerald-400/50 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/15"
+                  href={pendingResultHref}
+                >
+                  Cargar resultado pendiente
+                </Link>
+              ) : null}
+              {matches.length ? (
+                <Link
+                  className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
+                  href="#partidos-cargados"
+                >
+                  Editar existentes
+                </Link>
+              ) : null}
+            </div>
+          ) : (
+            <span className="w-fit rounded-md border border-slate-700 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Solo lectura
+            </span>
+          )}
+        </div>
+
+        {pendingResultMatch ? (
+          <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+            <span className="font-semibold">Pendiente de resultado:</span>{" "}
+            {formatMatchDateTime(pendingResultMatch.scheduled_at)} - {pendingResultMatch.modality}
+          </div>
+        ) : null}
+      </Card>
+
+      <Card>
+        <CardTitle id="partidos-cargados">Partidos cargados</CardTitle>
         <CardDescription>
           Revisa partidos en borrador, confirmados o finalizados y entra a cada uno para editarlo.
         </CardDescription>

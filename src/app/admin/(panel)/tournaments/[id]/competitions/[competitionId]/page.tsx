@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { MatchDateTimeFields } from "@/components/admin/match-date-time-fields";
 import { PhotoUploadInput } from "@/components/admin/photo-upload-input";
 import { TournamentFixtureTable } from "@/components/tournaments/tournament-fixture-table";
 import {
@@ -39,7 +40,12 @@ import {
   requireAdminCompetition
 } from "@/lib/auth/tournaments";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
-import { formatMatchDateTime, matchIsoToDatetimeLocal } from "@/lib/match-datetime";
+import {
+  formatMatchDateTime,
+  getCurrentMatchDateInput,
+  matchIsoToDateInput,
+  matchIsoToTimeInput
+} from "@/lib/match-datetime";
 import {
   findTopFigureRows,
   findTopScorerRows,
@@ -53,10 +59,6 @@ import type {
   TournamentMatchStatus,
   TournamentStandingRow
 } from "@/types/domain";
-
-function toInputDateTime(isoDate: string | null) {
-  return matchIsoToDatetimeLocal(isoDate);
-}
 
 function formatMatchSchedule(value: string | null) {
   return value ? formatMatchDateTime(value) : "Sin horario";
@@ -148,6 +150,7 @@ export default async function AdminCompetitionDetailPage({
   const leagueMatchRows = details.fixture.filter((row) => row.kind === "match" && row.phase === "league");
   const canEditFormat = details.fixture.length === 0;
   const isRosterFrozen = isCompetitionRosterFrozen(details.competition.status);
+  const defaultScheduledDate = getCurrentMatchDateInput();
   const canGeneratePlayoff =
     details.competition.type === "league_and_cup" &&
     leagueMatchRows.length > 0 &&
@@ -658,10 +661,13 @@ export default async function AdminCompetitionDetailPage({
                   ))}
                 </Select>
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200">Horario</label>
-                <Input name="scheduledAt" type="datetime-local" />
-              </div>
+              <MatchDateTimeFields
+                dateId="manualScheduledDate"
+                dateName="scheduledDate"
+                defaultDate={defaultScheduledDate}
+                timeId="manualScheduledTime"
+                timeName="scheduledTime"
+              />
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-200">Sede</label>
                 <Input name="venue" />
@@ -808,10 +814,15 @@ export default async function AdminCompetitionDetailPage({
                                 ))}
                               </Select>
                             </div>
-                            <div>
-                              <label className="mb-1 block text-sm font-semibold text-slate-200">Horario</label>
-                              <Input defaultValue={toInputDateTime(match.scheduledAt)} disabled={match.status === "played"} name="scheduledAt" type="datetime-local" />
-                            </div>
+                            <MatchDateTimeFields
+                              dateId={`scheduledDate-${match.id}`}
+                              dateName="scheduledDate"
+                              defaultDate={matchIsoToDateInput(match.scheduledAt) || defaultScheduledDate}
+                              defaultTime={matchIsoToTimeInput(match.scheduledAt)}
+                              disabled={match.status === "played"}
+                              timeId={`scheduledTime-${match.id}`}
+                              timeName="scheduledTime"
+                            />
                             <div>
                               <label className="mb-1 block text-sm font-semibold text-slate-200">Sede</label>
                               <Input defaultValue={match.venue ?? ""} disabled={match.status === "played"} name="venue" />

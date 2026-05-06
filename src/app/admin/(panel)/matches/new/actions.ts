@@ -8,7 +8,7 @@ import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/li
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { createDraftMatchWithOptions } from "@/lib/domain/match-workflow";
 import { parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
-import { datetimeLocalToMatchIso } from "@/lib/match-datetime";
+import { matchDateAndTimeToIso } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { logError, logInfo } from "@/lib/observability/log";
 import { GROWTH_EVENTS, withGrowthEvent } from "@/lib/growth";
@@ -18,7 +18,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const schema = z.object({
   organizationId: z.string().uuid(),
-  scheduledAt: z.string().min(1, "La fecha es obligatoria."),
+  scheduledDate: z.string().optional(),
+  scheduledTime: z.string().min(1, "La hora es obligatoria."),
   modality: z.enum(["5v5", "6v6", "7v7", "9v9", "11v11"]),
   location: z.string().optional(),
   playerIds: z.array(z.string().uuid())
@@ -137,7 +138,8 @@ export async function createMatchAction(formData: FormData) {
   try {
     const parsed = schema.safeParse({
       organizationId: formData.get("organizationId"),
-      scheduledAt: formData.get("scheduledAt"),
+      scheduledDate: String(formData.get("scheduledDate") ?? ""),
+      scheduledTime: String(formData.get("scheduledTime") ?? ""),
       modality: formData.get("modality"),
       location: formData.get("location"),
       playerIds: formData.getAll("playerIds")
@@ -227,7 +229,7 @@ export async function createMatchAction(formData: FormData) {
       supabase,
       adminId: admin.userId,
       organizationId: parsed.data.organizationId,
-      scheduledAt: datetimeLocalToMatchIso(parsed.data.scheduledAt),
+      scheduledAt: matchDateAndTimeToIso(parsed.data.scheduledDate, parsed.data.scheduledTime),
       modality: parsed.data.modality,
       location: parsed.data.location ?? "",
       selectedPlayerIds: parsed.data.playerIds,

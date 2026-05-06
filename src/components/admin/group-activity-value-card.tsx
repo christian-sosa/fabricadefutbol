@@ -59,10 +59,10 @@ export function GroupActivityValueCard({
         <TrackedLink
           className="inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
           eventName={GROWTH_EVENTS.ctaClicked}
-          eventProperties={{ cta: "create_match", source: "group_activity_value" }}
-          href={withOrgQuery("/admin/matches/new", organizationSlug)}
+          eventProperties={{ cta: "matches", source: "group_activity_value" }}
+          href={withOrgQuery("/admin/matches", organizationSlug)}
         >
-          Crear proximo partido
+          Ir a partidos
         </TrackedLink>
         <TrackedLink
           className="inline-flex items-center justify-center rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"

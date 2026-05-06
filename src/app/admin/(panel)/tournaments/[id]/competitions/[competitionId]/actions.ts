@@ -19,7 +19,7 @@ import {
 } from "@/lib/domain/tournament-workflow";
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
-import { datetimeLocalToMatchIso } from "@/lib/match-datetime";
+import { optionalMatchDateAndTimeToIso } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import {
   assertPlayerPhotoUploadAllowed,
@@ -108,7 +108,8 @@ const manualMatchSchema = z.object({
   phase: z.enum(["league", "cup"]).optional(),
   homeTeamId: z.string().uuid(),
   awayTeamId: z.string().uuid(),
-  scheduledAt: z.string().optional(),
+  scheduledDate: z.string().optional(),
+  scheduledTime: z.string().optional(),
   venue: z.string().max(120).optional(),
   status: z.enum(["draft", "scheduled", "cancelled"])
 });
@@ -118,7 +119,8 @@ const updateMatchSchema = z.object({
   roundId: z.string().uuid().nullable(),
   homeTeamId: z.string().uuid(),
   awayTeamId: z.string().uuid(),
-  scheduledAt: z.string().optional(),
+  scheduledDate: z.string().optional(),
+  scheduledTime: z.string().optional(),
   venue: z.string().max(120).optional(),
   status: z.enum(["draft", "scheduled", "cancelled"])
 });
@@ -208,9 +210,8 @@ function buildMatchSheetPath(params: {
   return search ? `${basePath}?${search}` : basePath;
 }
 
-function normalizeScheduledAt(value: string | undefined) {
-  if (!value?.trim()) return null;
-  return datetimeLocalToMatchIso(value);
+function normalizeScheduledAt(dateValue: string | undefined, timeValue: string | undefined) {
+  return optionalMatchDateAndTimeToIso(dateValue, timeValue);
 }
 
 function buildInviteExpiresAt() {
@@ -933,7 +934,8 @@ export async function createManualCompetitionMatchAction(
       phase: formData.get("phase") || undefined,
       homeTeamId: formData.get("homeTeamId"),
       awayTeamId: formData.get("awayTeamId"),
-      scheduledAt: formData.get("scheduledAt"),
+      scheduledDate: String(formData.get("scheduledDate") ?? ""),
+      scheduledTime: String(formData.get("scheduledTime") ?? ""),
       venue: formData.get("venue"),
       status: formData.get("status")
     });
@@ -968,7 +970,7 @@ export async function createManualCompetitionMatchAction(
       away_team_id: parsed.data.awayTeamId,
       phase,
       stage_label: parsed.data.roundName.trim(),
-      scheduled_at: normalizeScheduledAt(parsed.data.scheduledAt),
+      scheduled_at: normalizeScheduledAt(parsed.data.scheduledDate, parsed.data.scheduledTime),
       venue: parsed.data.venue?.trim() || null,
       status: parsed.data.status,
       created_by: admin.userId
@@ -999,7 +1001,8 @@ export async function updateCompetitionMatchAction(
       roundId: formData.get("roundId") ? String(formData.get("roundId")) : null,
       homeTeamId: formData.get("homeTeamId"),
       awayTeamId: formData.get("awayTeamId"),
-      scheduledAt: formData.get("scheduledAt"),
+      scheduledDate: String(formData.get("scheduledDate") ?? ""),
+      scheduledTime: String(formData.get("scheduledTime") ?? ""),
       venue: formData.get("venue"),
       status: formData.get("status")
     });
@@ -1051,7 +1054,7 @@ export async function updateCompetitionMatchAction(
         round_id: parsed.data.roundId,
         home_team_id: parsed.data.homeTeamId,
         away_team_id: parsed.data.awayTeamId,
-        scheduled_at: normalizeScheduledAt(parsed.data.scheduledAt),
+        scheduled_at: normalizeScheduledAt(parsed.data.scheduledDate, parsed.data.scheduledTime),
         venue: parsed.data.venue?.trim() || null,
         status: parsed.data.status
       })

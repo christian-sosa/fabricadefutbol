@@ -45,7 +45,8 @@ test("login admin, crea partido, carga resultado y lo ve en publico", async ({ p
 
   await page.goto(`/admin/matches/new?org=${ORG_SLUG}`);
 
-  await page.locator('input[name="scheduledAt"]').fill("2026-04-30T20:00");
+  await page.locator('input[name="scheduledDate"]').fill("2026-04-30");
+  await page.locator('input[name="scheduledTime"]').fill("20:00");
   await page.locator('select[name="modality"]').selectOption("5v5");
 
   for (const playerId of E2E_PLAYER_IDS) {

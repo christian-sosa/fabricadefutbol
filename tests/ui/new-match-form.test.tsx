@@ -8,6 +8,8 @@ vi.mock("@/app/admin/(panel)/matches/new/actions", () => ({
 
 import { NewMatchForm } from "@/components/admin/new-match-form";
 
+const DEFAULT_SCHEDULED_DATE = "2026-05-05";
+
 function buildPlayers(count: number) {
   return Array.from({ length: count }, (_, index) => ({
     id: `player-${index + 1}`,
@@ -35,7 +37,7 @@ describe("NewMatchForm", () => {
   it("arma un payload manual valido cuando el roster esta completo", async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <NewMatchForm organizationId="org-1" players={buildPlayers(10)} />
+      <NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={buildPlayers(10)} />
     );
 
     await user.selectOptions(screen.getByLabelText("Modalidad"), "5v5");
@@ -69,7 +71,7 @@ describe("NewMatchForm", () => {
   it("bloquea el submit manual si faltan jugadores", async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <NewMatchForm organizationId="org-1" players={buildPlayers(10)} />
+      <NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={buildPlayers(10)} />
     );
 
     await user.selectOptions(screen.getByLabelText("Modalidad"), "5v5");
@@ -91,7 +93,7 @@ describe("NewMatchForm", () => {
   it("aclara la escala especial para invitados temporales", async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <NewMatchForm organizationId="org-1" players={buildPlayers(10)} />
+      <NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={buildPlayers(10)} />
     );
 
     await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
@@ -111,7 +113,7 @@ describe("NewMatchForm", () => {
   it("bloquea el submit manual si los arqueros quedan en el mismo equipo", async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <NewMatchForm organizationId="org-1" players={buildPlayers(10)} />
+      <NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={buildPlayers(10)} />
     );
 
     await user.selectOptions(screen.getByLabelText("Modalidad"), "5v5");

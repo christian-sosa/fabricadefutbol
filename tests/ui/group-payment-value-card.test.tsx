@@ -21,9 +21,9 @@ describe("GroupActivityValueCard", () => {
     expect(screen.getByText("Tu grupo ya tiene valor acumulado")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Activar plan/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/trial|prueba|plan mensual|pago/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Crear proximo partido" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Ir a partidos" })).toHaveAttribute(
       "href",
-      "/admin/matches/new?org=la-cantera"
+      "/admin/matches?org=la-cantera"
     );
     expect(screen.getByRole("link", { name: "Ir a jugadores" })).toHaveAttribute(
       "href",

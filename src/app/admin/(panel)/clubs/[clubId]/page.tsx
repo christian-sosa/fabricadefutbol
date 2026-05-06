@@ -12,11 +12,13 @@ import {
   removeClubTeamPlayerAction,
   removeClubAdminAction,
   revokeClubAdminInviteAction,
+  toggleClubCompetitionAction,
   toggleClubPlayerAction,
   updateClubAction,
   uploadClubLogoAction,
   uploadClubPlayerPhotoAction,
 } from "@/app/admin/(panel)/clubs/[clubId]/actions";
+import { MatchDateTimeFields } from "@/components/admin/match-date-time-fields";
 import { MatchGuestFields } from "@/app/admin/(panel)/clubs/[clubId]/match-guest-fields";
 import { MatchPlayerPicker } from "@/app/admin/(panel)/clubs/[clubId]/match-player-picker";
 import { LeagueLogo } from "@/components/tournaments/league-logo";
@@ -30,6 +32,7 @@ import { Select } from "@/components/ui/select";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { requireAdminClub } from "@/lib/auth/clubs";
+import { getCurrentMatchDateInput } from "@/lib/match-datetime";
 import {
   CLUB_PLAYER_POSITIONS,
   buildClubTeamRosterOptions,
@@ -781,22 +784,40 @@ function CompetitionsTab({
             <THead>
               <tr>
                 <TH>Torneo</TH>
-                <TH>Slug</TH>
-                <TH>Estado</TH>
                 <TH>Notas</TH>
+                <TH>Accion</TH>
               </tr>
             </THead>
             <TBody>
               {competitions.map((competition) => (
                 <tr key={competition.id}>
-                  <TD className="font-semibold">{competition.name}</TD>
-                  <TD className="text-slate-300">{competition.slug}</TD>
                   <TD>
-                    <Badge className={competition.active ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}>
-                      {competition.active ? "Activo" : "Inactivo"}
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">{competition.name}</span>
+                      {!competition.active ? (
+                        <Badge className="bg-slate-800 text-slate-300">Inactivo</Badge>
+                      ) : null}
+                    </div>
                   </TD>
-                  <TD className="text-slate-300">{competition.notes || "Sin notas"}</TD>
+                  <TD className="text-slate-300">{competition.notes?.trim() || "-"}</TD>
+                  <TD>
+                    <form action={toggleClubCompetitionAction.bind(null, clubId)}>
+                      <input name="competitionId" type="hidden" value={competition.id} />
+                      <input name="active" type="hidden" value={competition.active ? "false" : "true"} />
+                      {competition.active ? (
+                        <ConfirmSubmitButton
+                          className="h-8 px-3 text-xs"
+                          confirmMessage={`Seguro que quieres dar de baja ${competition.name}? No se borra el historial, pero no aparecera para nuevos partidos.`}
+                          label="Dar de baja"
+                          variant="ghost"
+                        />
+                      ) : (
+                        <Button className="h-8 px-3 text-xs" type="submit" variant="secondary">
+                          Reactivar
+                        </Button>
+                      )}
+                    </form>
+                  </TD>
                 </tr>
               ))}
             </TBody>
@@ -825,14 +846,22 @@ function MatchesTab({
   const activeTeams = teams.filter((team) => team.active);
   const activeCompetitions = competitions.filter((competition) => competition.active);
   const competitionById = new Map(competitions.map((competition) => [competition.id, competition]));
+  const defaultPlayedDate = getCurrentMatchDateInput();
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle>Nuevo partido jugado</CardTitle>
-        <CardDescription className="mt-2">
-          Los partidos de clubes son siempre 11 vs 11 y quedan publicados por snapshot.
-        </CardDescription>
+      <details className="rounded-2xl border border-slate-800 bg-slate-950/75 p-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <div>
+            <CardTitle>Nuevo partido jugado</CardTitle>
+            <CardDescription className="mt-1">
+              Carga resultado, jugadores, invitados y estadisticas del partido.
+            </CardDescription>
+          </div>
+          <span className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white">
+            Agregar partido
+          </span>
+        </summary>
         <form action={addClubMatchAction.bind(null, clubId)} className="mt-4 space-y-5">
           <section className="grid gap-3 md:grid-cols-3">
             <div>
@@ -846,10 +875,12 @@ function MatchesTab({
                 ))}
               </Select>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200">Fecha</label>
-              <Input name="playedAt" required type="datetime-local" />
-            </div>
+            <MatchDateTimeFields
+              dateName="playedDate"
+              defaultDate={defaultPlayedDate}
+              requiredTime
+              timeName="playedTime"
+            />
             <div>
               <label className="mb-1 block text-sm font-semibold text-slate-200">Rival</label>
               <Input name="opponentName" required />
@@ -879,10 +910,20 @@ function MatchesTab({
 
           <Button type="submit">Guardar partido</Button>
         </form>
-      </Card>
+      </details>
 
-      <Card>
-        <CardTitle>Historial cargado</CardTitle>
+      <details className="rounded-2xl border border-slate-800 bg-slate-950/75 p-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <div>
+            <CardTitle>Partidos cargados</CardTitle>
+            <CardDescription className="mt-1">
+              Revisa los partidos existentes antes de hacer cambios.
+            </CardDescription>
+          </div>
+          <span className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200">
+            Editar partidos
+          </span>
+        </summary>
         <div className="mt-4 space-y-3">
           {matches.length ? (
             matches.map((match) => (
@@ -907,7 +948,7 @@ function MatchesTab({
             <p className="text-sm text-slate-400">Todavia no hay partidos cargados.</p>
           )}
         </div>
-      </Card>
+      </details>
     </div>
   );
 }

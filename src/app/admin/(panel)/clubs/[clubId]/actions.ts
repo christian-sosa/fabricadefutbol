@@ -14,7 +14,7 @@ import {
 } from "@/lib/domain/clubs";
 import { getPlayerPhotosBucket, getSupabaseDbSchema, getTeamLogosBucket } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
-import { datetimeLocalToMatchIso } from "@/lib/match-datetime";
+import { matchDateAndTimeToIso } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { normalizeEmail, slugifyClubName } from "@/lib/org";
 import {
@@ -70,6 +70,11 @@ const playerToggleSchema = z.object({
   active: z.boolean()
 });
 
+const competitionToggleSchema = z.object({
+  competitionId: z.string().uuid(),
+  active: z.boolean()
+});
+
 const teamSchema = z.object({
   name: z.string().min(2, "El equipo debe tener al menos 2 caracteres.").max(80),
   shortName: z.string().max(20).optional(),
@@ -96,7 +101,8 @@ const teamPlayerSchema = rosterSchema.extend({
 const matchSchema = z.object({
   teamId: z.string().uuid(),
   competitionId: z.string().uuid("Elegir donde se jugo el partido."),
-  playedAt: z.string().min(1, "Carga la fecha del partido."),
+  playedDate: z.string().optional(),
+  playedTime: z.string().min(1, "Carga la hora del partido."),
   opponentName: z.string().min(2, "Carga el rival.").max(100),
   venue: z.string().max(120).optional(),
   goalsFor: z.coerce.number().int().min(0),
@@ -584,6 +590,39 @@ export async function addClubCompetitionAction(clubId: string, formData: FormDat
   }
 }
 
+export async function toggleClubCompetitionAction(clubId: string, formData: FormData) {
+  try {
+    await assertClubWriteAction(clubId);
+    const parsed = competitionToggleSchema.safeParse({
+      competitionId: formData.get("competitionId"),
+      active: formData.get("active") === "true"
+    });
+
+    if (!parsed.success) {
+      redirect(buildClubDetailPath({ clubId, tab: "competitions", error: "Falta el torneo a actualizar." }));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { data: competition, error } = await supabase
+      .from("club_competitions")
+      .update({ active: parsed.data.active })
+      .eq("id", parsed.data.competitionId)
+      .eq("club_id", clubId)
+      .select("id")
+      .maybeSingle();
+
+    if (error || !competition) {
+      redirect(buildClubDetailPath({ clubId, tab: "competitions", error: toUserMessage(error, "No se pudo actualizar el torneo.") }));
+    }
+
+    await refreshAndRevalidate(clubId);
+    redirect(buildClubDetailPath({ clubId, tab: "competitions", success: parsed.data.active ? "Torneo reactivado." : "Torneo dado de baja." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab: "competitions", error: toUserMessage(error, "No se pudo actualizar el torneo.") }));
+  }
+}
+
 export async function addClubTeamAction(clubId: string, formData: FormData) {
   try {
     await assertClubWriteAction(clubId);
@@ -794,7 +833,8 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
     const parsed = matchSchema.safeParse({
       teamId: formData.get("teamId"),
       competitionId: formData.get("competitionId"),
-      playedAt: formData.get("playedAt"),
+      playedDate: String(formData.get("playedDate") ?? ""),
+      playedTime: String(formData.get("playedTime") ?? ""),
       opponentName: formData.get("opponentName"),
       venue: formData.get("venue"),
       goalsFor: formData.get("goalsFor"),
@@ -897,7 +937,7 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
         club_id: clubId,
         club_team_id: parsed.data.teamId,
         club_competition_id: parsed.data.competitionId,
-        played_at: datetimeLocalToMatchIso(parsed.data.playedAt),
+        played_at: matchDateAndTimeToIso(parsed.data.playedDate, parsed.data.playedTime),
         opponent_name: parsed.data.opponentName.trim(),
         venue: parsed.data.venue?.trim() || null,
         goals_for: parsed.data.goalsFor,

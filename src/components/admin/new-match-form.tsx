@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { createMatchAction } from "@/app/admin/(panel)/matches/new/actions";
+import { MatchDateTimeFields } from "@/components/admin/match-date-time-fields";
 import { Button } from "@/components/ui/button";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
@@ -48,10 +49,12 @@ const EXPECTED_PLAYERS: Record<MatchModality, number> = Object.fromEntries(
 ) as Record<MatchModality, number>;
 
 export function NewMatchForm({
+  defaultScheduledDate,
   organizationId,
   players,
   error
 }: {
+  defaultScheduledDate: string;
   organizationId: string;
   players: SelectablePlayer[];
   error?: string;
@@ -248,12 +251,12 @@ export function NewMatchForm({
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="manualAssignmentsPayload" type="hidden" value={manualAssignmentsPayload} />
       <div className="grid gap-3 md:grid-cols-3">
-        <div>
-          <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="scheduledAt">
-            Fecha y hora
-          </label>
-          <Input id="scheduledAt" name="scheduledAt" required type="datetime-local" />
-        </div>
+        <MatchDateTimeFields
+          dateName="scheduledDate"
+          defaultDate={defaultScheduledDate}
+          requiredTime
+          timeName="scheduledTime"
+        />
         <div>
           <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="modality">
             Modalidad

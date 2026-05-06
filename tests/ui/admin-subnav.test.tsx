@@ -38,7 +38,26 @@ describe("AdminSubnav", () => {
       "href",
       "/admin/players?org=grupo-a"
     );
+    expect(screen.getByRole("link", { name: "Partidos" })).toHaveAttribute(
+      "href",
+      "/admin/matches?org=grupo-a"
+    );
+    expect(screen.queryByRole("link", { name: "Nuevo partido" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Facturacion" })).not.toBeInTheDocument();
+  });
+
+  it("mantiene Partidos activo cuando se crea un partido nuevo", () => {
+    navigationState.pathname = "/admin/matches/new";
+    navigationState.searchParams = new URLSearchParams({ org: "grupo-a" });
+
+    render(<AdminSubnav />);
+
+    expect(screen.getByRole("link", { name: "Partidos" })).toHaveAttribute(
+      "href",
+      "/admin/matches?org=grupo-a"
+    );
+    expect(screen.getByRole("link", { name: "Partidos" }).className).toContain("border-emerald");
+    expect(screen.queryByRole("link", { name: "Nuevo partido" })).not.toBeInTheDocument();
   });
 
   it("muestra navegacion de liga dentro de una liga seleccionada", () => {

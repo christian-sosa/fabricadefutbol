@@ -4,6 +4,7 @@ import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-ca
 import { NewMatchForm } from "@/components/admin/new-match-form";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
+import { getCurrentMatchDateInput } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { getSelectablePlayers } from "@/lib/queries/admin";
 
@@ -22,6 +23,7 @@ export default async function NewMatchPage({
   }
   const players = await getSelectablePlayers(selectedOrganization.id);
   const error = resolvedSearchParams.error;
+  const defaultScheduledDate = getCurrentMatchDateInput();
 
   return (
     <div className="space-y-4">
@@ -34,7 +36,12 @@ export default async function NewMatchPage({
           arma equipos manuales.
         </CardDescription>
 
-        <NewMatchForm error={error} organizationId={selectedOrganization.id} players={players} />
+        <NewMatchForm
+          defaultScheduledDate={defaultScheduledDate}
+          error={error}
+          organizationId={selectedOrganization.id}
+          players={players}
+        />
       </Card>
     </div>
   );

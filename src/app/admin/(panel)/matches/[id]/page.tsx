@@ -9,6 +9,7 @@ import {
   updateMatchTeamLabelsAction
 } from "@/app/admin/(panel)/matches/[id]/actions";
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
+import { MatchDateTimeFields } from "@/components/admin/match-date-time-fields";
 import { MatchTeamLabelsShareForm } from "@/components/admin/match-team-labels-share-form";
 import { TeamOptionCard } from "@/components/matches/team-option-card";
 import { MATCH_STATUS_LABELS } from "@/components/ui/badge";
@@ -17,7 +18,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
-import { matchIsoToDatetimeLocal } from "@/lib/match-datetime";
+import { matchIsoToDateInput, matchIsoToTimeInput } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getAdminMatchDetails } from "@/lib/queries/admin";
@@ -66,13 +67,14 @@ export default async function AdminMatchDetailPage({
 
       <Card>
         <CardTitle>Editar partido</CardTitle>
-        <form action={matchUpdateAction} className="mt-4 grid gap-3 md:grid-cols-4">
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="scheduledAt">
-              Fecha y hora
-            </label>
-            <Input defaultValue={matchIsoToDatetimeLocal(details.match.scheduled_at)} id="scheduledAt" name="scheduledAt" required type="datetime-local" />
-          </div>
+        <form action={matchUpdateAction} className="mt-4 grid gap-3 md:grid-cols-5">
+          <MatchDateTimeFields
+            dateName="scheduledDate"
+            defaultDate={matchIsoToDateInput(details.match.scheduled_at)}
+            defaultTime={matchIsoToTimeInput(details.match.scheduled_at)}
+            requiredTime
+            timeName="scheduledTime"
+          />
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="location">
               Ubicacion
