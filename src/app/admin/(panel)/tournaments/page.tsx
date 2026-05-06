@@ -1,247 +1,112 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import {
-  archiveLeagueAction,
-  createLeagueAction,
-  deleteLeagueAction
-} from "@/app/admin/(panel)/tournaments/actions";
-import {
-  adminContextActionLinkClass,
-  adminContextPrimaryActionLinkClass,
-} from "@/components/admin/admin-context-actions";
-import { LeagueLogo } from "@/components/tournaments/league-logo";
-import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
-import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
-import { Input } from "@/components/ui/input";
-import { requireAdminSession } from "@/lib/auth/admin";
-import { getLeagueCreationAccess } from "@/lib/auth/tournaments";
-import { TEMP_SKIP_TOURNAMENT_CHECKOUT } from "@/lib/constants";
 import { syncTournamentBillingPaymentFromMercadoPago } from "@/lib/domain/tournament-billing-workflow";
-import { getAdminLeagueList } from "@/lib/queries/tournaments";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+
+type AdminTournamentsSearchParams = {
+  checkout?: string;
+  error?: string;
+  payment_id?: string;
+  success?: string;
+};
+
+function buildAdminHubPath(params?: { error?: string; success?: string }) {
+  const searchParams = new URLSearchParams();
+  if (params?.error) searchParams.set("error", params.error);
+  if (params?.success) searchParams.set("success", params.success);
+  const query = searchParams.toString();
+  return query ? `/admin?${query}` : "/admin";
+}
+
+function buildLeagueDetailPath(leagueId: string, success: string) {
+  const searchParams = new URLSearchParams({ success });
+  return `/admin/tournaments/${leagueId}?${searchParams.toString()}`;
+}
 
 export default async function AdminTournamentsPage({
   searchParams
 }: {
-  searchParams: Promise<{
-    checkout?: string;
-    error?: string;
-    payment_id?: string;
-    success?: string;
-  }>;
+  searchParams: Promise<AdminTournamentsSearchParams>;
 }) {
   const resolvedSearchParams = await searchParams;
 
-  let checkoutMessage: { tone: "danger" | "success" | "info"; text: string } | null = null;
+  if (resolvedSearchParams.error) {
+    redirect(buildAdminHubPath({ error: resolvedSearchParams.error }));
+  }
+
+  if (resolvedSearchParams.success) {
+    redirect(buildAdminHubPath({ success: resolvedSearchParams.success }));
+  }
+
   if (resolvedSearchParams.payment_id) {
     const supabaseAdmin = createSupabaseAdminClient();
     if (!supabaseAdmin) {
-      checkoutMessage = {
-        tone: "danger",
-        text: "Falta SUPABASE_SERVICE_ROLE_KEY para confirmar el pago de la liga."
-      };
-    } else {
-      try {
-        const syncResult = await syncTournamentBillingPaymentFromMercadoPago({
-          supabase: supabaseAdmin,
-          mercadopagoPaymentId: resolvedSearchParams.payment_id
-        });
+      redirect(buildAdminHubPath({ error: "Falta SUPABASE_SERVICE_ROLE_KEY para confirmar el pago de la liga." }));
+    }
 
-        if (resolvedSearchParams.checkout === "success" && syncResult.updated && syncResult.createdLeagueId) {
-          redirect(
-            `/admin/tournaments/${syncResult.createdLeagueId}?success=${encodeURIComponent("Liga creada despues de confirmar el pago.")}`
-          );
-        }
+    let detailRedirectPath: string | null = null;
+    let hubMessage: { tone: "error" | "success"; text: string } | null = null;
 
-        if (resolvedSearchParams.checkout === "failure") {
-          checkoutMessage = {
-            tone: "danger",
-            text: "El pago no se completo. Puedes intentarlo de nuevo cuando quieras."
-          };
-        } else if (resolvedSearchParams.checkout === "pending") {
-          checkoutMessage = {
-            tone: "info",
-            text: "El pago quedo pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear la liga."
-          };
-        } else if (syncResult.updated && syncResult.status === "approved") {
-          checkoutMessage = {
-            tone: "success",
-            text: "Pago aprobado. Estamos terminando de preparar la liga."
-          };
-        } else if (!syncResult.updated && "reason" in syncResult && syncResult.reason) {
-          checkoutMessage = {
-            tone: "danger",
-            text: syncResult.reason
-          };
-        }
-      } catch (error) {
-        checkoutMessage = {
-          tone: "danger",
-          text: error instanceof Error ? error.message : "No se pudo confirmar el pago de la liga."
+    try {
+      const syncResult = await syncTournamentBillingPaymentFromMercadoPago({
+        supabase: supabaseAdmin,
+        mercadopagoPaymentId: resolvedSearchParams.payment_id
+      });
+
+      if (syncResult.updated && syncResult.createdLeagueId) {
+        detailRedirectPath = buildLeagueDetailPath(syncResult.createdLeagueId, "Liga creada despues de confirmar el pago.");
+      } else if (resolvedSearchParams.checkout === "failure") {
+        hubMessage = {
+          tone: "error",
+          text: "El pago no se completo. Puedes intentarlo de nuevo cuando quieras."
+        };
+      } else if (resolvedSearchParams.checkout === "pending") {
+        hubMessage = {
+          tone: "success",
+          text: "El pago quedo pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear la liga."
+        };
+      } else if (syncResult.updated && syncResult.status === "approved") {
+        hubMessage = {
+          tone: "success",
+          text: "Pago aprobado. Estamos terminando de preparar la liga."
+        };
+      } else if (!syncResult.updated && "reason" in syncResult && syncResult.reason) {
+        hubMessage = {
+          tone: "error",
+          text: syncResult.reason
         };
       }
+    } catch (error) {
+      hubMessage = {
+        tone: "error",
+        text: error instanceof Error ? error.message : "No se pudo confirmar el pago de la liga."
+      };
     }
-  } else if (resolvedSearchParams.checkout === "failure") {
-    checkoutMessage = {
-      tone: "danger",
-      text: "El pago no se completo. Puedes intentarlo de nuevo cuando quieras."
-    };
-  } else if (resolvedSearchParams.checkout === "pending") {
-    checkoutMessage = {
-      tone: "info",
-      text: "El pago quedo pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear la liga."
-    };
+
+    if (detailRedirectPath) {
+      redirect(detailRedirectPath);
+    }
+
+    if (hubMessage?.tone === "error") {
+      redirect(buildAdminHubPath({ error: hubMessage.text }));
+    }
+
+    if (hubMessage?.tone === "success") {
+      redirect(buildAdminHubPath({ success: hubMessage.text }));
+    }
   }
 
-  const admin = await requireAdminSession();
-  const creationAccess = await getLeagueCreationAccess(admin);
-  const leagues = await getAdminLeagueList();
-  const hasLeagues = leagues.length > 0;
-  const feedbackMessage = resolvedSearchParams.error
-    ? { tone: "danger" as const, text: resolvedSearchParams.error }
-    : resolvedSearchParams.success
-      ? { tone: "success" as const, text: resolvedSearchParams.success }
-      : checkoutMessage;
+  if (resolvedSearchParams.checkout === "failure") {
+    redirect(buildAdminHubPath({ error: "El pago no se completo. Puedes intentarlo de nuevo cuando quieras." }));
+  }
 
-  return (
-    <div className="space-y-4">
-      {feedbackMessage ? (
-        <Card>
-          <p
-            className={
-              feedbackMessage.tone === "danger"
-                ? "text-sm font-semibold text-danger"
-                : feedbackMessage.tone === "success"
-                  ? "text-sm font-semibold text-emerald-300"
-                  : "text-sm font-semibold text-sky-300"
-            }
-          >
-            {feedbackMessage.text}
-          </p>
-        </Card>
-      ) : null}
+  if (resolvedSearchParams.checkout === "pending") {
+    redirect(buildAdminHubPath({ success: "El pago quedo pendiente. En cuanto Mercado Pago lo confirme, terminaremos de crear la liga." }));
+  }
 
-      {!hasLeagues ? (
-        creationAccess.canCreateLeague ? (
-          <Card className="p-5 sm:p-6">
-            <CardTitle>Nueva liga</CardTitle>
-            <CardDescription className="mt-2">
-              {TEMP_SKIP_TOURNAMENT_CHECKOUT
-                ? "Carga el nombre de la liga y la creamos al instante. Luego podras cargar equipos, competencias y capitanes opcionales."
-                : "Carga el nombre de la liga y te llevamos a Mercado Pago para confirmar el alta antes de habilitar equipos y competencias."}
-            </CardDescription>
-            <form action={createLeagueAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="name">
-                  Nombre de la liga
-                </label>
-                <Input id="name" name="name" placeholder="Ej: LAFAB" required />
-              </div>
-              <div className="md:self-end">
-                <Button type="submit">
-                  {TEMP_SKIP_TOURNAMENT_CHECKOUT ? "Crear liga" : "Continuar a Mercado Pago"}
-                </Button>
-              </div>
-            </form>
-          </Card>
-        ) : (
-          <Card className="p-5 sm:p-6">
-            <CardTitle>Torneos en prueba controlada</CardTitle>
-            <CardDescription className="mt-2">
-              {creationAccess.reason ?? "Por ahora las altas de ligas estan habilitadas manualmente."}
-            </CardDescription>
-          </Card>
-        )
-      ) : null}
+  if (resolvedSearchParams.checkout === "success") {
+    redirect(buildAdminHubPath({ success: "Pago aprobado. Estamos terminando de preparar la liga." }));
+  }
 
-      <Card>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle>Mis ligas</CardTitle>
-            <CardDescription className="mt-2">
-              Cada liga concentra equipos maestros y una o varias competencias como Viernes A, Viernes B o Copa Clausura.
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link className={adminContextActionLinkClass} href="/admin">
-              Menu admin
-            </Link>
-            {hasLeagues && creationAccess.canCreateLeague ? (
-              <Link className={adminContextActionLinkClass} href="/admin/tournaments/new">
-                Nueva liga
-              </Link>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="mt-4 space-y-3">
-          {leagues.length ? (
-            leagues.map((league) => (
-              <div
-                className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 md:flex-row md:items-center md:justify-between"
-                key={league.id}
-              >
-                <div className="flex min-w-0 flex-1 items-start gap-3">
-                  <LeagueLogo alt={`Logo de ${league.name}`} size={56} src={league.logoUrl} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-base font-semibold text-slate-100">{league.name}</p>
-                      <TournamentStatusBadge status={league.status} />
-                    </div>
-                    <p className="mt-1 text-sm text-slate-400">/{league.slug}</p>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {league.teamCount} equipos · {league.competitionCount} competencias
-                    </p>
-                    {league.venueName || league.locationNotes ? (
-                      <p className="mt-1 text-xs text-slate-400">
-                        {league.venueName ? `Sede: ${league.venueName}` : "Sede pendiente"}
-                        {league.locationNotes ? ` · ${league.locationNotes}` : ""}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Link
-                    className={adminContextPrimaryActionLinkClass}
-                    href={`/admin/tournaments/${league.id}`}
-                  >
-                    Gestionar
-                  </Link>
-                  <Link
-                    className={adminContextActionLinkClass}
-                    href={`/tournaments/${league.slug}`}
-                  >
-                    Ver publica
-                  </Link>
-                  {league.status !== "archived" ? (
-                    <form action={archiveLeagueAction}>
-                      <input name="leagueId" type="hidden" value={league.id} />
-                      <Button type="submit" variant="ghost">
-                        Archivar
-                      </Button>
-                    </form>
-                  ) : null}
-                  <form action={deleteLeagueAction}>
-                    <input name="leagueId" type="hidden" value={league.id} />
-                    <ConfirmSubmitButton
-                      className="h-8 px-3 text-xs"
-                      confirmMessage={`Seguro que quieres borrar la liga ${league.name}? Antes debe estar sin competencias.`}
-                      label="Borrar"
-                      variant="ghost"
-                    />
-                  </form>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-sm text-slate-400">Todavia no administras ninguna liga.</p>
-          )}
-        </div>
-      </Card>
-    </div>
-  );
+  redirect("/admin");
 }

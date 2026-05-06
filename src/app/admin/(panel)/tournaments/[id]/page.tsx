@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { deleteLeagueAction } from "@/app/admin/(panel)/tournaments/actions";
 import {
   addLeagueTeamAction,
   deleteLeagueTeamAction,
@@ -22,12 +21,11 @@ import { CreateCompetitionCard } from "@/components/admin/create-competition-car
 import { SignOutButton } from "@/components/admin/sign-out-button";
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { LeaguePhoto } from "@/components/tournaments/league-photo";
-import { TOURNAMENT_STATUS_LABELS, TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
+import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { requireAdminLeague } from "@/lib/auth/tournaments";
 import { getAdminLeagueDetails } from "@/lib/queries/tournaments";
@@ -128,22 +126,10 @@ export default async function AdminLeagueDetailPage({
             <Link className={adminContextActionLinkClass} href="/admin">
               Menu admin
             </Link>
-            <Link className={adminContextActionLinkClass} href="/admin/tournaments">
-              Volver a ligas
-            </Link>
             <Link className={adminContextPrimaryActionLinkClass} href={`/tournaments/${details.league.slug}`}>
               Ver publica
             </Link>
             <SignOutButton />
-            <form action={deleteLeagueAction}>
-              <input name="leagueId" type="hidden" value={id} />
-              <ConfirmSubmitButton
-                className="h-8 px-3 text-xs"
-                confirmMessage={`Seguro que quieres borrar ${details.league.name}?`}
-                label="Borrar"
-                variant="ghost"
-              />
-            </form>
           </div>
         </div>
         {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}
@@ -185,18 +171,6 @@ export default async function AdminLeagueDetailPage({
                     Nombre
                   </label>
                   <Input defaultValue={details.league.name} id="name" name="name" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="status">
-                    Estado
-                  </label>
-                  <Select defaultValue={details.league.status} id="status" name="status">
-                    {(["draft", "active", "finished", "archived"] as const).map((status) => (
-                      <option key={status} value={status}>
-                        {TOURNAMENT_STATUS_LABELS[status]}
-                      </option>
-                    ))}
-                  </Select>
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="venueName">

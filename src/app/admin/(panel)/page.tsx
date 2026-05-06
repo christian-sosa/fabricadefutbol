@@ -85,12 +85,14 @@ function formatOrganizationSeasonRange(season: OrganizationSeasonEntry) {
 
 function AdminFeedback({
   checkout,
-  error
+  error,
+  success
 }: {
   checkout?: string;
   error?: string;
+  success?: string;
 }) {
-  if (!checkout && !error) return null;
+  if (!checkout && !error && !success) return null;
 
   return (
     <Card>
@@ -99,6 +101,7 @@ function AdminFeedback({
           Grupo actualizado.
         </p>
       ) : null}
+      {success ? <p className="text-sm font-semibold text-emerald-300">{success}</p> : null}
       {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
     </Card>
   );
@@ -204,7 +207,8 @@ function AdminHomeHub({
   leagueCreationAccess,
   leagues,
   organizations,
-  showTournaments
+  showTournaments,
+  success
 }: {
   creationAccess: Awaited<ReturnType<typeof getAdminOrganizationCreationAccess>>;
   clubs: ClubEntry[];
@@ -214,6 +218,7 @@ function AdminHomeHub({
   leagues: LeagueEntry[];
   organizations: OrganizationEntry[];
   showTournaments: boolean;
+  success?: string;
 }) {
   const hasOrganizations = organizations.length > 0;
   const hasClubs = clubs.length > 0;
@@ -223,7 +228,7 @@ function AdminHomeHub({
 
   return (
     <div className="space-y-4">
-      <AdminFeedback checkout={checkout} error={error} />
+      <AdminFeedback checkout={checkout} error={error} success={success} />
 
       <Card className="p-5 sm:p-6">
         <CardTitle className="text-3xl">Que queres administrar?</CardTitle>
@@ -405,7 +410,7 @@ function AdminHomeHub({
 export default async function AdminDashboardPage({
   searchParams
 }: {
-  searchParams: Promise<{ org?: string; error?: string; checkout?: string }>;
+  searchParams: Promise<{ org?: string; error?: string; checkout?: string; success?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const { admin, organizations } = await getAdminOrganizationContext(resolvedSearchParams.org);
@@ -436,6 +441,7 @@ export default async function AdminDashboardPage({
         leagues={leagues}
         organizations={organizations}
         showTournaments={showTournaments}
+        success={resolvedSearchParams.success}
       />
     );
   }
@@ -448,7 +454,11 @@ export default async function AdminDashboardPage({
 
   return (
     <div className="space-y-4">
-      <AdminFeedback checkout={resolvedSearchParams.checkout} error={resolvedSearchParams.error} />
+      <AdminFeedback
+        checkout={resolvedSearchParams.checkout}
+        error={resolvedSearchParams.error}
+        success={resolvedSearchParams.success}
+      />
 
       <AdminCurrentGroupCard admin={admin} organization={selectedOrganization} />
 

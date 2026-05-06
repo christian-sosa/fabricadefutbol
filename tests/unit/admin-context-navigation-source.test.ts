@@ -62,7 +62,13 @@ describe("admin context navigation source", () => {
     expect(leagueDetailSource).toContain("SignOutButton");
     expect(leagueDetailSource).toContain("adminContextActionLinkClass");
     expect(leagueDetailSource).toContain("adminContextPrimaryActionLinkClass");
-    expect(tournamentsListSource).toContain("adminContextActionLinkClass");
-    expect(tournamentsListSource).toContain("adminContextPrimaryActionLinkClass");
+    expect(leagueDetailSource).not.toContain("Volver a ligas");
+    expect(leagueDetailSource).not.toContain("deleteLeagueAction");
+    expect(leagueDetailSource).not.toContain("Seguro que quieres borrar ${details.league.name}");
+    expect(leagueDetailSource).not.toContain('htmlFor="status"');
+    expect(leagueDetailSource).not.toContain('name="status"');
+    expect(tournamentsListSource).toContain('redirect("/admin")');
+    expect(tournamentsListSource).not.toContain("Mis ligas");
+    expect(tournamentsListSource).not.toContain("Gestionar");
   });
 });

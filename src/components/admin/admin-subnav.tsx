@@ -60,8 +60,8 @@ function buildTournamentItems(pathname: string, tournamentId: string | null, cur
   if (!tournamentId) {
     return [
       {
-        href: "/admin/tournaments",
-        label: "Panel",
+        href: "/admin",
+        label: "Menu admin",
         active: pathname === "/admin/tournaments"
       },
       {
@@ -131,7 +131,6 @@ export function AdminSubnav({ scope = "all" }: AdminSubnavProps) {
     return null;
   }
 
-  const showHeader = isTournamentArea;
   const items = isTournamentArea
     ? buildTournamentItems(pathname, tournamentId, currentTab)
     : buildOrganizationItems(pathname, organizationKey);
@@ -141,19 +140,6 @@ export function AdminSubnav({ scope = "all" }: AdminSubnavProps) {
   return (
     <section className="rounded-2xl border border-slate-800 bg-slate-950/75 px-4 py-3">
       <div className="space-y-3">
-        {showHeader ? (
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-400">
-              {tournamentId ? "Liga actual" : "Torneos"}
-            </p>
-            <p className="mt-1 text-sm text-slate-400">
-              {tournamentId
-                ? "Estas trabajando dentro de una liga. Las competencias, equipos y resultados quedan separados de Grupos."
-                : "Elige una liga para administrar sus equipos, competencias, resultados y facturacion."}
-            </p>
-          </div>
-        ) : null}
-
         <nav className="flex flex-nowrap gap-2 overflow-x-auto pb-1">
           {items.map((item) => (
             <Link

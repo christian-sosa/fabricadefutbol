@@ -82,7 +82,8 @@ describe("AdminSubnav", () => {
 
     render(<AdminSubnav />);
 
-    expect(screen.getByText("Liga actual")).toBeInTheDocument();
+    expect(screen.queryByText("Liga actual")).not.toBeInTheDocument();
+    expect(screen.queryByText("Estas trabajando dentro de una liga. Las competencias, equipos y resultados quedan separados de Grupos.")).not.toBeInTheDocument();
     expect(screen.queryByText("Contexto torneos")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Competencias" })).toHaveAttribute(
       "href",

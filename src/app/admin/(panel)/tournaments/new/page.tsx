@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { createLeagueAction } from "@/app/admin/(panel)/tournaments/actions";
+import { adminContextActionLinkClass } from "@/components/admin/admin-context-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,8 +24,8 @@ export default async function NewTournamentLeaguePage() {
             </CardDescription>
           </div>
           <Link
-            className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
-            href="/admin/tournaments"
+            className={adminContextActionLinkClass}
+            href="/admin"
           >
             Volver
           </Link>

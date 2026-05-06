@@ -41,8 +41,7 @@ const updateLeagueSchema = z.object({
   name: z.string().min(3, "El nombre de la liga debe tener al menos 3 caracteres.").max(100),
   description: z.string().max(500).optional(),
   venueName: z.string().max(120).optional(),
-  locationNotes: z.string().max(300).optional(),
-  status: z.enum(["draft", "active", "finished", "archived"])
+  locationNotes: z.string().max(300).optional()
 });
 
 const leagueTeamSchema = z.object({
@@ -316,8 +315,7 @@ export async function updateLeagueAction(leagueId: string, formData: FormData) {
       name: formData.get("name"),
       description: formData.get("description"),
       venueName: formData.get("venueName"),
-      locationNotes: formData.get("locationNotes"),
-      status: formData.get("status")
+      locationNotes: formData.get("locationNotes")
     });
 
     if (!parsed.success) {
@@ -347,8 +345,7 @@ export async function updateLeagueAction(leagueId: string, formData: FormData) {
         description: parsed.data.description?.trim() || null,
         venue_name: parsed.data.venueName?.trim() || null,
         location_notes: parsed.data.locationNotes?.trim() || null,
-        is_public: true,
-        status: parsed.data.status
+        is_public: true
       })
       .eq("id", leagueId);
 
