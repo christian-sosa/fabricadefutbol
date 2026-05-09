@@ -5,10 +5,15 @@ import { notFound } from "next/navigation";
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
-import { formatClubPlayerPosition } from "@/lib/domain/clubs";
+import { formatMatchModality, MATCH_MODALITIES } from "@/lib/constants";
+import {
+  filterClubPublicSnapshotByModality,
+  formatClubPlayerPosition
+} from "@/lib/domain/clubs";
 import { getPublicClubBySlug } from "@/lib/queries/clubs";
 import { getClubLogoUrl } from "@/lib/team-logos";
-import type { ClubPublicActivity, ClubPublicPlayerStat } from "@/lib/domain/clubs";
+import type { ClubPublicActivity, ClubPublicPlayerStat, ClubSnapshotModalityFilter } from "@/lib/domain/clubs";
+import type { MatchModality } from "@/types/domain";
 
 export async function generateMetadata({
   params
@@ -45,6 +50,26 @@ function getActivityLabel(type: ClubPublicActivity["type"]) {
     default:
       return "Club";
   }
+}
+
+function normalizeModalityFilter(value: string | undefined): ClubSnapshotModalityFilter {
+  return MATCH_MODALITIES.includes(value as MatchModality) ? (value as MatchModality) : "all";
+}
+
+function buildClubHref(slug: string, params: { modality: ClubSnapshotModalityFilter; teamId?: string }) {
+  const searchParams = new URLSearchParams();
+  if (params.modality !== "all") searchParams.set("modality", params.modality);
+  if (params.teamId) searchParams.set("team", params.teamId);
+  const query = searchParams.toString();
+  return query ? `/clubs/${slug}?${query}` : `/clubs/${slug}`;
+}
+
+function ModalityBadge({ modality }: { modality: MatchModality }) {
+  return (
+    <span className="inline-flex w-fit rounded-full border border-sky-400/30 bg-sky-500/10 px-2 py-0.5 text-xs font-semibold text-sky-100">
+      {formatMatchModality(modality)}
+    </span>
+  );
 }
 
 function PlayerStatsTable({ rows }: { rows: ClubPublicPlayerStat[] }) {
@@ -102,13 +127,15 @@ export default async function PublicClubPage({
   searchParams
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ team?: string }>;
+  searchParams: Promise<{ team?: string; modality?: string }>;
 }) {
   const [{ slug }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   const data = await getPublicClubBySlug(slug);
   if (!data) notFound();
 
-  const { club, snapshot } = data;
+  const { club } = data;
+  const selectedModality = normalizeModalityFilter(resolvedSearchParams.modality);
+  const snapshot = filterClubPublicSnapshotByModality(data.snapshot, selectedModality);
   const selectedTeam = snapshot.teams.find((team) => team.id === resolvedSearchParams.team) ?? null;
   const hasSummaryData =
     snapshot.summary.teamCount > 0 ||
@@ -179,6 +206,34 @@ export default async function PublicClubPage({
         </div>
       </section>
 
+      {data.snapshot.availableModalities.length ? (
+        <section className="flex flex-wrap gap-2 rounded-2xl border border-slate-800 bg-slate-950/75 p-3">
+          <Link
+            className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+              selectedModality === "all"
+                ? "bg-emerald-500 text-white"
+                : "border border-slate-700 text-slate-300 hover:border-emerald-400/60 hover:text-emerald-200"
+            }`}
+            href={buildClubHref(club.slug, { modality: "all" })}
+          >
+            Todas
+          </Link>
+          {data.snapshot.availableModalities.map((modality) => (
+            <Link
+              className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                selectedModality === modality
+                  ? "bg-emerald-500 text-white"
+                  : "border border-slate-700 text-slate-300 hover:border-emerald-400/60 hover:text-emerald-200"
+              }`}
+              href={buildClubHref(club.slug, { modality })}
+              key={modality}
+            >
+              {formatMatchModality(modality)}
+            </Link>
+          ))}
+        </section>
+      ) : null}
+
       {hasSummaryData ? (
         <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
           <Card>
@@ -248,9 +303,15 @@ export default async function PublicClubPage({
                       src={getClubLogoUrl(club.id)}
                     />
                     <div>
-                      <Link className="font-semibold text-slate-100 hover:text-emerald-200" href={`/clubs/${club.slug}?team=${team.id}`}>
+                      <Link
+                        className="font-semibold text-slate-100 hover:text-emerald-200"
+                        href={buildClubHref(club.slug, { modality: selectedModality, teamId: team.id })}
+                      >
                         {team.name}
                       </Link>
+                      <div className="mt-1">
+                        <ModalityBadge modality={team.modality} />
+                      </div>
                       <p className="mt-1 text-sm text-slate-400">
                         {team.playerCount} jugadores - {team.matchesPlayed} partidos
                       </p>
@@ -262,7 +323,10 @@ export default async function PublicClubPage({
                   <div className="text-left text-sm text-slate-300 sm:text-right">
                     <p>{team.wins} G / {team.draws} E / {team.losses} P</p>
                     <p className="mt-1">{team.goalsFor} GF / {team.goalsAgainst} GC</p>
-                    <Link className="mt-2 inline-block font-semibold text-emerald-300 hover:underline" href={`/clubs/${club.slug}?team=${team.id}`}>
+                    <Link
+                      className="mt-2 inline-block font-semibold text-emerald-300 hover:underline"
+                      href={buildClubHref(club.slug, { modality: selectedModality, teamId: team.id })}
+                    >
                       Ver equipo
                     </Link>
                   </div>
@@ -279,10 +343,10 @@ export default async function PublicClubPage({
             <div>
               <CardTitle>{selectedTeam.name}</CardTitle>
               <CardDescription className="mt-2">
-                {selectedTeam.playerCount} jugadores - {selectedTeam.matchesPlayed} partidos
+                {formatMatchModality(selectedTeam.modality)} - {selectedTeam.playerCount} jugadores - {selectedTeam.matchesPlayed} partidos
               </CardDescription>
             </div>
-            <Link className="text-sm font-semibold text-slate-300 hover:underline" href={`/clubs/${club.slug}`}>
+            <Link className="text-sm font-semibold text-slate-300 hover:underline" href={buildClubHref(club.slug, { modality: selectedModality })}>
               Ver todos
             </Link>
           </div>
@@ -318,7 +382,7 @@ export default async function PublicClubPage({
                         <div>
                           <p className="font-semibold text-slate-100">vs {match.opponentName}</p>
                           <p className="mt-1 text-slate-400">
-                            {formatDate(match.playedAt)} - {match.competitionName}
+                            {formatDate(match.playedAt)} - {formatMatchModality(match.modality)} - {match.competitionName}
                           </p>
                           {match.venue ? <p className="mt-1 text-xs text-slate-500">{match.venue}</p> : null}
                         </div>

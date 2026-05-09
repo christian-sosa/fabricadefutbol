@@ -1111,6 +1111,7 @@ export type Database = {
           created_at: string;
           id: string;
           logo_path: string | null;
+          modality: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           name: string;
           notes: string | null;
           short_name: string | null;
@@ -1122,6 +1123,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           logo_path?: string | null;
+          modality?: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           name: string;
           notes?: string | null;
           short_name?: string | null;
@@ -1133,6 +1135,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           logo_path?: string | null;
+          modality?: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           name?: string;
           notes?: string | null;
           short_name?: string | null;
@@ -1171,6 +1174,7 @@ export type Database = {
           goals_against: number;
           goals_for: number;
           id: string;
+          modality: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           notes: string | null;
           opponent_name: string;
           played_at: string;
@@ -1187,6 +1191,7 @@ export type Database = {
           goals_against?: number;
           goals_for?: number;
           id?: string;
+          modality?: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           notes?: string | null;
           opponent_name: string;
           played_at: string;
@@ -1203,6 +1208,7 @@ export type Database = {
           goals_against?: number;
           goals_for?: number;
           id?: string;
+          modality?: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           notes?: string | null;
           opponent_name?: string;
           played_at?: string;
@@ -1220,7 +1226,7 @@ export type Database = {
           guest_name: string | null;
           id: string;
           match_id: string;
-          role: "starter" | "substitute";
+          role: "starter" | "substitute" | "present";
         };
         Insert: {
           club_player_id?: string | null;
@@ -1229,7 +1235,7 @@ export type Database = {
           guest_name?: string | null;
           id?: string;
           match_id: string;
-          role?: "starter" | "substitute";
+          role?: "starter" | "substitute" | "present";
         };
         Update: {
           club_player_id?: string | null;
@@ -1238,7 +1244,7 @@ export type Database = {
           guest_name?: string | null;
           id?: string;
           match_id?: string;
-          role?: "starter" | "substitute";
+          role?: "starter" | "substitute" | "present";
         };
         Relationships: [];
       };
@@ -1278,6 +1284,8 @@ export type Database = {
       club_public_snapshots: {
         Row: {
           activity: Json;
+          available_modalities: Json;
+          by_modality: Json;
           club_id: string;
           competition_stats: Json;
           player_stats: Json;
@@ -1293,6 +1301,8 @@ export type Database = {
         };
         Insert: {
           activity?: Json;
+          available_modalities?: Json;
+          by_modality?: Json;
           club_id: string;
           competition_stats?: Json;
           player_stats?: Json;
@@ -1308,6 +1318,8 @@ export type Database = {
         };
         Update: {
           activity?: Json;
+          available_modalities?: Json;
+          by_modality?: Json;
           club_id?: string;
           competition_stats?: Json;
           player_stats?: Json;

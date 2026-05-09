@@ -53,6 +53,7 @@ const playerPositionSchema = z.preprocess(
   normalizePlayerPositionForSchema,
   z.enum(CLUB_PLAYER_POSITIONS).nullable()
 );
+const matchModalitySchema = z.enum(["5v5", "6v6", "7v7", "9v9", "11v11"]);
 
 const playerSchema = z.object({
   fullName: z.string().min(2, "El jugador debe tener al menos 2 caracteres.").max(80),
@@ -78,7 +79,13 @@ const competitionToggleSchema = z.object({
 const teamSchema = z.object({
   name: z.string().min(2, "El equipo debe tener al menos 2 caracteres.").max(80),
   shortName: z.string().max(20).optional(),
+  modality: matchModalitySchema,
   notes: z.string().max(300).optional()
+});
+
+const teamUpdateSchema = teamSchema.extend({
+  teamId: z.string().uuid(),
+  active: z.boolean()
 });
 
 const competitionSchema = z.object({
@@ -101,6 +108,7 @@ const teamPlayerSchema = rosterSchema.extend({
 const matchSchema = z.object({
   teamId: z.string().uuid(),
   competitionId: z.string().uuid("Elegir donde se jugo el partido."),
+  modality: matchModalitySchema,
   playedDate: z.string().optional(),
   playedTime: z.string().min(1, "Carga la hora del partido."),
   opponentName: z.string().min(2, "Carga el rival.").max(100),
@@ -629,6 +637,7 @@ export async function addClubTeamAction(clubId: string, formData: FormData) {
     const parsed = teamSchema.safeParse({
       name: formData.get("name"),
       shortName: formData.get("shortName"),
+      modality: formData.get("modality"),
       notes: formData.get("notes")
     });
 
@@ -641,6 +650,7 @@ export async function addClubTeamAction(clubId: string, formData: FormData) {
       club_id: clubId,
       name: parsed.data.name.trim(),
       short_name: parsed.data.shortName?.trim() || null,
+      modality: parsed.data.modality,
       notes: parsed.data.notes?.trim() || null,
       active: true
     });
@@ -658,6 +668,53 @@ export async function addClubTeamAction(clubId: string, formData: FormData) {
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(error, "No se pudo agregar el equipo.") }));
+  }
+}
+
+export async function updateClubTeamAction(clubId: string, formData: FormData) {
+  try {
+    await assertClubWriteAction(clubId);
+    const parsed = teamUpdateSchema.safeParse({
+      teamId: formData.get("teamId"),
+      name: formData.get("name"),
+      shortName: formData.get("shortName"),
+      modality: formData.get("modality"),
+      active: formData.get("active") === "true",
+      notes: formData.get("notes")
+    });
+
+    if (!parsed.success) {
+      redirect(buildClubDetailPath({ clubId, tab: "teams", error: parsed.error.issues[0]?.message ?? "Datos invalidos." }));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { data: team, error } = await supabase
+      .from("club_teams")
+      .update({
+        name: parsed.data.name.trim(),
+        short_name: parsed.data.shortName?.trim() || null,
+        modality: parsed.data.modality,
+        notes: parsed.data.notes?.trim() || null,
+        active: parsed.data.active
+      })
+      .eq("id", parsed.data.teamId)
+      .eq("club_id", clubId)
+      .select("id")
+      .maybeSingle();
+
+    if (error || !team) {
+      const userMessage =
+        error?.code === "23505"
+          ? "Ya existe un equipo con ese nombre en el club."
+          : toUserMessage(error, "No se pudo actualizar el equipo.");
+      redirect(buildClubDetailPath({ clubId, tab: "teams", teamId: parsed.data.teamId, error: userMessage }));
+    }
+
+    await refreshAndRevalidate(clubId);
+    redirect(buildClubDetailPath({ clubId, tab: "teams", teamId: parsed.data.teamId, success: "Equipo actualizado." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab: "teams", error: toUserMessage(error, "No se pudo actualizar el equipo.") }));
   }
 }
 
@@ -833,6 +890,7 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
     const parsed = matchSchema.safeParse({
       teamId: formData.get("teamId"),
       competitionId: formData.get("competitionId"),
+      modality: formData.get("modality"),
       playedDate: String(formData.get("playedDate") ?? ""),
       playedTime: String(formData.get("playedTime") ?? ""),
       opponentName: formData.get("opponentName"),
@@ -898,20 +956,10 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
       });
     }
 
-    const validationErrors = validateClubMatchSheet({
-      goalsFor: parsed.data.goalsFor,
-      goalsAgainst: parsed.data.goalsAgainst,
-      participants
-    });
-
-    if (validationErrors.length) {
-      redirect(buildClubDetailPath({ clubId, tab: "matches", error: validationErrors[0] }));
-    }
-
     const [{ data: team, error: teamError }, { data: competition, error: competitionError }] = await Promise.all([
       supabase
         .from("club_teams")
-        .select("id")
+        .select("id, modality")
         .eq("id", parsed.data.teamId)
         .eq("club_id", clubId)
         .maybeSingle(),
@@ -930,6 +978,20 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
     if (competitionError || !competition) {
       redirect(buildClubDetailPath({ clubId, tab: "matches", error: "No se encontro el torneo del club para este partido." }));
     }
+    if (team.modality !== parsed.data.modality) {
+      redirect(buildClubDetailPath({ clubId, tab: "matches", error: "La modalidad del equipo cambio. Recarga la pagina y vuelve a intentar." }));
+    }
+
+    const validationErrors = validateClubMatchSheet({
+      modality: team.modality,
+      goalsFor: parsed.data.goalsFor,
+      goalsAgainst: parsed.data.goalsAgainst,
+      participants
+    });
+
+    if (validationErrors.length) {
+      redirect(buildClubDetailPath({ clubId, tab: "matches", error: validationErrors[0] }));
+    }
 
     const { data: match, error: matchError } = await supabase
       .from("club_matches")
@@ -937,6 +999,7 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
         club_id: clubId,
         club_team_id: parsed.data.teamId,
         club_competition_id: parsed.data.competitionId,
+        modality: team.modality,
         played_at: matchDateAndTimeToIso(parsed.data.playedDate, parsed.data.playedTime),
         opponent_name: parsed.data.opponentName.trim(),
         venue: parsed.data.venue?.trim() || null,

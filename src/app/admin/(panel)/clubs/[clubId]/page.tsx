@@ -15,12 +15,13 @@ import {
   toggleClubCompetitionAction,
   toggleClubPlayerAction,
   updateClubAction,
+  updateClubTeamAction,
   uploadClubLogoAction,
-  uploadClubPlayerPhotoAction,
+  uploadClubPlayerPhotoAction
 } from "@/app/admin/(panel)/clubs/[clubId]/actions";
 import {
   adminContextActionLinkClass,
-  adminContextPrimaryActionLinkClass,
+  adminContextPrimaryActionLinkClass
 } from "@/components/admin/admin-context-actions";
 import { MatchGuestFields } from "@/app/admin/(panel)/clubs/[clubId]/match-guest-fields";
 import { MatchPlayerPicker } from "@/app/admin/(panel)/clubs/[clubId]/match-player-picker";
@@ -37,6 +38,7 @@ import { Select } from "@/components/ui/select";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { requireAdminClub } from "@/lib/auth/clubs";
+import { formatMatchModality, MATCH_MODALITIES } from "@/lib/constants";
 import { getCurrentMatchDateInput } from "@/lib/match-datetime";
 import {
   CLUB_PLAYER_POSITIONS,
@@ -71,6 +73,14 @@ function formatDateTime(value: string) {
 
 function getTeamName(teamId: string, teams: ClubTeamRecord[]) {
   return teams.find((team) => team.id === teamId)?.name ?? "Equipo";
+}
+
+function ModalityBadge({ modality }: { modality: ClubTeamRecord["modality"] }) {
+  return (
+    <Badge className="bg-sky-500/15 text-sky-200">
+      {formatMatchModality(modality)}
+    </Badge>
+  );
 }
 
 function formatPlayerMeta(player: ClubPlayerRecord) {
@@ -516,6 +526,16 @@ function TeamsTab({
             <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre corto</label>
             <Input name="shortName" />
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Modalidad</label>
+            <Select defaultValue="11v11" name="modality" required>
+              {MATCH_MODALITIES.map((modality) => (
+                <option key={modality} value={modality}>
+                  {formatMatchModality(modality)}
+                </option>
+              ))}
+            </Select>
+          </div>
           <div className="md:col-span-2">
             <label className="mb-1 block text-sm font-semibold text-slate-200">Notas</label>
             <Textarea name="notes" rows={2} />
@@ -544,6 +564,7 @@ function TeamsTab({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <CardTitle className="truncate">{team.name}</CardTitle>
+                      <ModalityBadge modality={team.modality} />
                       <Badge className={team.active ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}>
                         {team.active ? "Activo" : "Inactivo"}
                       </Badge>
@@ -613,6 +634,7 @@ function TeamRosterTab({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <ModalityBadge modality={team.modality} />
             <Badge className={team.active ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}>
               {team.active ? "Activo" : "Inactivo"}
             </Badge>
@@ -624,6 +646,43 @@ function TeamRosterTab({
             </Link>
           </div>
         </div>
+        <form action={updateClubTeamAction.bind(null, clubId)} className="mt-5 grid gap-3 md:grid-cols-2">
+          <input name="teamId" type="hidden" value={team.id} />
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
+            <Input defaultValue={team.name} name="name" required />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre corto</label>
+            <Input defaultValue={team.short_name ?? ""} name="shortName" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Modalidad</label>
+            <Select defaultValue={team.modality} name="modality" required>
+              {MATCH_MODALITIES.map((modality) => (
+                <option key={modality} value={modality}>
+                  {formatMatchModality(modality)}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Estado</label>
+            <Select defaultValue={team.active ? "true" : "false"} name="active">
+              <option value="true">Activo</option>
+              <option value="false">Inactivo</option>
+            </Select>
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Notas</label>
+            <Textarea defaultValue={team.notes ?? ""} name="notes" rows={2} />
+          </div>
+          <div className="md:col-span-2">
+            <Button type="submit" variant="secondary">
+              Guardar equipo
+            </Button>
+          </div>
+        </form>
       </Card>
 
       <section className="grid gap-4 xl:grid-cols-2">
@@ -938,7 +997,9 @@ function MatchesTab({
                     <p className="font-semibold text-slate-100">
                       {getTeamName(match.club_team_id, teams)} vs {match.opponent_name}
                     </p>
-                    <p className="mt-1 text-sm text-slate-400">{formatDateTime(match.played_at)}{match.venue ? ` - ${match.venue}` : ""}</p>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {formatDateTime(match.played_at)} - {formatMatchModality(match.modality)}{match.venue ? ` - ${match.venue}` : ""}
+                    </p>
                     <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-emerald-300">
                       {match.club_competition_id ? competitionById.get(match.club_competition_id)?.name ?? "Torneo" : "Sin torneo"}
                     </p>

@@ -76,6 +76,18 @@ export const TEAM_SIZE_BY_MODALITY: Record<MatchModality, number> = {
   "11v11": 11
 };
 
+export const MATCH_MODALITY_LABELS: Record<MatchModality, string> = {
+  "5v5": "5 vs 5",
+  "6v6": "6 vs 6",
+  "7v7": "7 vs 7",
+  "9v9": "9 vs 9",
+  "11v11": "11 vs 11"
+};
+
+export function formatMatchModality(modality: MatchModality) {
+  return MATCH_MODALITY_LABELS[modality];
+}
+
 export const PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
   { href: "/groups", label: "Grupos" },

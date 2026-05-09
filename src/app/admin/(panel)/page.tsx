@@ -303,7 +303,7 @@ function AdminHomeHub({
               <div>
                 <CardTitle>Tus clubes</CardTitle>
                 <CardDescription className="mt-2">
-                  Para planteles, equipos del club, partidos 11 vs 11, torneos internos y estadisticas privadas.
+                  Para planteles, equipos del club, partidos segun modalidad, torneos internos y estadisticas privadas.
                 </CardDescription>
               </div>
               <Link

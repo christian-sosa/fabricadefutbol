@@ -13,6 +13,7 @@ import {
   type ClubPlayerRecord,
   type ClubPublicMatch,
   type ClubPublicRecords,
+  type ClubPublicSnapshotCore,
   type ClubPublicSnapshot,
   type ClubPublicStatRow,
   type ClubPublicSummary,
@@ -85,6 +86,8 @@ type ClubSnapshotRow = {
   top_assisters: ClubPublicStatRow[] | null;
   top_figures: ClubPublicStatRow[] | null;
   competition_stats: ClubPublicSnapshot["competitionStats"] | null;
+  available_modalities: ClubPublicSnapshot["availableModalities"] | null;
+  by_modality: ClubPublicSnapshot["byModality"] | null;
 };
 
 function emptySnapshot(clubName: string): ClubPublicSnapshot {
@@ -120,7 +123,9 @@ function emptySnapshot(clubName: string): ClubPublicSnapshot {
     topScorers: [],
     topAssisters: [],
     topFigures: [],
-    competitionStats: []
+    competitionStats: [],
+    availableModalities: [],
+    byModality: {}
   };
 }
 
@@ -132,11 +137,11 @@ function normalizePlayerStat(row: ClubPublicPlayerStat): ClubPublicPlayerStat {
   };
 }
 
-function normalizeSnapshot(row: ClubSnapshotRow | null, clubName: string): ClubPublicSnapshot {
-  const base = emptySnapshot(clubName);
-  if (!row) return base;
-
-  const records = row.records
+function normalizeSnapshotCore(
+  row: Partial<ClubPublicSnapshotCore> | null | undefined,
+  base: ClubPublicSnapshot
+): ClubPublicSnapshotCore {
+  const records = row?.records
     ? {
         ...base.records,
         ...row.records,
@@ -151,22 +156,70 @@ function normalizeSnapshot(row: ClubSnapshotRow | null, clubName: string): ClubP
   return {
     summary: {
       ...base.summary,
-      ...(row.summary ?? {})
+      ...(row?.summary ?? {})
     },
-    activity: row.activity ?? [],
-    teams: (row.teams ?? []).map((team) => ({
+    activity: row?.activity ?? [],
+    teams: (row?.teams ?? []).map((team) => ({
       ...team,
+      modality: team.modality ?? "11v11",
       logoPath: team.logoPath ?? null,
       players: team.players ?? [],
-      matches: team.matches ?? []
+      matches: (team.matches ?? []).map((match) => ({
+        ...match,
+        modality: match.modality ?? team.modality ?? "11v11"
+      }))
     })),
-    recentMatches: row.recent_matches ?? [],
-    playerStats: (row.player_stats ?? []).map(normalizePlayerStat),
+    recentMatches: (row?.recentMatches ?? []).map((match) => ({
+      ...match,
+      modality: match.modality ?? "11v11"
+    })),
+    playerStats: (row?.playerStats ?? []).map(normalizePlayerStat),
     records,
-    topScorers: row.top_scorers ?? [],
-    topAssisters: row.top_assisters ?? [],
-    topFigures: row.top_figures ?? [],
-    competitionStats: row.competition_stats ?? []
+    topScorers: row?.topScorers ?? [],
+    topAssisters: row?.topAssisters ?? [],
+    topFigures: row?.topFigures ?? [],
+    competitionStats: row?.competitionStats ?? []
+  };
+}
+
+function normalizeSnapshot(row: ClubSnapshotRow | null, clubName: string): ClubPublicSnapshot {
+  const base = emptySnapshot(clubName);
+  if (!row) return base;
+
+  const core = normalizeSnapshotCore(
+    {
+      summary: row.summary ?? undefined,
+      activity: row.activity ?? undefined,
+      teams: row.teams ?? undefined,
+      recentMatches: row.recent_matches ?? undefined,
+      playerStats: row.player_stats ?? undefined,
+      records: row.records ?? undefined,
+      topScorers: row.top_scorers ?? undefined,
+      topAssisters: row.top_assisters ?? undefined,
+      topFigures: row.top_figures ?? undefined,
+      competitionStats: row.competition_stats ?? undefined
+    },
+    base
+  );
+  const byModality = Object.fromEntries(
+    Object.entries(row.by_modality ?? {}).map(([modality, value]) => [
+      modality,
+      normalizeSnapshotCore(value, base)
+    ])
+  ) as ClubPublicSnapshot["byModality"];
+  const availableModalities = row.available_modalities?.length
+    ? row.available_modalities
+    : Array.from(
+        new Set([
+          ...core.teams.map((team) => team.modality),
+          ...core.recentMatches.map((match) => match.modality)
+        ])
+      );
+
+  return {
+    ...core,
+    availableModalities,
+    byModality
   };
 }
 
@@ -227,13 +280,13 @@ async function loadClubPrivateData(clubId: string) {
       .order("name", { ascending: true }),
     supabase
       .from("club_teams")
-      .select("id, club_id, name, short_name, logo_path, active, created_at")
+      .select("id, club_id, name, short_name, logo_path, modality, active, notes, created_at")
       .eq("club_id", clubId)
       .order("name", { ascending: true }),
     supabase.from("club_team_players").select("id, club_team_id, club_player_id"),
     supabase
       .from("club_matches")
-      .select("id, club_id, club_team_id, club_competition_id, played_at, opponent_name, venue, goals_for, goals_against, status, notes, created_at")
+      .select("id, club_id, club_team_id, club_competition_id, modality, played_at, opponent_name, venue, goals_for, goals_against, status, notes, created_at")
       .eq("club_id", clubId)
       .order("played_at", { ascending: false }),
     supabase.from("club_match_lineups").select("id, match_id, club_player_id, guest_name, display_name, role"),
@@ -289,6 +342,8 @@ export async function refreshClubPublicSnapshot(clubId: string) {
       top_assisters: snapshot.topAssisters,
       top_figures: snapshot.topFigures,
       competition_stats: snapshot.competitionStats,
+      available_modalities: snapshot.availableModalities,
+      by_modality: snapshot.byModality,
       refreshed_at: new Date().toISOString()
     },
     { onConflict: "club_id" }
@@ -311,7 +366,7 @@ export async function getAdminClubDetails(clubId: string): Promise<AdminClubDeta
   ] = await Promise.all([
     supabase
       .from("club_public_snapshots")
-      .select("summary, activity, teams, recent_matches, player_stats, records, top_scorers, top_assisters, top_figures, competition_stats")
+      .select("summary, activity, teams, recent_matches, player_stats, records, top_scorers, top_assisters, top_figures, competition_stats, available_modalities, by_modality")
       .eq("club_id", clubId)
       .maybeSingle(),
     supabase
@@ -380,7 +435,7 @@ export async function getPublicClubBySlug(slug: string) {
 
   const { data: snapshot, error: snapshotError } = await supabase
     .from("club_public_snapshots")
-    .select("summary, activity, teams, recent_matches, player_stats, records, top_scorers, top_assisters, top_figures, competition_stats")
+    .select("summary, activity, teams, recent_matches, player_stats, records, top_scorers, top_assisters, top_figures, competition_stats, available_modalities, by_modality")
     .eq("club_id", club.id)
     .maybeSingle();
 

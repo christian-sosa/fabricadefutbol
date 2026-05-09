@@ -73,10 +73,19 @@ describeSupabaseSql("clubes sql", () => {
     expect(policiesSql).toContain("scope_name = 'club-teams'");
   });
 
+  it("guarda modalidad en equipos y partidos de club con backfill 11v11", () => {
+    expect(schemaSql).toMatch(/create table if not exists public\.club_teams[\s\S]*modality public\.match_modality not null default '11v11'/);
+    expect(schemaSql).toMatch(/create table if not exists public\.club_matches[\s\S]*modality public\.match_modality not null default '11v11'/);
+    expect(schemaSql).toContain("add column modality public.match_modality not null default '11v11'");
+    expect(schemaSql).toContain("idx_club_matches_club_modality_played_at");
+  });
+
   it("mantiene los agregados publicos dentro del snapshot", () => {
     expect(schemaSql).toContain("activity jsonb not null default '[]'::jsonb");
     expect(schemaSql).toContain("player_stats jsonb not null default '[]'::jsonb");
     expect(schemaSql).toContain("records jsonb not null default '{}'::jsonb");
+    expect(schemaSql).toContain("available_modalities jsonb not null default '[]'::jsonb");
+    expect(schemaSql).toContain("by_modality jsonb not null default '{}'::jsonb");
     expect(schemaSql).toContain("'totalMatches', 0");
     expect(schemaSql).not.toContain("create table if not exists public.club_events");
     expect(schemaSql).not.toContain("create view public.club_stats_summary");

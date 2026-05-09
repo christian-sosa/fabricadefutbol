@@ -381,12 +381,14 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
     case "club_teams":
       if (!("short_name" in normalized)) normalized.short_name = null;
       if (!("logo_path" in normalized)) normalized.logo_path = null;
+      if (!("modality" in normalized)) normalized.modality = "11v11";
       if (!("notes" in normalized)) normalized.notes = null;
       if (!("active" in normalized)) normalized.active = true;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "club_matches":
       if (!("club_competition_id" in normalized)) normalized.club_competition_id = null;
+      if (!("modality" in normalized)) normalized.modality = "11v11";
       if (!("venue" in normalized)) normalized.venue = null;
       if (!("notes" in normalized)) normalized.notes = null;
       if (!normalized.status) normalized.status = "played";
@@ -416,6 +418,8 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!("top_assisters" in normalized)) normalized.top_assisters = [];
       if (!("top_figures" in normalized)) normalized.top_figures = [];
       if (!("competition_stats" in normalized)) normalized.competition_stats = [];
+      if (!("available_modalities" in normalized)) normalized.available_modalities = [];
+      if (!("by_modality" in normalized)) normalized.by_modality = {};
       if (!normalized.refreshed_at) normalized.refreshed_at = now;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;

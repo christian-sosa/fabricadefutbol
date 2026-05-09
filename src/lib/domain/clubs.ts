@@ -1,6 +1,10 @@
+import { MATCH_MODALITIES, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
+import type { MatchModality } from "@/types/domain";
+
 export type ClubStatus = "draft" | "active" | "archived";
 export type ClubMatchStatus = "draft" | "played" | "cancelled";
 export type ClubLineupRole = "starter" | "substitute" | "present";
+export type ClubSnapshotModalityFilter = MatchModality | "all";
 export const CLUB_PLAYER_POSITIONS = ["arquero", "defensor", "volante", "delantero"] as const;
 export type ClubPlayerPosition = (typeof CLUB_PLAYER_POSITIONS)[number];
 
@@ -51,7 +55,9 @@ export type ClubTeamRecord = {
   name: string;
   short_name: string | null;
   logo_path: string | null;
+  modality: MatchModality;
   active: boolean;
+  notes?: string | null;
   created_at?: string;
 };
 
@@ -66,6 +72,7 @@ export type ClubMatchRecord = {
   club_id: string;
   club_team_id: string;
   club_competition_id: string | null;
+  modality: MatchModality;
   played_at: string;
   opponent_name: string;
   venue: string | null;
@@ -116,6 +123,7 @@ export type ClubPublicTeam = {
   name: string;
   shortName: string | null;
   logoPath: string | null;
+  modality: MatchModality;
   players: ClubPublicTeamPlayer[];
   matches: ClubPublicTeamMatch[];
   playerCount: number;
@@ -138,6 +146,7 @@ export type ClubPublicTeamPlayer = {
 export type ClubPublicTeamMatch = {
   id: string;
   playedAt: string;
+  modality: MatchModality;
   competitionName: string;
   opponentName: string;
   venue: string | null;
@@ -148,6 +157,7 @@ export type ClubPublicTeamMatch = {
 export type ClubPublicMatch = {
   id: string;
   playedAt: string;
+  modality: MatchModality;
   teamId: string;
   teamName: string;
   competitionId: string | null;
@@ -207,7 +217,7 @@ export type ClubPublicRecords = {
   bestWinStreak: null;
 };
 
-export type ClubPublicSnapshot = {
+export type ClubPublicSnapshotCore = {
   summary: ClubPublicSummary;
   activity: ClubPublicActivity[];
   teams: ClubPublicTeam[];
@@ -220,6 +230,11 @@ export type ClubPublicSnapshot = {
   competitionStats: ClubPublicCompetitionStat[];
 };
 
+export type ClubPublicSnapshot = ClubPublicSnapshotCore & {
+  availableModalities: MatchModality[];
+  byModality: Partial<Record<MatchModality, ClubPublicSnapshotCore>>;
+};
+
 export type ClubMatchSheetParticipantInput = {
   playerId?: string | null;
   guestName?: string | null;
@@ -230,6 +245,7 @@ export type ClubMatchSheetParticipantInput = {
 };
 
 export type ClubMatchSheetInput = {
+  modality: MatchModality;
   goalsFor: number;
   goalsAgainst: number;
   participants: ClubMatchSheetParticipantInput[];
@@ -375,9 +391,14 @@ function addStatValue(params: {
   });
 }
 
+function compareModality(left: MatchModality, right: MatchModality) {
+  return MATCH_MODALITIES.indexOf(left) - MATCH_MODALITIES.indexOf(right);
+}
+
 export function validateClubMatchSheet(input: ClubMatchSheetInput) {
   const errors: string[] = [];
   const starters = input.participants.filter((participant) => participant.role === "starter");
+  const expectedStarters = TEAM_SIZE_BY_MODALITY[input.modality];
   const duplicatePlayerIds = new Set<string>();
   const seenPlayerIds = new Set<string>();
   let goalsTotal = 0;
@@ -392,8 +413,8 @@ export function validateClubMatchSheet(input: ClubMatchSheetInput) {
     errors.push("Los goles en contra deben ser un numero entero mayor o igual a 0.");
   }
 
-  if (starters.length !== 11) {
-    errors.push("El partido debe tener exactamente 11 titulares.");
+  if (starters.length !== expectedStarters) {
+    errors.push(`El partido ${input.modality} debe tener exactamente ${expectedStarters} titulares.`);
   }
 
   for (const participant of input.participants) {
@@ -453,7 +474,7 @@ export function validateClubMatchSheet(input: ClubMatchSheetInput) {
   return errors;
 }
 
-export function buildClubPublicSnapshot(params: {
+type ClubPublicSnapshotInput = {
   club: ClubRecord;
   players: ClubPlayerRecord[];
   competitions: ClubCompetitionRecord[];
@@ -462,14 +483,19 @@ export function buildClubPublicSnapshot(params: {
   matches: ClubMatchRecord[];
   lineups: ClubLineupRecord[];
   stats: ClubMatchPlayerStatRecord[];
-}): ClubPublicSnapshot {
-  const activeTeams = params.teams.filter((team) => team.active);
-  const activePlayers = params.players.filter((player) => player.active);
+};
+
+function buildClubPublicSnapshotCore(
+  params: ClubPublicSnapshotInput,
+  modalityFilter?: MatchModality
+): ClubPublicSnapshotCore {
+  const activeTeams = params.teams.filter((team) => team.active && (!modalityFilter || team.modality === modalityFilter));
+  const activeTeamIds = new Set(activeTeams.map((team) => team.id));
   const competitionsById = new Map(params.competitions.map((competition) => [competition.id, competition]));
   const teamsById = new Map(params.teams.map((team) => [team.id, team]));
   const playersById = new Map(params.players.map((player) => [player.id, player]));
   const playedMatches = params.matches
-    .filter((match) => match.status === "played")
+    .filter((match) => match.status === "played" && (!modalityFilter || match.modality === modalityFilter))
     .sort((left, right) => new Date(right.played_at).getTime() - new Date(left.played_at).getTime());
   const playedMatchIds = new Set(playedMatches.map((match) => match.id));
   const playedMatchDatesAscending = playedMatches.map((match) => match.played_at).sort(compareDateAsc);
@@ -511,9 +537,12 @@ export function buildClubPublicSnapshot(params: {
   const playerCountByTeam = new Map<string, number>();
   const rosterTeamNamesByPlayerId = new Map<string, Set<string>>();
   const playersByTeam = new Map<string, ClubPublicTeamPlayer[]>();
+  const visibleActivePlayerIds = new Set<string>();
   for (const teamPlayer of params.teamPlayers) {
+    if (!activeTeamIds.has(teamPlayer.club_team_id)) continue;
     const player = playersById.get(teamPlayer.club_player_id);
     if (player?.active) {
+      visibleActivePlayerIds.add(player.id);
       playerCountByTeam.set(
         teamPlayer.club_team_id,
         (playerCountByTeam.get(teamPlayer.club_team_id) ?? 0) + 1
@@ -534,6 +563,9 @@ export function buildClubPublicSnapshot(params: {
       rosterTeamNamesByPlayerId.set(teamPlayer.club_player_id, teamNames);
     }
   }
+  const visibleActivePlayers = params.players.filter((player) =>
+    player.active && (!modalityFilter || visibleActivePlayerIds.has(player.id))
+  );
 
   const lineupById = new Map(params.lineups.map((lineup) => [lineup.id, lineup]));
   const matchById = new Map(params.matches.map((match) => [match.id, match]));
@@ -714,7 +746,7 @@ export function buildClubPublicSnapshot(params: {
   const summary: ClubPublicSummary = {
     clubName: params.club.name,
     teamCount: activeTeams.length,
-    playerCount: activePlayers.length,
+    playerCount: visibleActivePlayers.length,
     playedMatches: playedMatches.length,
     goalsFor: playedMatches.reduce((total, match) => total + Number(match.goals_for), 0),
     goalsAgainst: playedMatches.reduce((total, match) => total + Number(match.goals_against), 0),
@@ -724,7 +756,7 @@ export function buildClubPublicSnapshot(params: {
       playedMatches.length > 0
         ? Number((playedMatches.reduce((total, match) => total + Number(match.goals_for), 0) / playedMatches.length).toFixed(2))
         : 0,
-    totalPlayersDistinct: activePlayers.length,
+    totalPlayersDistinct: visibleActivePlayers.length,
     totalAttendances: playerStats.reduce((total, player) => total + player.attendances, 0),
     presentNotPlayedCount: playerStats.reduce((total, player) => total + player.presentNotPlayed, 0),
     firstMatchDate: playedMatchDatesAscending[0] ?? null,
@@ -735,12 +767,12 @@ export function buildClubPublicSnapshot(params: {
     ...playedMatches.map((match) => ({
       type: "match_played" as const,
       title: `${teamsById.get(match.club_team_id)?.name ?? "Equipo"} vs ${match.opponent_name}`,
-      description: `${match.goals_for} - ${match.goals_against}`,
+      description: `${match.goals_for} - ${match.goals_against} - ${match.modality}`,
       createdAt: match.played_at,
       entityId: match.id
     })),
     ...params.players
-      .filter((player) => Boolean(player.created_at))
+      .filter((player) => Boolean(player.created_at) && (!modalityFilter || visibleActivePlayerIds.has(player.id)))
       .map((player) => ({
         type: "player_added_to_club" as const,
         title: player.full_name,
@@ -749,7 +781,7 @@ export function buildClubPublicSnapshot(params: {
         entityId: player.id
       })),
     ...params.teams
-      .filter((team) => Boolean(team.created_at))
+      .filter((team) => Boolean(team.created_at) && (!modalityFilter || team.modality === modalityFilter))
       .map((team) => ({
         type: "team_created" as const,
         title: team.name,
@@ -790,12 +822,14 @@ export function buildClubPublicSnapshot(params: {
           name: team.name,
           shortName: team.short_name,
           logoPath: params.club.logo_path,
+          modality: team.modality,
           players: (playersByTeam.get(team.id) ?? []).sort((left, right) => left.name.localeCompare(right.name, "es")),
           matches: playedMatches
             .filter((match) => match.club_team_id === team.id)
             .map((match) => ({
               id: match.id,
               playedAt: match.played_at,
+              modality: match.modality,
               competitionName: match.club_competition_id
                 ? competitionsById.get(match.club_competition_id)?.name ?? "Torneo"
                 : "Sin torneo",
@@ -812,6 +846,7 @@ export function buildClubPublicSnapshot(params: {
     recentMatches: playedMatches.slice(0, 10).map((match) => ({
       id: match.id,
       playedAt: match.played_at,
+      modality: match.modality,
       teamId: match.club_team_id,
       teamName: teamsById.get(match.club_team_id)?.name ?? "Equipo",
       competitionId: match.club_competition_id,
@@ -843,5 +878,78 @@ export function buildClubPublicSnapshot(params: {
         if (right.matchesPlayed !== left.matchesPlayed) return right.matchesPlayed - left.matchesPlayed;
         return left.name.localeCompare(right.name, "es");
       })
+  };
+}
+
+export function buildClubPublicSnapshot(params: ClubPublicSnapshotInput): ClubPublicSnapshot {
+  const core = buildClubPublicSnapshotCore(params);
+  const availableModalities = Array.from(
+    new Set([
+      ...params.teams.filter((team) => team.active).map((team) => team.modality),
+      ...params.matches.filter((match) => match.status === "played").map((match) => match.modality)
+    ])
+  ).sort(compareModality);
+  const byModality = Object.fromEntries(
+    availableModalities.map((modality) => [modality, buildClubPublicSnapshotCore(params, modality)])
+  ) as Partial<Record<MatchModality, ClubPublicSnapshotCore>>;
+
+  return {
+    ...core,
+    availableModalities,
+    byModality
+  };
+}
+
+export function filterClubPublicSnapshotByModality(
+  snapshot: ClubPublicSnapshot,
+  modality: ClubSnapshotModalityFilter
+): ClubPublicSnapshot {
+  if (modality === "all") return snapshot;
+  const core = snapshot.byModality?.[modality];
+  if (!core && snapshot.availableModalities.length === 1 && snapshot.availableModalities[0] === modality) {
+    return snapshot;
+  }
+  if (!core) {
+    return {
+      ...snapshot,
+      summary: {
+        ...snapshot.summary,
+        teamCount: 0,
+        playerCount: 0,
+        playedMatches: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        totalMatches: 0,
+        totalGoals: 0,
+        avgGoalsPerMatch: 0,
+        totalPlayersDistinct: 0,
+        totalAttendances: 0,
+        presentNotPlayedCount: 0,
+        firstMatchDate: null,
+        lastMatchDate: null
+      },
+      activity: [],
+      teams: [],
+      recentMatches: [],
+      playerStats: [],
+      records: {
+        topScorerAllTime: null,
+        topAssistsAllTime: null,
+        mostMvps: null,
+        mostAttendances: null,
+        mostMatchesPlayed: null,
+        bestWinStreak: null
+      },
+      topScorers: [],
+      topAssisters: [],
+      topFigures: [],
+      competitionStats: []
+    };
+  }
+
+  return {
+    ...core,
+    availableModalities: snapshot.availableModalities ?? [],
+    byModality: snapshot.byModality ?? {}
   };
 }

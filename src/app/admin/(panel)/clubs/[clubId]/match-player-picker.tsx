@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
+import { formatMatchModality, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import type { ClubPlayerRecord, ClubTeamPlayerRecord, ClubTeamRecord } from "@/lib/domain/clubs";
 
 type MatchPlayerPickerProps = {
@@ -76,6 +77,7 @@ export function MatchPlayerPicker({ players, teams, teamPlayers }: MatchPlayerPi
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [showPool, setShowPool] = useState(false);
   const activePlayers = useMemo(() => players.filter((player) => player.active), [players]);
+  const selectedTeam = teams.find((team) => team.id === selectedTeamId) ?? null;
   const rosterIds = useMemo(
     () =>
       new Set(
@@ -112,6 +114,18 @@ export function MatchPlayerPicker({ players, teams, teamPlayers }: MatchPlayerPi
 
       {selectedTeamId ? (
         <>
+          {selectedTeam ? (
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+              <input name="modality" type="hidden" value={selectedTeam.modality} />
+              <p className="font-semibold">
+                Modalidad: {formatMatchModality(selectedTeam.modality)}
+              </p>
+              <p className="mt-1 text-emerald-100/80">
+                La planilla debe tener exactamente {TEAM_SIZE_BY_MODALITY[selectedTeam.modality]} titulares.
+              </p>
+            </div>
+          ) : null}
+
           <PlayerRows players={teamRosterPlayers} title="Plantel del equipo elegido" />
 
           <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
