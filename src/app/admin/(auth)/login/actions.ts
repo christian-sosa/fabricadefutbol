@@ -33,6 +33,58 @@ export type RegisterState = {
   success: string | null;
 };
 
+function getAppBaseUrl() {
+  const appUrl = process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
+  return appUrl ? appUrl.replace(/\/+$/, "") : null;
+}
+
+function buildOAuthCallbackUrl(nextPath: string) {
+  const appUrl = getAppBaseUrl();
+  if (!appUrl) return null;
+  const callbackUrl = new URL("/auth/callback", appUrl);
+  callbackUrl.searchParams.set("next", nextPath);
+  return callbackUrl.toString();
+}
+
+function buildLoginErrorPath(nextPath: string, error: string) {
+  const searchParams = new URLSearchParams({ error });
+  if (nextPath !== "/admin") searchParams.set("next", nextPath);
+  return `/admin/login?${searchParams.toString()}`;
+}
+
+export async function loginWithGoogleAction(formData: FormData) {
+  const nextPath = resolveSafeNextPath(
+    typeof formData.get("next") === "string" ? String(formData.get("next")) : null,
+    "/admin"
+  );
+  const redirectTo = buildOAuthCallbackUrl(nextPath);
+
+  if (!redirectTo) {
+    redirect(buildLoginErrorPath(nextPath, "Falta configurar la URL publica de la app para ingresar con Google."));
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo
+    }
+  });
+
+  if (error || !data.url) {
+    if (error && typeof console !== "undefined") {
+      console.error("[auth] signInWithOAuth Google fallo", {
+        code: "code" in error ? error.code : undefined,
+        message: error.message,
+        status: "status" in error ? error.status : undefined
+      });
+    }
+    redirect(buildLoginErrorPath(nextPath, toUserMessage(error, "No se pudo iniciar sesion con Google.")));
+  }
+
+  redirect(data.url);
+}
+
 export async function loginAdminAction(_: LoginState, formData: FormData): Promise<LoginState> {
   const nextPath = resolveSafeNextPath(
     typeof formData.get("next") === "string" ? String(formData.get("next")) : null,
