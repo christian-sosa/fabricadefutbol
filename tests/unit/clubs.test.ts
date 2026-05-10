@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildClubFinancialSummary,
   buildClubPublicSnapshot,
   buildClubTeamRosterOptions,
   filterClubPublicSnapshotByModality,
   filterClubPlayersForRosterManagement,
+  getClubPaymentStatus,
+  splitClubMatchCost,
   validateClubMatchSheet
 } from "@/lib/domain/clubs";
 
@@ -165,6 +168,130 @@ describe("club match sheet validation", () => {
     });
 
     expect(errors).toContain("Un jugador que fue pero no entro no puede tener goles, asistencias ni figura.");
+  });
+});
+
+describe("club finances", () => {
+  it("divide el costo de cancha entre participantes sin perder centavos", () => {
+    const shares = splitClubMatchCost(10001, ["lineup-1", "lineup-2", "lineup-3"]);
+
+    expect(shares).toEqual([
+      { lineupId: "lineup-1", expectedCents: 3334 },
+      { lineupId: "lineup-2", expectedCents: 3334 },
+      { lineupId: "lineup-3", expectedCents: 3333 }
+    ]);
+    expect(shares.reduce((total, share) => total + share.expectedCents, 0)).toBe(10001);
+  });
+
+  it("deriva estado de pago desde monto esperado y monto pagado", () => {
+    expect(getClubPaymentStatus({ expected_cents: 2500, paid_cents: 2500 })).toBe("paid");
+    expect(getClubPaymentStatus({ expected_cents: 2500, paid_cents: 0 })).toBe("unpaid");
+    expect(getClubPaymentStatus({ expected_cents: 2500, paid_cents: 1200 })).toBe("partial");
+    expect(getClubPaymentStatus({ expected_cents: 0, paid_cents: 0 })).toBe("paid");
+  });
+
+  it("agrega deuda por partido y por jugador del club", () => {
+    const summary = buildClubFinancialSummary({
+      matches: [
+        {
+          id: "match-1",
+          club_id: "club-1",
+          club_team_id: "team-1",
+          club_competition_id: "competition-1",
+          modality: "5v5",
+          played_at: "2026-05-01T20:00:00Z",
+          opponent_name: "Rival F5",
+          venue: "Cancha 1",
+          goals_for: 3,
+          goals_against: 2,
+          status: "played",
+          notes: null,
+          field_cost_cents: 10000,
+          field_cost_currency: "ARS"
+        }
+      ],
+      lineups: [
+        {
+          id: "lineup-1",
+          match_id: "match-1",
+          club_player_id: "player-1",
+          guest_name: null,
+          display_name: "Sosa",
+          role: "starter"
+        },
+        {
+          id: "lineup-2",
+          match_id: "match-1",
+          club_player_id: "player-2",
+          guest_name: null,
+          display_name: "Nacho",
+          role: "starter"
+        }
+      ],
+      payments: [
+        {
+          id: "payment-1",
+          match_id: "match-1",
+          lineup_id: "lineup-1",
+          expected_cents: 5000,
+          paid_cents: 5000,
+          paid_at: "2026-05-01T21:00:00Z",
+          notes: null
+        },
+        {
+          id: "payment-2",
+          match_id: "match-1",
+          lineup_id: "lineup-2",
+          expected_cents: 5000,
+          paid_cents: 1500,
+          paid_at: "2026-05-01T21:00:00Z",
+          notes: "Pago parcial"
+        }
+      ]
+    });
+
+    expect(summary.totals).toEqual({
+      matchCount: 1,
+      totalCostCents: 10000,
+      expectedCents: 10000,
+      paidCents: 6500,
+      pendingCents: 3500
+    });
+    expect(summary.matches).toEqual([
+      {
+        matchId: "match-1",
+        opponentName: "Rival F5",
+        playedAt: "2026-05-01T20:00:00Z",
+        participantCount: 2,
+        costCents: 10000,
+        expectedCents: 10000,
+        paidCents: 6500,
+        pendingCents: 3500,
+        status: "partial"
+      }
+    ]);
+    expect(summary.players).toEqual([
+      {
+        key: "player:player-2",
+        playerId: "player-2",
+        displayName: "Nacho",
+        matchCount: 1,
+        expectedCents: 5000,
+        paidCents: 1500,
+        pendingCents: 3500,
+        status: "partial"
+      },
+      {
+        key: "player:player-1",
+        playerId: "player-1",
+        displayName: "Sosa",
+        matchCount: 1,
+        expectedCents: 5000,
+        paidCents: 5000,
+        pendingCents: 0,
+        status: "paid"
+      }
+    ]);
   });
 });
 

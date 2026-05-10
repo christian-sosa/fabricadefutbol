@@ -15,4 +15,14 @@ describe("MatchGuestFields", () => {
 
     expect(screen.getByPlaceholderText("Nombre")).toBeInTheDocument();
   });
+
+  it("permite cargar pago de cancha para invitados", async () => {
+    const user = userEvent.setup();
+    render(<MatchGuestFields />);
+
+    await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
+
+    expect(screen.getByLabelText("Pago cancha invitado 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Monto pagado invitado 1")).toBeInTheDocument();
+  });
 });

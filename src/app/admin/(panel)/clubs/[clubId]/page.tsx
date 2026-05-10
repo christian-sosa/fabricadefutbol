@@ -15,6 +15,7 @@ import {
   toggleClubCompetitionAction,
   toggleClubPlayerAction,
   updateClubAction,
+  updateClubMatchFinanceAction,
   updateClubTeamAction,
   uploadClubLogoAction,
   uploadClubPlayerPhotoAction
@@ -45,8 +46,12 @@ import {
   buildClubTeamRosterOptions,
   filterClubPlayersForRosterManagement,
   formatClubPlayerPosition,
+  getClubPaymentStatus,
   normalizeClubPlayerPosition,
   type ClubCompetitionRecord,
+  type ClubFinancialSummary,
+  type ClubLineupRecord,
+  type ClubMatchPaymentRecord,
   type ClubMatchRecord,
   type ClubPlayerPosition,
   type ClubPlayerRecord,
@@ -71,8 +76,38 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
+function formatCurrencyCents(cents: number, currency = "ARS") {
+  return new Intl.NumberFormat("es-AR", {
+    currency,
+    maximumFractionDigits: cents % 100 === 0 ? 0 : 2,
+    style: "currency"
+  }).format(cents / 100);
+}
+
 function getTeamName(teamId: string, teams: ClubTeamRecord[]) {
   return teams.find((team) => team.id === teamId)?.name ?? "Equipo";
+}
+
+function getPaymentStatusLabel(status: ReturnType<typeof getClubPaymentStatus>) {
+  switch (status) {
+    case "paid":
+      return "Pagado";
+    case "partial":
+      return "Parcial";
+    case "unpaid":
+      return "Debe";
+  }
+}
+
+function getPaymentStatusClass(status: ReturnType<typeof getClubPaymentStatus>) {
+  switch (status) {
+    case "paid":
+      return "bg-emerald-500/15 text-emerald-200";
+    case "partial":
+      return "bg-amber-500/15 text-amber-200";
+    case "unpaid":
+      return "bg-rose-500/15 text-rose-200";
+  }
 }
 
 function ModalityBadge({ modality }: { modality: ClubTeamRecord["modality"] }) {
@@ -892,17 +927,115 @@ function CompetitionsTab({
   );
 }
 
+function formatCentsInputValue(cents: number) {
+  if (cents <= 0) return "";
+  const amount = cents / 100;
+  return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
+}
+
+function MatchFinanceEditor({
+  clubId,
+  lineups,
+  match,
+  payments,
+  returnTab
+}: {
+  clubId: string;
+  lineups: ClubLineupRecord[];
+  match: ClubMatchRecord;
+  payments: ClubMatchPaymentRecord[];
+  returnTab: "matches" | "finances";
+}) {
+  const lineupsById = new Map(lineups.map((lineup) => [lineup.id, lineup]));
+  const rows = payments
+    .filter((payment) => payment.match_id === match.id)
+    .map((payment) => ({
+      lineup: lineupsById.get(payment.lineup_id),
+      payment
+    }))
+    .filter((row): row is { lineup: ClubLineupRecord; payment: ClubMatchPaymentRecord } => Boolean(row.lineup))
+    .sort((left, right) => left.lineup.display_name.localeCompare(right.lineup.display_name, "es"));
+
+  if (!rows.length) {
+    return (
+      <p className="mt-3 rounded-lg border border-dashed border-slate-800 bg-slate-950/50 px-3 py-2 text-sm text-slate-400">
+        Este partido todavia no tiene pagos de cancha cargados.
+      </p>
+    );
+  }
+
+  return (
+    <details className="mt-3 rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+      <summary className="cursor-pointer text-sm font-semibold text-slate-200">
+        Editar pagos de cancha
+      </summary>
+      <form action={updateClubMatchFinanceAction.bind(null, clubId)} className="mt-3 space-y-3">
+        <input name="matchId" type="hidden" value={match.id} />
+        <input name="returnTab" type="hidden" value={returnTab} />
+        <div className="grid gap-2">
+          {rows.map(({ lineup, payment }) => {
+            const status = getClubPaymentStatus(payment);
+            return (
+              <div
+                className="grid gap-2 rounded-lg border border-slate-800 bg-slate-900/50 p-3 md:grid-cols-[1fr_130px_150px_130px_1fr]"
+                key={payment.id}
+              >
+                <div>
+                  <p className="font-semibold text-slate-100">{lineup.display_name}</p>
+                  <p className="text-xs text-slate-500">
+                    Corresponde {formatCurrencyCents(payment.expected_cents)}
+                  </p>
+                </div>
+                <Badge className={getPaymentStatusClass(status)}>
+                  {getPaymentStatusLabel(status)}
+                </Badge>
+                <Select defaultValue={status} name={`paymentStatus:${payment.id}`}>
+                  <option value="unpaid">No pago</option>
+                  <option value="paid">Pago completo</option>
+                  <option value="partial">Pago parcial</option>
+                </Select>
+                <Input
+                  min={0}
+                  name={`paidAmount:${payment.id}`}
+                  placeholder="$"
+                  step="0.01"
+                  type="number"
+                  defaultValue={formatCentsInputValue(payment.paid_cents)}
+                />
+                <Input
+                  defaultValue={payment.notes ?? ""}
+                  name={`paymentNotes:${payment.id}`}
+                  placeholder="Nota"
+                />
+              </div>
+            );
+          })}
+        </div>
+        <Button type="submit" variant="secondary">
+          Guardar pagos
+        </Button>
+      </form>
+    </details>
+  );
+}
+
 function MatchesTab({
   clubId,
   competitions,
+  financialSummary,
+  lineups,
   matches,
+  payments,
   players,
   teamPlayers,
   teams
 }: {
   clubId: string;
   competitions: ClubCompetitionRecord[];
+  financialSummary: ClubFinancialSummary;
+  lineups: ClubLineupRecord[];
   matches: ClubMatchRecord[];
+  payments: ClubMatchPaymentRecord[];
   players: ClubPlayerRecord[];
   teamPlayers: ClubTeamPlayerRecord[];
   teams: ClubTeamRecord[];
@@ -910,6 +1043,7 @@ function MatchesTab({
   const activeTeams = teams.filter((team) => team.active);
   const activeCompetitions = competitions.filter((competition) => competition.active);
   const competitionById = new Map(competitions.map((competition) => [competition.id, competition]));
+  const financeByMatchId = new Map(financialSummary.matches.map((row) => [row.matchId, row]));
   const defaultPlayedDate = getCurrentMatchDateInput();
 
   return (
@@ -950,8 +1084,12 @@ function MatchesTab({
               <Input name="opponentName" required />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200">Cancha</label>
+              <label className="mb-1 block text-sm font-semibold text-slate-200">Lugar / cancha</label>
               <Input name="venue" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200">Costo cancha</label>
+              <Input min={0} name="fieldCostAmount" placeholder="0" step="0.01" type="number" />
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold text-slate-200">Goles a favor</label>
@@ -990,31 +1128,192 @@ function MatchesTab({
         </summary>
         <div className="mt-4 space-y-3">
           {matches.length ? (
-            matches.map((match) => (
-              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4" key={match.id}>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-100">
-                      {getTeamName(match.club_team_id, teams)} vs {match.opponent_name}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-400">
-                      {formatDateTime(match.played_at)} - {formatMatchModality(match.modality)}{match.venue ? ` - ${match.venue}` : ""}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-emerald-300">
-                      {match.club_competition_id ? competitionById.get(match.club_competition_id)?.name ?? "Torneo" : "Sin torneo"}
+            matches.map((match) => {
+              const finance = financeByMatchId.get(match.id);
+
+              return (
+                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4" key={match.id}>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-semibold text-slate-100">
+                        {getTeamName(match.club_team_id, teams)} vs {match.opponent_name}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        {formatDateTime(match.played_at)} - {formatMatchModality(match.modality)}{match.venue ? ` - ${match.venue}` : ""}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-emerald-300">
+                        {match.club_competition_id ? competitionById.get(match.club_competition_id)?.name ?? "Torneo" : "Sin torneo"}
+                      </p>
+                    </div>
+                    <p className="text-2xl font-black text-white">
+                      {match.goals_for} - {match.goals_against}
                     </p>
                   </div>
-                  <p className="text-2xl font-black text-white">
-                    {match.goals_for} - {match.goals_against}
-                  </p>
+                  {finance ? (
+                    <div className="mt-3 grid gap-2 rounded-lg border border-slate-800 bg-slate-900/50 p-3 text-sm text-slate-300 md:grid-cols-4">
+                      <p>Cancha: <span className="font-semibold text-slate-100">{formatCurrencyCents(finance.costCents, match.field_cost_currency)}</span></p>
+                      <p>Cobrado: <span className="font-semibold text-emerald-200">{formatCurrencyCents(finance.paidCents, match.field_cost_currency)}</span></p>
+                      <p>Pendiente: <span className="font-semibold text-amber-200">{formatCurrencyCents(finance.pendingCents, match.field_cost_currency)}</span></p>
+                      <p>Jugadores: <span className="font-semibold text-slate-100">{finance.participantCount}</span></p>
+                    </div>
+                  ) : null}
+                  <MatchFinanceEditor
+                    clubId={clubId}
+                    lineups={lineups}
+                    match={match}
+                    payments={payments}
+                    returnTab="matches"
+                  />
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <p className="text-sm text-slate-400">Todavia no hay partidos cargados.</p>
           )}
         </div>
       </details>
+    </div>
+  );
+}
+
+function FinancesTab({
+  clubId,
+  details
+}: {
+  clubId: string;
+  details: NonNullable<Awaited<ReturnType<typeof getAdminClubDetails>>>;
+}) {
+  const summary = details.financialSummary;
+  const matchesById = new Map(details.matches.map((match) => [match.id, match]));
+
+  return (
+    <div className="space-y-4">
+      <section className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardDescription>Cancha total</CardDescription>
+          <CardTitle className="mt-1 text-3xl">{formatCurrencyCents(summary.totals.totalCostCents)}</CardTitle>
+        </Card>
+        <Card>
+          <CardDescription>Esperado</CardDescription>
+          <CardTitle className="mt-1 text-3xl">{formatCurrencyCents(summary.totals.expectedCents)}</CardTitle>
+        </Card>
+        <Card>
+          <CardDescription>Cobrado</CardDescription>
+          <CardTitle className="mt-1 text-3xl">{formatCurrencyCents(summary.totals.paidCents)}</CardTitle>
+        </Card>
+        <Card>
+          <CardDescription>Pendiente</CardDescription>
+          <CardTitle className="mt-1 text-3xl">{formatCurrencyCents(summary.totals.pendingCents)}</CardTitle>
+        </Card>
+      </section>
+
+      <Card>
+        <CardTitle>Deuda por jugador</CardTitle>
+        <div className="mt-4 overflow-x-auto">
+          <Table>
+            <THead>
+              <tr>
+                <TH>Jugador</TH>
+                <TH>Partidos</TH>
+                <TH>Esperado</TH>
+                <TH>Cobrado</TH>
+                <TH>Pendiente</TH>
+                <TH>Estado</TH>
+              </tr>
+            </THead>
+            <TBody>
+              {summary.players.map((player) => (
+                <tr key={player.key}>
+                  <TD className="font-semibold">{player.displayName}</TD>
+                  <TD>{player.matchCount}</TD>
+                  <TD>{formatCurrencyCents(player.expectedCents)}</TD>
+                  <TD>{formatCurrencyCents(player.paidCents)}</TD>
+                  <TD className="font-semibold text-amber-200">{formatCurrencyCents(player.pendingCents)}</TD>
+                  <TD>
+                    <Badge className={getPaymentStatusClass(player.status)}>
+                      {getPaymentStatusLabel(player.status)}
+                    </Badge>
+                  </TD>
+                </tr>
+              ))}
+              {!summary.players.length ? (
+                <tr>
+                  <TD className="text-slate-400" colSpan={6}>Todavia no hay pagos de cancha cargados.</TD>
+                </tr>
+              ) : null}
+            </TBody>
+          </Table>
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Partidos y cancha</CardTitle>
+        <div className="mt-4 overflow-x-auto">
+          <Table>
+            <THead>
+              <tr>
+                <TH>Partido</TH>
+                <TH>Fecha</TH>
+                <TH>Participantes</TH>
+                <TH>Costo</TH>
+                <TH>Cobrado</TH>
+                <TH>Pendiente</TH>
+                <TH>Estado</TH>
+              </tr>
+            </THead>
+            <TBody>
+              {summary.matches.map((match) => (
+                <tr key={match.matchId}>
+                  <TD className="font-semibold">{match.opponentName}</TD>
+                  <TD>{formatDateTime(match.playedAt)}</TD>
+                  <TD>{match.participantCount}</TD>
+                  <TD>{formatCurrencyCents(match.costCents)}</TD>
+                  <TD>{formatCurrencyCents(match.paidCents)}</TD>
+                  <TD className="font-semibold text-amber-200">{formatCurrencyCents(match.pendingCents)}</TD>
+                  <TD>
+                    <Badge className={getPaymentStatusClass(match.status)}>
+                      {getPaymentStatusLabel(match.status)}
+                    </Badge>
+                  </TD>
+                </tr>
+              ))}
+              {!summary.matches.length ? (
+                <tr>
+                  <TD className="text-slate-400" colSpan={7}>Todavia no hay costos de cancha cargados.</TD>
+                </tr>
+              ) : null}
+            </TBody>
+          </Table>
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Editar pagos</CardTitle>
+        <div className="mt-4 space-y-3">
+          {summary.matches.map((matchRow) => {
+            const match = matchesById.get(matchRow.matchId);
+            if (!match) return null;
+
+            return (
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4" key={match.id}>
+                <p className="font-semibold text-slate-100">
+                  {formatDateTime(match.played_at)} - {getTeamName(match.club_team_id, details.teams)} vs {match.opponent_name}
+                </p>
+                <MatchFinanceEditor
+                  clubId={clubId}
+                  lineups={details.lineups}
+                  match={match}
+                  payments={details.payments}
+                  returnTab="finances"
+                />
+              </div>
+            );
+          })}
+          {!summary.matches.length ? (
+            <p className="text-sm text-slate-400">Cuando cargues un partido con costo de cancha, vas a poder editar los pagos desde aca.</p>
+          ) : null}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -1132,6 +1431,7 @@ export default async function AdminClubDetailPage({
     { key: "teams", label: "Equipos" },
     { key: "competitions", label: "Torneos" },
     { key: "matches", label: "Partidos" },
+    { key: "finances", label: "Finanzas" },
     { key: "admins", label: "Admins" }
   ];
 
@@ -1205,12 +1505,16 @@ export default async function AdminClubDetailPage({
         <MatchesTab
           clubId={clubId}
           competitions={details.competitions}
+          financialSummary={details.financialSummary}
+          lineups={details.lineups}
           matches={details.matches}
+          payments={details.payments}
           players={details.players}
           teamPlayers={details.teamPlayers}
           teams={details.teams}
         />
       ) : null}
+      {selectedTab === "finances" ? <FinancesTab clubId={clubId} details={details} /> : null}
       {selectedTab === "admins" ? <AdminsTab clubId={clubId} details={details} /> : null}
     </div>
   );

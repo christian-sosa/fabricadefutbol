@@ -195,4 +195,96 @@ describe("club admin actions", () => {
       goals_against: 2
     });
   });
+
+  it("crea el control de pagos de cancha al cargar un partido", async () => {
+    const players = Array.from({ length: 5 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-00000000060${index}`,
+      club_id: clubId,
+      full_name: `Jugador Pago ${index + 1}`,
+      active: true
+    }));
+    const fake = createFakeSupabase({
+      club_teams: [
+        {
+          id: teamId,
+          club_id: clubId,
+          name: "La Quinta F5",
+          short_name: "LQ5",
+          modality: "5v5",
+          active: true
+        }
+      ],
+      club_competitions: [
+        {
+          id: competitionId,
+          club_id: clubId,
+          name: "LAFAB",
+          slug: "lafab",
+          active: true
+        }
+      ],
+      club_players: players
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+
+    const formData = new FormData();
+    formData.set("teamId", teamId);
+    formData.set("competitionId", competitionId);
+    formData.set("modality", "5v5");
+    formData.set("playedDate", "2026-05-01");
+    formData.set("playedTime", "20:00");
+    formData.set("opponentName", "Rival Pagos");
+    formData.set("venue", "Complejo Norte");
+    formData.set("goalsFor", "2");
+    formData.set("goalsAgainst", "1");
+    formData.set("fieldCostAmount", "100");
+    formData.set("notes", "");
+
+    const paymentStatuses = ["paid", "unpaid", "partial", "paid", "unpaid"];
+    for (const [index, player] of players.entries()) {
+      formData.set(`playerRole:${player.id}`, "starter");
+      formData.set(`playerGoals:${player.id}`, index === 0 ? "2" : "0");
+      formData.set(`playerAssists:${player.id}`, "0");
+      formData.set(`playerPaymentStatus:${player.id}`, paymentStatuses[index]);
+      if (paymentStatuses[index] === "partial") {
+        formData.set(`playerPaidAmount:${player.id}`, "12");
+      }
+    }
+
+    await expect(addClubMatchAction(clubId, formData)).rejects.toMatchObject({
+      digest: expect.stringContaining(`/admin/clubs/${clubId}?tab=matches`)
+    });
+
+    const match = fake.find("club_matches", (row) => row.opponent_name === "Rival Pagos");
+    expect(match).toMatchObject({
+      field_cost_cents: 10000,
+      field_cost_currency: "ARS"
+    });
+
+    const lineups = fake.table("club_match_lineups").filter((row) => row.match_id === match?.id);
+    const payments = fake.table("club_match_payments").filter((row) => row.match_id === match?.id);
+    expect(payments).toHaveLength(5);
+    expect(payments.reduce((total, row) => total + Number(row.expected_cents), 0)).toBe(10000);
+
+    const paymentByName = new Map(
+      lineups.map((lineup) => [
+        String(lineup.display_name),
+        payments.find((payment) => payment.lineup_id === lineup.id)
+      ])
+    );
+
+    expect(paymentByName.get("Jugador Pago 1")).toMatchObject({
+      expected_cents: 2000,
+      paid_cents: 2000
+    });
+    expect(paymentByName.get("Jugador Pago 2")).toMatchObject({
+      expected_cents: 2000,
+      paid_cents: 0,
+      paid_at: null
+    });
+    expect(paymentByName.get("Jugador Pago 3")).toMatchObject({
+      expected_cents: 2000,
+      paid_cents: 1200
+    });
+  });
 });

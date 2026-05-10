@@ -20,6 +20,7 @@ const privateClubTables = [
   "club_team_players",
   "club_matches",
   "club_match_lineups",
+  "club_match_payments",
   "club_match_player_stats"
 ] as const;
 
@@ -78,6 +79,19 @@ describeSupabaseSql("clubes sql", () => {
     expect(schemaSql).toMatch(/create table if not exists public\.club_matches[\s\S]*modality public\.match_modality not null default '11v11'/);
     expect(schemaSql).toContain("add column modality public.match_modality not null default '11v11'");
     expect(schemaSql).toContain("idx_club_matches_club_modality_played_at");
+  });
+
+  it("agrega finanzas privadas de cancha por partido y participante", () => {
+    expect(schemaSql).toMatch(/create table if not exists public\.club_matches[\s\S]*field_cost_cents integer not null default 0/);
+    expect(schemaSql).toMatch(/create table if not exists public\.club_match_payments[\s\S]*expected_cents integer not null default 0/);
+    expect(schemaSql).toMatch(/create table if not exists public\.club_match_payments[\s\S]*paid_cents integer not null default 0/);
+    expect(schemaSql).toContain("unique (match_id, lineup_id)");
+    expect(schemaSql).toContain("check (paid_cents <= expected_cents)");
+    expect(schemaSql).toContain("idx_club_match_payments_match_id");
+    expect(policiesSql).toContain("create policy club_match_payments_admin_read");
+    expect(policiesSql).toContain("create policy club_match_payments_admin_write");
+    expect(policiesSql).toContain("where m.id = club_match_payments.match_id");
+    expect(policiesSql).toContain("and public.is_club_admin(m.club_id)");
   });
 
   it("mantiene los agregados publicos dentro del snapshot", () => {

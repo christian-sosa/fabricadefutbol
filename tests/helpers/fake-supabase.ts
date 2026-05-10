@@ -36,6 +36,7 @@ type TableName =
   | "club_team_players"
   | "club_matches"
   | "club_match_lineups"
+  | "club_match_payments"
   | "club_match_player_stats"
   | "club_public_snapshots"
   | "players"
@@ -115,6 +116,7 @@ function createEmptyDatabase(): FakeDatabase {
     club_team_players: [],
     club_matches: [],
     club_match_lineups: [],
+    club_match_payments: [],
     club_match_player_stats: [],
     club_public_snapshots: [],
     players: [],
@@ -389,6 +391,8 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
     case "club_matches":
       if (!("club_competition_id" in normalized)) normalized.club_competition_id = null;
       if (!("modality" in normalized)) normalized.modality = "11v11";
+      if (!("field_cost_cents" in normalized)) normalized.field_cost_cents = 0;
+      if (!("field_cost_currency" in normalized)) normalized.field_cost_currency = "ARS";
       if (!("venue" in normalized)) normalized.venue = null;
       if (!("notes" in normalized)) normalized.notes = null;
       if (!normalized.status) normalized.status = "played";
@@ -400,6 +404,14 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!("club_player_id" in normalized)) normalized.club_player_id = null;
       if (!("guest_name" in normalized)) normalized.guest_name = null;
       if (!normalized.role) normalized.role = "starter";
+      break;
+    case "club_match_payments":
+      if (!("expected_cents" in normalized)) normalized.expected_cents = 0;
+      if (!("paid_cents" in normalized)) normalized.paid_cents = 0;
+      if (!("paid_at" in normalized)) normalized.paid_at = null;
+      if (!("notes" in normalized)) normalized.notes = null;
+      if (!("updated_by" in normalized)) normalized.updated_by = null;
+      if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "club_match_player_stats":
       if (!("goals" in normalized)) normalized.goals = 0;
@@ -808,6 +820,9 @@ class FakeSupabaseState {
       this.db.club_team_players = this.db.club_team_players.filter((row) => !deletedTeamIds.has(String(row.club_team_id)));
       this.db.club_matches = this.db.club_matches.filter((row) => !deletedClubIds.has(String(row.club_id)));
       this.db.club_match_lineups = this.db.club_match_lineups.filter((row) => !deletedMatchIds.has(String(row.match_id)));
+      this.db.club_match_payments = this.db.club_match_payments.filter(
+        (row) => !deletedMatchIds.has(String(row.match_id)) && !deletedLineupIds.has(String(row.lineup_id))
+      );
       this.db.club_match_player_stats = this.db.club_match_player_stats.filter(
         (row) => !deletedMatchIds.has(String(row.match_id)) && !deletedLineupIds.has(String(row.lineup_id))
       );
@@ -852,6 +867,9 @@ class FakeSupabaseState {
       );
       this.db.club_match_lineups = this.db.club_match_lineups.filter(
         (row) => !deletedMatchIds.has(String(row.match_id))
+      );
+      this.db.club_match_payments = this.db.club_match_payments.filter(
+        (row) => !deletedMatchIds.has(String(row.match_id)) && !deletedLineupIds.has(String(row.lineup_id))
       );
       this.db.club_match_player_stats = this.db.club_match_player_stats.filter(
         (row) => !deletedMatchIds.has(String(row.match_id)) && !deletedLineupIds.has(String(row.lineup_id))

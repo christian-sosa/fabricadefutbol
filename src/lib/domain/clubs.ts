@@ -4,6 +4,7 @@ import type { MatchModality } from "@/types/domain";
 export type ClubStatus = "draft" | "active" | "archived";
 export type ClubMatchStatus = "draft" | "played" | "cancelled";
 export type ClubLineupRole = "starter" | "substitute" | "present";
+export type ClubPaymentStatus = "paid" | "partial" | "unpaid";
 export type ClubSnapshotModalityFilter = MatchModality | "all";
 export const CLUB_PLAYER_POSITIONS = ["arquero", "defensor", "volante", "delantero"] as const;
 export type ClubPlayerPosition = (typeof CLUB_PLAYER_POSITIONS)[number];
@@ -80,6 +81,8 @@ export type ClubMatchRecord = {
   goals_against: number;
   status: ClubMatchStatus;
   notes: string | null;
+  field_cost_cents?: number;
+  field_cost_currency?: string;
   created_at?: string;
 };
 
@@ -99,6 +102,56 @@ export type ClubMatchPlayerStatRecord = {
   goals: number;
   assists: number;
   is_mvp: boolean;
+};
+
+export type ClubMatchPaymentRecord = {
+  id: string;
+  match_id: string;
+  lineup_id: string;
+  expected_cents: number;
+  paid_cents: number;
+  paid_at: string | null;
+  notes: string | null;
+  updated_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ClubFinancialTotals = {
+  matchCount: number;
+  totalCostCents: number;
+  expectedCents: number;
+  paidCents: number;
+  pendingCents: number;
+};
+
+export type ClubFinancialMatchRow = {
+  matchId: string;
+  opponentName: string;
+  playedAt: string;
+  participantCount: number;
+  costCents: number;
+  expectedCents: number;
+  paidCents: number;
+  pendingCents: number;
+  status: ClubPaymentStatus;
+};
+
+export type ClubFinancialPlayerRow = {
+  key: string;
+  playerId: string | null;
+  displayName: string;
+  matchCount: number;
+  expectedCents: number;
+  paidCents: number;
+  pendingCents: number;
+  status: ClubPaymentStatus;
+};
+
+export type ClubFinancialSummary = {
+  totals: ClubFinancialTotals;
+  matches: ClubFinancialMatchRow[];
+  players: ClubFinancialPlayerRow[];
 };
 
 export type ClubPublicSummary = {
@@ -253,6 +306,124 @@ export type ClubMatchSheetInput = {
 
 function normalizeKey(value: string) {
   return value.trim().toLowerCase();
+}
+
+function toSafeCents(value: unknown) {
+  const amount = typeof value === "number" ? value : Number(value ?? 0);
+  if (!Number.isFinite(amount)) return 0;
+  return Math.max(0, Math.trunc(amount));
+}
+
+function getAggregateStatus(expectedCents: number, paidCents: number): ClubPaymentStatus {
+  if (expectedCents <= 0 || paidCents >= expectedCents) return "paid";
+  if (paidCents <= 0) return "unpaid";
+  return "partial";
+}
+
+export function splitClubMatchCost(totalCents: number, lineupIds: string[]) {
+  const normalizedTotal = toSafeCents(totalCents);
+  if (!lineupIds.length) return [];
+
+  const baseShare = Math.floor(normalizedTotal / lineupIds.length);
+  const remainder = normalizedTotal % lineupIds.length;
+
+  return lineupIds.map((lineupId, index) => ({
+    lineupId,
+    expectedCents: baseShare + (index < remainder ? 1 : 0)
+  }));
+}
+
+export function getClubPaymentStatus(payment: Pick<ClubMatchPaymentRecord, "expected_cents" | "paid_cents">): ClubPaymentStatus {
+  return getAggregateStatus(toSafeCents(payment.expected_cents), toSafeCents(payment.paid_cents));
+}
+
+export function buildClubFinancialSummary({
+  lineups,
+  matches,
+  payments
+}: {
+  lineups: ClubLineupRecord[];
+  matches: ClubMatchRecord[];
+  payments: ClubMatchPaymentRecord[];
+}): ClubFinancialSummary {
+  const playedMatches = matches.filter((match) => match.status === "played");
+  const matchesById = new Map(playedMatches.map((match) => [match.id, match]));
+  const lineupsById = new Map(lineups.map((lineup) => [lineup.id, lineup]));
+  const paymentsByMatch = new Map<string, ClubMatchPaymentRecord[]>();
+  const playersByKey = new Map<ClubFinancialPlayerRow["key"], ClubFinancialPlayerRow>();
+
+  for (const payment of payments) {
+    if (!matchesById.has(payment.match_id)) continue;
+    const matchPayments = paymentsByMatch.get(payment.match_id) ?? [];
+    matchPayments.push(payment);
+    paymentsByMatch.set(payment.match_id, matchPayments);
+
+    const lineup = lineupsById.get(payment.lineup_id);
+    if (!lineup) continue;
+
+    const key = lineup.club_player_id
+      ? `player:${lineup.club_player_id}`
+      : `guest:${normalizeKey(lineup.display_name) || lineup.id}`;
+    const expectedCents = toSafeCents(payment.expected_cents);
+    const paidCents = toSafeCents(payment.paid_cents);
+    const existing = playersByKey.get(key) ?? {
+      key,
+      playerId: lineup.club_player_id,
+      displayName: lineup.display_name,
+      matchCount: 0,
+      expectedCents: 0,
+      paidCents: 0,
+      pendingCents: 0,
+      status: "unpaid" as ClubPaymentStatus
+    };
+
+    existing.matchCount += 1;
+    existing.expectedCents += expectedCents;
+    existing.paidCents += paidCents;
+    existing.pendingCents += Math.max(0, expectedCents - paidCents);
+    existing.status = getAggregateStatus(existing.expectedCents, existing.paidCents);
+    playersByKey.set(key, existing);
+  }
+
+  const matchRows = playedMatches
+    .map((match) => {
+      const matchPayments = paymentsByMatch.get(match.id) ?? [];
+      const expectedCents = matchPayments.reduce((total, payment) => total + toSafeCents(payment.expected_cents), 0);
+      const paidCents = matchPayments.reduce((total, payment) => total + toSafeCents(payment.paid_cents), 0);
+      const pendingCents = Math.max(0, expectedCents - paidCents);
+
+      return {
+        matchId: match.id,
+        opponentName: match.opponent_name,
+        playedAt: match.played_at,
+        participantCount: matchPayments.length,
+        costCents: toSafeCents(match.field_cost_cents),
+        expectedCents,
+        paidCents,
+        pendingCents,
+        status: getAggregateStatus(expectedCents, paidCents)
+      };
+    })
+    .filter((row) => row.costCents > 0 || row.expectedCents > 0 || row.paidCents > 0)
+    .sort((left, right) => compareDateDesc(left.playedAt, right.playedAt));
+
+  const players = Array.from(playersByKey.values()).sort((left, right) => {
+    if (right.pendingCents !== left.pendingCents) return right.pendingCents - left.pendingCents;
+    if (right.expectedCents !== left.expectedCents) return right.expectedCents - left.expectedCents;
+    return left.displayName.localeCompare(right.displayName, "es");
+  });
+
+  return {
+    totals: {
+      matchCount: matchRows.length,
+      totalCostCents: matchRows.reduce((total, match) => total + match.costCents, 0),
+      expectedCents: matchRows.reduce((total, match) => total + match.expectedCents, 0),
+      paidCents: matchRows.reduce((total, match) => total + match.paidCents, 0),
+      pendingCents: matchRows.reduce((total, match) => total + match.pendingCents, 0)
+    },
+    matches: matchRows,
+    players
+  };
 }
 
 export function normalizeClubPlayerPosition(value: unknown): ClubPlayerPosition | null {

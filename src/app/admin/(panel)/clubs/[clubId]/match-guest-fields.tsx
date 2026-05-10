@@ -29,7 +29,7 @@ export function MatchGuestFields() {
       {slots.length ? (
         <div className="mt-2 grid gap-3">
           {slots.map((slot) => (
-            <div className="grid gap-2 rounded-xl border border-slate-800 bg-slate-950/70 p-3 md:grid-cols-[1fr_170px_90px_90px_80px]" key={slot}>
+            <div className="grid gap-2 rounded-xl border border-slate-800 bg-slate-950/70 p-3 md:grid-cols-[1fr_170px_90px_90px_80px_160px_110px]" key={slot}>
               <Input name={`guestName:${slot}`} placeholder="Nombre" />
               <Select defaultValue="starter" name={`guestRole:${slot}`}>
                 <option value="starter">Titular</option>
@@ -42,6 +42,19 @@ export function MatchGuestFields() {
                 <input className="h-4 w-4 accent-emerald-400" name="mvp" type="radio" value={`guest:${slot}`} />
                 Figura
               </label>
+              <Select aria-label={`Pago cancha invitado ${slot}`} defaultValue="unpaid" name={`guestPaymentStatus:${slot}`}>
+                <option value="unpaid">No pago</option>
+                <option value="paid">Pago completo</option>
+                <option value="partial">Pago parcial</option>
+              </Select>
+              <Input
+                aria-label={`Monto pagado invitado ${slot}`}
+                min={0}
+                name={`guestPaidAmount:${slot}`}
+                placeholder="$"
+                step="0.01"
+                type="number"
+              />
             </div>
           ))}
         </div>

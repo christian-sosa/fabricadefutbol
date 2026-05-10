@@ -3,10 +3,13 @@ import { unstable_noStore as noStore } from "next/cache";
 import { requireAdminSession } from "@/lib/auth/admin";
 import { getAdminClubs } from "@/lib/auth/clubs";
 import {
+  buildClubFinancialSummary,
   buildClubPublicSnapshot,
   type ClubCompetitionRecord,
+  type ClubFinancialSummary,
   type ClubPublicActivity,
   type ClubLineupRecord,
+  type ClubMatchPaymentRecord,
   type ClubMatchPlayerStatRecord,
   type ClubMatchRecord,
   type ClubPublicPlayerStat,
@@ -51,6 +54,8 @@ export type AdminClubDetails = {
   matches: ClubMatchRecord[];
   lineups: ClubLineupRecord[];
   stats: ClubMatchPlayerStatRecord[];
+  payments: ClubMatchPaymentRecord[];
+  financialSummary: ClubFinancialSummary;
   publicSnapshot: ClubPublicSnapshot;
   admins: ClubAdminListItem[];
   pendingInvites: ClubAdminInviteListItem[];
@@ -261,7 +266,8 @@ async function loadClubPrivateData(clubId: string) {
     { data: teamPlayers, error: teamPlayersError },
     { data: matches, error: matchesError },
     { data: lineups, error: lineupsError },
-    { data: stats, error: statsError }
+    { data: stats, error: statsError },
+    { data: payments, error: paymentsError }
   ] = await Promise.all([
     supabase
       .from("clubs")
@@ -286,11 +292,14 @@ async function loadClubPrivateData(clubId: string) {
     supabase.from("club_team_players").select("id, club_team_id, club_player_id"),
     supabase
       .from("club_matches")
-      .select("id, club_id, club_team_id, club_competition_id, modality, played_at, opponent_name, venue, goals_for, goals_against, status, notes, created_at")
+      .select("id, club_id, club_team_id, club_competition_id, modality, played_at, opponent_name, venue, goals_for, goals_against, status, notes, field_cost_cents, field_cost_currency, created_at")
       .eq("club_id", clubId)
       .order("played_at", { ascending: false }),
     supabase.from("club_match_lineups").select("id, match_id, club_player_id, guest_name, display_name, role"),
-    supabase.from("club_match_player_stats").select("id, match_id, lineup_id, goals, assists, is_mvp")
+    supabase.from("club_match_player_stats").select("id, match_id, lineup_id, goals, assists, is_mvp"),
+    supabase
+      .from("club_match_payments")
+      .select("id, match_id, lineup_id, expected_cents, paid_cents, paid_at, notes, updated_by, created_at, updated_at")
   ]);
 
   if (clubError) throw new Error(clubError.message);
@@ -301,6 +310,7 @@ async function loadClubPrivateData(clubId: string) {
   if (matchesError) throw new Error(matchesError.message);
   if (lineupsError) throw new Error(lineupsError.message);
   if (statsError) throw new Error(statsError.message);
+  if (paymentsError) throw new Error(paymentsError.message);
   if (!club) return null;
 
   const matchIds = new Set((matches ?? []).map((match) => String(match.id)));
@@ -308,6 +318,9 @@ async function loadClubPrivateData(clubId: string) {
     matchIds.has(lineup.match_id)
   );
   const lineupIds = new Set(filteredLineups.map((lineup) => lineup.id));
+  const filteredPayments = ((payments ?? []) as ClubMatchPaymentRecord[]).filter((payment) =>
+    matchIds.has(payment.match_id) && lineupIds.has(payment.lineup_id)
+  );
 
   return {
     club: club as ClubRecord,
@@ -319,7 +332,8 @@ async function loadClubPrivateData(clubId: string) {
     ),
     matches: (matches ?? []) as ClubMatchRecord[],
     lineups: filteredLineups,
-    stats: ((stats ?? []) as ClubMatchPlayerStatRecord[]).filter((stat) => lineupIds.has(stat.lineup_id))
+    stats: ((stats ?? []) as ClubMatchPlayerStatRecord[]).filter((stat) => lineupIds.has(stat.lineup_id)),
+    payments: filteredPayments
   };
 }
 
@@ -392,6 +406,11 @@ export async function getAdminClubDetails(clubId: string): Promise<AdminClubDeta
 
   return {
     ...privateData,
+    financialSummary: buildClubFinancialSummary({
+      lineups: privateData.lineups,
+      matches: privateData.matches,
+      payments: privateData.payments
+    }),
     publicSnapshot: normalizeSnapshot((snapshotRow ?? null) as ClubSnapshotRow | null, privateData.club.name),
     admins: adminRows.map((row) => {
       const relation = row.admins;

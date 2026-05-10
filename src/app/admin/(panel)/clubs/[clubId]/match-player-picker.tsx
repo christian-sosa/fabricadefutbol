@@ -41,6 +41,8 @@ function PlayerRows({
               <TH>Goles</TH>
               <TH>Asist.</TH>
               <TH>Figura</TH>
+              <TH>Pago cancha</TH>
+              <TH>Monto pago</TH>
             </tr>
           </THead>
           <TBody>
@@ -63,6 +65,24 @@ function PlayerRows({
                 </TD>
                 <TD>
                   <input className="h-4 w-4 accent-emerald-400" name="mvp" type="radio" value={`player:${player.id}`} />
+                </TD>
+                <TD>
+                  <Select className="w-40" defaultValue="unpaid" name={`playerPaymentStatus:${player.id}`}>
+                    <option value="unpaid">No pago</option>
+                    <option value="paid">Pago completo</option>
+                    <option value="partial">Pago parcial</option>
+                  </Select>
+                </TD>
+                <TD>
+                  <Input
+                    aria-label={`Monto pagado ${player.full_name}`}
+                    className="w-24"
+                    min={0}
+                    name={`playerPaidAmount:${player.id}`}
+                    placeholder="$"
+                    step="0.01"
+                    type="number"
+                  />
                 </TD>
               </tr>
             ))}

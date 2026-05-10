@@ -1174,6 +1174,8 @@ export type Database = {
           goals_against: number;
           goals_for: number;
           id: string;
+          field_cost_cents: number;
+          field_cost_currency: string;
           modality: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           notes: string | null;
           opponent_name: string;
@@ -1191,6 +1193,8 @@ export type Database = {
           goals_against?: number;
           goals_for?: number;
           id?: string;
+          field_cost_cents?: number;
+          field_cost_currency?: string;
           modality?: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           notes?: string | null;
           opponent_name: string;
@@ -1208,6 +1212,8 @@ export type Database = {
           goals_against?: number;
           goals_for?: number;
           id?: string;
+          field_cost_cents?: number;
+          field_cost_currency?: string;
           modality?: "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
           notes?: string | null;
           opponent_name?: string;
@@ -1245,6 +1251,45 @@ export type Database = {
           id?: string;
           match_id?: string;
           role?: "starter" | "substitute" | "present";
+        };
+        Relationships: [];
+      };
+      club_match_payments: {
+        Row: {
+          created_at: string;
+          expected_cents: number;
+          id: string;
+          lineup_id: string;
+          match_id: string;
+          notes: string | null;
+          paid_at: string | null;
+          paid_cents: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          expected_cents?: number;
+          id?: string;
+          lineup_id: string;
+          match_id: string;
+          notes?: string | null;
+          paid_at?: string | null;
+          paid_cents?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          expected_cents?: number;
+          id?: string;
+          lineup_id?: string;
+          match_id?: string;
+          notes?: string | null;
+          paid_at?: string | null;
+          paid_cents?: number;
+          updated_at?: string;
+          updated_by?: string | null;
         };
         Relationships: [];
       };

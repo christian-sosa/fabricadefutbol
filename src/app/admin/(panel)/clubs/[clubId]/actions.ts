@@ -8,8 +8,10 @@ import { assertClubWriteAction, getClubSlugById } from "@/lib/auth/clubs";
 import {
   CLUB_PLAYER_POSITIONS,
   normalizeClubPlayerPosition,
+  splitClubMatchCost,
   validateClubMatchSheet,
   type ClubLineupRole,
+  type ClubPaymentStatus,
   type ClubMatchSheetParticipantInput
 } from "@/lib/domain/clubs";
 import { getPlayerPhotosBucket, getSupabaseDbSchema, getTeamLogosBucket } from "@/lib/env";
@@ -115,7 +117,15 @@ const matchSchema = z.object({
   venue: z.string().max(120).optional(),
   goalsFor: z.coerce.number().int().min(0),
   goalsAgainst: z.coerce.number().int().min(0),
+  fieldCostAmount: z.preprocess(
+    (value) => (typeof value === "string" ? value : ""),
+    z.string().max(30)
+  ),
   notes: z.string().max(500).optional()
+});
+
+const matchFinanceSchema = z.object({
+  matchId: z.string().uuid()
 });
 
 const clubAdminInviteSchema = z.object({
@@ -160,6 +170,44 @@ function parseOptionalRole(value: FormDataEntryValue | null): ClubLineupRole | n
 function parseStatValue(value: FormDataEntryValue | null) {
   const raw = typeof value === "string" && value.trim() ? Number(value) : 0;
   return Number.isInteger(raw) && raw >= 0 ? raw : 0;
+}
+
+function parsePaymentStatus(value: FormDataEntryValue | null): ClubPaymentStatus {
+  if (value === "paid" || value === "partial" || value === "unpaid") return value;
+  return "unpaid";
+}
+
+function parseCurrencyAmountToCents(value: FormDataEntryValue | null) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return 0;
+  const compact = raw.replace(/\s/g, "");
+  const normalized = compact.includes(",") && compact.includes(".")
+    ? compact.lastIndexOf(",") > compact.lastIndexOf(".")
+      ? compact.replace(/\./g, "").replace(",", ".")
+      : compact.replace(/,/g, "")
+    : compact.replace(",", ".");
+  const amount = Number(normalized);
+
+  if (!Number.isFinite(amount) || amount < 0) return null;
+  return Math.round(amount * 100);
+}
+
+function resolvePaidCents(params: {
+  expectedCents: number;
+  paidAmountCents: number;
+  status: ClubPaymentStatus;
+}) {
+  if (params.expectedCents <= 0) return { paidCents: 0, error: null };
+  if (params.status === "paid") return { paidCents: params.expectedCents, error: null };
+  if (params.status === "unpaid") return { paidCents: 0, error: null };
+  if (params.paidAmountCents <= 0) {
+    return { paidCents: 0, error: "Para un pago parcial carga un monto mayor a 0." };
+  }
+  if (params.paidAmountCents >= params.expectedCents) {
+    return { paidCents: params.paidAmountCents, error: "El pago parcial debe ser menor a lo que corresponde pagar." };
+  }
+
+  return { paidCents: params.paidAmountCents, error: null };
 }
 
 function parseBulkPlayerLine(line: string, lineNumber: number) {
@@ -897,6 +945,7 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
       venue: formData.get("venue"),
       goalsFor: formData.get("goalsFor"),
       goalsAgainst: formData.get("goalsAgainst"),
+      fieldCostAmount: formData.get("fieldCostAmount"),
       notes: formData.get("notes")
     });
 
@@ -928,10 +977,20 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
 
     const playersById = new Map((players ?? []).map((player) => [String(player.id), String(player.full_name)]));
     const mvpKey = String(formData.get("mvp") ?? "");
-    const participants: Array<ClubMatchSheetParticipantInput & { displayName: string }> = [];
+    const participants: Array<
+      ClubMatchSheetParticipantInput & {
+        displayName: string;
+        paidAmountCents: number;
+        paymentStatus: ClubPaymentStatus;
+      }
+    > = [];
 
     for (const playerId of selectedPlayerIds) {
       if (!playersById.has(playerId)) continue;
+      const paidAmountCents = parseCurrencyAmountToCents(formData.get(`playerPaidAmount:${playerId}`));
+      if (paidAmountCents === null) {
+        redirect(buildClubDetailPath({ clubId, tab: "matches", error: "El monto pagado de cancha debe ser un numero valido." }));
+      }
 
       participants.push({
         playerId,
@@ -939,20 +998,28 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
         goals: parseStatValue(formData.get(`playerGoals:${playerId}`)),
         assists: parseStatValue(formData.get(`playerAssists:${playerId}`)),
         isMvp: mvpKey === `player:${playerId}`,
-        displayName: playersById.get(playerId) ?? "Jugador"
+        displayName: playersById.get(playerId) ?? "Jugador",
+        paidAmountCents,
+        paymentStatus: parsePaymentStatus(formData.get(`playerPaymentStatus:${playerId}`))
       });
     }
 
     for (let index = 1; index <= 6; index += 1) {
       const guestName = String(formData.get(`guestName:${index}`) ?? "").trim();
       if (!guestName) continue;
+      const paidAmountCents = parseCurrencyAmountToCents(formData.get(`guestPaidAmount:${index}`));
+      if (paidAmountCents === null) {
+        redirect(buildClubDetailPath({ clubId, tab: "matches", error: "El monto pagado de cancha debe ser un numero valido." }));
+      }
       participants.push({
         guestName,
         role: parseRole(formData.get(`guestRole:${index}`)),
         goals: parseStatValue(formData.get(`guestGoals:${index}`)),
         assists: parseStatValue(formData.get(`guestAssists:${index}`)),
         isMvp: mvpKey === `guest:${index}`,
-        displayName: guestName
+        displayName: guestName,
+        paidAmountCents,
+        paymentStatus: parsePaymentStatus(formData.get(`guestPaymentStatus:${index}`))
       });
     }
 
@@ -993,6 +1060,33 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
       redirect(buildClubDetailPath({ clubId, tab: "matches", error: validationErrors[0] }));
     }
 
+    const fieldCostCents = parseCurrencyAmountToCents(formData.get("fieldCostAmount"));
+    if (fieldCostCents === null) {
+      redirect(buildClubDetailPath({ clubId, tab: "matches", error: "El costo de cancha debe ser un numero valido." }));
+    }
+
+    const paymentDrafts = splitClubMatchCost(
+      fieldCostCents,
+      participants.map((_, index) => String(index))
+    ).map((share, index) => {
+      const participant = participants[index];
+      const resolvedPayment = resolvePaidCents({
+        expectedCents: share.expectedCents,
+        paidAmountCents: participant.paidAmountCents,
+        status: participant.paymentStatus
+      });
+
+      return {
+        expectedCents: share.expectedCents,
+        paidCents: resolvedPayment.paidCents,
+        error: resolvedPayment.error
+      };
+    });
+    const firstPaymentError = paymentDrafts.find((draft) => draft.error)?.error;
+    if (firstPaymentError) {
+      redirect(buildClubDetailPath({ clubId, tab: "matches", error: firstPaymentError }));
+    }
+
     const { data: match, error: matchError } = await supabase
       .from("club_matches")
       .insert({
@@ -1005,6 +1099,8 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
         venue: parsed.data.venue?.trim() || null,
         goals_for: parsed.data.goalsFor,
         goals_against: parsed.data.goalsAgainst,
+        field_cost_cents: fieldCostCents,
+        field_cost_currency: "ARS",
         status: "played",
         notes: parsed.data.notes?.trim() || null,
         created_by: admin.userId
@@ -1016,7 +1112,8 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
       redirect(buildClubDetailPath({ clubId, tab: "matches", error: toUserMessage(matchError, "No se pudo crear el partido.") }));
     }
 
-    for (const participant of participants) {
+    const insertedLineups: Array<{ index: number; lineupId: string }> = [];
+    for (const [index, participant] of participants.entries()) {
       const { data: lineup, error: lineupError } = await supabase
         .from("club_match_lineups")
         .insert({
@@ -1032,6 +1129,7 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
       if (lineupError || !lineup) {
         redirect(buildClubDetailPath({ clubId, tab: "matches", error: toUserMessage(lineupError, "No se pudo guardar la alineacion.") }));
       }
+      insertedLineups.push({ index, lineupId: String(lineup.id) });
 
       const { error: statError } = await supabase.from("club_match_player_stats").insert({
         match_id: match.id,
@@ -1046,11 +1144,105 @@ export async function addClubMatchAction(clubId: string, formData: FormData) {
       }
     }
 
+    const paidAt = new Date().toISOString();
+    const paymentRows = insertedLineups.map((lineup) => {
+      const draft = paymentDrafts[lineup.index];
+      return {
+        match_id: match.id,
+        lineup_id: lineup.lineupId,
+        expected_cents: draft.expectedCents,
+        paid_cents: draft.paidCents,
+        paid_at: draft.paidCents > 0 ? paidAt : null,
+        updated_by: admin.userId
+      };
+    });
+
+    if (paymentRows.length) {
+      const { error: paymentError } = await supabase.from("club_match_payments").insert(paymentRows);
+      if (paymentError) {
+        redirect(buildClubDetailPath({ clubId, tab: "matches", error: toUserMessage(paymentError, "No se pudieron guardar los pagos de cancha.") }));
+      }
+    }
+
     await refreshAndRevalidate(clubId);
     redirect(buildClubDetailPath({ clubId, tab: "matches", success: "Partido cargado." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildClubDetailPath({ clubId, tab: "matches", error: toUserMessage(error, "No se pudo cargar el partido.") }));
+  }
+}
+
+export async function updateClubMatchFinanceAction(clubId: string, formData: FormData) {
+  const tab = formData.get("returnTab") === "matches" ? "matches" : "finances";
+  try {
+    const admin = await assertClubWriteAction(clubId);
+    const parsed = matchFinanceSchema.safeParse({
+      matchId: formData.get("matchId")
+    });
+
+    if (!parsed.success) {
+      redirect(buildClubDetailPath({ clubId, tab, error: "Falta el partido a actualizar." }));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { data: match, error: matchError } = await supabase
+      .from("club_matches")
+      .select("id")
+      .eq("id", parsed.data.matchId)
+      .eq("club_id", clubId)
+      .maybeSingle();
+
+    if (matchError || !match) {
+      redirect(buildClubDetailPath({ clubId, tab, error: "No se encontro el partido dentro de este club." }));
+    }
+
+    const { data: payments, error: paymentsError } = await supabase
+      .from("club_match_payments")
+      .select("id, expected_cents, paid_at")
+      .eq("match_id", parsed.data.matchId);
+
+    if (paymentsError) {
+      redirect(buildClubDetailPath({ clubId, tab, error: toUserMessage(paymentsError, "No se pudieron leer los pagos del partido.") }));
+    }
+
+    const now = new Date().toISOString();
+    for (const payment of payments ?? []) {
+      const paidAmountCents = parseCurrencyAmountToCents(formData.get(`paidAmount:${payment.id}`));
+      if (paidAmountCents === null) {
+        redirect(buildClubDetailPath({ clubId, tab, error: "El monto pagado de cancha debe ser un numero valido." }));
+      }
+
+      const resolvedPayment = resolvePaidCents({
+        expectedCents: Number(payment.expected_cents ?? 0),
+        paidAmountCents,
+        status: parsePaymentStatus(formData.get(`paymentStatus:${payment.id}`))
+      });
+      if (resolvedPayment.error) {
+        redirect(buildClubDetailPath({ clubId, tab, error: resolvedPayment.error }));
+      }
+
+      const notes = String(formData.get(`paymentNotes:${payment.id}`) ?? "").trim();
+      const { error: updateError } = await supabase
+        .from("club_match_payments")
+        .update({
+          paid_cents: resolvedPayment.paidCents,
+          paid_at: resolvedPayment.paidCents > 0 ? payment.paid_at ?? now : null,
+          notes: notes || null,
+          updated_by: admin.userId
+        })
+        .eq("id", payment.id)
+        .eq("match_id", parsed.data.matchId);
+
+      if (updateError) {
+        redirect(buildClubDetailPath({ clubId, tab, error: toUserMessage(updateError, "No se pudieron actualizar los pagos de cancha.") }));
+      }
+    }
+
+    await revalidateClubPaths(clubId);
+    redirect(buildClubDetailPath({ clubId, tab, success: "Pagos de cancha actualizados." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab, error: toUserMessage(error, "No se pudieron actualizar los pagos de cancha.") }));
   }
 }
 
