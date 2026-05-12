@@ -52,6 +52,7 @@ export default async function MatchDetailPage({
   const publicMatchPath = withOrgQuery(`/matches/${id}`, resolvedSearchParams.org);
   const publicMatchUrl = buildAbsolutePublicUrl(withShareTracking(publicMatchPath, "match"));
   const teamLabels = resolveMatchTeamLabels(details.match);
+  const showCurrentRendimiento = details.match.status !== "finished" && !details.result;
 
   return (
     <div className="space-y-4">
@@ -94,7 +95,7 @@ export default async function MatchDetailPage({
                       </span>
                     ) : null}
                   </span>
-                  {!player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
+                  {showCurrentRendimiento && !player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
                 </li>
               ))}
             </ul>
@@ -113,7 +114,7 @@ export default async function MatchDetailPage({
                       </span>
                     ) : null}
                   </span>
-                  {!player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
+                  {showCurrentRendimiento && !player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
                 </li>
               ))}
             </ul>

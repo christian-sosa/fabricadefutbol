@@ -12,7 +12,6 @@ describe("GroupActivityValueCard", () => {
     render(
       <GroupActivityValueCard
         finishedCount={3}
-        organizationSlug="la-cantera"
         playersCount={16}
         totalMatches={5}
       />
@@ -21,13 +20,8 @@ describe("GroupActivityValueCard", () => {
     expect(screen.getByText("Resumen del grupo")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Activar plan/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/trial|prueba|plan mensual|pago/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Ir a partidos" })).toHaveAttribute(
-      "href",
-      "/admin/matches?org=la-cantera"
-    );
-    expect(screen.getByRole("link", { name: "Ir a jugadores" })).toHaveAttribute(
-      "href",
-      "/admin/players?org=la-cantera"
-    );
+    expect(screen.queryByText("Grupos gratis")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Ir a partidos" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Ir a jugadores" })).not.toBeInTheDocument();
   });
 });

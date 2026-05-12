@@ -37,6 +37,16 @@ describe("admin context navigation source", () => {
     expect(source).toContain("!isLeagueRootContext");
   });
 
+  it("mantiene /admin como hub general si no hay grupo explicito", () => {
+    const adminLandingSource = readFileSync(adminLandingPath, "utf8");
+
+    expect(adminLandingSource).toContain("resolvedSearchParams.org");
+    expect(adminLandingSource).toContain("const selectedOrganization = resolvedSearchParams.org");
+    expect(adminLandingSource).not.toContain(
+      "const selectedOrganization = findOrganizationByKey(organizations, resolvedSearchParams.org);"
+    );
+  });
+
   it("usa acciones de contexto compartidas en admin Clubs", () => {
     const clubDetailSource = readFileSync(clubDetailPath, "utf8");
     const clubsListSource = readFileSync(clubsListPath, "utf8");

@@ -190,6 +190,30 @@ export function MatchResultEditor({
     const fromGuests = validNewGuests.filter((guest) => guest.team === "B").length;
     return fromParticipants + fromReplacementPlayers + fromGuests;
   }, [assignments, existingParticipants, replacementPlayers, validNewGuests]);
+  const teamADisplayNames = useMemo(
+    () => [
+      ...existingParticipants
+        .filter((participant) => assignments[participant.participantId] === "A")
+        .map((participant) => participant.fullName),
+      ...replacementPlayers
+        .filter((player) => player.team === "A")
+        .map((player) => playersById.get(player.playerId)?.fullName ?? "Jugador"),
+      ...validNewGuests.filter((guest) => guest.team === "A").map((guest) => guest.name.trim())
+    ],
+    [assignments, existingParticipants, playersById, replacementPlayers, validNewGuests]
+  );
+  const teamBDisplayNames = useMemo(
+    () => [
+      ...existingParticipants
+        .filter((participant) => assignments[participant.participantId] === "B")
+        .map((participant) => participant.fullName),
+      ...replacementPlayers
+        .filter((player) => player.team === "B")
+        .map((player) => playersById.get(player.playerId)?.fullName ?? "Jugador"),
+      ...validNewGuests.filter((guest) => guest.team === "B").map((guest) => guest.name.trim())
+    ],
+    [assignments, existingParticipants, playersById, replacementPlayers, validNewGuests]
+  );
 
   useEffect(() => {
     if (!handicapEnabled) return;
@@ -300,6 +324,25 @@ export function MatchResultEditor({
         <p className="mt-1 text-xl font-black text-white">
           {teamALabel} vs {teamBLabel}
         </p>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Equipo {teamALabel}
+          </p>
+          <p className="mt-2 text-sm text-slate-200">
+            {teamADisplayNames.length ? teamADisplayNames.join(", ") : "Sin jugadores asignados"}
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Equipo {teamBLabel}
+          </p>
+          <p className="mt-2 text-sm text-slate-200">
+            {teamBDisplayNames.length ? teamBDisplayNames.join(", ") : "Sin jugadores asignados"}
+          </p>
+        </div>
       </section>
 
       <div className="grid gap-3 md:grid-cols-4">

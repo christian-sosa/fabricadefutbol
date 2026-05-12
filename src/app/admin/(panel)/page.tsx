@@ -416,7 +416,9 @@ export default async function AdminDashboardPage({
   const { admin, organizations } = await getAdminOrganizationContext(resolvedSearchParams.org);
 
   const creationAccess = await getAdminOrganizationCreationAccess(admin);
-  const selectedOrganization = findOrganizationByKey(organizations, resolvedSearchParams.org);
+  const selectedOrganization = resolvedSearchParams.org
+    ? findOrganizationByKey(organizations, resolvedSearchParams.org)
+    : null;
   const showTournaments = admin.isSuperAdmin;
   const leagueCreationAccess = showTournaments
     ? await getLeagueCreationAccess(admin)
@@ -464,7 +466,6 @@ export default async function AdminDashboardPage({
 
       <GroupActivityValueCard
         finishedCount={dashboardData.finishedCount}
-        organizationSlug={selectedOrganization.slug}
         playersCount={dashboardData.playersCount}
         totalMatches={dashboardData.draftsCount + dashboardData.confirmedCount + dashboardData.finishedCount}
       />

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -58,6 +58,50 @@ describe("MatchResultEditor", () => {
     expect(screen.getByText("TEST1 vs TEST2")).toBeInTheDocument();
     expect(screen.getByText("Formacion final")).toBeInTheDocument();
     expect(screen.getByText("Invitados y reemplazos")).toBeInTheDocument();
+  });
+
+  it("muestra quienes integran cada equipo al cargar los goles", () => {
+    render(
+      <MatchResultEditor
+        defaultNotes=""
+        defaultScoreA={2}
+        defaultScoreB={1}
+        existingParticipants={existingParticipants}
+        submitLabel="Guardar"
+        teamALabel="Negro"
+        teamBLabel="Blanco"
+      />
+    );
+
+    const teamACard = screen.getByText("Equipo Negro").closest("div");
+    const teamBCard = screen.getByText("Equipo Blanco").closest("div");
+
+    expect(teamACard).not.toBeNull();
+    expect(teamBCard).not.toBeNull();
+    expect(within(teamACard as HTMLElement).getByText("Jugador 1, Jugador 2")).toBeInTheDocument();
+    expect(within(teamBCard as HTMLElement).getByText("Jugador 3")).toBeInTheDocument();
+  });
+
+  it("aclara cuando un equipo no tiene jugadores asignados", () => {
+    render(
+      <MatchResultEditor
+        defaultNotes=""
+        defaultScoreA={0}
+        defaultScoreB={0}
+        existingParticipants={[]}
+        submitLabel="Guardar"
+        teamALabel="Negro"
+        teamBLabel="Blanco"
+      />
+    );
+
+    const teamACard = screen.getByText("Equipo Negro").closest("div");
+    const teamBCard = screen.getByText("Equipo Blanco").closest("div");
+
+    expect(teamACard).not.toBeNull();
+    expect(teamBCard).not.toBeNull();
+    expect(within(teamACard as HTMLElement).getByText("Sin jugadores asignados")).toBeInTheDocument();
+    expect(within(teamBCard as HTMLElement).getByText("Sin jugadores asignados")).toBeInTheDocument();
   });
 
   it("actualiza el payload de lineup, invitados y handicap", async () => {
