@@ -88,7 +88,7 @@ const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
       {
         title: "2. Cargás jugadores",
         description:
-          "Asignás un nivel inicial simple: Figura, Muy bueno, Intermedio, Recreativo o Principiante."
+          "Asignás un nivel inicial simple: Estrella, Figura, Muy bueno, Bueno, Intermedio, Recreativo o Principiante."
       },
       {
         title: "3. Armás el partido",

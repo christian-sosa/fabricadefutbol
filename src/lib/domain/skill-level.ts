@@ -1,19 +1,22 @@
 export const MIN_SKILL_LEVEL = 1;
-export const MAX_SKILL_LEVEL = 5;
+export const MAX_SKILL_LEVEL = 7;
+export const DEFAULT_SKILL_LEVEL = 5;
 export const RATING_UP_THRESHOLD = 1050;
 export const RATING_DOWN_THRESHOLD = 950;
 export const EDGE_RATING_BONUS = 25;
 export const GUEST_FEATURED_SKILL_LEVEL = 0.5;
-export const SKILL_LEVEL_OPTIONS = [1, 2, 3, 4, 5] as const;
+export const SKILL_LEVEL_OPTIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 export const GUEST_SKILL_LEVEL_OPTIONS = [GUEST_FEATURED_SKILL_LEVEL, ...SKILL_LEVEL_OPTIONS] as const;
 export const GUEST_SKILL_LEVEL_HELP_TEXT =
-  "Figura destacada: invitado superior a tus jugadores de Nivel 1. Nivel 1 es el mas fuerte; Nivel 5 es principiante.";
+  "Invitado superior: mejor que Estrella. Nivel 1 es Estrella; Nivel 7 es Principiante.";
 export const SKILL_LEVEL_LABELS: Record<(typeof SKILL_LEVEL_OPTIONS)[number], string> = {
-  1: "Figura",
-  2: "Muy bueno",
-  3: "Intermedio",
-  4: "Recreativo",
-  5: "Principiante"
+  1: "Estrella",
+  2: "Figura",
+  3: "Muy bueno",
+  4: "Bueno",
+  5: "Intermedio",
+  6: "Recreativo",
+  7: "Principiante"
 };
 
 export type EffectiveSkillScoreInput = {
@@ -46,7 +49,7 @@ export function parseGuestSkillLevelValue(value: number | string | null | undefi
 export function formatGuestSkillLevelLabel(value: number | string | null | undefined) {
   const level = parseGuestSkillLevelValue(value);
   if (level === GUEST_FEATURED_SKILL_LEVEL) {
-    return "Figura destacada - superior al Nivel 1";
+    return "Invitado superior - mejor que Estrella";
   }
   if (level === null) return "Nivel invitado invalido";
   return formatSkillLevelLabel(level);

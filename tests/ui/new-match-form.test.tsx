@@ -16,7 +16,7 @@ function buildPlayers(count: number) {
     full_name: `Jugador ${index + 1}`,
     current_rating: 1000 - index * 10,
     initial_rank: index + 1,
-    skill_level: Math.min(5, Math.floor(index / 2) + 1),
+    skill_level: Math.min(7, Math.floor(index / 2) + 1),
     display_order: index + 1
   }));
 }
@@ -98,9 +98,9 @@ describe("NewMatchForm", () => {
 
     await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
 
-    expect(screen.getByText(/Figura destacada: invitado superior/)).toBeInTheDocument();
+    expect(screen.getByText(/Invitado superior: mejor que Estrella/)).toBeInTheDocument();
     expect(
-      screen.getByRole("option", { name: "Figura destacada - superior al Nivel 1" })
+      screen.getByRole("option", { name: "Invitado superior - mejor que Estrella" })
     ).toHaveValue("0.5");
 
     await user.type(screen.getByPlaceholderText("Nombre invitado #1"), "Crack");

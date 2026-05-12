@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
-import { formatSkillLevelLabel, SKILL_LEVEL_OPTIONS } from "@/lib/domain/skill-level";
+import { DEFAULT_SKILL_LEVEL, formatSkillLevelLabel, SKILL_LEVEL_OPTIONS } from "@/lib/domain/skill-level";
 import { getAdminPlayers } from "@/lib/queries/admin";
 import { withOrgQuery } from "@/lib/org";
 
@@ -87,7 +87,7 @@ export default async function AdminPlayersPage({
           <form action={createPlayerAction} className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_220px_1.2fr_auto] lg:items-start">
             <input name="organizationId" type="hidden" value={selectedOrganization.id} />
             <Input name="fullName" placeholder="Nombre completo" required />
-            <Select aria-label="Nivel de habilidad" defaultValue="3" name="skillLevel" required>
+            <Select aria-label="Nivel de habilidad" defaultValue={String(DEFAULT_SKILL_LEVEL)} name="skillLevel" required>
               {SKILL_LEVEL_OPTIONS.map((level) => (
                 <option key={level} value={level}>
                   {formatSkillLevelLabel(level)}
@@ -106,7 +106,7 @@ export default async function AdminPlayersPage({
         <Card>
           <CardTitle>Editar planilla de jugadores</CardTitle>
           <CardDescription>
-            Modifica la planilla y guarda una sola vez. La lista se ordena por nivel despues de guardar, de Nivel 1 a Nivel 5.
+            Modifica la planilla y guarda una sola vez. La lista se ordena por nivel despues de guardar, de Nivel 1 a Nivel 7.
             La foto se actualiza en la fila de cada jugador.
           </CardDescription>
 

@@ -14,7 +14,7 @@ import {
   assertPlayerPhotoUploadAllowed,
   registerPlayerPhotoUploadEvent
 } from "@/lib/player-photo-upload-limits";
-import { normalizeSkillLevel } from "@/lib/domain/skill-level";
+import { MAX_SKILL_LEVEL, MIN_SKILL_LEVEL, normalizeSkillLevel } from "@/lib/domain/skill-level";
 import {
   getOrganizationPlayerPhotoObjectPath,
   inferPlayerPhotoExtension,
@@ -28,7 +28,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 const createSchema = z.object({
   organizationId: z.string().uuid(),
   fullName: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
-  skillLevel: z.coerce.number().int().min(1, "El nivel debe estar entre 1 y 5.").max(5, "El nivel debe estar entre 1 y 5.")
+  skillLevel: z.coerce
+    .number()
+    .int()
+    .min(MIN_SKILL_LEVEL, "El nivel debe estar entre 1 y 7.")
+    .max(MAX_SKILL_LEVEL, "El nivel debe estar entre 1 y 7.")
 });
 
 const deleteSchema = z.object({
@@ -44,7 +48,11 @@ const photoSchema = z.object({
 const rowSchema = z.object({
   id: z.string().uuid(),
   fullName: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
-  skillLevel: z.number().int().min(1, "El nivel debe estar entre 1 y 5.").max(5, "El nivel debe estar entre 1 y 5.")
+  skillLevel: z
+    .number()
+    .int()
+    .min(MIN_SKILL_LEVEL, "El nivel debe estar entre 1 y 7.")
+    .max(MAX_SKILL_LEVEL, "El nivel debe estar entre 1 y 7.")
 });
 
 function withMessage(organizationId: string, error: string | null) {

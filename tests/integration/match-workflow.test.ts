@@ -23,7 +23,7 @@ function buildPlayers(count: number, organizationId = ORG_ID) {
     organization_id: organizationId,
     full_name: `Jugador ${index + 1}`,
     initial_rank: index + 1,
-    skill_level: Math.min(5, Math.floor(index / 2) + 1),
+    skill_level: Math.min(7, Math.floor(index / 2) + 1),
     display_order: index + 1,
     current_rating: 1000,
     active: true

@@ -28,6 +28,16 @@ describe("admin group admins screen", () => {
     expect(teamPageSource).toContain("getOrganizationAdminData");
   });
 
+  it("muestra invitaciones pendientes con URL productiva e instrucciones para compartir", () => {
+    const teamPageSource = readFileSync(adminTeamPagePath, "utf8");
+
+    expect(teamPageSource).toContain("buildAbsolutePublicUrl");
+    expect(teamPageSource).toContain('buildAbsolutePublicUrl(`/invite/${invite.inviteToken}`)');
+    expect(teamPageSource).toContain("{inviteUrl}");
+    expect(teamPageSource).toContain("Enviale este link a");
+    expect(teamPageSource).not.toContain("/invite/{invite.inviteToken}");
+  });
+
   it("vuelve a la pantalla de admins despues de cambios en el equipo", () => {
     const actionsSource = readFileSync(actionsPath, "utf8");
 

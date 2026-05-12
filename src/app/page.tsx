@@ -20,7 +20,7 @@ const groupFeatures = [
   {
     title: "Niveles simples",
     description:
-      "Definí una base clara para cada jugador: Figura, Muy bueno, Intermedio, Recreativo o Principiante."
+      "Definí una base clara para cada jugador: Estrella, Figura, Muy bueno, Bueno, Intermedio, Recreativo o Principiante."
   },
   {
     title: "Equipos parejos",

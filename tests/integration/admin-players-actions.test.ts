@@ -71,7 +71,7 @@ describe("admin players actions", () => {
     formData.set("organizationId", organizationId);
     formData.append("playerId", playerId);
     formData.append("fullName", "Juan Perez actualizado");
-    formData.append("skillLevel", "2");
+    formData.append("skillLevel", "7");
 
     await expect(bulkUpdatePlayersAction(formData)).rejects.toMatchObject({
       digest: expect.stringContaining("/admin/players?org=la-banda")
@@ -79,7 +79,7 @@ describe("admin players actions", () => {
 
     expect(fake.find("players", (row) => row.id === playerId)).toMatchObject({
       full_name: "Juan Perez actualizado",
-      skill_level: 2,
+      skill_level: 7,
       current_rating: 1175
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin/players");

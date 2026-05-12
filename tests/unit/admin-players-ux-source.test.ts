@@ -34,6 +34,14 @@ describe("admin players UX source", () => {
     expect(source).not.toContain("minmax(260px,1.6fr)_auto");
   });
 
+  it("explica la escala editable de Nivel 1 a Nivel 7", () => {
+    const source = readFileSync(playersPagePath, "utf8");
+
+    expect(source).toContain("de Nivel 1 a Nivel 7");
+    expect(source).toContain("DEFAULT_SKILL_LEVEL");
+    expect(source).not.toContain("de Nivel 1 a Nivel 5");
+  });
+
   it("el shell admin oculta el encabezado global dentro de un grupo activo", () => {
     expect(existsSync(panelShellPath)).toBe(true);
 

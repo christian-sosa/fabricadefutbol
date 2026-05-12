@@ -11,6 +11,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
+import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getOrganizationAdminData } from "@/lib/queries/admin";
 
 function AdminsFeedback({ error }: { error?: string }) {
@@ -97,28 +98,37 @@ export default async function AdminOrganizationAdminsPage({
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Invitaciones pendientes</p>
             <div className="space-y-2">
               {organizationAdmins.pendingInvites.length ? (
-                organizationAdmins.pendingInvites.map((invite) => (
-                  <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm" key={invite.id}>
-                    <p className="font-semibold text-slate-100">{invite.email}</p>
-                    <p className="text-xs text-slate-400">
-                      Enviada {new Date(invite.createdAt).toLocaleDateString("es-AR")}
-                    </p>
-                    <p className="mt-2 text-xs text-slate-400">Link de invitacion:</p>
-                    <Link
-                      className="break-all text-xs font-semibold text-emerald-300 hover:underline"
-                      href={`/invite/${invite.inviteToken}`}
-                    >
-                      /invite/{invite.inviteToken}
-                    </Link>
-                    <form action={revokeOrganizationInviteAction} className="mt-2">
-                      <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-                      <input name="inviteId" type="hidden" value={invite.id} />
-                      <Button disabled={!canWriteSelectedOrganization} type="submit" variant="ghost">
-                        Cancelar invitacion
-                      </Button>
-                    </form>
-                  </div>
-                ))
+                organizationAdmins.pendingInvites.map((invite) => {
+                  const inviteUrl = buildAbsolutePublicUrl(`/invite/${invite.inviteToken}`);
+
+                  return (
+                    <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm" key={invite.id}>
+                      <p className="font-semibold text-slate-100">{invite.email}</p>
+                      <p className="text-xs text-slate-400">
+                        Enviada {new Date(invite.createdAt).toLocaleDateString("es-AR")}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-400">
+                        Enviale este link a {invite.email}. La persona debe registrarse o iniciar sesion con ese email,
+                        abrir el link y aceptar la invitacion.
+                      </p>
+                      <Link
+                        className="mt-1 block break-all text-xs font-semibold text-emerald-300 hover:underline"
+                        href={inviteUrl}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {inviteUrl}
+                      </Link>
+                      <form action={revokeOrganizationInviteAction} className="mt-2">
+                        <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+                        <input name="inviteId" type="hidden" value={invite.id} />
+                        <Button disabled={!canWriteSelectedOrganization} type="submit" variant="ghost">
+                          Cancelar invitacion
+                        </Button>
+                      </form>
+                    </div>
+                  );
+                })
               ) : (
                 <p className="text-sm text-slate-400">No hay invitaciones pendientes.</p>
               )}

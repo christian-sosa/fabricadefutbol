@@ -436,7 +436,7 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "players":
-      if (!("skill_level" in normalized)) normalized.skill_level = 3;
+      if (!("skill_level" in normalized)) normalized.skill_level = 5;
       if (!("display_order" in normalized)) normalized.display_order = normalized.initial_rank ?? 1;
       if (!("current_rating" in normalized)) normalized.current_rating = 1000;
       if (!("active" in normalized)) normalized.active = true;
