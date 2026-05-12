@@ -26,6 +26,9 @@ const primaryActionLinkClass =
 const secondaryActionLinkClass =
   "inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300";
 
+const playersRosterGridColumns =
+  "lg:grid-cols-[minmax(220px,2fr)_minmax(170px,0.9fr)_minmax(260px,1.6fr)_80px]";
+
 export default async function AdminPlayersPage({
   searchParams
 }: {
@@ -112,7 +115,9 @@ export default async function AdminPlayersPage({
           </form>
 
           <div className="mt-4 space-y-3">
-            <div className="hidden grid-cols-[minmax(220px,2fr)_minmax(170px,0.9fr)_minmax(260px,1.6fr)_auto] gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 lg:grid">
+            <div
+              className={`hidden ${playersRosterGridColumns} gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 lg:grid`}
+            >
               <span>Jugador</span>
               <span>Nivel</span>
               <span>Foto</span>
@@ -121,7 +126,7 @@ export default async function AdminPlayersPage({
 
             {players.map((player) => (
               <div
-                className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3 lg:grid-cols-[minmax(220px,2fr)_minmax(170px,0.9fr)_minmax(260px,1.6fr)_auto] lg:items-start"
+                className={`grid ${playersRosterGridColumns} gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3 lg:items-start`}
                 key={player.id}
               >
                 <input form={bulkFormId} name="playerId" type="hidden" value={player.id} />
@@ -156,7 +161,7 @@ export default async function AdminPlayersPage({
                     Subir foto
                   </Button>
                 </form>
-                <form action={deletePlayerAction} className="lg:self-start lg:justify-self-end">
+                <form action={deletePlayerAction} className="lg:self-start lg:justify-self-start">
                   <input name="organizationId" type="hidden" value={selectedOrganization.id} />
                   <input name="deletePlayerId" type="hidden" value={player.id} />
                   <ConfirmSubmitButton

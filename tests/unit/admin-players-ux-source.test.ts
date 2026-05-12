@@ -26,6 +26,14 @@ describe("admin players UX source", () => {
     expect(source).not.toContain("<span>Rendimiento</span>");
   });
 
+  it("usa una grilla estable para alinear nivel, foto y acciones en la planilla", () => {
+    const source = readFileSync(playersPagePath, "utf8");
+
+    expect(source).toContain("playersRosterGridColumns");
+    expect(source).toContain("minmax(260px,1.6fr)_80px");
+    expect(source).not.toContain("minmax(260px,1.6fr)_auto");
+  });
+
   it("el shell admin oculta el encabezado global dentro de un grupo activo", () => {
     expect(existsSync(panelShellPath)).toBe(true);
 

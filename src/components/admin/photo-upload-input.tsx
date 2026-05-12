@@ -21,7 +21,7 @@ export function PhotoUploadInput({ compact = false, hint, required = true }: Pho
     <div>
       <Input
         accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-        className={compact ? "px-2 py-1.5 text-xs" : undefined}
+        className={compact ? "h-[38px] px-2 py-1.5 text-xs" : undefined}
         name="photo"
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
