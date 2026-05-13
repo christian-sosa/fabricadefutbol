@@ -12,7 +12,7 @@ import { getAdminMatches } from "@/lib/queries/admin";
 export default async function AdminMatchesPage({
   searchParams
 }: {
-  searchParams: Promise<{ org?: string; view?: string }>;
+  searchParams: Promise<{ org?: string; view?: string; success?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const { admin, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
@@ -80,6 +80,12 @@ export default async function AdminMatchesPage({
           <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
             <span className="font-semibold">Pendiente de resultado:</span>{" "}
             {formatMatchDateTime(pendingResultMatch.scheduled_at)} - {pendingResultMatch.modality}
+          </div>
+        ) : null}
+
+        {resolvedSearchParams.success ? (
+          <div className="mt-4 rounded-md border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100">
+            {resolvedSearchParams.success}
           </div>
         ) : null}
       </Card>

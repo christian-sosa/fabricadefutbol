@@ -1,13 +1,20 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import {
+  formatGuestSkillLevelLabel,
+  formatRatingTrendBadgeLabel,
+  formatRatingTrendLabel,
+  formatSkillLevelLabel
+} from "@/lib/domain/skill-level";
 import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL } from "@/lib/team-labels";
-import { cn, formatRendimiento } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 type OptionPlayer = {
   id: string;
   full_name: string;
   current_rating: number;
+  skill_level?: number | null;
   is_guest?: boolean;
 };
 
@@ -83,6 +90,70 @@ const balanceToneClassName = {
   danger: "border-rose-400/45 bg-rose-500/10 text-rose-100"
 } as const;
 
+function getSortLevel(player: OptionPlayer) {
+  const level = Number(player.skill_level);
+  return Number.isFinite(level) ? level : Number.MAX_SAFE_INTEGER;
+}
+
+function sortTeamPlayers(players: OptionPlayer[]) {
+  return [...players].sort((a, b) => {
+    const levelDiff = getSortLevel(a) - getSortLevel(b);
+    if (levelDiff !== 0) return levelDiff;
+    const ratingDiff = Number(b.current_rating) - Number(a.current_rating);
+    if (ratingDiff !== 0) return ratingDiff;
+    return a.full_name.localeCompare(b.full_name);
+  });
+}
+
+function getLevelLabel(player: OptionPlayer) {
+  const level = Number(player.skill_level);
+  if (!Number.isFinite(level)) return null;
+  return player.is_guest ? formatGuestSkillLevelLabel(level) : formatSkillLevelLabel(level);
+}
+
+function PlayerRow({ player }: { player: OptionPlayer }) {
+  const levelLabel = getLevelLabel(player);
+  const ratingTrendLabel = formatRatingTrendLabel(player.current_rating);
+  const shouldShowRatingTrend = !player.is_guest && ratingTrendLabel !== "Parejo";
+
+  return (
+    <li className="flex items-start justify-between gap-2">
+      <span className="flex min-w-0 items-start gap-2">
+        <PlayerAvatar name={player.full_name} playerId={player.is_guest ? undefined : player.id} size="sm" />
+        <span className="min-w-0">
+          <span className="flex flex-wrap items-center gap-1.5">
+            <span className="truncate font-semibold text-slate-100">{player.full_name}</span>
+            {player.is_guest ? (
+              <span className="rounded-full border border-cyan-400/50 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
+                Invitado
+              </span>
+            ) : null}
+          </span>
+          <span className="mt-1 flex flex-wrap gap-1.5">
+            {levelLabel ? (
+              <span className="rounded border border-slate-700 bg-slate-950 px-2 py-0.5 text-[11px] font-semibold text-slate-300">
+                {levelLabel}
+              </span>
+            ) : null}
+            {shouldShowRatingTrend ? (
+              <span
+                className={cn(
+                  "rounded border px-2 py-0.5 text-[11px] font-semibold",
+                  ratingTrendLabel === "Viene bien"
+                    ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+                    : "border-amber-400/40 bg-amber-500/10 text-amber-200"
+                )}
+              >
+                {formatRatingTrendBadgeLabel(player.current_rating)}
+              </span>
+            ) : null}
+          </span>
+        </span>
+      </span>
+    </li>
+  );
+}
+
 export function TeamOptionCard({
   optionId,
   optionNumber,
@@ -96,6 +167,8 @@ export function TeamOptionCard({
   isConfirmed,
   confirmAction
 }: TeamOptionCardProps) {
+  const sortedTeamA = sortTeamPlayers(teamA);
+  const sortedTeamB = sortTeamPlayers(teamB);
   const balanceSummary = buildBalanceSummary({
     ratingDiff,
     ratingSumA,
@@ -133,38 +206,16 @@ export function TeamOptionCard({
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{teamALabel}</p>
           <ul className="space-y-2 text-sm text-slate-200">
-            {teamA.map((player) => (
-              <li className="flex items-center justify-between gap-2" key={player.id}>
-                <span className="flex items-center gap-2">
-                  <PlayerAvatar name={player.full_name} playerId={player.is_guest ? undefined : player.id} size="sm" />
-                  {player.full_name}
-                  {player.is_guest ? (
-                    <span className="rounded-full border border-cyan-400/50 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
-                      Invitado
-                    </span>
-                  ) : null}
-                </span>
-                {!player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
-              </li>
+            {sortedTeamA.map((player) => (
+              <PlayerRow key={player.id} player={player} />
             ))}
           </ul>
         </div>
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{teamBLabel}</p>
           <ul className="space-y-2 text-sm text-slate-200">
-            {teamB.map((player) => (
-              <li className="flex items-center justify-between gap-2" key={player.id}>
-                <span className="flex items-center gap-2">
-                  <PlayerAvatar name={player.full_name} playerId={player.is_guest ? undefined : player.id} size="sm" />
-                  {player.full_name}
-                  {player.is_guest ? (
-                    <span className="rounded-full border border-cyan-400/50 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
-                      Invitado
-                    </span>
-                  ) : null}
-                </span>
-                {!player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
-              </li>
+            {sortedTeamB.map((player) => (
+              <PlayerRow key={player.id} player={player} />
             ))}
           </ul>
         </div>

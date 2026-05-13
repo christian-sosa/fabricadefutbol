@@ -53,12 +53,16 @@ describe("admin context navigation source", () => {
 
     expect(clubDetailSource).toContain("const { admin } = await requireAdminClub(clubId);");
     expect(clubDetailSource).toContain("Modo administrador / {admin.displayName}");
+    expect(clubDetailSource).toContain("Cambiar espacio");
     expect(clubDetailSource).toContain("Vista del club");
     expect(clubDetailSource).toContain("SignOutButton");
     expect(clubDetailSource).toContain("adminContextActionLinkClass");
     expect(clubDetailSource).toContain("adminContextPrimaryActionLinkClass");
+    expect(clubDetailSource).not.toContain("Menu admin");
     expect(clubsListSource).toContain("adminContextActionLinkClass");
     expect(clubsListSource).toContain("adminContextPrimaryActionLinkClass");
+    expect(clubsListSource).toContain("Cambiar espacio");
+    expect(clubsListSource).not.toContain("Menu admin");
   });
 
   it("usa acciones de contexto compartidas en admin Ligas", () => {
@@ -67,11 +71,13 @@ describe("admin context navigation source", () => {
 
     expect(leagueDetailSource).toContain("const { admin } = await requireAdminLeague(id);");
     expect(leagueDetailSource).toContain("Modo administrador / {admin.displayName}");
+    expect(leagueDetailSource).toContain("Cambiar espacio");
     expect(leagueDetailSource).toContain("Ver publica");
     expect(leagueDetailSource).toContain("<AdminSubnav scope=\"tournaments\" />");
     expect(leagueDetailSource).toContain("SignOutButton");
     expect(leagueDetailSource).toContain("adminContextActionLinkClass");
     expect(leagueDetailSource).toContain("adminContextPrimaryActionLinkClass");
+    expect(leagueDetailSource).not.toContain("Menu admin");
     expect(leagueDetailSource).not.toContain("Volver a ligas");
     expect(leagueDetailSource).not.toContain("deleteLeagueAction");
     expect(leagueDetailSource).not.toContain("Seguro que quieres borrar ${details.league.name}");

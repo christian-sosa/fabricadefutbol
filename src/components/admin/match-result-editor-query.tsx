@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { MatchResultEditor } from "@/components/admin/match-result-editor";
 import { useUpdateMatchResultMutation } from "@/lib/query/hooks";
@@ -30,13 +31,15 @@ type MatchResultEditorQueryProps = {
   defaultMvpParticipantId?: string | null;
   defaultNotes?: string | null;
   submitLabel: string;
+  successRedirectHref?: string;
   teamALabel?: string;
   teamBLabel?: string;
 };
 
 export function MatchResultEditorQuery(props: MatchResultEditorQueryProps) {
-  const { organizationId, matchId, ...editorProps } = props;
+  const { organizationId, matchId, successRedirectHref, ...editorProps } = props;
   const mutation = useUpdateMatchResultMutation({ organizationId, matchId });
+  const router = useRouter();
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   return (
@@ -45,6 +48,10 @@ export function MatchResultEditorQuery(props: MatchResultEditorQueryProps) {
         {...editorProps}
         onSubmit={async (payload) => {
           await mutation.mutateAsync(payload);
+          if (successRedirectHref) {
+            router.push(successRedirectHref);
+            return;
+          }
           setSuccessMessage("Resultado guardado. Se actualizaran solo los datos de este grupo.");
         }}
       />

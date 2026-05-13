@@ -6,7 +6,7 @@ import {
   isIsoDateExpired
 } from "@/lib/domain/billing";
 import { cleanupStalePendingOrganizationBillingPayments } from "@/lib/domain/billing-workflow";
-import { calculateGuestDisplayRating } from "@/lib/domain/skill-level";
+import { calculateGuestDisplayRating, parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
 import {
   countPendingInvitesByOrganization,
   fetchPendingInvitesForOrganization
@@ -272,7 +272,7 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
   const { data: players, error: playersError } = playerIds.length
     ? await supabase
         .from("players")
-        .select("id, full_name, current_rating")
+        .select("id, full_name, current_rating, skill_level")
         .eq("organization_id", organizationId)
         .in("id", playerIds)
     : { data: [], error: null };
@@ -307,6 +307,7 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
           id: guest.id,
           full_name: guest.guest_name,
           current_rating: calculateGuestDisplayRating(guest.guest_rating),
+          skill_level: parseGuestSkillLevelValue(guest.guest_rating),
           is_guest: true
         }));
       const teamBFromPlayers = memberPlayers
@@ -322,6 +323,7 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
           id: guest.id,
           full_name: guest.guest_name,
           current_rating: calculateGuestDisplayRating(guest.guest_rating),
+          skill_level: parseGuestSkillLevelValue(guest.guest_rating),
           is_guest: true
         }));
 

@@ -134,6 +134,33 @@ type TeamRosterFilters = {
   rosterSearch: string;
 };
 
+type ClubPlayersView = "new" | "bulk" | "pool";
+
+function normalizeClubPlayersView(view?: string): ClubPlayersView | null {
+  return view === "new" || view === "bulk" || view === "pool" ? view : null;
+}
+
+function buildClubPlayersPath({
+  clubId,
+  position,
+  view
+}: {
+  clubId: string;
+  position?: ClubPlayerPosition | null;
+  view?: ClubPlayersView | null;
+}) {
+  const searchParams = new URLSearchParams({
+    tab: "players"
+  });
+  if (view) searchParams.set("view", view);
+  if (position) searchParams.set("position", position);
+  return `/admin/clubs/${clubId}?${searchParams.toString()}`;
+}
+
+function getClubPlayersActionLinkClass(active: boolean) {
+  return active ? adminContextPrimaryActionLinkClass : adminContextActionLinkClass;
+}
+
 function buildTeamRosterPath({
   availablePosition,
   availableSearch,
@@ -314,20 +341,28 @@ function SummaryTab({
         <CardDescription className="mt-2">
           Este escudo lo heredan todos los equipos del club.
         </CardDescription>
-        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/70 p-3 sm:flex-row sm:items-center">
+        <div className="mt-4 flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950/70 p-3 sm:flex-row sm:items-center">
           <LeagueLogo
             alt={`Escudo de ${details.club.name}`}
             size={64}
             src={getClubLogoUrl(clubId)}
           />
-          <form action={uploadClubLogoAction.bind(null, clubId)} className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-            <Input accept="image/jpeg,image/png,image/webp,image/svg+xml" className="max-w-72" name="logo" type="file" />
-            <Button className="w-fit" type="submit" variant="secondary">
-              Guardar escudo
-            </Button>
-          </form>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-slate-100">Escudo actual</p>
+            <p className="mt-1 text-xs text-slate-500">JPG, PNG, WEBP o SVG.</p>
+            <details className="mt-3">
+              <summary className="inline-flex w-fit cursor-pointer list-none items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300">
+                Cambiar escudo
+              </summary>
+              <form action={uploadClubLogoAction.bind(null, clubId)} className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input accept="image/jpeg,image/png,image/webp,image/svg+xml" className="max-w-72" name="logo" type="file" />
+                <Button className="w-fit" type="submit" variant="secondary">
+                  Guardar escudo
+                </Button>
+              </form>
+            </details>
+          </div>
         </div>
-        <p className="mt-2 text-xs text-slate-500">JPG, PNG, WEBP o SVG.</p>
       </Card>
 
       <Card>
@@ -365,20 +400,56 @@ function SummaryTab({
 
 function PlayersTab({
   clubId,
+  playerView,
   players,
   selectedPosition
 }: {
   clubId: string;
+  playerView: ClubPlayersView | null;
   players: ClubPlayerRecord[];
   selectedPosition: ClubPlayerPosition | null;
 }) {
+  const showCreateForm = playerView === "new";
+  const showBulkForm = playerView === "bulk";
+  const showPool = playerView === "pool";
   const filteredPlayers = selectedPosition
     ? players.filter((player) => player.position === selectedPosition)
     : players;
 
   return (
     <div className="space-y-4">
-      <section className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
+      <Card>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <CardTitle>Jugadores</CardTitle>
+            <CardDescription className="mt-1">
+              {players.length} jugadores cargados en el club.
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              className={getClubPlayersActionLinkClass(showCreateForm)}
+              href={buildClubPlayersPath({ clubId, view: "new" })}
+            >
+              Agregar
+            </Link>
+            <Link
+              className={getClubPlayersActionLinkClass(showBulkForm)}
+              href={buildClubPlayersPath({ clubId, view: "bulk" })}
+            >
+              Agregar masivo
+            </Link>
+            <Link
+              className={getClubPlayersActionLinkClass(showPool)}
+              href={buildClubPlayersPath({ clubId, view: "pool" })}
+            >
+              Ver pool
+            </Link>
+          </div>
+        </div>
+      </Card>
+
+      {showCreateForm ? (
         <Card>
           <CardTitle>Nuevo jugador</CardTitle>
           <form action={addClubPlayerAction.bind(null, clubId)} className="mt-4 grid gap-3 md:grid-cols-2">
@@ -414,7 +485,9 @@ function PlayersTab({
             </div>
           </form>
         </Card>
+      ) : null}
 
+      {showBulkForm ? (
         <Card>
           <CardTitle>Carga masiva</CardTitle>
           <CardDescription className="mt-2">
@@ -443,88 +516,90 @@ Martin Alvarez`}
             </Button>
           </form>
         </Card>
-      </section>
+      ) : null}
 
-      <Card>
-        <CardTitle>Pool del club</CardTitle>
-        <CardDescription className="mt-2">
-          Desactivar no borra al jugador: lo deja fuera del pool activo y puedes volver a activarlo.
-        </CardDescription>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            className={
-              selectedPosition
-                ? "rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-slate-300"
-                : "rounded-full border border-emerald-400/60 bg-emerald-500/15 px-3 py-1.5 text-sm font-semibold text-emerald-200"
-            }
-            href={`/admin/clubs/${clubId}?tab=players`}
-          >
-            Todos
-          </Link>
-          {CLUB_PLAYER_POSITIONS.map((position) => (
+      {showPool ? (
+        <Card>
+          <CardTitle>Pool del club</CardTitle>
+          <CardDescription className="mt-2">
+            Desactivar no borra al jugador: lo deja fuera del pool activo y puedes volver a activarlo.
+          </CardDescription>
+          <div className="mt-4 flex flex-wrap gap-2">
             <Link
               className={
-                selectedPosition === position
-                  ? "rounded-full border border-emerald-400/60 bg-emerald-500/15 px-3 py-1.5 text-sm font-semibold text-emerald-200"
-                  : "rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-slate-300"
+                selectedPosition
+                  ? "rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-slate-300"
+                  : "rounded-full border border-emerald-400/60 bg-emerald-500/15 px-3 py-1.5 text-sm font-semibold text-emerald-200"
               }
-              href={`/admin/clubs/${clubId}?tab=players&position=${position}`}
-              key={position}
+              href={buildClubPlayersPath({ clubId, view: "pool" })}
             >
-              {formatClubPlayerPosition(position)}
+              Todos
             </Link>
-          ))}
-        </div>
-        <div className="mt-4 overflow-x-auto">
-          <Table>
-            <THead>
-              <tr>
-                <TH>Foto</TH>
-                <TH>Jugador</TH>
-                <TH>Datos</TH>
-                <TH>Estado</TH>
-                <TH>Accion</TH>
-              </tr>
-            </THead>
-            <TBody>
-              {filteredPlayers.map((player) => (
-                <tr key={player.id}>
-                  <TD>
-                    <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
-                  </TD>
-                  <TD className="font-semibold">{player.full_name}</TD>
-                  <TD className="text-slate-300">
-                    {formatPlayerMeta(player) || "Sin detalle"}
-                  </TD>
-                  <TD>
-                    <Badge className={player.active ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}>
-                      {player.active ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </TD>
-                  <TD>
-                    <div className="flex flex-col gap-2">
-                      <form action={uploadClubPlayerPhotoAction.bind(null, clubId)} className="flex flex-col gap-2">
-                        <input name="playerId" type="hidden" value={player.id} />
-                        <Input accept="image/jpeg,image/png,image/webp" className="max-w-48" name="photo" type="file" />
-                        <Button className="h-8 w-fit px-3 text-xs" type="submit" variant="secondary">
-                          Subir foto
-                        </Button>
-                      </form>
-                      <form action={toggleClubPlayerAction.bind(null, clubId)}>
-                      <input name="playerId" type="hidden" value={player.id} />
-                      <input name="active" type="hidden" value={player.active ? "false" : "true"} />
-                      <Button className="h-8 px-3 text-xs" type="submit" variant="ghost">
-                        {player.active ? "Desactivar" : "Activar"}
-                      </Button>
-                      </form>
-                    </div>
-                  </TD>
+            {CLUB_PLAYER_POSITIONS.map((position) => (
+              <Link
+                className={
+                  selectedPosition === position
+                    ? "rounded-full border border-emerald-400/60 bg-emerald-500/15 px-3 py-1.5 text-sm font-semibold text-emerald-200"
+                    : "rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-slate-300"
+                }
+                href={buildClubPlayersPath({ clubId, position, view: "pool" })}
+                key={position}
+              >
+                {formatClubPlayerPosition(position)}
+              </Link>
+            ))}
+          </div>
+          <div className="mt-4 overflow-x-auto">
+            <Table>
+              <THead>
+                <tr>
+                  <TH>Foto</TH>
+                  <TH>Jugador</TH>
+                  <TH>Datos</TH>
+                  <TH>Estado</TH>
+                  <TH>Accion</TH>
                 </tr>
-              ))}
-            </TBody>
-          </Table>
-        </div>
-      </Card>
+              </THead>
+              <TBody>
+                {filteredPlayers.map((player) => (
+                  <tr key={player.id}>
+                    <TD>
+                      <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
+                    </TD>
+                    <TD className="font-semibold">{player.full_name}</TD>
+                    <TD className="text-slate-300">
+                      {formatPlayerMeta(player) || "Sin detalle"}
+                    </TD>
+                    <TD>
+                      <Badge className={player.active ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}>
+                        {player.active ? "Activo" : "Inactivo"}
+                      </Badge>
+                    </TD>
+                    <TD>
+                      <div className="flex flex-col gap-2">
+                        <form action={uploadClubPlayerPhotoAction.bind(null, clubId)} className="flex flex-col gap-2">
+                          <input name="playerId" type="hidden" value={player.id} />
+                          <Input accept="image/jpeg,image/png,image/webp" className="max-w-48" name="photo" type="file" />
+                          <Button className="h-8 w-fit px-3 text-xs" type="submit" variant="secondary">
+                            Subir foto
+                          </Button>
+                        </form>
+                        <form action={toggleClubPlayerAction.bind(null, clubId)}>
+                          <input name="playerId" type="hidden" value={player.id} />
+                          <input name="active" type="hidden" value={player.active ? "false" : "true"} />
+                          <Button className="h-8 px-3 text-xs" type="submit" variant="ghost">
+                            {player.active ? "Desactivar" : "Activar"}
+                          </Button>
+                        </form>
+                      </div>
+                    </TD>
+                  </tr>
+                ))}
+              </TBody>
+            </Table>
+          </div>
+        </Card>
+      ) : null}
     </div>
   );
 }
@@ -1405,6 +1480,7 @@ export default async function AdminClubDetailPage({
     success?: string;
     tab?: string;
     teamId?: string;
+    view?: string;
   }>;
 }) {
   const [{ clubId }, resolvedSearchParams] = await Promise.all([params, searchParams]);
@@ -1415,6 +1491,7 @@ export default async function AdminClubDetailPage({
 
   const selectedTab = resolvedSearchParams.tab ?? "summary";
   const selectedPosition = normalizeClubPlayerPosition(resolvedSearchParams.position);
+  const selectedPlayersView = normalizeClubPlayersView(resolvedSearchParams.view);
   const selectedTeam = selectedTab === "teams" && resolvedSearchParams.teamId
     ? details.teams.find((team) => team.id === resolvedSearchParams.teamId)
     : null;
@@ -1460,7 +1537,7 @@ export default async function AdminClubDetailPage({
               </Link>
             ) : null}
             <Link className={adminContextActionLinkClass} href="/admin">
-              Menu admin
+              Cambiar espacio
             </Link>
             <Link className={adminContextPrimaryActionLinkClass} href={`/clubs/${details.club.slug}`}>
               Vista del club
@@ -1484,7 +1561,12 @@ export default async function AdminClubDetailPage({
 
       {selectedTab === "summary" ? <SummaryTab clubId={clubId} details={details} /> : null}
       {selectedTab === "players" ? (
-        <PlayersTab clubId={clubId} players={details.players} selectedPosition={selectedPosition} />
+        <PlayersTab
+          clubId={clubId}
+          playerView={selectedPlayersView}
+          players={details.players}
+          selectedPosition={selectedPosition}
+        />
       ) : null}
       {selectedTab === "teams" && selectedTeam ? (
         <TeamRosterTab

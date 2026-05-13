@@ -8,7 +8,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: createSupabaseServerClientMock
 }));
 
-import { getAdminDashboardData, getAdminPlayers, getSelectablePlayers } from "@/lib/queries/admin";
+import { getAdminDashboardData, getAdminMatchDetails, getAdminPlayers, getSelectablePlayers } from "@/lib/queries/admin";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 const ORG_ID = "org-1";
@@ -124,5 +124,82 @@ describe("admin player queries", () => {
       "confirmed-1",
       "draft-1"
     ]);
+  });
+
+  it("incluye nivel de jugadores e invitados en las opciones de equipo", async () => {
+    const fake = createFakeSupabase({
+      matches: [
+        {
+          id: "match-1",
+          organization_id: ORG_ID,
+          status: "draft",
+          scheduled_at: "2026-04-01T20:00:00Z"
+        }
+      ],
+      players: [
+        {
+          id: "player-strong",
+          organization_id: ORG_ID,
+          full_name: "Jugador Fuerte",
+          skill_level: 2,
+          current_rating: 1050
+        },
+        {
+          id: "player-low",
+          organization_id: ORG_ID,
+          full_name: "Jugador Bajo",
+          skill_level: 7,
+          current_rating: 950
+        }
+      ],
+      match_guests: [
+        {
+          id: "guest-elite",
+          match_id: "match-1",
+          guest_name: "Invitado Elite",
+          guest_rating: 0.5
+        }
+      ],
+      team_options: [
+        {
+          id: "option-1",
+          match_id: "match-1",
+          option_number: 1,
+          rating_sum_a: 200,
+          rating_sum_b: 180,
+          rating_diff: 20
+        }
+      ],
+      team_option_players: [
+        {
+          team_option_id: "option-1",
+          player_id: "player-strong",
+          team: "A"
+        },
+        {
+          team_option_id: "option-1",
+          player_id: "player-low",
+          team: "A"
+        }
+      ],
+      team_option_guests: [
+        {
+          team_option_id: "option-1",
+          guest_id: "guest-elite",
+          team: "A"
+        }
+      ]
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+
+    const details = await getAdminMatchDetails("match-1", ORG_ID);
+    const teamA = details?.options[0]?.teamA ?? [];
+
+    expect(teamA.find((player: { id: string }) => player.id === "player-strong")).toMatchObject({
+      skill_level: 2
+    });
+    expect(teamA.find((player: { id: string }) => player.id === "guest-elite")).toMatchObject({
+      skill_level: 0.5
+    });
   });
 });

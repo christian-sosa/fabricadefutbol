@@ -120,8 +120,16 @@ function buildPath(matchId: string, organizationKey: string, error?: string) {
   return `${basePath}${separator}error=${encodeURIComponent(error)}`;
 }
 
+function buildAdminMatchesPath(organizationKey: string, success?: string) {
+  const basePath = withOrgQuery("/admin/matches?view=edit", organizationKey);
+  if (!success) return basePath;
+  const separator = basePath.includes("?") ? "&" : "?";
+  return `${basePath}${separator}success=${encodeURIComponent(success)}`;
+}
+
 function revalidateMatchPaths(matchId: string) {
   revalidatePath("/admin");
+  revalidatePath("/admin/matches");
   revalidatePath(`/admin/matches/${matchId}`);
   revalidatePath("/matches");
   revalidatePath(`/matches/${matchId}`);
@@ -232,7 +240,7 @@ export async function saveResultAction(matchId: string, organizationId: string, 
 
     await refreshOrganizationPublicSnapshotSafe(organizationId);
     revalidateMatchPaths(matchId);
-    redirect(buildPath(matchId, organizationQueryKey));
+    redirect(buildAdminMatchesPath(organizationQueryKey, "Resultado guardado."));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo guardar resultado.";

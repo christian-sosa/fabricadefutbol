@@ -21,7 +21,7 @@ export default async function AdminClubsPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <CardTitle>Clubes</CardTitle>
           <Link className={adminContextActionLinkClass} href="/admin">
-            Menu admin
+            Cambiar espacio
           </Link>
         </div>
       </Card>

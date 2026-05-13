@@ -60,9 +60,16 @@ export function formatGuestSkillLevelLabel(value: number | string | null | undef
 export function formatRatingTrendLabel(currentRating: number | null | undefined) {
   const rating = Number(currentRating ?? BASE_RATING);
   if (!Number.isFinite(rating)) return "Parejo";
-  if (rating >= RATING_UP_THRESHOLD) return "Viene alto";
-  if (rating <= RATING_DOWN_THRESHOLD) return "Viene bajo";
+  if (rating >= RATING_UP_THRESHOLD) return "Viene bien";
+  if (rating <= RATING_DOWN_THRESHOLD) return "Viene mal";
   return "Parejo";
+}
+
+export function formatRatingTrendBadgeLabel(currentRating: number | null | undefined) {
+  const label = formatRatingTrendLabel(currentRating);
+  if (label === "Viene bien") return `+ ${label}`;
+  if (label === "Viene mal") return `- ${label}`;
+  return label;
 }
 
 export function mapInitialRankToSkillLevel(params: {

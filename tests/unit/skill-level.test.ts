@@ -56,10 +56,10 @@ describe("skill level helpers", () => {
   });
 
   it("traduce el rendimiento actual a etiquetas humanas", () => {
-    expect(formatRatingTrendLabel(1050)).toBe("Viene alto");
+    expect(formatRatingTrendLabel(1050)).toBe("Viene bien");
     expect(formatRatingTrendLabel(1049)).toBe("Parejo");
     expect(formatRatingTrendLabel(951)).toBe("Parejo");
-    expect(formatRatingTrendLabel(950)).toBe("Viene bajo");
+    expect(formatRatingTrendLabel(950)).toBe("Viene mal");
   });
 
   it("normaliza valores invalidos a un nivel seguro", () => {

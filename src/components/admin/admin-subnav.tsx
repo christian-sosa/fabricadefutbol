@@ -61,7 +61,7 @@ function buildTournamentItems(pathname: string, tournamentId: string | null, cur
     return [
       {
         href: "/admin",
-        label: "Menu admin",
+        label: "Cambiar espacio",
         active: pathname === "/admin/tournaments"
       },
       {

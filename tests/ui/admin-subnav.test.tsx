@@ -90,4 +90,13 @@ describe("AdminSubnav", () => {
       "/admin/tournaments/league-1?tab=competitions"
     );
   });
+
+  it("usa Cambiar espacio para volver al hub desde torneos", () => {
+    navigationState.pathname = "/admin/tournaments";
+
+    render(<AdminSubnav />);
+
+    expect(screen.getByRole("link", { name: "Cambiar espacio" })).toHaveAttribute("href", "/admin");
+    expect(screen.queryByRole("link", { name: "Menu admin" })).not.toBeInTheDocument();
+  });
 });

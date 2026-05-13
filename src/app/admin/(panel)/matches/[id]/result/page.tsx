@@ -67,6 +67,9 @@ export default async function AdminMatchResultPage({
     : details.result?.mvp_guest_id
       ? `guest:${details.result.mvp_guest_id}`
       : null;
+  const resultSavedHrefBase = withOrgQuery("/admin/matches?view=edit", selectedOrganization.slug);
+  const resultSavedHrefSeparator = resultSavedHrefBase.includes("?") ? "&" : "?";
+  const resultSavedHref = `${resultSavedHrefBase}${resultSavedHrefSeparator}success=${encodeURIComponent("Resultado guardado.")}`;
 
   return (
     <div className="space-y-4">
@@ -94,6 +97,7 @@ export default async function AdminMatchResultPage({
             matchId={id}
             organizationId={selectedOrganization.id}
             submitLabel={details.result ? "Guardar correccion" : "Guardar resultado y finalizar"}
+            successRedirectHref={resultSavedHref}
             teamALabel={teamLabels.teamA}
             teamBLabel={teamLabels.teamB}
           />

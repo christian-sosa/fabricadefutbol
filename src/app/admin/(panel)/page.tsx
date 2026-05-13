@@ -504,13 +504,18 @@ export default async function AdminDashboardPage({
               Sube una foto que represente al grupo o una imagen post partido. Se mostrara en la vista publica de grupos.
             </CardDescription>
 
-            <form action={uploadOrganizationImageAction} className="mt-4 space-y-3">
-              <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-              <Input accept="image/png,image/jpeg,image/webp" name="image" type="file" />
-              <Button disabled={!canWriteSelectedOrganization} type="submit">
-                Guardar imagen
-              </Button>
-            </form>
+            <details>
+              <summary className="mt-4 flex w-fit cursor-pointer list-none items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300">
+                Cambiar imagen
+              </summary>
+              <form action={uploadOrganizationImageAction} className="mt-4 space-y-3">
+                <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+                <Input accept="image/png,image/jpeg,image/webp" name="image" type="file" />
+                <Button disabled={!canWriteSelectedOrganization} type="submit">
+                  Guardar imagen
+                </Button>
+              </form>
+            </details>
           </div>
         </div>
       </Card>

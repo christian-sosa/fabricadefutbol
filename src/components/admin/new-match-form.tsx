@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import {
   formatGuestSkillLevelLabel,
+  formatRatingTrendBadgeLabel,
   formatRatingTrendLabel,
   formatSkillLevelLabel,
   GUEST_SKILL_LEVEL_HELP_TEXT,
@@ -320,12 +321,12 @@ export function NewMatchForm({
                         <span
                           className={cn(
                             "rounded border px-2 py-0.5 text-[11px] font-semibold",
-                            ratingTrendLabel === "Viene alto"
+                            ratingTrendLabel === "Viene bien"
                               ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
                               : "border-amber-400/40 bg-amber-500/10 text-amber-200"
                           )}
                         >
-                          {ratingTrendLabel}
+                          {formatRatingTrendBadgeLabel(player.current_rating)}
                         </span>
                       ) : null}
                     </span>
@@ -451,7 +452,7 @@ export function NewMatchForm({
                 const registeredPlayerDetails = [
                   "Jugador",
                   formatSkillLevelLabel(participant.skillLevel),
-                  ...(ratingTrendLabel === "Parejo" ? [] : [ratingTrendLabel])
+                  ...(ratingTrendLabel === "Parejo" ? [] : [formatRatingTrendBadgeLabel(participant.rating)])
                 ].join(" | ");
 
                 return (

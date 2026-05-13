@@ -124,7 +124,7 @@ export default async function AdminLeagueDetailPage({
               </Link>
             ) : null}
             <Link className={adminContextActionLinkClass} href="/admin">
-              Menu admin
+              Cambiar espacio
             </Link>
             <Link className={adminContextPrimaryActionLinkClass} href={`/tournaments/${details.league.slug}`}>
               Ver publica
@@ -204,29 +204,37 @@ export default async function AdminLeagueDetailPage({
                 </CardDescription>
                 <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-start">
                   <LeagueLogo alt={`Logo de ${details.league.name}`} size={120} src={details.league.logoUrl} />
-                  <form
-                    action={uploadLeagueLogoAction.bind(null, id)}
-                    className="flex-1 space-y-3"
-                  >
-                    <div>
-                      <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="logo">
-                        Archivo
-                      </label>
-                      <Input
-                        accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml"
-                        id="logo"
-                        name="logo"
-                        required
-                        type="file"
-                      />
-                      <p className="mt-2 text-xs text-slate-500">
-                        Recomendado: fondo transparente o cuadrado. Lo optimizamos a WEBP automaticamente.
-                      </p>
-                    </div>
-                    <Button type="submit" variant="secondary">
-                      Guardar logo
-                    </Button>
-                  </form>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-100">Logo actual</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Recomendado: fondo transparente o cuadrado. Lo optimizamos a WEBP automaticamente.
+                    </p>
+                    <details className="mt-3">
+                      <summary className="inline-flex w-fit cursor-pointer list-none items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300">
+                        Cambiar logo
+                      </summary>
+                      <form
+                        action={uploadLeagueLogoAction.bind(null, id)}
+                        className="mt-4 space-y-3"
+                      >
+                        <div>
+                          <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="logo">
+                            Archivo
+                          </label>
+                          <Input
+                            accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml"
+                            id="logo"
+                            name="logo"
+                            required
+                            type="file"
+                          />
+                        </div>
+                        <Button type="submit" variant="secondary">
+                          Guardar logo
+                        </Button>
+                      </form>
+                    </details>
+                  </div>
                 </div>
               </Card>
 
@@ -241,28 +249,33 @@ export default async function AdminLeagueDetailPage({
                     className="aspect-[16/9] min-h-[180px] sm:min-h-[220px]"
                     src={details.league.photoUrl}
                   />
-                  <form
-                    action={uploadLeaguePhotoAction.bind(null, id)}
-                    className="space-y-3"
-                  >
-                    <div>
-                      <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="photo">
-                        Archivo
-                      </label>
-                      <Input
-                        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                        id="photo"
-                        name="photo"
-                        type="file"
-                      />
-                      <p className="mt-2 text-xs text-slate-500">
-                        Ideal para una foto general de la liga o una imagen ambientada del torneo.
-                      </p>
-                    </div>
-                    <Button type="submit" variant="secondary">
-                      Guardar foto
-                    </Button>
-                  </form>
+                  <details>
+                    <summary className="inline-flex w-fit cursor-pointer list-none items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300">
+                      Cambiar foto
+                    </summary>
+                    <form
+                      action={uploadLeaguePhotoAction.bind(null, id)}
+                      className="mt-4 space-y-3"
+                    >
+                      <div>
+                        <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="photo">
+                          Archivo
+                        </label>
+                        <Input
+                          accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                          id="photo"
+                          name="photo"
+                          type="file"
+                        />
+                        <p className="mt-2 text-xs text-slate-500">
+                          Ideal para una foto general de la liga o una imagen ambientada del torneo.
+                        </p>
+                      </div>
+                      <Button type="submit" variant="secondary">
+                        Guardar foto
+                      </Button>
+                    </form>
+                  </details>
                 </div>
               </Card>
             </div>

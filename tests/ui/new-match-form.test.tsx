@@ -71,9 +71,9 @@ describe("NewMatchForm", () => {
     expect(screen.getByText("Nivel 2 - Figura")).toBeInTheDocument();
     expect(screen.getByText("Nivel 4 - Bueno")).toBeInTheDocument();
     expect(screen.getByText("Nivel 6 - Recreativo")).toBeInTheDocument();
-    expect(screen.getByText("Viene alto")).toBeInTheDocument();
+    expect(screen.getByText("+ Viene bien")).toBeInTheDocument();
     expect(screen.queryByText("Parejo")).not.toBeInTheDocument();
-    expect(screen.getByText("Viene bajo")).toBeInTheDocument();
+    expect(screen.getByText("- Viene mal")).toBeInTheDocument();
     expect(screen.queryByText("1050")).not.toBeInTheDocument();
     expect(screen.queryByText("1000")).not.toBeInTheDocument();
     expect(screen.queryByText("950")).not.toBeInTheDocument();
