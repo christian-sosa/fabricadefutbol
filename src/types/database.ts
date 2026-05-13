@@ -1067,6 +1067,7 @@ export type Database = {
           active: boolean;
           club_id: string;
           created_at: string;
+          default_payment_cents: number | null;
           full_name: string;
           id: string;
           nickname: string | null;
@@ -1080,6 +1081,7 @@ export type Database = {
           active?: boolean;
           club_id: string;
           created_at?: string;
+          default_payment_cents?: number | null;
           full_name: string;
           id?: string;
           nickname?: string | null;
@@ -1093,6 +1095,7 @@ export type Database = {
           active?: boolean;
           club_id?: string;
           created_at?: string;
+          default_payment_cents?: number | null;
           full_name?: string;
           id?: string;
           nickname?: string | null;
@@ -1161,6 +1164,96 @@ export type Database = {
           club_team_id?: string;
           created_at?: string;
           id?: string;
+        };
+        Relationships: [];
+      };
+      club_callups: {
+        Row: {
+          club_id: string;
+          club_team_id: string;
+          created_at: string;
+          created_by: string;
+          field_cost_cents: number;
+          full_payment_cents: number;
+          id: string;
+          ideal_player_count: number;
+          max_player_count: number;
+          notes: string | null;
+          opponent_name: string | null;
+          scheduled_at: string;
+          status: string;
+          target_payment_count: number;
+          updated_at: string;
+          venue: string | null;
+        };
+        Insert: {
+          club_id: string;
+          club_team_id: string;
+          created_at?: string;
+          created_by: string;
+          field_cost_cents?: number;
+          full_payment_cents?: number;
+          id?: string;
+          ideal_player_count?: number;
+          max_player_count?: number;
+          notes?: string | null;
+          opponent_name?: string | null;
+          scheduled_at: string;
+          status?: string;
+          target_payment_count?: number;
+          updated_at?: string;
+          venue?: string | null;
+        };
+        Update: {
+          club_id?: string;
+          club_team_id?: string;
+          created_at?: string;
+          created_by?: string;
+          field_cost_cents?: number;
+          full_payment_cents?: number;
+          id?: string;
+          ideal_player_count?: number;
+          max_player_count?: number;
+          notes?: string | null;
+          opponent_name?: string | null;
+          scheduled_at?: string;
+          status?: string;
+          target_payment_count?: number;
+          updated_at?: string;
+          venue?: string | null;
+        };
+        Relationships: [];
+      };
+      club_callup_players: {
+        Row: {
+          callup_id: string;
+          club_player_id: string;
+          created_at: string;
+          expected_cents: number | null;
+          id: string;
+          notes: string | null;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          callup_id: string;
+          club_player_id: string;
+          created_at?: string;
+          expected_cents?: number | null;
+          id?: string;
+          notes?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          callup_id?: string;
+          club_player_id?: string;
+          created_at?: string;
+          expected_cents?: number | null;
+          id?: string;
+          notes?: string | null;
+          status?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };

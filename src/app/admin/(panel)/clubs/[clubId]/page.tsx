@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
+  addClubCallupAction,
   addClubCompetitionAction,
   addClubMatchAction,
   addClubPlayerAction,
@@ -15,7 +16,9 @@ import {
   toggleClubCompetitionAction,
   toggleClubPlayerAction,
   updateClubAction,
+  updateClubCallupPlayerAction,
   updateClubMatchFinanceAction,
+  updateClubPlayerPaymentAction,
   updateClubTeamAction,
   uploadClubLogoAction,
   uploadClubPlayerPhotoAction
@@ -43,11 +46,14 @@ import { formatMatchModality, MATCH_MODALITIES } from "@/lib/constants";
 import { getCurrentMatchDateInput } from "@/lib/match-datetime";
 import {
   CLUB_PLAYER_POSITIONS,
+  buildClubCallupSummary,
   buildClubTeamRosterOptions,
   filterClubPlayersForRosterManagement,
   formatClubPlayerPosition,
   getClubPaymentStatus,
   normalizeClubPlayerPosition,
+  type ClubCallupPlayerRecord,
+  type ClubCallupPlayerStatus,
   type ClubCompetitionRecord,
   type ClubFinancialSummary,
   type ClubLineupRecord,
@@ -109,6 +115,54 @@ function getPaymentStatusClass(status: ReturnType<typeof getClubPaymentStatus>) 
       return "bg-rose-500/15 text-rose-200";
   }
 }
+
+function formatCurrencyInput(cents: number | null | undefined) {
+  if (!cents) return "";
+  return cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2);
+}
+
+function getCallupPlayerStatusLabel(status: ClubCallupPlayerStatus | "") {
+  switch (status) {
+    case "confirmed":
+      return "Confirmado";
+    case "tentative":
+      return "Dudoso";
+    case "out":
+      return "Baja";
+    case "injured":
+      return "Lesionado";
+    case "waitlist":
+      return "Espera";
+    default:
+      return "Sin cargar";
+  }
+}
+
+function getCallupPlayerStatusClass(status: ClubCallupPlayerStatus | "") {
+  switch (status) {
+    case "confirmed":
+      return "bg-emerald-500/15 text-emerald-200";
+    case "tentative":
+      return "bg-amber-500/15 text-amber-200";
+    case "injured":
+      return "bg-rose-500/15 text-rose-200";
+    case "out":
+      return "bg-slate-600/40 text-slate-200";
+    case "waitlist":
+      return "bg-sky-500/15 text-sky-200";
+    default:
+      return "bg-slate-800 text-slate-300";
+  }
+}
+
+const CALLUP_PLAYER_STATUS_OPTIONS: Array<{ value: ClubCallupPlayerStatus | ""; label: string }> = [
+  { value: "", label: "Sin cargar" },
+  { value: "confirmed", label: "Confirmado" },
+  { value: "tentative", label: "Dudoso" },
+  { value: "waitlist", label: "Espera" },
+  { value: "injured", label: "Lesionado" },
+  { value: "out", label: "Baja" }
+];
 
 function ModalityBadge({ modality }: { modality: ClubTeamRecord["modality"] }) {
   return (
@@ -476,6 +530,10 @@ function PlayersTab({
               <label className="mb-1 block text-sm font-semibold text-slate-200">Numero</label>
               <Input min={1} max={99} name="shirtNumber" type="number" />
             </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200">Aporte habitual</label>
+              <Input min={0} name="defaultPaymentAmount" placeholder="25000" step="0.01" type="number" />
+            </div>
             <div className="md:col-span-2">
               <label className="mb-1 block text-sm font-semibold text-slate-200">Notas</label>
               <Textarea name="notes" rows={2} />
@@ -556,6 +614,7 @@ Martin Alvarez`}
                   <TH>Foto</TH>
                   <TH>Jugador</TH>
                   <TH>Datos</TH>
+                  <TH>Aporte habitual</TH>
                   <TH>Estado</TH>
                   <TH>Accion</TH>
                 </tr>
@@ -569,6 +628,24 @@ Martin Alvarez`}
                     <TD className="font-semibold">{player.full_name}</TD>
                     <TD className="text-slate-300">
                       {formatPlayerMeta(player) || "Sin detalle"}
+                    </TD>
+                    <TD>
+                      <form action={updateClubPlayerPaymentAction.bind(null, clubId)} className="flex min-w-44 gap-2">
+                        <input name="playerId" type="hidden" value={player.id} />
+                        <Input
+                          aria-label={`Aporte habitual ${player.full_name}`}
+                          className="w-24"
+                          defaultValue={formatCurrencyInput(player.default_payment_cents)}
+                          min={0}
+                          name="defaultPaymentAmount"
+                          placeholder="25000"
+                          step="0.01"
+                          type="number"
+                        />
+                        <Button className="h-8 px-3 text-xs" type="submit" variant="secondary">
+                          Guardar
+                        </Button>
+                      </form>
                     </TD>
                     <TD>
                       <Badge className={player.active ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}>
@@ -1006,6 +1083,297 @@ function formatCentsInputValue(cents: number) {
   if (cents <= 0) return "";
   const amount = cents / 100;
   return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
+}
+
+function CallupsTab({
+  clubId,
+  details,
+  selectedCallupId
+}: {
+  clubId: string;
+  details: NonNullable<Awaited<ReturnType<typeof getAdminClubDetails>>>;
+  selectedCallupId: string | null;
+}) {
+  const activeTeams = details.teams.filter((team) => team.active);
+  const activePlayers = details.players.filter((player) => player.active);
+  const selectedCallup =
+    details.callups.find((callup) => callup.id === selectedCallupId) ??
+    details.callups.find((callup) => callup.status === "draft") ??
+    details.callups[0] ??
+    null;
+  const callupEntries = selectedCallup
+    ? details.callupPlayers.filter((entry) => entry.callup_id === selectedCallup.id)
+    : [];
+  const entriesByPlayerId = new Map(callupEntries.map((entry) => [entry.club_player_id, entry]));
+  const selectedSummary = selectedCallup
+    ? details.callupSummaries[selectedCallup.id] ?? buildClubCallupSummary({
+        callup: selectedCallup,
+        entries: callupEntries,
+        players: details.players
+      })
+    : null;
+  const defaultScheduledDate = getCurrentMatchDateInput();
+
+  return (
+    <div className="space-y-4">
+      <details className="rounded-2xl border border-slate-800 bg-slate-950/75 p-4" open={!selectedCallup}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <div>
+            <CardTitle>Nueva convocatoria</CardTitle>
+            <CardDescription className="mt-1">
+              Crea la lista previa para controlar cupo, plata y posiciones antes del partido.
+            </CardDescription>
+          </div>
+          <span className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white">
+            Crear
+          </span>
+        </summary>
+        <form action={addClubCallupAction.bind(null, clubId)} className="mt-4 grid gap-3 md:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Equipo</label>
+            <Select name="teamId" required>
+              <option value="">Elegir equipo</option>
+              {activeTeams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name} - {formatMatchModality(team.modality)}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <MatchDateTimeFields
+            dateName="scheduledDate"
+            defaultDate={defaultScheduledDate}
+            requiredTime
+            timeName="scheduledTime"
+          />
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Rival</label>
+            <Input name="opponentName" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Lugar / cancha</label>
+            <Input defaultValue={details.club.home_venue ?? ""} name="venue" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Costo cancha</label>
+            <Input min={0} name="fieldCostAmount" placeholder="350000" step="0.01" type="number" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Pago completo</label>
+            <Input defaultValue="25000" min={1} name="fullPaymentAmount" step="0.01" type="number" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Jugadores ideal</label>
+            <Input defaultValue={14} min={1} max={30} name="idealPlayerCount" type="number" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Maximo jugadores</label>
+            <Input defaultValue={16} min={1} max={30} name="maxPlayerCount" type="number" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Pagos objetivo</label>
+            <Input defaultValue={14} min={0} max={30} name="targetPaymentCount" type="number" />
+          </div>
+          <div className="md:col-span-3">
+            <label className="mb-1 block text-sm font-semibold text-slate-200">Notas</label>
+            <Textarea name="notes" rows={2} />
+          </div>
+          <div className="md:col-span-3">
+            <Button type="submit">Crear convocatoria</Button>
+          </div>
+        </form>
+      </details>
+
+      {details.callups.length ? (
+        <Card>
+          <CardTitle>Convocatorias</CardTitle>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {details.callups.map((callup) => (
+              <Link
+                className={
+                  selectedCallup?.id === callup.id
+                    ? "rounded-full border border-emerald-400/60 bg-emerald-500/15 px-3 py-1.5 text-sm font-semibold text-emerald-200"
+                    : "rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-slate-300"
+                }
+                href={`/admin/clubs/${clubId}?tab=callups&callupId=${callup.id}`}
+                key={callup.id}
+              >
+                {formatDateTime(callup.scheduled_at)}
+              </Link>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
+      {selectedCallup && selectedSummary ? (
+        <>
+          <section className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardDescription>Confirmados</CardDescription>
+              <CardTitle className="mt-1 text-3xl">
+                {selectedSummary.confirmedCount}/{selectedCallup.ideal_player_count}
+              </CardTitle>
+              <p className="mt-1 text-xs text-slate-400">Maximo {selectedCallup.max_player_count}</p>
+            </Card>
+            <Card>
+              <CardDescription>Pagos equivalentes</CardDescription>
+              <CardTitle className="mt-1 text-3xl">
+                {selectedSummary.paymentEquivalentCount}/{selectedCallup.target_payment_count}
+              </CardTitle>
+              <p className="mt-1 text-xs text-slate-400">{formatCurrencyCents(selectedSummary.confirmedExpectedCents)} esperado</p>
+            </Card>
+            <Card>
+              <CardDescription>Falta cobrar</CardDescription>
+              <CardTitle className="mt-1 text-3xl">{formatCurrencyCents(selectedSummary.revenueMissingCents)}</CardTitle>
+              <p className="mt-1 text-xs text-slate-400">Objetivo {formatCurrencyCents(selectedSummary.targetRevenueCents)}</p>
+            </Card>
+            <Card>
+              <CardDescription>Dudosos / espera</CardDescription>
+              <CardTitle className="mt-1 text-3xl">
+                {selectedSummary.tentativeCount}/{selectedSummary.waitlistCount}
+              </CardTitle>
+              <p className="mt-1 text-xs text-slate-400">Bajas {selectedSummary.outCount + selectedSummary.injuredCount}</p>
+            </Card>
+          </section>
+
+          <Card>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle>
+                  {getTeamName(selectedCallup.club_team_id, details.teams)} - {formatDateTime(selectedCallup.scheduled_at)}
+                </CardTitle>
+                <CardDescription className="mt-2">
+                  {selectedCallup.opponent_name ? `Rival: ${selectedCallup.opponent_name}` : "Rival sin cargar"}
+                  {selectedCallup.venue ? ` - ${selectedCallup.venue}` : ""}
+                </CardDescription>
+              </div>
+              <Badge className="bg-sky-500/15 text-sky-200">{selectedCallup.status}</Badge>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-sm font-semibold text-slate-100">Diagnostico</p>
+                <ul className="mt-2 space-y-1 text-sm text-slate-300">
+                  {selectedSummary.recommendations.map((recommendation) => (
+                    <li key={recommendation}>{recommendation}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-sm font-semibold text-slate-100">Faltantes por posicion</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedSummary.positionNeeds.length ? (
+                    selectedSummary.positionNeeds.map((need) => (
+                      <Badge className="bg-amber-500/15 text-amber-200" key={need.position}>
+                        {need.needed} {need.label}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-slate-400">Posiciones base cubiertas.</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <CardTitle>Sugeridos</CardTitle>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {selectedSummary.candidateSuggestions.map((candidate) => (
+                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3" key={candidate.playerId}>
+                  <p className="font-semibold text-slate-100">{candidate.displayName}</p>
+                  <p className="mt-1 text-sm text-slate-400">{candidate.reason}</p>
+                  <p className="mt-2 text-sm text-slate-300">
+                    {candidate.positionLabel} - {formatCurrencyCents(candidate.expectedCents)}
+                  </p>
+                </div>
+              ))}
+              {!selectedSummary.candidateSuggestions.length ? (
+                <p className="text-sm text-slate-400">No hay candidatos claros fuera de la convocatoria.</p>
+              ) : null}
+            </div>
+          </Card>
+
+          <Card>
+            <CardTitle>Lista de jugadores</CardTitle>
+            <div className="mt-4 overflow-x-auto">
+              <Table>
+                <THead>
+                  <tr>
+                    <TH>Jugador</TH>
+                    <TH>Posicion</TH>
+                    <TH>Estado</TH>
+                    <TH>Aporte</TH>
+                    <TH>Notas</TH>
+                    <TH>Accion</TH>
+                  </tr>
+                </THead>
+                <TBody>
+                  {activePlayers.map((player) => {
+                    const entry = entriesByPlayerId.get(player.id) as ClubCallupPlayerRecord | undefined;
+                    const currentStatus = entry?.status ?? "";
+                    const paymentDefault = entry?.expected_cents ?? player.default_payment_cents ?? selectedCallup.full_payment_cents;
+
+                    return (
+                      <tr key={player.id}>
+                        <TD className="font-semibold">{player.full_name}</TD>
+                        <TD>{formatClubPlayerPosition(player.position) || "Sin posicion"}</TD>
+                        <TD>
+                          <Badge className={getCallupPlayerStatusClass(currentStatus)}>
+                            {getCallupPlayerStatusLabel(currentStatus)}
+                          </Badge>
+                        </TD>
+                        <TD>{formatCurrencyCents(paymentDefault)}</TD>
+                        <TD className="text-slate-400">{entry?.notes || player.notes || ""}</TD>
+                        <TD>
+                          <form action={updateClubCallupPlayerAction.bind(null, clubId)} className="flex min-w-[520px] gap-2">
+                            <input name="callupId" type="hidden" value={selectedCallup.id} />
+                            <input name="playerId" type="hidden" value={player.id} />
+                            <Select className="w-36" defaultValue={currentStatus} name="status">
+                              {CALLUP_PLAYER_STATUS_OPTIONS.map((option) => (
+                                <option key={option.value || "none"} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </Select>
+                            <Input
+                              aria-label={`Aporte esperado ${player.full_name}`}
+                              className="w-24"
+                              defaultValue={formatCurrencyInput(entry?.expected_cents)}
+                              min={0}
+                              name="expectedAmount"
+                              placeholder={formatCurrencyInput(player.default_payment_cents ?? selectedCallup.full_payment_cents)}
+                              step="0.01"
+                              type="number"
+                            />
+                            <Input className="w-44" defaultValue={entry?.notes ?? ""} name="notes" placeholder="Nota" />
+                            <Button className="h-9 px-3 text-xs" type="submit" variant="secondary">
+                              Actualizar
+                            </Button>
+                          </form>
+                        </TD>
+                      </tr>
+                    );
+                  })}
+                  {!activePlayers.length ? (
+                    <tr>
+                      <TD className="text-slate-400" colSpan={6}>Carga jugadores activos para armar la convocatoria.</TD>
+                    </tr>
+                  ) : null}
+                </TBody>
+              </Table>
+            </div>
+          </Card>
+        </>
+      ) : (
+        <Card>
+          <CardTitle>Sin convocatoria activa</CardTitle>
+          <CardDescription className="mt-2">
+            Crea la proxima fecha para empezar a marcar confirmados, bajas y aportes esperados.
+          </CardDescription>
+        </Card>
+      )}
+    </div>
+  );
 }
 
 function MatchFinanceEditor({
@@ -1473,6 +1841,7 @@ export default async function AdminClubDetailPage({
   searchParams: Promise<{
     availablePosition?: string;
     availableSearch?: string;
+    callupId?: string;
     error?: string;
     position?: string;
     rosterPosition?: string;
@@ -1507,6 +1876,7 @@ export default async function AdminClubDetailPage({
     { key: "players", label: "Jugadores" },
     { key: "teams", label: "Equipos" },
     { key: "competitions", label: "Torneos" },
+    { key: "callups", label: "Convocatoria" },
     { key: "matches", label: "Partidos" },
     { key: "finances", label: "Finanzas" },
     { key: "admins", label: "Admins" }
@@ -1582,6 +1952,13 @@ export default async function AdminClubDetailPage({
       ) : null}
       {selectedTab === "competitions" ? (
         <CompetitionsTab clubId={clubId} competitions={details.competitions} />
+      ) : null}
+      {selectedTab === "callups" ? (
+        <CallupsTab
+          clubId={clubId}
+          details={details}
+          selectedCallupId={resolvedSearchParams.callupId ?? null}
+        />
       ) : null}
       {selectedTab === "matches" ? (
         <MatchesTab

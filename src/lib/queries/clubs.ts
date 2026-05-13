@@ -3,8 +3,12 @@ import { unstable_noStore as noStore } from "next/cache";
 import { requireAdminSession } from "@/lib/auth/admin";
 import { getAdminClubs } from "@/lib/auth/clubs";
 import {
+  buildClubCallupSummary,
   buildClubFinancialSummary,
   buildClubPublicSnapshot,
+  type ClubCallupPlayerRecord,
+  type ClubCallupRecord,
+  type ClubCallupSummary,
   type ClubCompetitionRecord,
   type ClubFinancialSummary,
   type ClubPublicActivity,
@@ -51,6 +55,9 @@ export type AdminClubDetails = {
   players: ClubPlayerRecord[];
   teams: ClubTeamRecord[];
   teamPlayers: ClubTeamPlayerRecord[];
+  callups: ClubCallupRecord[];
+  callupPlayers: ClubCallupPlayerRecord[];
+  callupSummaries: Record<string, ClubCallupSummary>;
   matches: ClubMatchRecord[];
   lineups: ClubLineupRecord[];
   stats: ClubMatchPlayerStatRecord[];
@@ -264,6 +271,8 @@ async function loadClubPrivateData(clubId: string) {
     { data: competitions, error: competitionsError },
     { data: teams, error: teamsError },
     { data: teamPlayers, error: teamPlayersError },
+    { data: callups, error: callupsError },
+    { data: callupPlayers, error: callupPlayersError },
     { data: matches, error: matchesError },
     { data: lineups, error: lineupsError },
     { data: stats, error: statsError },
@@ -276,7 +285,7 @@ async function loadClubPrivateData(clubId: string) {
       .maybeSingle(),
     supabase
       .from("club_players")
-      .select("id, club_id, full_name, nickname, position, shirt_number, photo_path, notes, active, created_at")
+      .select("id, club_id, full_name, nickname, position, shirt_number, photo_path, default_payment_cents, notes, active, created_at")
       .eq("club_id", clubId)
       .order("full_name", { ascending: true }),
     supabase
@@ -290,6 +299,12 @@ async function loadClubPrivateData(clubId: string) {
       .eq("club_id", clubId)
       .order("name", { ascending: true }),
     supabase.from("club_team_players").select("id, club_team_id, club_player_id"),
+    supabase
+      .from("club_callups")
+      .select("id, club_id, club_team_id, scheduled_at, opponent_name, venue, status, ideal_player_count, max_player_count, target_payment_count, full_payment_cents, field_cost_cents, notes, created_at")
+      .eq("club_id", clubId)
+      .order("scheduled_at", { ascending: false }),
+    supabase.from("club_callup_players").select("id, callup_id, club_player_id, status, expected_cents, notes, created_at, updated_at"),
     supabase
       .from("club_matches")
       .select("id, club_id, club_team_id, club_competition_id, modality, played_at, opponent_name, venue, goals_for, goals_against, status, notes, field_cost_cents, field_cost_currency, created_at")
@@ -307,6 +322,8 @@ async function loadClubPrivateData(clubId: string) {
   if (competitionsError) throw new Error(competitionsError.message);
   if (teamsError) throw new Error(teamsError.message);
   if (teamPlayersError) throw new Error(teamPlayersError.message);
+  if (callupsError) throw new Error(callupsError.message);
+  if (callupPlayersError) throw new Error(callupPlayersError.message);
   if (matchesError) throw new Error(matchesError.message);
   if (lineupsError) throw new Error(lineupsError.message);
   if (statsError) throw new Error(statsError.message);
@@ -314,6 +331,7 @@ async function loadClubPrivateData(clubId: string) {
   if (!club) return null;
 
   const matchIds = new Set((matches ?? []).map((match) => String(match.id)));
+  const callupIds = new Set((callups ?? []).map((callup) => String(callup.id)));
   const filteredLineups = ((lineups ?? []) as ClubLineupRecord[]).filter((lineup) =>
     matchIds.has(lineup.match_id)
   );
@@ -321,14 +339,31 @@ async function loadClubPrivateData(clubId: string) {
   const filteredPayments = ((payments ?? []) as ClubMatchPaymentRecord[]).filter((payment) =>
     matchIds.has(payment.match_id) && lineupIds.has(payment.lineup_id)
   );
+  const filteredCallupPlayers = ((callupPlayers ?? []) as ClubCallupPlayerRecord[]).filter((entry) =>
+    callupIds.has(entry.callup_id)
+  );
+  const playersRows = (players ?? []) as ClubPlayerRecord[];
+  const callupRows = (callups ?? []) as ClubCallupRecord[];
 
   return {
     club: club as ClubRecord,
-    players: (players ?? []) as ClubPlayerRecord[],
+    players: playersRows,
     competitions: (competitions ?? []) as ClubCompetitionRecord[],
     teams: (teams ?? []) as ClubTeamRecord[],
     teamPlayers: ((teamPlayers ?? []) as ClubTeamPlayerRecord[]).filter((teamPlayer) =>
       ((teams ?? []) as ClubTeamRecord[]).some((team) => team.id === teamPlayer.club_team_id)
+    ),
+    callups: callupRows,
+    callupPlayers: filteredCallupPlayers,
+    callupSummaries: Object.fromEntries(
+      callupRows.map((callup) => [
+        callup.id,
+        buildClubCallupSummary({
+          callup,
+          entries: filteredCallupPlayers.filter((entry) => entry.callup_id === callup.id),
+          players: playersRows
+        })
+      ])
     ),
     matches: (matches ?? []) as ClubMatchRecord[],
     lineups: filteredLineups,

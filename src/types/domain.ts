@@ -16,6 +16,8 @@ export type TournamentByeKind = "free_round" | "advance";
 export type ClubStatus = "draft" | "active" | "archived";
 export type ClubMatchStatus = "draft" | "played" | "cancelled";
 export type ClubLineupRole = "starter" | "substitute" | "present";
+export type ClubCallupStatus = "draft" | "closed" | "cancelled";
+export type ClubCallupPlayerStatus = "confirmed" | "tentative" | "out" | "injured" | "waitlist";
 
 export type PlayerRatingInput = {
   id: string;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildClubCallupSummary,
   buildClubFinancialSummary,
   buildClubPublicSnapshot,
   buildClubTeamRosterOptions,
@@ -290,6 +291,109 @@ describe("club finances", () => {
         paidCents: 5000,
         pendingCents: 0,
         status: "paid"
+      }
+    ]);
+  });
+});
+
+describe("club callup planning", () => {
+  it("calcula cupo, pagadores equivalentes y faltantes por posicion", () => {
+    const summary = buildClubCallupSummary({
+      callup: {
+        id: "callup-1",
+        club_id: "club-1",
+        club_team_id: "team-1",
+        scheduled_at: "2026-05-16T20:00:00Z",
+        opponent_name: "Rival",
+        venue: "La Quinta",
+        status: "draft",
+        ideal_player_count: 14,
+        max_player_count: 16,
+        target_payment_count: 14,
+        full_payment_cents: 2500000,
+        field_cost_cents: 35000000,
+        notes: null
+      },
+      entries: [
+        { id: "entry-1", callup_id: "callup-1", club_player_id: "player-1", status: "confirmed", expected_cents: null, notes: null },
+        { id: "entry-2", callup_id: "callup-1", club_player_id: "player-2", status: "confirmed", expected_cents: 1500000, notes: null },
+        { id: "entry-3", callup_id: "callup-1", club_player_id: "player-3", status: "confirmed", expected_cents: null, notes: null },
+        { id: "entry-4", callup_id: "callup-1", club_player_id: "player-4", status: "tentative", expected_cents: null, notes: null },
+        { id: "entry-5", callup_id: "callup-1", club_player_id: "player-5", status: "injured", expected_cents: null, notes: null }
+      ],
+      players: [
+        { id: "player-1", club_id: "club-1", full_name: "Arquero", nickname: null, position: "arquero", shirt_number: null, photo_path: null, active: true },
+        { id: "player-2", club_id: "club-1", full_name: "Pitu", nickname: null, position: "defensor", shirt_number: null, photo_path: null, active: true, default_payment_cents: 1500000 },
+        { id: "player-3", club_id: "club-1", full_name: "Nueve", nickname: null, position: "delantero", shirt_number: null, photo_path: null, active: true },
+        { id: "player-4", club_id: "club-1", full_name: "Dudoso", nickname: null, position: "volante", shirt_number: null, photo_path: null, active: true },
+        { id: "player-5", club_id: "club-1", full_name: "Isa", nickname: null, position: "defensor", shirt_number: null, photo_path: null, active: true }
+      ]
+    });
+
+    expect(summary.confirmedCount).toBe(3);
+    expect(summary.availableCount).toBe(4);
+    expect(summary.remainingIdealSlots).toBe(11);
+    expect(summary.remainingMaxSlots).toBe(13);
+    expect(summary.confirmedExpectedCents).toBe(6500000);
+    expect(summary.paymentEquivalentCount).toBe(2.6);
+    expect(summary.paymentEquivalentMissing).toBe(11.4);
+    expect(summary.revenueMissingCents).toBe(28500000);
+    expect(summary.positionNeeds).toEqual([
+      { position: "defensor", label: "Defensor", needed: 3 },
+      { position: "volante", label: "Volante", needed: 4 },
+      { position: "delantero", label: "Delantero", needed: 1 }
+    ]);
+    expect(summary.recommendations[0]).toContain("11 jugadores");
+    expect(summary.recommendations).toContain("Prioridad: sumar 3 defensores.");
+    expect(summary.recommendations).toContain("Faltan 11.4 pagos completos para cubrir la cancha.");
+  });
+
+  it("sugiere candidatos activos fuera de la convocatoria para cubrir posiciones y pago", () => {
+    const candidates = buildClubCallupSummary({
+      callup: {
+        id: "callup-1",
+        club_id: "club-1",
+        club_team_id: "team-1",
+        scheduled_at: "2026-05-16T20:00:00Z",
+        opponent_name: null,
+        venue: null,
+        status: "draft",
+        ideal_player_count: 14,
+        max_player_count: 16,
+        target_payment_count: 14,
+        full_payment_cents: 2500000,
+        field_cost_cents: 35000000,
+        notes: null
+      },
+      entries: [
+        { id: "entry-1", callup_id: "callup-1", club_player_id: "player-1", status: "confirmed", expected_cents: null, notes: null }
+      ],
+      players: [
+        { id: "player-1", club_id: "club-1", full_name: "Arquero", nickname: null, position: "arquero", shirt_number: null, photo_path: null, active: true },
+        { id: "player-2", club_id: "club-1", full_name: "Central completo", nickname: null, position: "defensor", shirt_number: null, photo_path: null, active: true },
+        { id: "player-3", club_id: "club-1", full_name: "Volante parcial", nickname: null, position: "volante", shirt_number: null, photo_path: null, active: true, default_payment_cents: 1500000 },
+        { id: "player-4", club_id: "club-1", full_name: "Inactivo", nickname: null, position: "defensor", shirt_number: null, photo_path: null, active: false }
+      ]
+    }).candidateSuggestions;
+
+    expect(candidates).toEqual([
+      {
+        playerId: "player-2",
+        displayName: "Central completo",
+        position: "defensor",
+        positionLabel: "Defensor",
+        expectedCents: 2500000,
+        paymentEquivalent: 1,
+        reason: "Cubre Defensor y paga completo"
+      },
+      {
+        playerId: "player-3",
+        displayName: "Volante parcial",
+        position: "volante",
+        positionLabel: "Volante",
+        expectedCents: 1500000,
+        paymentEquivalent: 0.6,
+        reason: "Cubre Volante"
       }
     ]);
   });

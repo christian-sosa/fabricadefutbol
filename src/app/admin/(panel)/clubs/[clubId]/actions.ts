@@ -65,6 +65,7 @@ const playerSchema = z.object({
     (value) => (typeof value === "string" && value.trim() ? Number(value) : null),
     z.number().int().min(1).max(99).nullable()
   ),
+  defaultPaymentAmount: z.string().max(30).optional(),
   notes: z.string().max(300).optional()
 });
 
@@ -99,6 +100,11 @@ const playerPhotoSchema = z.object({
   playerId: z.string().uuid()
 });
 
+const playerPaymentSchema = z.object({
+  playerId: z.string().uuid(),
+  defaultPaymentAmount: z.string().max(30).optional()
+});
+
 const rosterSchema = z.object({
   teamId: z.string().uuid()
 });
@@ -128,6 +134,28 @@ const matchFinanceSchema = z.object({
   matchId: z.string().uuid()
 });
 
+const callupSchema = z.object({
+  teamId: z.string().uuid(),
+  scheduledDate: z.string().optional(),
+  scheduledTime: z.string().min(1, "Carga la hora de la convocatoria."),
+  opponentName: z.string().max(100).optional(),
+  venue: z.string().max(120).optional(),
+  idealPlayerCount: z.coerce.number().int().min(1).max(30),
+  maxPlayerCount: z.coerce.number().int().min(1).max(30),
+  targetPaymentCount: z.coerce.number().int().min(0).max(30),
+  fullPaymentAmount: z.string().max(30),
+  fieldCostAmount: z.string().max(30),
+  notes: z.string().max(500).optional()
+});
+
+const callupPlayerSchema = z.object({
+  callupId: z.string().uuid(),
+  playerId: z.string().uuid(),
+  status: z.enum(["", "confirmed", "tentative", "out", "injured", "waitlist"]),
+  expectedAmount: z.string().max(30).optional(),
+  notes: z.string().max(300).optional()
+});
+
 const clubAdminInviteSchema = z.object({
   email: z.string().email("Ingresa un email valido.")
 });
@@ -142,8 +170,10 @@ const clubAdminInviteDeleteSchema = z.object({
 
 function buildClubDetailPath(params: {
   clubId: string;
+  callupId?: string;
   tab?: string;
   teamId?: string;
+  view?: string;
   error?: string;
   success?: string;
 }) {
@@ -151,6 +181,8 @@ function buildClubDetailPath(params: {
   const searchParams = new URLSearchParams();
   if (params.tab) searchParams.set("tab", params.tab);
   if (params.teamId) searchParams.set("teamId", params.teamId);
+  if (params.callupId) searchParams.set("callupId", params.callupId);
+  if (params.view) searchParams.set("view", params.view);
   if (params.error) searchParams.set("error", params.error);
   if (params.success) searchParams.set("success", params.success);
   const search = searchParams.toString();
@@ -395,6 +427,7 @@ export async function addClubPlayerAction(clubId: string, formData: FormData) {
       nickname: formData.get("nickname"),
       position: formData.get("position"),
       shirtNumber: formData.get("shirtNumber"),
+      defaultPaymentAmount: String(formData.get("defaultPaymentAmount") ?? ""),
       notes: formData.get("notes")
     });
 
@@ -406,6 +439,11 @@ export async function addClubPlayerAction(clubId: string, formData: FormData) {
       redirect(buildClubDetailPath({ clubId, tab: "players", error: message }));
     }
 
+    const defaultPaymentCents = parseCurrencyAmountToCents(formData.get("defaultPaymentAmount"));
+    if (defaultPaymentCents === null) {
+      redirect(buildClubDetailPath({ clubId, tab: "players", error: "El aporte habitual debe ser un numero valido." }));
+    }
+
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.from("club_players").insert({
       club_id: clubId,
@@ -413,6 +451,7 @@ export async function addClubPlayerAction(clubId: string, formData: FormData) {
       nickname: parsed.data.nickname?.trim() || null,
       position: parsed.data.position?.trim() || null,
       shirt_number: parsed.data.shirtNumber,
+      default_payment_cents: defaultPaymentCents || null,
       notes: parsed.data.notes?.trim() || null,
       active: true
     });
@@ -525,6 +564,42 @@ export async function toggleClubPlayerAction(clubId: string, formData: FormData)
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildClubDetailPath({ clubId, tab: "players", error: toUserMessage(error, "No se pudo actualizar el jugador.") }));
+  }
+}
+
+export async function updateClubPlayerPaymentAction(clubId: string, formData: FormData) {
+  try {
+    await assertClubWriteAction(clubId);
+    const parsed = playerPaymentSchema.safeParse({
+      playerId: formData.get("playerId"),
+      defaultPaymentAmount: String(formData.get("defaultPaymentAmount") ?? "")
+    });
+
+    if (!parsed.success) {
+      redirect(buildClubDetailPath({ clubId, tab: "players", error: "Falta el jugador a actualizar." }));
+    }
+
+    const defaultPaymentCents = parseCurrencyAmountToCents(formData.get("defaultPaymentAmount"));
+    if (defaultPaymentCents === null) {
+      redirect(buildClubDetailPath({ clubId, tab: "players", error: "El aporte habitual debe ser un numero valido." }));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase
+      .from("club_players")
+      .update({ default_payment_cents: defaultPaymentCents || null })
+      .eq("id", parsed.data.playerId)
+      .eq("club_id", clubId);
+
+    if (error) {
+      redirect(buildClubDetailPath({ clubId, tab: "players", error: toUserMessage(error, "No se pudo actualizar el aporte del jugador.") }));
+    }
+
+    await refreshAndRevalidate(clubId);
+    redirect(buildClubDetailPath({ clubId, tab: "players", view: "pool", success: "Aporte habitual actualizado." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab: "players", error: toUserMessage(error, "No se pudo actualizar el aporte del jugador.") }));
   }
 }
 
@@ -1243,6 +1318,162 @@ export async function updateClubMatchFinanceAction(clubId: string, formData: For
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildClubDetailPath({ clubId, tab, error: toUserMessage(error, "No se pudieron actualizar los pagos de cancha.") }));
+  }
+}
+
+export async function addClubCallupAction(clubId: string, formData: FormData) {
+  try {
+    const admin = await assertClubWriteAction(clubId);
+    const parsed = callupSchema.safeParse({
+      teamId: formData.get("teamId"),
+      scheduledDate: String(formData.get("scheduledDate") ?? ""),
+      scheduledTime: String(formData.get("scheduledTime") ?? ""),
+      opponentName: formData.get("opponentName"),
+      venue: formData.get("venue"),
+      idealPlayerCount: formData.get("idealPlayerCount"),
+      maxPlayerCount: formData.get("maxPlayerCount"),
+      targetPaymentCount: formData.get("targetPaymentCount"),
+      fullPaymentAmount: String(formData.get("fullPaymentAmount") ?? ""),
+      fieldCostAmount: String(formData.get("fieldCostAmount") ?? ""),
+      notes: formData.get("notes")
+    });
+
+    if (!parsed.success) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", error: parsed.error.issues[0]?.message ?? "Datos invalidos." }));
+    }
+    if (parsed.data.maxPlayerCount < parsed.data.idealPlayerCount) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", error: "El maximo de jugadores no puede ser menor al ideal." }));
+    }
+
+    const fullPaymentCents = parseCurrencyAmountToCents(formData.get("fullPaymentAmount"));
+    const fieldCostCents = parseCurrencyAmountToCents(formData.get("fieldCostAmount"));
+    if (fullPaymentCents === null || fullPaymentCents <= 0) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", error: "El pago completo debe ser un numero mayor a 0." }));
+    }
+    if (fieldCostCents === null) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", error: "El costo de cancha debe ser un numero valido." }));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { data: team, error: teamError } = await supabase
+      .from("club_teams")
+      .select("id")
+      .eq("id", parsed.data.teamId)
+      .eq("club_id", clubId)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (teamError || !team) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", error: "No se encontro el equipo activo dentro de este club." }));
+    }
+
+    const { data: callup, error } = await supabase
+      .from("club_callups")
+      .insert({
+        club_id: clubId,
+        club_team_id: parsed.data.teamId,
+        scheduled_at: matchDateAndTimeToIso(parsed.data.scheduledDate, parsed.data.scheduledTime),
+        opponent_name: parsed.data.opponentName?.trim() || null,
+        venue: parsed.data.venue?.trim() || null,
+        ideal_player_count: parsed.data.idealPlayerCount,
+        max_player_count: parsed.data.maxPlayerCount,
+        target_payment_count: parsed.data.targetPaymentCount,
+        full_payment_cents: fullPaymentCents,
+        field_cost_cents: fieldCostCents,
+        notes: parsed.data.notes?.trim() || null,
+        created_by: admin.userId
+      })
+      .select("id")
+      .single();
+
+    if (error || !callup) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", error: toUserMessage(error, "No se pudo crear la convocatoria.") }));
+    }
+
+    await revalidateClubPaths(clubId);
+    redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: String(callup.id), success: "Convocatoria creada." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab: "callups", error: toUserMessage(error, "No se pudo crear la convocatoria.") }));
+  }
+}
+
+export async function updateClubCallupPlayerAction(clubId: string, formData: FormData) {
+  try {
+    await assertClubWriteAction(clubId);
+    const parsed = callupPlayerSchema.safeParse({
+      callupId: formData.get("callupId"),
+      playerId: formData.get("playerId"),
+      status: formData.get("status"),
+      expectedAmount: String(formData.get("expectedAmount") ?? ""),
+      notes: formData.get("notes")
+    });
+
+    if (!parsed.success) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", error: "Datos invalidos para la convocatoria." }));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const [{ data: callup, error: callupError }, { data: player, error: playerError }] = await Promise.all([
+      supabase
+        .from("club_callups")
+        .select("id")
+        .eq("id", parsed.data.callupId)
+        .eq("club_id", clubId)
+        .maybeSingle(),
+      supabase
+        .from("club_players")
+        .select("id")
+        .eq("id", parsed.data.playerId)
+        .eq("club_id", clubId)
+        .maybeSingle()
+    ]);
+
+    if (callupError || !callup) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", error: "No se encontro la convocatoria dentro de este club." }));
+    }
+    if (playerError || !player) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, error: "No se encontro el jugador dentro de este club." }));
+    }
+
+    if (!parsed.data.status) {
+      const { error } = await supabase
+        .from("club_callup_players")
+        .delete()
+        .eq("callup_id", parsed.data.callupId)
+        .eq("club_player_id", parsed.data.playerId);
+      if (error) {
+        redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, error: toUserMessage(error, "No se pudo quitar el jugador de la convocatoria.") }));
+      }
+      await revalidateClubPaths(clubId);
+      redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, success: "Convocatoria actualizada." }));
+    }
+
+    const expectedCents = parseCurrencyAmountToCents(formData.get("expectedAmount"));
+    if (expectedCents === null) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, error: "El aporte esperado debe ser un numero valido." }));
+    }
+
+    const { error } = await supabase.from("club_callup_players").upsert(
+      {
+        callup_id: parsed.data.callupId,
+        club_player_id: parsed.data.playerId,
+        status: parsed.data.status,
+        expected_cents: expectedCents || null,
+        notes: parsed.data.notes?.trim() || null
+      },
+      { onConflict: "callup_id,club_player_id" }
+    );
+
+    if (error) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, error: toUserMessage(error, "No se pudo actualizar la convocatoria.") }));
+    }
+
+    await revalidateClubPaths(clubId);
+    redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, success: "Convocatoria actualizada." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab: "callups", error: toUserMessage(error, "No se pudo actualizar la convocatoria.") }));
   }
 }
 

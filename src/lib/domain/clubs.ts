@@ -5,6 +5,8 @@ export type ClubStatus = "draft" | "active" | "archived";
 export type ClubMatchStatus = "draft" | "played" | "cancelled";
 export type ClubLineupRole = "starter" | "substitute" | "present";
 export type ClubPaymentStatus = "paid" | "partial" | "unpaid";
+export type ClubCallupStatus = "draft" | "closed" | "cancelled";
+export type ClubCallupPlayerStatus = "confirmed" | "tentative" | "out" | "injured" | "waitlist";
 export type ClubSnapshotModalityFilter = MatchModality | "all";
 export const CLUB_PLAYER_POSITIONS = ["arquero", "defensor", "volante", "delantero"] as const;
 export type ClubPlayerPosition = (typeof CLUB_PLAYER_POSITIONS)[number];
@@ -36,6 +38,7 @@ export type ClubPlayerRecord = {
   position: ClubPlayerPosition | null;
   shirt_number: number | null;
   photo_path: string | null;
+  default_payment_cents?: number | null;
   notes?: string | null;
   active: boolean;
   created_at?: string;
@@ -115,6 +118,69 @@ export type ClubMatchPaymentRecord = {
   updated_by?: string | null;
   created_at?: string;
   updated_at?: string;
+};
+
+export type ClubCallupRecord = {
+  id: string;
+  club_id: string;
+  club_team_id: string;
+  scheduled_at: string;
+  opponent_name: string | null;
+  venue: string | null;
+  status: ClubCallupStatus;
+  ideal_player_count: number;
+  max_player_count: number;
+  target_payment_count: number;
+  full_payment_cents: number;
+  field_cost_cents: number;
+  notes: string | null;
+  created_at?: string;
+};
+
+export type ClubCallupPlayerRecord = {
+  id: string;
+  callup_id: string;
+  club_player_id: string;
+  status: ClubCallupPlayerStatus;
+  expected_cents: number | null;
+  notes: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ClubCallupPositionNeed = {
+  position: ClubPlayerPosition;
+  label: string;
+  needed: number;
+};
+
+export type ClubCallupCandidateSuggestion = {
+  playerId: string;
+  displayName: string;
+  position: ClubPlayerPosition | null;
+  positionLabel: string;
+  expectedCents: number;
+  paymentEquivalent: number;
+  reason: string;
+};
+
+export type ClubCallupSummary = {
+  confirmedCount: number;
+  tentativeCount: number;
+  waitlistCount: number;
+  outCount: number;
+  injuredCount: number;
+  availableCount: number;
+  remainingIdealSlots: number;
+  remainingMaxSlots: number;
+  confirmedExpectedCents: number;
+  targetRevenueCents: number;
+  revenueMissingCents: number;
+  paymentEquivalentCount: number;
+  paymentEquivalentMissing: number;
+  positionNeeds: ClubCallupPositionNeed[];
+  candidateSuggestions: ClubCallupCandidateSuggestion[];
+  recommendations: string[];
 };
 
 export type ClubFinancialTotals = {
@@ -314,6 +380,42 @@ function toSafeCents(value: unknown) {
   return Math.max(0, Math.trunc(amount));
 }
 
+function roundToOneDecimal(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
+const DEFAULT_CALLUP_POSITION_TARGETS: Record<ClubPlayerPosition, number> = {
+  arquero: 1,
+  defensor: 4,
+  volante: 4,
+  delantero: 2
+};
+
+const POSITION_PLURALS: Record<ClubPlayerPosition, string> = {
+  arquero: "arqueros",
+  defensor: "defensores",
+  volante: "volantes",
+  delantero: "delanteros"
+};
+
+function getPlayerPaymentExpectation({
+  entry,
+  fullPaymentCents,
+  player
+}: {
+  entry?: Pick<ClubCallupPlayerRecord, "expected_cents"> | null;
+  fullPaymentCents: number;
+  player?: Pick<ClubPlayerRecord, "default_payment_cents"> | null;
+}) {
+  if (entry?.expected_cents != null) return toSafeCents(entry.expected_cents);
+  if (player?.default_payment_cents != null) return toSafeCents(player.default_payment_cents);
+  return fullPaymentCents;
+}
+
+function formatPaymentEquivalent(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 function getAggregateStatus(expectedCents: number, paidCents: number): ClubPaymentStatus {
   if (expectedCents <= 0 || paidCents >= expectedCents) return "paid";
   if (paidCents <= 0) return "unpaid";
@@ -335,6 +437,126 @@ export function splitClubMatchCost(totalCents: number, lineupIds: string[]) {
 
 export function getClubPaymentStatus(payment: Pick<ClubMatchPaymentRecord, "expected_cents" | "paid_cents">): ClubPaymentStatus {
   return getAggregateStatus(toSafeCents(payment.expected_cents), toSafeCents(payment.paid_cents));
+}
+
+export function buildClubCallupSummary({
+  callup,
+  entries,
+  players
+}: {
+  callup: ClubCallupRecord;
+  entries: ClubCallupPlayerRecord[];
+  players: ClubPlayerRecord[];
+}): ClubCallupSummary {
+  const playersById = new Map(players.map((player) => [player.id, player]));
+  const entryPlayerIds = new Set(entries.map((entry) => entry.club_player_id));
+  const fullPaymentCents = Math.max(1, toSafeCents(callup.full_payment_cents));
+  const confirmedEntries = entries.filter((entry) => entry.status === "confirmed");
+  const tentativeEntries = entries.filter((entry) => entry.status === "tentative");
+  const waitlistEntries = entries.filter((entry) => entry.status === "waitlist");
+  const outEntries = entries.filter((entry) => entry.status === "out");
+  const injuredEntries = entries.filter((entry) => entry.status === "injured");
+  const availableEntries = entries.filter((entry) => entry.status === "confirmed" || entry.status === "tentative");
+  const confirmedExpectedCents = confirmedEntries.reduce((total, entry) => {
+    const player = playersById.get(entry.club_player_id);
+    return total + getPlayerPaymentExpectation({ entry, fullPaymentCents, player });
+  }, 0);
+  const paymentEquivalentCount = roundToOneDecimal(confirmedExpectedCents / fullPaymentCents);
+  const targetPaymentCount = Math.max(0, Number(callup.target_payment_count) || 0);
+  const targetRevenueCents = toSafeCents(callup.field_cost_cents) || targetPaymentCount * fullPaymentCents;
+  const positionCounts = Object.fromEntries(
+    CLUB_PLAYER_POSITIONS.map((position) => [position, 0])
+  ) as Record<ClubPlayerPosition, number>;
+
+  for (const entry of confirmedEntries) {
+    const position = normalizeClubPlayerPosition(playersById.get(entry.club_player_id)?.position);
+    if (position) positionCounts[position] += 1;
+  }
+
+  const positionNeeds = CLUB_PLAYER_POSITIONS
+    .map((position) => ({
+      position,
+      label: formatClubPlayerPosition(position),
+      needed: Math.max(0, DEFAULT_CALLUP_POSITION_TARGETS[position] - positionCounts[position])
+    }))
+    .filter((row) => row.needed > 0);
+
+  const missingPositions = new Set(positionNeeds.map((row) => row.position));
+  const candidateSuggestions = players
+    .filter((player) => player.active && !entryPlayerIds.has(player.id))
+    .map((player) => {
+      const position = normalizeClubPlayerPosition(player.position);
+      const expectedCents = getPlayerPaymentExpectation({ fullPaymentCents, player });
+      const paymentEquivalent = roundToOneDecimal(expectedCents / fullPaymentCents);
+      const positionLabel = position ? formatClubPlayerPosition(position) : "Sin posicion";
+      const reasons = [
+        position && missingPositions.has(position) ? `Cubre ${positionLabel}` : null,
+        expectedCents >= fullPaymentCents ? "paga completo" : null
+      ].filter(Boolean);
+
+      return {
+        playerId: player.id,
+        displayName: player.full_name,
+        position,
+        positionLabel,
+        expectedCents,
+        paymentEquivalent,
+        reason: reasons.length ? reasons.join(" y ") : "Disponible para completar cupo"
+      };
+    })
+    .filter((candidate) => candidate.position && missingPositions.has(candidate.position))
+    .sort((left, right) => {
+      const leftPositionIndex = left.position ? CLUB_PLAYER_POSITIONS.indexOf(left.position) : CLUB_PLAYER_POSITIONS.length;
+      const rightPositionIndex = right.position ? CLUB_PLAYER_POSITIONS.indexOf(right.position) : CLUB_PLAYER_POSITIONS.length;
+      if (leftPositionIndex !== rightPositionIndex) return leftPositionIndex - rightPositionIndex;
+      if (right.paymentEquivalent !== left.paymentEquivalent) return right.paymentEquivalent - left.paymentEquivalent;
+      return left.displayName.localeCompare(right.displayName, "es");
+    })
+    .slice(0, 6);
+
+  const remainingIdealSlots = Math.max(0, callup.ideal_player_count - confirmedEntries.length);
+  const remainingMaxSlots = Math.max(0, callup.max_player_count - confirmedEntries.length);
+  const paymentEquivalentMissing = roundToOneDecimal(Math.max(0, targetPaymentCount - paymentEquivalentCount));
+  const revenueMissingCents = Math.max(0, targetRevenueCents - confirmedExpectedCents);
+  const recommendations: string[] = [];
+
+  if (remainingIdealSlots > 0) {
+    recommendations.push(`Te faltan ${remainingIdealSlots} jugadores para llegar al ideal de ${callup.ideal_player_count}.`);
+  } else if (remainingMaxSlots === 0) {
+    recommendations.push("Ya estas en el maximo de jugadores para esta convocatoria.");
+  } else {
+    recommendations.push("El cupo base esta cubierto.");
+  }
+
+  const priorityNeed = positionNeeds.find((need) => need.position !== "arquero") ?? positionNeeds[0];
+  if (priorityNeed) {
+    recommendations.push(`Prioridad: sumar ${priorityNeed.needed} ${POSITION_PLURALS[priorityNeed.position]}.`);
+  }
+
+  if (paymentEquivalentMissing > 0) {
+    recommendations.push(`Faltan ${formatPaymentEquivalent(paymentEquivalentMissing)} pagos completos para cubrir la cancha.`);
+  } else {
+    recommendations.push("La cancha queda cubierta con los pagos esperados.");
+  }
+
+  return {
+    confirmedCount: confirmedEntries.length,
+    tentativeCount: tentativeEntries.length,
+    waitlistCount: waitlistEntries.length,
+    outCount: outEntries.length,
+    injuredCount: injuredEntries.length,
+    availableCount: availableEntries.length,
+    remainingIdealSlots,
+    remainingMaxSlots,
+    confirmedExpectedCents,
+    targetRevenueCents,
+    revenueMissingCents,
+    paymentEquivalentCount,
+    paymentEquivalentMissing,
+    positionNeeds,
+    candidateSuggestions,
+    recommendations
+  };
 }
 
 export function buildClubFinancialSummary({
