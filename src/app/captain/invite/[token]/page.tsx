@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { acceptCaptainInviteAction } from "@/app/captain/invite/[token]/actions";
+import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { buildAdminLoginPath } from "@/lib/auth/redirects";
-import { deriveDisplayName } from "@/lib/auth/profile";
 import { normalizeEmail } from "@/lib/org";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -16,22 +17,15 @@ type InviteRow = {
   expires_at: string;
 };
 
-function buildCaptainPanelHref(params: { competitionId: string; teamId: string }) {
-  const searchParams = new URLSearchParams({
-    competition: params.competitionId,
-    team: params.teamId,
-    success: "Ya tienes acceso a tu equipo."
-  });
-
-  return `/captain?${searchParams.toString()}`;
-}
-
 export default async function CaptainInvitePage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const { token } = await params;
+  const resolvedSearchParams = await searchParams;
   const loginHref = buildAdminLoginPath(`/captain/invite/${token}`);
   const supabase = await createSupabaseServerClient();
   const privilegedSupabase = createSupabaseAdminClient() ?? supabase;
@@ -108,18 +102,6 @@ export default async function CaptainInvitePage({
     );
   }
 
-  const { error: ensureAdminError } = await privilegedSupabase.from("admins").upsert(
-    {
-      id: user.id,
-      display_name: deriveDisplayName(user.email, (user.user_metadata ?? undefined) as Record<string, unknown> | undefined)
-    },
-    { onConflict: "id" }
-  );
-
-  if (ensureAdminError) {
-    throw new Error(ensureAdminError.message);
-  }
-
   const { data: currentCaptain, error: currentCaptainError } = await privilegedSupabase
     .from("competition_team_captains")
     .select("id, captain_id")
@@ -147,29 +129,31 @@ export default async function CaptainInvitePage({
     );
   }
 
-  if (!currentCaptain) {
-    const { error: assignmentError } = await privilegedSupabase.from("competition_team_captains").insert({
-      competition_id: pendingInvite.competition_id,
-      competition_team_id: pendingInvite.competition_team_id,
-      captain_id: user.id
-    });
+  return (
+    <div className="py-6">
+      <Card>
+        <CardTitle>Aceptar invitacion</CardTitle>
+        <CardDescription className="mt-2">
+          Vas a entrar como capitan del equipo con <strong>{user.email}</strong>.
+        </CardDescription>
 
-    if (assignmentError && assignmentError.code !== "23505") {
-      throw new Error(assignmentError.message);
-    }
-  }
+        {resolvedSearchParams.error ? (
+          <p className="mt-4 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p>
+        ) : null}
 
-  const { error: deleteInviteError } = await privilegedSupabase
-    .from("competition_captain_invites")
-    .delete()
-    .eq("id", pendingInvite.id)
-    .eq("competition_team_id", pendingInvite.competition_team_id)
-    .eq("competition_id", pendingInvite.competition_id)
-    .eq("email", invitedEmail);
-
-  if (deleteInviteError) {
-    throw new Error(deleteInviteError.message);
-  }
-
-  redirect(buildCaptainPanelHref({ competitionId: pendingInvite.competition_id, teamId: pendingInvite.competition_team_id }));
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+          <form action={acceptCaptainInviteAction}>
+            <input name="token" type="hidden" value={token} />
+            <Button type="submit">Aceptar invitacion</Button>
+          </form>
+          <Link
+            className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
+            href="/captain"
+          >
+            Ahora no
+          </Link>
+        </div>
+      </Card>
+    </div>
+  );
 }

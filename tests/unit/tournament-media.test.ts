@@ -6,7 +6,13 @@ import {
   isSupportedLeaguePhotoFile
 } from "@/lib/league-photos";
 import { getClubPlayerPhotoObjectPath } from "@/lib/player-photos";
-import { getClubTeamLogoObjectPath, getClubTeamLogoUrl, getTeamLogoObjectPath, getTeamLogoUrl, isSupportedTeamLogoFile } from "@/lib/team-logos";
+import {
+  getClubTeamLogoObjectPath,
+  getClubTeamLogoUrl,
+  getTeamLogoObjectPath,
+  getTeamLogoUrl,
+  isSupportedTeamLogoFile
+} from "@/lib/team-logos";
 
 function buildFile(name: string, type: string) {
   return new File(["image"], name, { type });
@@ -20,10 +26,11 @@ describe("tournament media helpers", () => {
     expect(isSupportedLeaguePhotoFile(buildFile("liga.gif", "image/gif"))).toBe(false);
   });
 
-  it("acepta formatos compatibles para logos de equipos", () => {
-    expect(isSupportedTeamLogoFile(buildFile("escudo.svg", "image/svg+xml"))).toBe(true);
+  it("acepta formatos raster compatibles para logos de equipos y rechaza SVG", () => {
     expect(isSupportedTeamLogoFile(buildFile("escudo.png", "image/png"))).toBe(true);
     expect(isSupportedTeamLogoFile(buildFile("escudo.webp", "image/webp"))).toBe(true);
+    expect(isSupportedTeamLogoFile(buildFile("escudo.svg", "image/svg+xml"))).toBe(false);
+    expect(isSupportedTeamLogoFile(buildFile("escudo.svg", "image/png"))).toBe(false);
     expect(isSupportedTeamLogoFile(buildFile("escudo.gif", "image/gif"))).toBe(false);
   });
 

@@ -16,6 +16,10 @@ export const ACTION_RATE_LIMITS = {
   inviteOrganizationAdmin: {
     limit: 8,
     windowMs: DEFAULT_WINDOW_MS
+  },
+  acceptInvite: {
+    limit: 20,
+    windowMs: DEFAULT_WINDOW_MS
   }
 } as const;
 

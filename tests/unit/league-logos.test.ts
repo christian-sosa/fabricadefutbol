@@ -12,11 +12,12 @@ function buildFile(name: string, type: string) {
 }
 
 describe("league logo helpers", () => {
-  it("acepta formatos compatibles para logos de liga", () => {
+  it("acepta formatos raster compatibles para logos de liga y rechaza SVG", () => {
     expect(isSupportedLeagueLogoFile(buildFile("liga.jpg", "image/jpeg"))).toBe(true);
     expect(isSupportedLeagueLogoFile(buildFile("liga.png", "image/png"))).toBe(true);
     expect(isSupportedLeagueLogoFile(buildFile("liga.webp", "image/webp"))).toBe(true);
-    expect(isSupportedLeagueLogoFile(buildFile("liga.svg", "image/svg+xml"))).toBe(true);
+    expect(isSupportedLeagueLogoFile(buildFile("liga.svg", "image/svg+xml"))).toBe(false);
+    expect(isSupportedLeagueLogoFile(buildFile("liga.svg", "image/png"))).toBe(false);
     expect(isSupportedLeagueLogoFile(buildFile("liga.gif", "image/gif"))).toBe(false);
   });
 

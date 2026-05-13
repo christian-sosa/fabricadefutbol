@@ -8,15 +8,17 @@ export const LEAGUE_LOGO_QUALITY = 88;
 export const LEAGUE_LOGO_CACHE_CONTROL = "no-store";
 export const LEAGUE_LOGO_PLACEHOLDER_CACHE_CONTROL = "no-store";
 
-const LEAGUE_LOGO_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/svg+xml"]);
+const LEAGUE_LOGO_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export function isSupportedLeagueLogoFile(file: File) {
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  if (extension === "svg") return false;
+
   if (LEAGUE_LOGO_CONTENT_TYPES.has(file.type)) {
     return true;
   }
 
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  return ["jpg", "jpeg", "png", "webp", "svg"].includes(extension);
+  return ["jpg", "jpeg", "png", "webp"].includes(extension);
 }
 
 export function getLeagueLogoObjectPath(schemaName: string, leagueId: string) {

@@ -5,15 +5,17 @@ export const TEAM_LOGO_SIZE_PX = 512;
 export const TEAM_LOGO_QUALITY = 88;
 export const TEAM_LOGO_CACHE_CONTROL = "no-store";
 
-const TEAM_LOGO_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/svg+xml"]);
+const TEAM_LOGO_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export function isSupportedTeamLogoFile(file: File) {
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  if (extension === "svg") return false;
+
   if (TEAM_LOGO_CONTENT_TYPES.has(file.type)) {
     return true;
   }
 
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  return ["jpg", "jpeg", "png", "webp", "svg"].includes(extension);
+  return ["jpg", "jpeg", "png", "webp"].includes(extension);
 }
 
 export function getTeamLogoObjectPath(schemaName: string, leagueTeamId: string) {
