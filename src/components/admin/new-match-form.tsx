@@ -12,12 +12,13 @@ import { Select } from "@/components/ui/select";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import {
   formatGuestSkillLevelLabel,
+  formatRatingTrendLabel,
   formatSkillLevelLabel,
   GUEST_SKILL_LEVEL_HELP_TEXT,
   GUEST_SKILL_LEVEL_OPTIONS,
   parseGuestSkillLevelValue
 } from "@/lib/domain/skill-level";
-import { cn, formatRendimiento } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { MatchModality, TeamSide } from "@/types/domain";
 
 type SelectablePlayer = {
@@ -39,6 +40,7 @@ type ManualParticipant = {
   participantId: string;
   fullName: string;
   rating: number;
+  skillLevel?: number;
   source: "player" | "guest";
 };
 
@@ -110,6 +112,7 @@ export function NewMatchForm({
         participantId: `player:${player.id}`,
         fullName: player.full_name,
         rating: Number(player.current_rating),
+        skillLevel: player.skill_level,
         source: "player" as const
       })),
       ...validGuests.map((guest) => ({
@@ -293,50 +296,70 @@ export function NewMatchForm({
           Si marcas arqueros, deben ser exactamente 2 y se reparten uno por equipo.
         </p>
         <div className="mt-3 grid gap-2 md:grid-cols-2">
-          {players.map((player) => (
-            <label
-              className={cn(
-                "flex items-center justify-between rounded-lg border bg-slate-950 px-3 py-2 text-sm transition hover:border-slate-600",
-                selectedPlayers[player.id] ? "border-emerald-500/50" : "border-slate-800"
-              )}
-              key={player.id}
-            >
-              <span className="flex items-center gap-3">
-                <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
-                <span>
-                  {player.full_name}{" "}
-                  <span className="text-xs text-slate-500">({formatSkillLevelLabel(player.skill_level)})</span>
+          {players.map((player) => {
+            const ratingTrendLabel = formatRatingTrendLabel(player.current_rating);
+            const shouldShowRatingTrend = ratingTrendLabel !== "Parejo";
+
+            return (
+              <label
+                className={cn(
+                  "flex items-center justify-between rounded-lg border bg-slate-950 px-3 py-2 text-sm transition hover:border-slate-600",
+                  selectedPlayers[player.id] ? "border-emerald-500/50" : "border-slate-800"
+                )}
+                key={player.id}
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold text-slate-100">{player.full_name}</span>
+                    <span className="mt-1 flex flex-wrap gap-1.5">
+                      <span className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-slate-300">
+                        {formatSkillLevelLabel(player.skill_level)}
+                      </span>
+                      {shouldShowRatingTrend ? (
+                        <span
+                          className={cn(
+                            "rounded border px-2 py-0.5 text-[11px] font-semibold",
+                            ratingTrendLabel === "Viene alto"
+                              ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+                              : "border-amber-400/40 bg-amber-500/10 text-amber-200"
+                          )}
+                        >
+                          {ratingTrendLabel}
+                        </span>
+                      ) : null}
+                    </span>
+                  </span>
                 </span>
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span>
-                <span className="flex items-center gap-1 rounded border border-slate-700 px-2 py-1">
-                  <span className="text-[11px] font-semibold uppercase text-slate-300">Juega</span>
-                  <input
-                    checked={Boolean(selectedPlayers[player.id])}
-                    name="playerIds"
-                    onChange={(event) => togglePlayerSelection(player.id, event.target.checked)}
-                    type="checkbox"
-                    value={player.id}
-                  />
+                <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-1 rounded border border-slate-700 px-2 py-1">
+                    <span className="text-[11px] font-semibold uppercase text-slate-300">Juega</span>
+                    <input
+                      checked={Boolean(selectedPlayers[player.id])}
+                      name="playerIds"
+                      onChange={(event) => togglePlayerSelection(player.id, event.target.checked)}
+                      type="checkbox"
+                      value={player.id}
+                    />
+                  </span>
+                  <span className="flex items-center gap-1 rounded border border-cyan-500/30 px-2 py-1">
+                    <span className="text-[11px] font-semibold uppercase text-cyan-200">Arquero</span>
+                    <input
+                      checked={Boolean(goalkeeperPlayers[player.id]) && Boolean(selectedPlayers[player.id])}
+                      disabled={
+                        !selectedPlayers[player.id] ||
+                        (!goalkeeperPlayers[player.id] && selectedGoalkeeperIds.length >= 2)
+                      }
+                      name="goalkeeperPlayerIds"
+                      onChange={(event) => toggleGoalkeeperSelection(player.id, event.target.checked)}
+                      type="checkbox"
+                      value={player.id}
+                    />
+                  </span>
                 </span>
-                <span className="flex items-center gap-1 rounded border border-cyan-500/30 px-2 py-1">
-                  <span className="text-[11px] font-semibold uppercase text-cyan-200">Arquero</span>
-                  <input
-                    checked={Boolean(goalkeeperPlayers[player.id]) && Boolean(selectedPlayers[player.id])}
-                    disabled={
-                      !selectedPlayers[player.id] ||
-                      (!goalkeeperPlayers[player.id] && selectedGoalkeeperIds.length >= 2)
-                    }
-                    name="goalkeeperPlayerIds"
-                    onChange={(event) => toggleGoalkeeperSelection(player.id, event.target.checked)}
-                    type="checkbox"
-                    value={player.id}
-                  />
-                </span>
-              </span>
-            </label>
-          ))}
+              </label>
+            );
+          })}
         </div>
         {!goalkeepersReady ? (
           <p className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-200">
@@ -424,6 +447,13 @@ export function NewMatchForm({
             <div className="mt-3 grid gap-2 md:grid-cols-2">
               {manualParticipants.map((participant, index) => {
                 const assignedTeam = manualAssignments[participant.participantId] ?? (index < teamSize ? "A" : "B");
+                const ratingTrendLabel = formatRatingTrendLabel(participant.rating);
+                const registeredPlayerDetails = [
+                  "Jugador",
+                  formatSkillLevelLabel(participant.skillLevel),
+                  ...(ratingTrendLabel === "Parejo" ? [] : [ratingTrendLabel])
+                ].join(" | ");
+
                 return (
                   <div
                     className="grid gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 md:grid-cols-[1fr_130px]"
@@ -434,7 +464,7 @@ export function NewMatchForm({
                       <span className="ml-2 text-xs text-slate-400">
                         {participant.source === "guest"
                           ? `Invitado | ${formatGuestSkillLevelLabel(participant.rating)}`
-                          : `Jugador | rendimiento ${formatRendimiento(participant.rating)}`}
+                          : registeredPlayerDetails}
                       </span>
                     </div>
                     <Select

@@ -1,8 +1,10 @@
 export const MIN_SKILL_LEVEL = 1;
 export const MAX_SKILL_LEVEL = 7;
 export const DEFAULT_SKILL_LEVEL = 5;
-export const RATING_UP_THRESHOLD = 1050;
-export const RATING_DOWN_THRESHOLD = 950;
+export const BASE_RATING = 1000;
+export const RATING_STEP_SIZE = 50;
+export const RATING_UP_THRESHOLD = BASE_RATING + RATING_STEP_SIZE;
+export const RATING_DOWN_THRESHOLD = BASE_RATING - RATING_STEP_SIZE;
 export const EDGE_RATING_BONUS = 25;
 export const GUEST_FEATURED_SKILL_LEVEL = 0.5;
 export const SKILL_LEVEL_OPTIONS = [1, 2, 3, 4, 5, 6, 7] as const;
@@ -55,6 +57,14 @@ export function formatGuestSkillLevelLabel(value: number | string | null | undef
   return formatSkillLevelLabel(level);
 }
 
+export function formatRatingTrendLabel(currentRating: number | null | undefined) {
+  const rating = Number(currentRating ?? BASE_RATING);
+  if (!Number.isFinite(rating)) return "Parejo";
+  if (rating >= RATING_UP_THRESHOLD) return "Viene alto";
+  if (rating <= RATING_DOWN_THRESHOLD) return "Viene bajo";
+  return "Parejo";
+}
+
 export function mapInitialRankToSkillLevel(params: {
   initialRank: number;
   totalPlayers: number;
@@ -68,35 +78,42 @@ export function mapInitialRankToSkillLevel(params: {
   return normalizeSkillLevel(bucket);
 }
 
-export function calculateEffectiveSkillLevel(input: EffectiveSkillScoreInput) {
+function calculateRatingStepOffset(currentRating: number | null | undefined) {
+  const rating = Number(currentRating ?? BASE_RATING);
+  if (!Number.isFinite(rating)) return 0;
+
+  const distanceFromBase = rating - BASE_RATING;
+  if (Math.abs(distanceFromBase) < RATING_STEP_SIZE) return 0;
+
+  return distanceFromBase > 0
+    ? Math.floor(distanceFromBase / RATING_STEP_SIZE)
+    : Math.ceil(distanceFromBase / RATING_STEP_SIZE);
+}
+
+function calculateRawEffectiveSkillLevel(input: EffectiveSkillScoreInput) {
   const skillLevel = normalizeSkillLevel(input.skillLevel);
-  const currentRating = Number(input.currentRating ?? 1000);
+  return skillLevel - calculateRatingStepOffset(input.currentRating);
+}
 
-  if (Number.isFinite(currentRating) && currentRating >= RATING_UP_THRESHOLD) {
-    return Math.max(MIN_SKILL_LEVEL, skillLevel - 1);
-  }
-
-  if (Number.isFinite(currentRating) && currentRating <= RATING_DOWN_THRESHOLD) {
-    return Math.min(MAX_SKILL_LEVEL, skillLevel + 1);
-  }
-
-  return skillLevel;
+export function calculateEffectiveSkillLevel(input: EffectiveSkillScoreInput) {
+  return normalizeSkillLevel(calculateRawEffectiveSkillLevel(input));
 }
 
 export function calculateEffectiveSkillScore(input: EffectiveSkillScoreInput) {
   const skillLevel = normalizeSkillLevel(input.skillLevel);
   const currentRating = Number(input.currentRating ?? 1000);
-  const effectiveLevel = calculateEffectiveSkillLevel({
+  const rawEffectiveLevel = calculateRawEffectiveSkillLevel({
     skillLevel,
     currentRating
   });
+  const effectiveLevel = normalizeSkillLevel(rawEffectiveLevel);
 
   let score = (MAX_SKILL_LEVEL + 1 - effectiveLevel) * 100;
-  if (skillLevel === MIN_SKILL_LEVEL && Number.isFinite(currentRating) && currentRating >= RATING_UP_THRESHOLD) {
-    score += EDGE_RATING_BONUS;
+  if (rawEffectiveLevel < MIN_SKILL_LEVEL) {
+    score += (MIN_SKILL_LEVEL - rawEffectiveLevel) * EDGE_RATING_BONUS;
   }
-  if (skillLevel === MAX_SKILL_LEVEL && Number.isFinite(currentRating) && currentRating <= RATING_DOWN_THRESHOLD) {
-    score -= EDGE_RATING_BONUS;
+  if (rawEffectiveLevel > MAX_SKILL_LEVEL) {
+    score -= (rawEffectiveLevel - MAX_SKILL_LEVEL) * EDGE_RATING_BONUS;
   }
 
   return Number(score.toFixed(2));

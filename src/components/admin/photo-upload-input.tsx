@@ -18,10 +18,10 @@ export function PhotoUploadInput({ compact = false, hint, required = true }: Pho
   const helperText = hint ?? `Formato recomendado: JPG/PNG. Se optimiza a WEBP (${MAX_PHOTO_SIZE_MB} MB max).`;
 
   return (
-    <div>
+    <div className={compact ? "min-w-0" : undefined}>
       <Input
         accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-        className={compact ? "h-[38px] px-2 py-1.5 text-xs" : undefined}
+        className={compact ? "h-[38px] min-w-0 px-2 py-1.5 text-xs" : undefined}
         name="photo"
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];

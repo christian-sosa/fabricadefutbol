@@ -141,7 +141,7 @@ export default async function AdminPlayersPage({
                 </div>
                 <Select
                   aria-label={`Nivel de habilidad de ${player.full_name}`}
-                  className="min-w-[170px]"
+                  className="h-[38px] min-w-[170px]"
                   defaultValue={String(player.skill_level)}
                   form={bulkFormId}
                   name="skillLevel"
@@ -153,11 +153,14 @@ export default async function AdminPlayersPage({
                     </option>
                   ))}
                 </Select>
-                <form action={uploadPlayerPhotoAction} className="space-y-2 lg:self-start">
+                <form
+                  action={uploadPlayerPhotoAction}
+                  className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_112px] lg:items-start lg:self-start"
+                >
                   <input name="organizationId" type="hidden" value={selectedOrganization.id} />
                   <input name="playerId" type="hidden" value={player.id} />
                   <PhotoUploadInput compact hint="JPG, PNG o WEBP. Reemplaza la foto actual." />
-                  <Button className="w-full" type="submit" variant="secondary">
+                  <Button className="h-[38px] w-full lg:w-auto" type="submit" variant="secondary">
                     Subir foto
                   </Button>
                 </form>
@@ -165,7 +168,7 @@ export default async function AdminPlayersPage({
                   <input name="organizationId" type="hidden" value={selectedOrganization.id} />
                   <input name="deletePlayerId" type="hidden" value={player.id} />
                   <ConfirmSubmitButton
-                    className="h-8 px-3 text-xs"
+                    className="h-[38px] px-3 text-xs"
                     confirmMessage={`Estas seguro de eliminar a ${player.full_name}?`}
                     label="Eliminar"
                     variant="danger"

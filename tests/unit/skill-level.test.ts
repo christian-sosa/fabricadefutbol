@@ -7,6 +7,7 @@ import {
   calculateEffectiveSkillScore,
   formatSkillLevelLabel,
   formatGuestSkillLevelLabel,
+  formatRatingTrendLabel,
   GUEST_FEATURED_SKILL_LEVEL,
   mapInitialRankToSkillLevel,
   normalizeSkillLevel,
@@ -34,17 +35,31 @@ describe("skill level helpers", () => {
   });
 
   it("calcula nivel efectivo con umbrales de rating", () => {
-    expect(calculateEffectiveSkillLevel({ skillLevel: 2, currentRating: 1050 })).toBe(1);
+    expect(calculateEffectiveSkillLevel({ skillLevel: 4, currentRating: 1050 })).toBe(3);
+    expect(calculateEffectiveSkillLevel({ skillLevel: 4, currentRating: 1099 })).toBe(3);
+    expect(calculateEffectiveSkillLevel({ skillLevel: 4, currentRating: 1100 })).toBe(2);
+    expect(calculateEffectiveSkillLevel({ skillLevel: 2, currentRating: 1100 })).toBe(1);
     expect(calculateEffectiveSkillLevel({ skillLevel: 2, currentRating: 1049 })).toBe(2);
     expect(calculateEffectiveSkillLevel({ skillLevel: 4, currentRating: 951 })).toBe(4);
     expect(calculateEffectiveSkillLevel({ skillLevel: 4, currentRating: 950 })).toBe(5);
+    expect(calculateEffectiveSkillLevel({ skillLevel: 4, currentRating: 900 })).toBe(6);
+    expect(calculateEffectiveSkillLevel({ skillLevel: 6, currentRating: 900 })).toBe(7);
   });
 
   it("aplica bonus y penalizacion de borde sin salir de 1..7", () => {
-    expect(calculateEffectiveSkillScore({ skillLevel: 2, currentRating: 1060 })).toBe(700);
-    expect(calculateEffectiveSkillScore({ skillLevel: 1, currentRating: 1080 })).toBe(725);
-    expect(calculateEffectiveSkillScore({ skillLevel: 6, currentRating: 940 })).toBe(100);
-    expect(calculateEffectiveSkillScore({ skillLevel: 7, currentRating: 930 })).toBe(75);
+    expect(calculateEffectiveSkillScore({ skillLevel: 3, currentRating: 1100 })).toBe(700);
+    expect(calculateEffectiveSkillScore({ skillLevel: 2, currentRating: 1100 })).toBe(725);
+    expect(calculateEffectiveSkillScore({ skillLevel: 1, currentRating: 1100 })).toBe(750);
+    expect(calculateEffectiveSkillScore({ skillLevel: 5, currentRating: 900 })).toBe(100);
+    expect(calculateEffectiveSkillScore({ skillLevel: 6, currentRating: 900 })).toBe(75);
+    expect(calculateEffectiveSkillScore({ skillLevel: 7, currentRating: 900 })).toBe(50);
+  });
+
+  it("traduce el rendimiento actual a etiquetas humanas", () => {
+    expect(formatRatingTrendLabel(1050)).toBe("Viene alto");
+    expect(formatRatingTrendLabel(1049)).toBe("Parejo");
+    expect(formatRatingTrendLabel(951)).toBe("Parejo");
+    expect(formatRatingTrendLabel(950)).toBe("Viene bajo");
   });
 
   it("normaliza valores invalidos a un nivel seguro", () => {

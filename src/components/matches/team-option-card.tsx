@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL } from "@/lib/team-labels";
-import { formatRendimiento } from "@/lib/utils";
+import { cn, formatRendimiento } from "@/lib/utils";
 
 type OptionPlayer = {
   id: string;
@@ -25,6 +25,64 @@ type TeamOptionCardProps = {
   confirmAction?: (formData: FormData) => void;
 };
 
+function buildBalanceSummary(params: {
+  ratingDiff: number;
+  ratingSumA: number;
+  ratingSumB: number;
+  teamALabel: string;
+  teamBLabel: string;
+  playersPerTeam: number;
+}) {
+  const { ratingDiff, ratingSumA, ratingSumB, teamALabel, teamBLabel, playersPerTeam } = params;
+  const leadingTeamLabel = ratingSumA > ratingSumB ? teamALabel : teamBLabel;
+  const averageDiff = Math.abs(ratingDiff) / Math.max(playersPerTeam, 1);
+
+  if (ratingDiff === 0) {
+    return {
+      label: "Parejo perfecto",
+      detail: "Sin ventaja clara",
+      tone: "excellent"
+    } as const;
+  }
+
+  if (averageDiff <= 20) {
+    return {
+      label: "Muy parejo",
+      detail: `Apenas inclina para ${leadingTeamLabel}`,
+      tone: "excellent"
+    } as const;
+  }
+
+  if (averageDiff <= 45) {
+    return {
+      label: "Buen balance",
+      detail: `Leve ventaja para ${leadingTeamLabel}`,
+      tone: "good"
+    } as const;
+  }
+
+  if (averageDiff <= 75) {
+    return {
+      label: "Balance ajustado",
+      detail: `${leadingTeamLabel} queda mas fuerte`,
+      tone: "warning"
+    } as const;
+  }
+
+  return {
+    label: "Para revisar",
+    detail: `${leadingTeamLabel} queda bastante mas fuerte`,
+    tone: "danger"
+  } as const;
+}
+
+const balanceToneClassName = {
+  excellent: "border-emerald-400/45 bg-emerald-500/10 text-emerald-200",
+  good: "border-cyan-400/40 bg-cyan-500/10 text-cyan-200",
+  warning: "border-amber-400/45 bg-amber-500/10 text-amber-100",
+  danger: "border-rose-400/45 bg-rose-500/10 text-rose-100"
+} as const;
+
 export function TeamOptionCard({
   optionId,
   optionNumber,
@@ -38,15 +96,30 @@ export function TeamOptionCard({
   isConfirmed,
   confirmAction
 }: TeamOptionCardProps) {
+  const balanceSummary = buildBalanceSummary({
+    ratingDiff,
+    ratingSumA,
+    ratingSumB,
+    teamALabel,
+    teamBLabel,
+    playersPerTeam: Math.max(teamA.length, teamB.length)
+  });
+
   return (
     <Card className={isConfirmed ? "border-emerald-400/60 ring-2 ring-emerald-400/25" : ""}>
       <div className="mb-3 flex items-start justify-between gap-4">
         <div>
           <CardTitle>Opcion {optionNumber}</CardTitle>
-          <CardDescription>
-            Balance {teamALabel}: {formatRendimiento(ratingSumA)} | Balance {teamBLabel}:{" "}
-            {formatRendimiento(ratingSumB)} | Diferencia:{" "}
-            <span className="font-semibold text-emerald-300">{formatRendimiento(ratingDiff)}</span>
+          <CardDescription className="mt-2 flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-xs font-semibold",
+                balanceToneClassName[balanceSummary.tone]
+              )}
+            >
+              {balanceSummary.label}
+            </span>
+            <span className="text-slate-300">{balanceSummary.detail}</span>
           </CardDescription>
         </div>
         {isConfirmed ? (

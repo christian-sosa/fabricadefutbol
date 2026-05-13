@@ -34,6 +34,51 @@ function getCheckbox(container: HTMLElement, name: string, value: string) {
 }
 
 describe("NewMatchForm", () => {
+  it("muestra nivel cargado y solo destaca rendimiento alto o bajo al seleccionar convocados", () => {
+    render(
+      <NewMatchForm
+        defaultScheduledDate={DEFAULT_SCHEDULED_DATE}
+        organizationId="org-1"
+        players={[
+          {
+            id: "player-high",
+            full_name: "Jugador Alto",
+            current_rating: 1050,
+            initial_rank: 1,
+            skill_level: 2,
+            display_order: 1
+          },
+          {
+            id: "player-even",
+            full_name: "Jugador Parejo",
+            current_rating: 1000,
+            initial_rank: 2,
+            skill_level: 4,
+            display_order: 2
+          },
+          {
+            id: "player-low",
+            full_name: "Jugador Bajo",
+            current_rating: 950,
+            initial_rank: 3,
+            skill_level: 6,
+            display_order: 3
+          }
+        ]}
+      />
+    );
+
+    expect(screen.getByText("Nivel 2 - Figura")).toBeInTheDocument();
+    expect(screen.getByText("Nivel 4 - Bueno")).toBeInTheDocument();
+    expect(screen.getByText("Nivel 6 - Recreativo")).toBeInTheDocument();
+    expect(screen.getByText("Viene alto")).toBeInTheDocument();
+    expect(screen.queryByText("Parejo")).not.toBeInTheDocument();
+    expect(screen.getByText("Viene bajo")).toBeInTheDocument();
+    expect(screen.queryByText("1050")).not.toBeInTheDocument();
+    expect(screen.queryByText("1000")).not.toBeInTheDocument();
+    expect(screen.queryByText("950")).not.toBeInTheDocument();
+  });
+
   it("arma un payload manual valido cuando el roster esta completo", async () => {
     const user = userEvent.setup();
     const { container } = render(
