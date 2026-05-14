@@ -30,7 +30,6 @@ import {
 import { MatchGuestFields } from "@/app/admin/(panel)/clubs/[clubId]/match-guest-fields";
 import { MatchPlayerPicker } from "@/app/admin/(panel)/clubs/[clubId]/match-player-picker";
 import { MatchDateTimeFields } from "@/components/admin/match-date-time-fields";
-import { SignOutButton } from "@/components/admin/sign-out-button";
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -2216,7 +2215,6 @@ export default async function AdminClubDetailPage({
             <Link className={adminContextPrimaryActionLinkClass} href={`/clubs/${details.club.slug}`}>
               Vista del club
             </Link>
-            <SignOutButton />
           </div>
         </div>
       </Card>

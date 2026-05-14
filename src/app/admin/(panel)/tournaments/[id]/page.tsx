@@ -18,7 +18,6 @@ import {
 } from "@/components/admin/admin-context-actions";
 import { AdminSubnav } from "@/components/admin/admin-subnav";
 import { CreateCompetitionCard } from "@/components/admin/create-competition-card";
-import { SignOutButton } from "@/components/admin/sign-out-button";
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { LeaguePhoto } from "@/components/tournaments/league-photo";
 import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
@@ -129,7 +128,6 @@ export default async function AdminLeagueDetailPage({
             <Link className={adminContextPrimaryActionLinkClass} href={`/tournaments/${details.league.slug}`}>
               Ver publica
             </Link>
-            <SignOutButton />
           </div>
         </div>
         {resolvedSearchParams.error ? <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p> : null}

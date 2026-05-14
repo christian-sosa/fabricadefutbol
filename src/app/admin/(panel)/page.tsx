@@ -1,6 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
-
 import {
   createOrganizationAction,
   deleteOrganizationAction,
@@ -488,37 +486,11 @@ export default async function AdminDashboardPage({
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">
                 Identidad publica
               </p>
-              <CardTitle className="mt-2">Escudo y portada</CardTitle>
+              <CardTitle className="mt-2">Foto de portada</CardTitle>
             </div>
             <CardDescription className="mt-2">
-              El escudo identifica al grupo en el admin. La foto de portada representa al grupo en la vista publica.
+              Usa una foto que represente al grupo o una imagen post partido. Se muestra en la vista publica de grupos.
             </CardDescription>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/55 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  Escudo del grupo
-                </p>
-                <div className="relative mt-3 size-24 overflow-hidden rounded-2xl border border-emerald-400/25 bg-slate-950">
-                  <Image
-                    alt={`Escudo de ${selectedOrganization.name}`}
-                    className="object-cover"
-                    fill
-                    sizes="96px"
-                    src={organizationImageSrc}
-                    unoptimized
-                  />
-                </div>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/55 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  Foto de portada
-                </p>
-                <p className="mt-3 text-sm text-slate-300">
-                  Se usa como imagen principal del grupo y tambien como escudo cuando no hay un logo separado.
-                </p>
-              </div>
-            </div>
 
             <details>
               <summary className="mt-4 flex w-fit cursor-pointer list-none items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300">

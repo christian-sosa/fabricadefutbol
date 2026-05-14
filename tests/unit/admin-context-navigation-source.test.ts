@@ -35,6 +35,7 @@ describe("admin context navigation source", () => {
     expect(source).toContain("isFocusedAdminContext");
     expect(source).toContain("!isFocusedAdminContext");
     expect(source).toContain("!isLeagueRootContext");
+    expect(source).not.toContain("SignOutButton");
   });
 
   it("mantiene /admin como hub general si no hay grupo explicito", () => {
@@ -55,7 +56,7 @@ describe("admin context navigation source", () => {
     expect(clubDetailSource).toContain("Modo administrador / {admin.displayName}");
     expect(clubDetailSource).toContain("Cambiar espacio");
     expect(clubDetailSource).toContain("Vista del club");
-    expect(clubDetailSource).toContain("SignOutButton");
+    expect(clubDetailSource).not.toContain("SignOutButton");
     expect(clubDetailSource).toContain("adminContextActionLinkClass");
     expect(clubDetailSource).toContain("adminContextPrimaryActionLinkClass");
     expect(clubDetailSource).not.toContain("Menu admin");
@@ -74,7 +75,7 @@ describe("admin context navigation source", () => {
     expect(leagueDetailSource).toContain("Cambiar espacio");
     expect(leagueDetailSource).toContain("Ver publica");
     expect(leagueDetailSource).toContain("<AdminSubnav scope=\"tournaments\" />");
-    expect(leagueDetailSource).toContain("SignOutButton");
+    expect(leagueDetailSource).not.toContain("SignOutButton");
     expect(leagueDetailSource).toContain("adminContextActionLinkClass");
     expect(leagueDetailSource).toContain("adminContextPrimaryActionLinkClass");
     expect(leagueDetailSource).not.toContain("Menu admin");

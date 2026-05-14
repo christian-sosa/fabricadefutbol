@@ -34,8 +34,7 @@ describe("AdminCurrentGroupCard", () => {
         admin={admin}
         organization={{
           name: "La Banda",
-          slug: "la-banda",
-          imageSrc: "/api/organization-image/org-1"
+          slug: "la-banda"
         }}
       />
     );
@@ -44,13 +43,10 @@ describe("AdminCurrentGroupCard", () => {
     expect(screen.getByText("sosa.christian.agustin@gmail.com")).toBeInTheDocument();
     expect(screen.getByText("Grupo actual")).toBeInTheDocument();
     expect(screen.getByText("La Banda")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Escudo de La Banda" })).toHaveAttribute(
-      "src",
-      "/api/organization-image/org-1"
-    );
+    expect(screen.queryByRole("img", { name: /La Banda/ })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Super Admin" })).toHaveAttribute("href", "/admin/super");
     expect(screen.getByRole("link", { name: "Cambiar espacio" })).toHaveAttribute("href", "/admin");
-    expect(screen.getByRole("button", { name: "Cerrar sesion" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cerrar sesion" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Nuevo grupo" })).not.toBeInTheDocument();
   });
 });

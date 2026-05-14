@@ -5,7 +5,6 @@ import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { AdminSubnav } from "@/components/admin/admin-subnav";
-import { SignOutButton } from "@/components/admin/sign-out-button";
 import type { AdminSession } from "@/lib/auth/admin";
 
 type AdminPanelShellProps = {
@@ -52,7 +51,6 @@ export function AdminPanelShell({ admin, children }: AdminPanelShellProps) {
                   Super Admin
                 </Link>
               ) : null}
-              <SignOutButton />
             </div>
           </div>
         </section>
