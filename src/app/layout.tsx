@@ -36,6 +36,9 @@ export const metadata: Metadata = {
     "convocatoria"
   ],
   authors: [{ name: "Fábrica de Fútbol" }],
+  alternates: {
+    canonical: "./"
+  },
   robots: {
     index: true,
     follow: true
