@@ -7,6 +7,7 @@ import { z } from "zod";
 import { assertClubWriteAction, getClubSlugById } from "@/lib/auth/clubs";
 import {
   CLUB_PLAYER_POSITIONS,
+  calculateCallupEstimatedPaymentCents,
   normalizeClubPlayerPosition,
   splitClubMatchCost,
   validateClubMatchSheet,
@@ -142,8 +143,6 @@ const callupSchema = z.object({
   venue: z.string().max(120).optional(),
   idealPlayerCount: z.coerce.number().int().min(1).max(30),
   maxPlayerCount: z.coerce.number().int().min(1).max(30),
-  targetPaymentCount: z.coerce.number().int().min(0).max(30),
-  fullPaymentAmount: z.string().max(30),
   fieldCostAmount: z.string().max(30),
   notes: z.string().max(500).optional()
 });
@@ -153,6 +152,22 @@ const callupPlayerSchema = z.object({
   playerId: z.string().uuid(),
   status: z.enum(["", "confirmed", "tentative", "out", "injured", "waitlist"]),
   expectedAmount: z.string().max(30).optional(),
+  partialAmount: z.string().max(30).optional(),
+  paymentStatus: z.string().max(20).optional(),
+  returnSource: z.string().max(20).optional(),
+  returnPosition: z.string().max(20).optional(),
+  returnSearch: z.string().max(80).optional(),
+  returnSort: z.string().max(20).optional(),
+  notes: z.string().max(300).optional()
+});
+
+const callupGuestSchema = z.object({
+  callupId: z.string().uuid(),
+  guestName: z.string().min(2, "El invitado debe tener al menos 2 caracteres.").max(80),
+  position: playerPositionSchema,
+  status: z.enum(["confirmed", "tentative", "waitlist", "injured", "out"]).default("confirmed"),
+  partialAmount: z.string().max(30).optional(),
+  paymentStatus: z.string().max(20).optional(),
   notes: z.string().max(300).optional()
 });
 
@@ -171,6 +186,10 @@ const clubAdminInviteDeleteSchema = z.object({
 function buildClubDetailPath(params: {
   clubId: string;
   callupId?: string;
+  callupPosition?: string | null;
+  callupSearch?: string | null;
+  callupSort?: string | null;
+  callupSource?: string | null;
   tab?: string;
   teamId?: string;
   view?: string;
@@ -182,6 +201,10 @@ function buildClubDetailPath(params: {
   if (params.tab) searchParams.set("tab", params.tab);
   if (params.teamId) searchParams.set("teamId", params.teamId);
   if (params.callupId) searchParams.set("callupId", params.callupId);
+  if (params.callupSource) searchParams.set("callupSource", params.callupSource);
+  if (params.callupPosition) searchParams.set("callupPosition", params.callupPosition);
+  if (params.callupSearch?.trim()) searchParams.set("callupSearch", params.callupSearch.trim());
+  if (params.callupSort) searchParams.set("callupSort", params.callupSort);
   if (params.view) searchParams.set("view", params.view);
   if (params.error) searchParams.set("error", params.error);
   if (params.success) searchParams.set("success", params.success);
@@ -209,6 +232,12 @@ function parsePaymentStatus(value: FormDataEntryValue | null): ClubPaymentStatus
   return "unpaid";
 }
 
+function parseCallupPaymentMode(value: FormDataEntryValue | null) {
+  if (value === "partial") return "partial";
+  if (value === "none" || value === "unpaid") return "none";
+  return "full";
+}
+
 function parseCurrencyAmountToCents(value: FormDataEntryValue | null) {
   const raw = String(value ?? "").trim();
   if (!raw) return 0;
@@ -222,6 +251,35 @@ function parseCurrencyAmountToCents(value: FormDataEntryValue | null) {
 
   if (!Number.isFinite(amount) || amount < 0) return null;
   return Math.round(amount * 100);
+}
+
+function resolveCallupExpectedCents(params: {
+  fullPaymentCents: number;
+  legacyExpectedAmount?: FormDataEntryValue | null;
+  partialAmount?: FormDataEntryValue | null;
+  paymentStatus?: FormDataEntryValue | null;
+}) {
+  if (params.paymentStatus == null && params.legacyExpectedAmount != null) {
+    const legacyExpectedCents = parseCurrencyAmountToCents(params.legacyExpectedAmount);
+    if (legacyExpectedCents === null) {
+      return { error: "El aporte esperado debe ser un numero valido.", expectedCents: null };
+    }
+    return { error: null, expectedCents: legacyExpectedCents || null };
+  }
+
+  const mode = parseCallupPaymentMode(params.paymentStatus ?? null);
+  if (mode === "full") return { error: null, expectedCents: params.fullPaymentCents };
+  if (mode === "none") return { error: null, expectedCents: 0 };
+
+  const partialCents = parseCurrencyAmountToCents(params.partialAmount ?? null);
+  if (partialCents === null || partialCents <= 0) {
+    return { error: "Para un pago parcial carga un monto mayor a 0.", expectedCents: null };
+  }
+  if (partialCents >= params.fullPaymentCents) {
+    return { error: "El pago parcial debe ser menor al pago completo estimado.", expectedCents: null };
+  }
+
+  return { error: null, expectedCents: partialCents };
 }
 
 function resolvePaidCents(params: {
@@ -1332,8 +1390,6 @@ export async function addClubCallupAction(clubId: string, formData: FormData) {
       venue: formData.get("venue"),
       idealPlayerCount: formData.get("idealPlayerCount"),
       maxPlayerCount: formData.get("maxPlayerCount"),
-      targetPaymentCount: formData.get("targetPaymentCount"),
-      fullPaymentAmount: String(formData.get("fullPaymentAmount") ?? ""),
       fieldCostAmount: String(formData.get("fieldCostAmount") ?? ""),
       notes: formData.get("notes")
     });
@@ -1345,14 +1401,14 @@ export async function addClubCallupAction(clubId: string, formData: FormData) {
       redirect(buildClubDetailPath({ clubId, tab: "callups", error: "El maximo de jugadores no puede ser menor al ideal." }));
     }
 
-    const fullPaymentCents = parseCurrencyAmountToCents(formData.get("fullPaymentAmount"));
     const fieldCostCents = parseCurrencyAmountToCents(formData.get("fieldCostAmount"));
-    if (fullPaymentCents === null || fullPaymentCents <= 0) {
-      redirect(buildClubDetailPath({ clubId, tab: "callups", error: "El pago completo debe ser un numero mayor a 0." }));
-    }
     if (fieldCostCents === null) {
       redirect(buildClubDetailPath({ clubId, tab: "callups", error: "El costo de cancha debe ser un numero valido." }));
     }
+    const fullPaymentCents = Math.max(
+      1,
+      calculateCallupEstimatedPaymentCents(fieldCostCents, parsed.data.idealPlayerCount)
+    );
 
     const supabase = await createSupabaseServerClient();
     const { data: team, error: teamError } = await supabase
@@ -1377,7 +1433,7 @@ export async function addClubCallupAction(clubId: string, formData: FormData) {
         venue: parsed.data.venue?.trim() || null,
         ideal_player_count: parsed.data.idealPlayerCount,
         max_player_count: parsed.data.maxPlayerCount,
-        target_payment_count: parsed.data.targetPaymentCount,
+        target_payment_count: parsed.data.idealPlayerCount,
         full_payment_cents: fullPaymentCents,
         field_cost_cents: fieldCostCents,
         notes: parsed.data.notes?.trim() || null,
@@ -1406,6 +1462,12 @@ export async function updateClubCallupPlayerAction(clubId: string, formData: For
       playerId: formData.get("playerId"),
       status: formData.get("status"),
       expectedAmount: String(formData.get("expectedAmount") ?? ""),
+      partialAmount: String(formData.get("partialAmount") ?? ""),
+      paymentStatus: formData.get("paymentStatus") ? String(formData.get("paymentStatus")) : undefined,
+      returnSource: formData.get("returnSource") ? String(formData.get("returnSource")) : undefined,
+      returnPosition: formData.get("returnPosition") ? String(formData.get("returnPosition")) : undefined,
+      returnSearch: formData.get("returnSearch") ? String(formData.get("returnSearch")) : undefined,
+      returnSort: formData.get("returnSort") ? String(formData.get("returnSort")) : undefined,
       notes: formData.get("notes")
     });
 
@@ -1417,7 +1479,7 @@ export async function updateClubCallupPlayerAction(clubId: string, formData: For
     const [{ data: callup, error: callupError }, { data: player, error: playerError }] = await Promise.all([
       supabase
         .from("club_callups")
-        .select("id")
+        .select("id, full_payment_cents")
         .eq("id", parsed.data.callupId)
         .eq("club_id", clubId)
         .maybeSingle(),
@@ -1436,6 +1498,16 @@ export async function updateClubCallupPlayerAction(clubId: string, formData: For
       redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, error: "No se encontro el jugador dentro de este club." }));
     }
 
+    const returnPathParams = {
+      callupId: parsed.data.callupId,
+      callupPosition: parsed.data.returnPosition,
+      callupSearch: parsed.data.returnSearch,
+      callupSort: parsed.data.returnSort,
+      callupSource: parsed.data.returnSource,
+      clubId,
+      tab: "callups"
+    };
+
     if (!parsed.data.status) {
       const { error } = await supabase
         .from("club_callup_players")
@@ -1446,12 +1518,17 @@ export async function updateClubCallupPlayerAction(clubId: string, formData: For
         redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, error: toUserMessage(error, "No se pudo quitar el jugador de la convocatoria.") }));
       }
       await revalidateClubPaths(clubId);
-      redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, success: "Convocatoria actualizada." }));
+      redirect(buildClubDetailPath({ ...returnPathParams, success: "Convocatoria actualizada." }));
     }
 
-    const expectedCents = parseCurrencyAmountToCents(formData.get("expectedAmount"));
-    if (expectedCents === null) {
-      redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, error: "El aporte esperado debe ser un numero valido." }));
+    const resolvedExpected = resolveCallupExpectedCents({
+      fullPaymentCents: Number(callup.full_payment_cents) || 1,
+      legacyExpectedAmount: formData.has("paymentStatus") ? null : formData.get("expectedAmount"),
+      partialAmount: formData.get("partialAmount"),
+      paymentStatus: formData.get("paymentStatus")
+    });
+    if (resolvedExpected.error) {
+      redirect(buildClubDetailPath({ ...returnPathParams, error: resolvedExpected.error }));
     }
 
     const { error } = await supabase.from("club_callup_players").upsert(
@@ -1459,7 +1536,7 @@ export async function updateClubCallupPlayerAction(clubId: string, formData: For
         callup_id: parsed.data.callupId,
         club_player_id: parsed.data.playerId,
         status: parsed.data.status,
-        expected_cents: expectedCents || null,
+        expected_cents: resolvedExpected.expectedCents,
         notes: parsed.data.notes?.trim() || null
       },
       { onConflict: "callup_id,club_player_id" }
@@ -1470,10 +1547,69 @@ export async function updateClubCallupPlayerAction(clubId: string, formData: For
     }
 
     await revalidateClubPaths(clubId);
-    redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, success: "Convocatoria actualizada." }));
+    redirect(buildClubDetailPath({ ...returnPathParams, success: "Convocatoria actualizada." }));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildClubDetailPath({ clubId, tab: "callups", error: toUserMessage(error, "No se pudo actualizar la convocatoria.") }));
+  }
+}
+
+export async function addClubCallupGuestAction(clubId: string, formData: FormData) {
+  try {
+    await assertClubWriteAction(clubId);
+    const parsed = callupGuestSchema.safeParse({
+      callupId: formData.get("callupId"),
+      guestName: formData.get("guestName"),
+      position: formData.get("position"),
+      status: formData.get("status") || "confirmed",
+      partialAmount: String(formData.get("partialAmount") ?? ""),
+      paymentStatus: formData.get("paymentStatus") ? String(formData.get("paymentStatus")) : "full",
+      notes: formData.get("notes")
+    });
+
+    if (!parsed.success) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", error: parsed.error.issues[0]?.message ?? "Datos invalidos para el invitado." }));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { data: callup, error: callupError } = await supabase
+      .from("club_callups")
+      .select("id, full_payment_cents")
+      .eq("id", parsed.data.callupId)
+      .eq("club_id", clubId)
+      .maybeSingle();
+
+    if (callupError || !callup) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", error: "No se encontro la convocatoria dentro de este club." }));
+    }
+
+    const resolvedExpected = resolveCallupExpectedCents({
+      fullPaymentCents: Number(callup.full_payment_cents) || 1,
+      partialAmount: formData.get("partialAmount"),
+      paymentStatus: formData.get("paymentStatus")
+    });
+    if (resolvedExpected.error) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, error: resolvedExpected.error }));
+    }
+
+    const { error } = await supabase.from("club_callup_guests").insert({
+      callup_id: parsed.data.callupId,
+      guest_name: parsed.data.guestName.trim(),
+      position: parsed.data.position,
+      status: parsed.data.status,
+      expected_cents: resolvedExpected.expectedCents,
+      notes: parsed.data.notes?.trim() || null
+    });
+
+    if (error) {
+      redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, error: toUserMessage(error, "No se pudo agregar el invitado.") }));
+    }
+
+    await revalidateClubPaths(clubId);
+    redirect(buildClubDetailPath({ clubId, tab: "callups", callupId: parsed.data.callupId, success: "Invitado agregado a esta convocatoria." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab: "callups", error: toUserMessage(error, "No se pudo agregar el invitado.") }));
   }
 }
 

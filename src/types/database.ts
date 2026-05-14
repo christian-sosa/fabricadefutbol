@@ -1257,6 +1257,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      club_callup_guests: {
+        Row: {
+          callup_id: string;
+          created_at: string;
+          expected_cents: number | null;
+          guest_name: string;
+          id: string;
+          notes: string | null;
+          position: string | null;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          callup_id: string;
+          created_at?: string;
+          expected_cents?: number | null;
+          guest_name: string;
+          id?: string;
+          notes?: string | null;
+          position?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          callup_id?: string;
+          created_at?: string;
+          expected_cents?: number | null;
+          guest_name?: string;
+          id?: string;
+          notes?: string | null;
+          position?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       club_matches: {
         Row: {
           club_competition_id: string | null;

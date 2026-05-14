@@ -14,20 +14,22 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
   const resolvedSearchParams = await searchParams;
   const nextPath = resolveSafeNextPath(resolvedSearchParams.next, "/admin");
   return (
-    <div className="space-y-4 py-6">
-      <h1 className="mb-4 text-center text-3xl font-black text-slate-100">Acceso al Panel</h1>
+    <div className="mx-auto w-full max-w-md space-y-3 py-5 md:py-6">
+      <div className="text-center">
+        <h1 className="text-2xl font-black text-slate-100">Acceso al panel</h1>
+      </div>
 
       {resolvedSearchParams.confirmed ? (
-        <Card className="border-emerald-500/40 bg-emerald-500/10">
+        <Card className="rounded-lg border-emerald-500/40 bg-emerald-500/10">
           <CardTitle>Email confirmado</CardTitle>
           <CardDescription className="mt-1">
-            Tu cuenta ya quedo confirmada. Puedes ingresar con tu email y contrasena.
+            Tu cuenta ya qued&oacute; confirmada. Pod&eacute;s ingresar con tu email y contrase&ntilde;a.
           </CardDescription>
         </Card>
       ) : null}
 
       {resolvedSearchParams.error ? (
-        <Card className="border-danger/40 bg-danger/10">
+        <Card className="rounded-lg border-danger/40 bg-danger/10">
           <CardTitle>No se pudo confirmar</CardTitle>
           <CardDescription className="mt-1">{resolvedSearchParams.error}</CardDescription>
         </Card>

@@ -6,6 +6,7 @@ import {
   buildClubCallupSummary,
   buildClubFinancialSummary,
   buildClubPublicSnapshot,
+  type ClubCallupGuestRecord,
   type ClubCallupPlayerRecord,
   type ClubCallupRecord,
   type ClubCallupSummary,
@@ -57,6 +58,7 @@ export type AdminClubDetails = {
   teamPlayers: ClubTeamPlayerRecord[];
   callups: ClubCallupRecord[];
   callupPlayers: ClubCallupPlayerRecord[];
+  callupGuests: ClubCallupGuestRecord[];
   callupSummaries: Record<string, ClubCallupSummary>;
   matches: ClubMatchRecord[];
   lineups: ClubLineupRecord[];
@@ -273,6 +275,7 @@ async function loadClubPrivateData(clubId: string) {
     { data: teamPlayers, error: teamPlayersError },
     { data: callups, error: callupsError },
     { data: callupPlayers, error: callupPlayersError },
+    { data: callupGuests, error: callupGuestsError },
     { data: matches, error: matchesError },
     { data: lineups, error: lineupsError },
     { data: stats, error: statsError },
@@ -305,6 +308,7 @@ async function loadClubPrivateData(clubId: string) {
       .eq("club_id", clubId)
       .order("scheduled_at", { ascending: false }),
     supabase.from("club_callup_players").select("id, callup_id, club_player_id, status, expected_cents, notes, created_at, updated_at"),
+    supabase.from("club_callup_guests").select("id, callup_id, guest_name, position, status, expected_cents, notes, created_at, updated_at"),
     supabase
       .from("club_matches")
       .select("id, club_id, club_team_id, club_competition_id, modality, played_at, opponent_name, venue, goals_for, goals_against, status, notes, field_cost_cents, field_cost_currency, created_at")
@@ -324,6 +328,7 @@ async function loadClubPrivateData(clubId: string) {
   if (teamPlayersError) throw new Error(teamPlayersError.message);
   if (callupsError) throw new Error(callupsError.message);
   if (callupPlayersError) throw new Error(callupPlayersError.message);
+  if (callupGuestsError) throw new Error(callupGuestsError.message);
   if (matchesError) throw new Error(matchesError.message);
   if (lineupsError) throw new Error(lineupsError.message);
   if (statsError) throw new Error(statsError.message);
@@ -342,6 +347,9 @@ async function loadClubPrivateData(clubId: string) {
   const filteredCallupPlayers = ((callupPlayers ?? []) as ClubCallupPlayerRecord[]).filter((entry) =>
     callupIds.has(entry.callup_id)
   );
+  const filteredCallupGuests = ((callupGuests ?? []) as ClubCallupGuestRecord[]).filter((guest) =>
+    callupIds.has(guest.callup_id)
+  );
   const playersRows = (players ?? []) as ClubPlayerRecord[];
   const callupRows = (callups ?? []) as ClubCallupRecord[];
 
@@ -355,12 +363,14 @@ async function loadClubPrivateData(clubId: string) {
     ),
     callups: callupRows,
     callupPlayers: filteredCallupPlayers,
+    callupGuests: filteredCallupGuests,
     callupSummaries: Object.fromEntries(
       callupRows.map((callup) => [
         callup.id,
         buildClubCallupSummary({
           callup,
           entries: filteredCallupPlayers.filter((entry) => entry.callup_id === callup.id),
+          guests: filteredCallupGuests.filter((guest) => guest.callup_id === callup.id),
           players: playersRows
         })
       ])

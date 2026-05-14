@@ -5,6 +5,7 @@ import {
   buildClubFinancialSummary,
   buildClubPublicSnapshot,
   buildClubTeamRosterOptions,
+  calculateCallupEstimatedPaymentCents,
   filterClubPublicSnapshotByModality,
   filterClubPlayersForRosterManagement,
   getClubPaymentStatus,
@@ -297,6 +298,11 @@ describe("club finances", () => {
 });
 
 describe("club callup planning", () => {
+  it("estima el pago por jugador dividiendo costo de cancha por jugadores ideales", () => {
+    expect(calculateCallupEstimatedPaymentCents(3600000, 14)).toBe(257143);
+    expect(calculateCallupEstimatedPaymentCents(0, 14)).toBe(0);
+  });
+
   it("calcula cupo, pagadores equivalentes y faltantes por posicion", () => {
     const summary = buildClubCallupSummary({
       callup: {
@@ -348,7 +354,7 @@ describe("club callup planning", () => {
     expect(summary.recommendations).toContain("Faltan 11.4 pagos completos para cubrir la cancha.");
   });
 
-  it("sugiere candidatos activos fuera de la convocatoria para cubrir posiciones y pago", () => {
+  it("sugiere candidatos activos fuera de la convocatoria para cubrir posiciones faltantes", () => {
     const candidates = buildClubCallupSummary({
       callup: {
         id: "callup-1",
@@ -384,15 +390,15 @@ describe("club callup planning", () => {
         positionLabel: "Defensor",
         expectedCents: 2500000,
         paymentEquivalent: 1,
-        reason: "Cubre Defensor y paga completo"
+        reason: "Cubre Defensor"
       },
       {
         playerId: "player-3",
         displayName: "Volante parcial",
         position: "volante",
         positionLabel: "Volante",
-        expectedCents: 1500000,
-        paymentEquivalent: 0.6,
+        expectedCents: 2500000,
+        paymentEquivalent: 1,
         reason: "Cubre Volante"
       }
     ]);

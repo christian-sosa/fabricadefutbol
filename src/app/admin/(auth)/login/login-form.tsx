@@ -1,7 +1,7 @@
 "use client";
 
 import { track } from "@vercel/analytics";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -18,12 +18,13 @@ import { GROWTH_EVENTS } from "@/lib/growth";
 
 const initialLoginState: LoginState = { error: null };
 const initialRegisterState: RegisterState = { error: null, success: null };
+type AuthMode = "login" | "register";
 
 function LoginSubmitButton() {
   const { pending } = useFormStatus();
   return (
     <Button className="w-full" disabled={pending} type="submit">
-      {pending ? "Ingresando..." : "Ingresar"}
+      {pending ? "Ingresando..." : "Ingresar con email"}
     </Button>
   );
 }
@@ -82,28 +83,78 @@ function RegisterSubmitButton() {
 }
 
 export function LoginForm({ nextPath = "/admin" }: { nextPath?: string }) {
+  const [mode, setMode] = useState<AuthMode>("login");
   const [loginState, loginAction] = useActionState(loginAdminAction, initialLoginState);
   const [registerState, registerAction] = useActionState(registerAdminAction, initialRegisterState);
+  const isRegisterMode = mode === "register";
 
   return (
-    <div className="space-y-4">
-      <Card className="mx-auto max-w-xl">
-        <CardTitle>Ingresar rapido</CardTitle>
+    <Card className="mx-auto max-w-md overflow-hidden rounded-lg border-slate-700/80 p-0 shadow-[0_24px_80px_-40px_rgba(16,185,129,0.85)]">
+      <div className="border-b border-slate-800/90 bg-slate-950/35 px-5 py-4">
+        <CardTitle className="text-xl">{isRegisterMode ? "Crear cuenta" : "Entrar al panel"}</CardTitle>
         <CardDescription className="mt-2">
-          Usa tu cuenta de Google para entrar al panel sin crear otra contrasena.
+          {isRegisterMode
+            ? "Crea una cuenta para administrar tu grupo o aceptar invitaciones."
+            : "Usa Google para entrar r\u00e1pido, o ingresa con tu email."}
         </CardDescription>
-        <form action={loginWithGoogleAction} className="mt-4">
+      </div>
+
+      <div className="space-y-4 px-5 py-4">
+        <form action={loginWithGoogleAction}>
           <input name="next" type="hidden" value={nextPath} />
           <GoogleSubmitButton />
         </form>
-      </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardTitle>Ingresar</CardTitle>
-          <CardDescription>Accede al panel con tu email y contrasena.</CardDescription>
+        <div className="flex items-center gap-3 text-xs font-semibold uppercase text-slate-500">
+          <span className="h-px flex-1 bg-slate-800" />
+          <span>o</span>
+          <span className="h-px flex-1 bg-slate-800" />
+        </div>
 
-          <form action={loginAction} className="mt-4 space-y-3">
+        {isRegisterMode ? (
+          <form action={registerAction} className="space-y-3">
+            <input name="next" type="hidden" value={nextPath} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="displayName">
+                  Nombre
+                </label>
+                <Input autoComplete="name" id="displayName" name="displayName" required />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="registerEmail">
+                  Email
+                </label>
+                <Input autoComplete="email" id="registerEmail" name="email" required type="email" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="registerPassword">
+                  Contrase&ntilde;a
+                </label>
+                <Input autoComplete="new-password" id="registerPassword" name="password" required type="password" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="confirmPassword">
+                  Confirmar contrase&ntilde;a
+                </label>
+                <Input
+                  autoComplete="new-password"
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  required
+                  type="password"
+                />
+              </div>
+            </div>
+
+            {registerState.error ? <p className="text-sm font-semibold text-danger">{registerState.error}</p> : null}
+            {registerState.success ? (
+              <p className="text-sm font-semibold text-emerald-300">{registerState.success}</p>
+            ) : null}
+            <RegisterSubmitButton />
+          </form>
+        ) : (
+          <form action={loginAction} className="space-y-3">
             <input name="next" type="hidden" value={nextPath} />
             <div>
               <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="email">
@@ -113,7 +164,7 @@ export function LoginForm({ nextPath = "/admin" }: { nextPath?: string }) {
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="password">
-                Contrasena
+                Contrase&ntilde;a
               </label>
               <Input autoComplete="current-password" id="password" name="password" required type="password" />
             </div>
@@ -121,49 +172,34 @@ export function LoginForm({ nextPath = "/admin" }: { nextPath?: string }) {
             {loginState.error ? <p className="text-sm font-semibold text-danger">{loginState.error}</p> : null}
             <LoginSubmitButton />
           </form>
-        </Card>
+        )}
 
-        <Card>
-          <CardTitle>Registrarse</CardTitle>
-          <CardDescription>
-              Crea una cuenta para administrar tu grupo o aceptar invitaciones.
-          </CardDescription>
-
-          <form action={registerAction} className="mt-4 space-y-3">
-            <input name="next" type="hidden" value={nextPath} />
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="displayName">
-                Nombre
-              </label>
-              <Input id="displayName" name="displayName" required />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="registerEmail">
-                Email
-              </label>
-              <Input autoComplete="email" id="registerEmail" name="email" required type="email" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="registerPassword">
-                Contrasena
-              </label>
-              <Input autoComplete="new-password" id="registerPassword" name="password" required type="password" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="confirmPassword">
-                Confirmar contrasena
-              </label>
-              <Input autoComplete="new-password" id="confirmPassword" name="confirmPassword" required type="password" />
-            </div>
-
-            {registerState.error ? <p className="text-sm font-semibold text-danger">{registerState.error}</p> : null}
-            {registerState.success ? (
-              <p className="text-sm font-semibold text-emerald-300">{registerState.success}</p>
-            ) : null}
-            <RegisterSubmitButton />
-          </form>
-        </Card>
+        <div className="rounded-md border border-slate-800 bg-slate-950/45 px-3 py-3 text-center text-sm text-slate-400">
+          {isRegisterMode ? (
+            <>
+              &iquest;Ya ten&eacute;s cuenta?{" "}
+              <button
+                className="font-semibold text-emerald-300 transition hover:text-emerald-200"
+                onClick={() => setMode("login")}
+                type="button"
+              >
+                Ingresar
+              </button>
+            </>
+          ) : (
+            <>
+              &iquest;No ten&eacute;s cuenta?{" "}
+              <button
+                className="font-semibold text-emerald-300 transition hover:text-emerald-200"
+                onClick={() => setMode("register")}
+                type="button"
+              >
+                Crear cuenta
+              </button>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </Card>
   );
 }

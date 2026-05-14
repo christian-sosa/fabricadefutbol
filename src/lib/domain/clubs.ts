@@ -148,6 +148,18 @@ export type ClubCallupPlayerRecord = {
   updated_at?: string;
 };
 
+export type ClubCallupGuestRecord = {
+  id: string;
+  callup_id: string;
+  guest_name: string;
+  position: ClubPlayerPosition | null;
+  status: ClubCallupPlayerStatus;
+  expected_cents: number | null;
+  notes: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type ClubCallupPositionNeed = {
   position: ClubPlayerPosition;
   label: string;
@@ -400,15 +412,23 @@ const POSITION_PLURALS: Record<ClubPlayerPosition, string> = {
 
 function getPlayerPaymentExpectation({
   entry,
-  fullPaymentCents,
-  player
+  fullPaymentCents
 }: {
   entry?: Pick<ClubCallupPlayerRecord, "expected_cents"> | null;
   fullPaymentCents: number;
-  player?: Pick<ClubPlayerRecord, "default_payment_cents"> | null;
 }) {
   if (entry?.expected_cents != null) return toSafeCents(entry.expected_cents);
-  if (player?.default_payment_cents != null) return toSafeCents(player.default_payment_cents);
+  return fullPaymentCents;
+}
+
+function getGuestPaymentExpectation({
+  guest,
+  fullPaymentCents
+}: {
+  guest: Pick<ClubCallupGuestRecord, "expected_cents">;
+  fullPaymentCents: number;
+}) {
+  if (guest.expected_cents != null) return toSafeCents(guest.expected_cents);
   return fullPaymentCents;
 }
 
@@ -435,6 +455,13 @@ export function splitClubMatchCost(totalCents: number, lineupIds: string[]) {
   }));
 }
 
+export function calculateCallupEstimatedPaymentCents(fieldCostCents: number, idealPlayerCount: number) {
+  const normalizedCost = toSafeCents(fieldCostCents);
+  const normalizedIdeal = Math.trunc(Number(idealPlayerCount));
+  if (normalizedCost <= 0 || !Number.isFinite(normalizedIdeal) || normalizedIdeal <= 0) return 0;
+  return Math.round(normalizedCost / normalizedIdeal);
+}
+
 export function getClubPaymentStatus(payment: Pick<ClubMatchPaymentRecord, "expected_cents" | "paid_cents">): ClubPaymentStatus {
   return getAggregateStatus(toSafeCents(payment.expected_cents), toSafeCents(payment.paid_cents));
 }
@@ -442,10 +469,12 @@ export function getClubPaymentStatus(payment: Pick<ClubMatchPaymentRecord, "expe
 export function buildClubCallupSummary({
   callup,
   entries,
+  guests = [],
   players
 }: {
   callup: ClubCallupRecord;
   entries: ClubCallupPlayerRecord[];
+  guests?: ClubCallupGuestRecord[];
   players: ClubPlayerRecord[];
 }): ClubCallupSummary {
   const playersById = new Map(players.map((player) => [player.id, player]));
@@ -456,20 +485,31 @@ export function buildClubCallupSummary({
   const waitlistEntries = entries.filter((entry) => entry.status === "waitlist");
   const outEntries = entries.filter((entry) => entry.status === "out");
   const injuredEntries = entries.filter((entry) => entry.status === "injured");
+  const confirmedGuests = guests.filter((guest) => guest.status === "confirmed");
+  const tentativeGuests = guests.filter((guest) => guest.status === "tentative");
+  const waitlistGuests = guests.filter((guest) => guest.status === "waitlist");
+  const outGuests = guests.filter((guest) => guest.status === "out");
+  const injuredGuests = guests.filter((guest) => guest.status === "injured");
   const availableEntries = entries.filter((entry) => entry.status === "confirmed" || entry.status === "tentative");
+  const availableGuests = guests.filter((guest) => guest.status === "confirmed" || guest.status === "tentative");
   const confirmedExpectedCents = confirmedEntries.reduce((total, entry) => {
-    const player = playersById.get(entry.club_player_id);
-    return total + getPlayerPaymentExpectation({ entry, fullPaymentCents, player });
-  }, 0);
+    return total + getPlayerPaymentExpectation({ entry, fullPaymentCents });
+  }, 0) + confirmedGuests.reduce((total, guest) => total + getGuestPaymentExpectation({ guest, fullPaymentCents }), 0);
   const paymentEquivalentCount = roundToOneDecimal(confirmedExpectedCents / fullPaymentCents);
   const targetPaymentCount = Math.max(0, Number(callup.target_payment_count) || 0);
   const targetRevenueCents = toSafeCents(callup.field_cost_cents) || targetPaymentCount * fullPaymentCents;
+  const confirmedCount = confirmedEntries.length + confirmedGuests.length;
   const positionCounts = Object.fromEntries(
     CLUB_PLAYER_POSITIONS.map((position) => [position, 0])
   ) as Record<ClubPlayerPosition, number>;
 
   for (const entry of confirmedEntries) {
     const position = normalizeClubPlayerPosition(playersById.get(entry.club_player_id)?.position);
+    if (position) positionCounts[position] += 1;
+  }
+
+  for (const guest of confirmedGuests) {
+    const position = normalizeClubPlayerPosition(guest.position);
     if (position) positionCounts[position] += 1;
   }
 
@@ -486,12 +526,11 @@ export function buildClubCallupSummary({
     .filter((player) => player.active && !entryPlayerIds.has(player.id))
     .map((player) => {
       const position = normalizeClubPlayerPosition(player.position);
-      const expectedCents = getPlayerPaymentExpectation({ fullPaymentCents, player });
+      const expectedCents = fullPaymentCents;
       const paymentEquivalent = roundToOneDecimal(expectedCents / fullPaymentCents);
       const positionLabel = position ? formatClubPlayerPosition(position) : "Sin posicion";
       const reasons = [
-        position && missingPositions.has(position) ? `Cubre ${positionLabel}` : null,
-        expectedCents >= fullPaymentCents ? "paga completo" : null
+        position && missingPositions.has(position) ? `Cubre ${positionLabel}` : null
       ].filter(Boolean);
 
       return {
@@ -509,13 +548,12 @@ export function buildClubCallupSummary({
       const leftPositionIndex = left.position ? CLUB_PLAYER_POSITIONS.indexOf(left.position) : CLUB_PLAYER_POSITIONS.length;
       const rightPositionIndex = right.position ? CLUB_PLAYER_POSITIONS.indexOf(right.position) : CLUB_PLAYER_POSITIONS.length;
       if (leftPositionIndex !== rightPositionIndex) return leftPositionIndex - rightPositionIndex;
-      if (right.paymentEquivalent !== left.paymentEquivalent) return right.paymentEquivalent - left.paymentEquivalent;
       return left.displayName.localeCompare(right.displayName, "es");
     })
     .slice(0, 6);
 
-  const remainingIdealSlots = Math.max(0, callup.ideal_player_count - confirmedEntries.length);
-  const remainingMaxSlots = Math.max(0, callup.max_player_count - confirmedEntries.length);
+  const remainingIdealSlots = Math.max(0, callup.ideal_player_count - confirmedCount);
+  const remainingMaxSlots = Math.max(0, callup.max_player_count - confirmedCount);
   const paymentEquivalentMissing = roundToOneDecimal(Math.max(0, targetPaymentCount - paymentEquivalentCount));
   const revenueMissingCents = Math.max(0, targetRevenueCents - confirmedExpectedCents);
   const recommendations: string[] = [];
@@ -540,12 +578,12 @@ export function buildClubCallupSummary({
   }
 
   return {
-    confirmedCount: confirmedEntries.length,
-    tentativeCount: tentativeEntries.length,
-    waitlistCount: waitlistEntries.length,
-    outCount: outEntries.length,
-    injuredCount: injuredEntries.length,
-    availableCount: availableEntries.length,
+    confirmedCount,
+    tentativeCount: tentativeEntries.length + tentativeGuests.length,
+    waitlistCount: waitlistEntries.length + waitlistGuests.length,
+    outCount: outEntries.length + outGuests.length,
+    injuredCount: injuredEntries.length + injuredGuests.length,
+    availableCount: availableEntries.length + availableGuests.length,
     remainingIdealSlots,
     remainingMaxSlots,
     confirmedExpectedCents,

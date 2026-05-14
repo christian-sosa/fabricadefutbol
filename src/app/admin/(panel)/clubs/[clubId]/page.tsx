@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import {
   addClubCallupAction,
+  addClubCallupGuestAction,
   addClubCompetitionAction,
   addClubMatchAction,
   addClubPlayerAction,
@@ -18,7 +19,6 @@ import {
   updateClubAction,
   updateClubCallupPlayerAction,
   updateClubMatchFinanceAction,
-  updateClubPlayerPaymentAction,
   updateClubTeamAction,
   uploadClubLogoAction,
   uploadClubPlayerPhotoAction
@@ -52,6 +52,7 @@ import {
   formatClubPlayerPosition,
   getClubPaymentStatus,
   normalizeClubPlayerPosition,
+  type ClubCallupGuestRecord,
   type ClubCallupPlayerRecord,
   type ClubCallupPlayerStatus,
   type ClubCompetitionRecord,
@@ -530,10 +531,6 @@ function PlayersTab({
               <label className="mb-1 block text-sm font-semibold text-slate-200">Numero</label>
               <Input min={1} max={99} name="shirtNumber" type="number" />
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200">Aporte habitual</label>
-              <Input min={0} name="defaultPaymentAmount" placeholder="25000" step="0.01" type="number" />
-            </div>
             <div className="md:col-span-2">
               <label className="mb-1 block text-sm font-semibold text-slate-200">Notas</label>
               <Textarea name="notes" rows={2} />
@@ -580,7 +577,7 @@ Martin Alvarez`}
         <Card>
           <CardTitle>Pool del club</CardTitle>
           <CardDescription className="mt-2">
-            Desactivar no borra al jugador: lo deja fuera del pool activo y puedes volver a activarlo.
+            Desactivar no borra al jugador: lo deja fuera del pool activo y puedes volver a activarlo. Los pagos se definen en cada convocatoria.
           </CardDescription>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
@@ -614,7 +611,6 @@ Martin Alvarez`}
                   <TH>Foto</TH>
                   <TH>Jugador</TH>
                   <TH>Datos</TH>
-                  <TH>Aporte habitual</TH>
                   <TH>Estado</TH>
                   <TH>Accion</TH>
                 </tr>
@@ -628,24 +624,6 @@ Martin Alvarez`}
                     <TD className="font-semibold">{player.full_name}</TD>
                     <TD className="text-slate-300">
                       {formatPlayerMeta(player) || "Sin detalle"}
-                    </TD>
-                    <TD>
-                      <form action={updateClubPlayerPaymentAction.bind(null, clubId)} className="flex min-w-44 gap-2">
-                        <input name="playerId" type="hidden" value={player.id} />
-                        <Input
-                          aria-label={`Aporte habitual ${player.full_name}`}
-                          className="w-24"
-                          defaultValue={formatCurrencyInput(player.default_payment_cents)}
-                          min={0}
-                          name="defaultPaymentAmount"
-                          placeholder="25000"
-                          step="0.01"
-                          type="number"
-                        />
-                        <Button className="h-8 px-3 text-xs" type="submit" variant="secondary">
-                          Guardar
-                        </Button>
-                      </form>
                     </TD>
                     <TD>
                       <Badge className={player.active ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}>
@@ -1085,13 +1063,93 @@ function formatCentsInputValue(cents: number) {
   return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
 }
 
+type CallupSourceFilter = "team" | "other" | "free" | "all";
+type CallupSortMode = "position" | "name";
+
+type CallupFilters = {
+  position: ClubPlayerPosition | null;
+  search: string;
+  sort: CallupSortMode;
+  source: CallupSourceFilter;
+};
+
+const CALLUP_SOURCE_OPTIONS: Array<{ value: CallupSourceFilter; label: string }> = [
+  { value: "team", label: "Equipo" },
+  { value: "other", label: "Otros equipos" },
+  { value: "free", label: "Sin equipo" },
+  { value: "all", label: "Todos" }
+];
+
+const CALLUP_PAYMENT_OPTIONS = [
+  { value: "full", label: "Completo" },
+  { value: "partial", label: "Parte" },
+  { value: "none", label: "No paga" }
+];
+
+function normalizeCallupSourceFilter(value?: string): CallupSourceFilter {
+  if (value === "other" || value === "free" || value === "all") return value;
+  return "team";
+}
+
+function normalizeCallupSortMode(value?: string): CallupSortMode {
+  return value === "name" ? "name" : "position";
+}
+
+function buildCallupPath({
+  callupId,
+  clubId,
+  filters
+}: {
+  callupId?: string | null;
+  clubId: string;
+  filters: CallupFilters;
+}) {
+  const searchParams = new URLSearchParams({
+    tab: "callups",
+    callupSource: filters.source,
+    callupSort: filters.sort
+  });
+  if (callupId) searchParams.set("callupId", callupId);
+  if (filters.position) searchParams.set("callupPosition", filters.position);
+  if (filters.search.trim()) searchParams.set("callupSearch", filters.search.trim());
+  return `/admin/clubs/${clubId}?${searchParams.toString()}`;
+}
+
+function getCallupFilterLinkClass(active: boolean) {
+  return active
+    ? "rounded-full border border-emerald-400/60 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-200"
+    : "rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-slate-500 hover:bg-slate-800";
+}
+
+function getCallupPaymentMode(expectedCents: number | null | undefined, fullPaymentCents: number) {
+  if (expectedCents == null) return "full";
+  if (expectedCents <= 0) return "none";
+  if (expectedCents === fullPaymentCents) return "full";
+  return "partial";
+}
+
+function getCallupPaymentModeLabel(mode: ReturnType<typeof getCallupPaymentMode>) {
+  return CALLUP_PAYMENT_OPTIONS.find((option) => option.value === mode)?.label ?? "Completo";
+}
+
+function comparePlayersByPosition(left: ClubPlayerRecord, right: ClubPlayerRecord) {
+  const leftPosition = normalizeClubPlayerPosition(left.position);
+  const rightPosition = normalizeClubPlayerPosition(right.position);
+  const leftIndex = leftPosition ? CLUB_PLAYER_POSITIONS.indexOf(leftPosition) : CLUB_PLAYER_POSITIONS.length;
+  const rightIndex = rightPosition ? CLUB_PLAYER_POSITIONS.indexOf(rightPosition) : CLUB_PLAYER_POSITIONS.length;
+  if (leftIndex !== rightIndex) return leftIndex - rightIndex;
+  return left.full_name.localeCompare(right.full_name, "es");
+}
+
 function CallupsTab({
   clubId,
   details,
+  filters,
   selectedCallupId
 }: {
   clubId: string;
   details: NonNullable<Awaited<ReturnType<typeof getAdminClubDetails>>>;
+  filters: CallupFilters;
   selectedCallupId: string | null;
 }) {
   const activeTeams = details.teams.filter((team) => team.active);
@@ -1104,15 +1162,66 @@ function CallupsTab({
   const callupEntries = selectedCallup
     ? details.callupPlayers.filter((entry) => entry.callup_id === selectedCallup.id)
     : [];
+  const selectedCallupGuests = selectedCallup
+    ? details.callupGuests.filter((guest) => guest.callup_id === selectedCallup.id)
+    : [];
   const entriesByPlayerId = new Map(callupEntries.map((entry) => [entry.club_player_id, entry]));
   const selectedSummary = selectedCallup
     ? details.callupSummaries[selectedCallup.id] ?? buildClubCallupSummary({
         callup: selectedCallup,
         entries: callupEntries,
+        guests: selectedCallupGuests,
         players: details.players
       })
     : null;
   const defaultScheduledDate = getCurrentMatchDateInput();
+  const selectedTeamPlayerIds = new Set(
+    selectedCallup
+      ? details.teamPlayers
+          .filter((teamPlayer) => teamPlayer.club_team_id === selectedCallup.club_team_id)
+          .map((teamPlayer) => teamPlayer.club_player_id)
+      : []
+  );
+  const playerTeamIdsByPlayerId = new Map<string, Set<string>>();
+  for (const teamPlayer of details.teamPlayers) {
+    const teamIds = playerTeamIdsByPlayerId.get(teamPlayer.club_player_id) ?? new Set<string>();
+    teamIds.add(teamPlayer.club_team_id);
+    playerTeamIdsByPlayerId.set(teamPlayer.club_player_id, teamIds);
+  }
+  const sourceCounts: Record<CallupSourceFilter, number> = {
+    all: activePlayers.length,
+    free: activePlayers.filter((player) => !playerTeamIdsByPlayerId.get(player.id)?.size).length,
+    other: activePlayers.filter((player) => {
+      const teamIds = playerTeamIdsByPlayerId.get(player.id);
+      return Boolean(teamIds?.size) && !selectedTeamPlayerIds.has(player.id);
+    }).length,
+    team: activePlayers.filter((player) => selectedTeamPlayerIds.has(player.id)).length
+  };
+  const normalizedSearch = filters.search.trim().toLocaleLowerCase("es-AR");
+  const filteredPlayers = activePlayers
+    .filter((player) => {
+      const teamIds = playerTeamIdsByPlayerId.get(player.id);
+      const matchesSource = filters.source === "all"
+        || (filters.source === "team" && selectedTeamPlayerIds.has(player.id))
+        || (filters.source === "other" && Boolean(teamIds?.size) && !selectedTeamPlayerIds.has(player.id))
+        || (filters.source === "free" && !teamIds?.size);
+      const playerPosition = normalizeClubPlayerPosition(player.position);
+      const matchesPosition = !filters.position || playerPosition === filters.position;
+      const matchesSearch = !normalizedSearch
+        || player.full_name.toLocaleLowerCase("es-AR").includes(normalizedSearch)
+        || (player.nickname ?? "").toLocaleLowerCase("es-AR").includes(normalizedSearch);
+      return matchesSource && matchesPosition && matchesSearch;
+    })
+    .sort(filters.sort === "position"
+      ? comparePlayersByPosition
+      : (left, right) => left.full_name.localeCompare(right.full_name, "es"));
+  const selectedTeamName = selectedCallup ? getTeamName(selectedCallup.club_team_id, details.teams) : "Equipo";
+  const callupSelectionFilters: CallupFilters = {
+    position: null,
+    search: "",
+    sort: "position",
+    source: "team"
+  };
 
   return (
     <div className="space-y-4">
@@ -1156,23 +1265,16 @@ function CallupsTab({
           </div>
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200">Costo cancha</label>
-            <Input min={0} name="fieldCostAmount" placeholder="350000" step="0.01" type="number" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200">Pago completo</label>
-            <Input defaultValue="25000" min={1} name="fullPaymentAmount" step="0.01" type="number" />
+            <Input min={0} name="fieldCostAmount" placeholder="36000" step="0.01" type="number" />
           </div>
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200">Jugadores ideal</label>
             <Input defaultValue={14} min={1} max={30} name="idealPlayerCount" type="number" />
+            <p className="mt-1 text-xs text-slate-400">El pago completo se estima con cancha / ideal.</p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200">Maximo jugadores</label>
             <Input defaultValue={16} min={1} max={30} name="maxPlayerCount" type="number" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200">Pagos objetivo</label>
-            <Input defaultValue={14} min={0} max={30} name="targetPaymentCount" type="number" />
           </div>
           <div className="md:col-span-3">
             <label className="mb-1 block text-sm font-semibold text-slate-200">Notas</label>
@@ -1185,24 +1287,49 @@ function CallupsTab({
       </details>
 
       {details.callups.length ? (
-        <Card>
-          <CardTitle>Convocatorias</CardTitle>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {details.callups.map((callup) => (
-              <Link
-                className={
-                  selectedCallup?.id === callup.id
-                    ? "rounded-full border border-emerald-400/60 bg-emerald-500/15 px-3 py-1.5 text-sm font-semibold text-emerald-200"
-                    : "rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-slate-300"
-                }
-                href={`/admin/clubs/${clubId}?tab=callups&callupId=${callup.id}`}
-                key={callup.id}
-              >
-                {formatDateTime(callup.scheduled_at)}
-              </Link>
-            ))}
+        <details className="rounded-2xl border border-slate-800 bg-slate-950/75 p-4">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+            <div>
+              <CardTitle>Convocatorias cargadas</CardTitle>
+              <CardDescription className="mt-1">Abrir una convocatoria muestra solo su detalle debajo.</CardDescription>
+            </div>
+            <span className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200">
+              Ver lista
+            </span>
+          </summary>
+          <div className="mt-4 space-y-3">
+            {details.callups.map((callup) => {
+              const summary = details.callupSummaries[callup.id];
+
+              return (
+                <Link
+                  className={
+                    selectedCallup?.id === callup.id
+                      ? "block rounded-xl border border-emerald-400/60 bg-emerald-500/10 p-4 text-emerald-100"
+                      : "block rounded-xl border border-slate-800 bg-slate-950/70 p-4 text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+                  }
+                  href={buildCallupPath({ callupId: callup.id, clubId, filters: callupSelectionFilters })}
+                  key={callup.id}
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-semibold">
+                        {getTeamName(callup.club_team_id, details.teams)} - {formatDateTime(callup.scheduled_at)}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        {callup.opponent_name ? `Rival: ${callup.opponent_name}` : "Rival sin cargar"}
+                        {callup.venue ? ` - ${callup.venue}` : ""}
+                      </p>
+                    </div>
+                    <p className="text-sm font-semibold">
+                      {summary?.confirmedCount ?? 0}/{callup.ideal_player_count} confirmados
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
-        </Card>
+        </details>
       ) : null}
 
       {selectedCallup && selectedSummary ? (
@@ -1216,14 +1343,14 @@ function CallupsTab({
               <p className="mt-1 text-xs text-slate-400">Maximo {selectedCallup.max_player_count}</p>
             </Card>
             <Card>
-              <CardDescription>Pagos equivalentes</CardDescription>
-              <CardTitle className="mt-1 text-3xl">
-                {selectedSummary.paymentEquivalentCount}/{selectedCallup.target_payment_count}
-              </CardTitle>
-              <p className="mt-1 text-xs text-slate-400">{formatCurrencyCents(selectedSummary.confirmedExpectedCents)} esperado</p>
+              <CardDescription>Pago estimado</CardDescription>
+              <CardTitle className="mt-1 text-3xl">{formatCurrencyCents(selectedCallup.full_payment_cents)}</CardTitle>
+              <p className="mt-1 text-xs text-slate-400">
+                {formatCurrencyCents(selectedCallup.field_cost_cents)} / {selectedCallup.ideal_player_count}
+              </p>
             </Card>
             <Card>
-              <CardDescription>Falta cobrar</CardDescription>
+              <CardDescription>Falta cubrir</CardDescription>
               <CardTitle className="mt-1 text-3xl">{formatCurrencyCents(selectedSummary.revenueMissingCents)}</CardTitle>
               <p className="mt-1 text-xs text-slate-400">Objetivo {formatCurrencyCents(selectedSummary.targetRevenueCents)}</p>
             </Card>
@@ -1240,7 +1367,7 @@ function CallupsTab({
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <CardTitle>
-                  {getTeamName(selectedCallup.club_team_id, details.teams)} - {formatDateTime(selectedCallup.scheduled_at)}
+                  {selectedTeamName} - {formatDateTime(selectedCallup.scheduled_at)}
                 </CardTitle>
                 <CardDescription className="mt-2">
                   {selectedCallup.opponent_name ? `Rival: ${selectedCallup.opponent_name}` : "Rival sin cargar"}
@@ -1277,6 +1404,9 @@ function CallupsTab({
 
           <Card>
             <CardTitle>Sugeridos</CardTitle>
+            <CardDescription className="mt-2">
+              Activos fuera de esta convocatoria que cubren posiciones faltantes.
+            </CardDescription>
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {selectedSummary.candidateSuggestions.map((candidate) => (
                 <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3" key={candidate.playerId}>
@@ -1295,6 +1425,60 @@ function CallupsTab({
 
           <Card>
             <CardTitle>Lista de jugadores</CardTitle>
+            <div className="mt-4 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {CALLUP_SOURCE_OPTIONS.map((option) => (
+                  <Link
+                    className={getCallupFilterLinkClass(filters.source === option.value)}
+                    href={buildCallupPath({
+                      callupId: selectedCallup.id,
+                      clubId,
+                      filters: { ...filters, source: option.value }
+                    })}
+                    key={option.value}
+                  >
+                    {option.label} ({sourceCounts[option.value]})
+                  </Link>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  className={getCallupFilterLinkClass(!filters.position)}
+                  href={buildCallupPath({
+                    callupId: selectedCallup.id,
+                    clubId,
+                    filters: { ...filters, position: null }
+                  })}
+                >
+                  Todas las posiciones
+                </Link>
+                {CLUB_PLAYER_POSITIONS.map((position) => (
+                  <Link
+                    className={getCallupFilterLinkClass(filters.position === position)}
+                    href={buildCallupPath({
+                      callupId: selectedCallup.id,
+                      clubId,
+                      filters: { ...filters, position }
+                    })}
+                    key={position}
+                  >
+                    {formatClubPlayerPosition(position)}
+                  </Link>
+                ))}
+              </div>
+              <form className="grid gap-2 md:grid-cols-[1fr_180px_auto]" method="get">
+                <input name="tab" type="hidden" value="callups" />
+                <input name="callupId" type="hidden" value={selectedCallup.id} />
+                <input name="callupSource" type="hidden" value={filters.source} />
+                {filters.position ? <input name="callupPosition" type="hidden" value={filters.position} /> : null}
+                <Input defaultValue={filters.search} name="callupSearch" placeholder="Buscar por nombre" />
+                <Select defaultValue={filters.sort} name="callupSort">
+                  <option value="position">Ordenar por posicion</option>
+                  <option value="name">Ordenar por nombre</option>
+                </Select>
+                <Button type="submit" variant="secondary">Aplicar</Button>
+              </form>
+            </div>
             <div className="mt-4 overflow-x-auto">
               <Table>
                 <THead>
@@ -1302,16 +1486,18 @@ function CallupsTab({
                     <TH>Jugador</TH>
                     <TH>Posicion</TH>
                     <TH>Estado</TH>
-                    <TH>Aporte</TH>
+                    <TH>Pago</TH>
                     <TH>Notas</TH>
                     <TH>Accion</TH>
                   </tr>
                 </THead>
                 <TBody>
-                  {activePlayers.map((player) => {
+                  {filteredPlayers.map((player) => {
                     const entry = entriesByPlayerId.get(player.id) as ClubCallupPlayerRecord | undefined;
                     const currentStatus = entry?.status ?? "";
-                    const paymentDefault = entry?.expected_cents ?? player.default_payment_cents ?? selectedCallup.full_payment_cents;
+                    const paymentMode = getCallupPaymentMode(entry?.expected_cents, selectedCallup.full_payment_cents);
+                    const expectedCents = entry?.expected_cents ?? selectedCallup.full_payment_cents;
+                    const partialValue = paymentMode === "partial" ? formatCurrencyInput(entry?.expected_cents) : "";
 
                     return (
                       <tr key={player.id}>
@@ -1322,12 +1508,21 @@ function CallupsTab({
                             {getCallupPlayerStatusLabel(currentStatus)}
                           </Badge>
                         </TD>
-                        <TD>{formatCurrencyCents(paymentDefault)}</TD>
+                        <TD>
+                          <Badge className={paymentMode === "none" ? "bg-slate-800 text-slate-300" : "bg-emerald-500/15 text-emerald-200"}>
+                            {getCallupPaymentModeLabel(paymentMode)}
+                          </Badge>
+                          <p className="mt-1 text-xs text-slate-400">{formatCurrencyCents(expectedCents)}</p>
+                        </TD>
                         <TD className="text-slate-400">{entry?.notes || player.notes || ""}</TD>
                         <TD>
-                          <form action={updateClubCallupPlayerAction.bind(null, clubId)} className="flex min-w-[520px] gap-2">
+                          <form action={updateClubCallupPlayerAction.bind(null, clubId)} className="flex min-w-[680px] gap-2">
                             <input name="callupId" type="hidden" value={selectedCallup.id} />
                             <input name="playerId" type="hidden" value={player.id} />
+                            <input name="returnSource" type="hidden" value={filters.source} />
+                            <input name="returnPosition" type="hidden" value={filters.position ?? ""} />
+                            <input name="returnSearch" type="hidden" value={filters.search} />
+                            <input name="returnSort" type="hidden" value={filters.sort} />
                             <Select className="w-36" defaultValue={currentStatus} name="status">
                               {CALLUP_PLAYER_STATUS_OPTIONS.map((option) => (
                                 <option key={option.value || "none"} value={option.value}>
@@ -1335,13 +1530,20 @@ function CallupsTab({
                                 </option>
                               ))}
                             </Select>
+                            <Select className="w-32" defaultValue={paymentMode} name="paymentStatus">
+                              {CALLUP_PAYMENT_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </Select>
                             <Input
-                              aria-label={`Aporte esperado ${player.full_name}`}
+                              aria-label={`Monto parcial ${player.full_name}`}
                               className="w-24"
-                              defaultValue={formatCurrencyInput(entry?.expected_cents)}
+                              defaultValue={partialValue}
                               min={0}
-                              name="expectedAmount"
-                              placeholder={formatCurrencyInput(player.default_payment_cents ?? selectedCallup.full_payment_cents)}
+                              name="partialAmount"
+                              placeholder="Parte"
                               step="0.01"
                               type="number"
                             />
@@ -1354,14 +1556,106 @@ function CallupsTab({
                       </tr>
                     );
                   })}
-                  {!activePlayers.length ? (
+                  {!filteredPlayers.length ? (
                     <tr>
-                      <TD className="text-slate-400" colSpan={6}>Carga jugadores activos para armar la convocatoria.</TD>
+                      <TD className="text-slate-400" colSpan={6}>No hay jugadores para esos filtros.</TD>
                     </tr>
                   ) : null}
                 </TBody>
               </Table>
             </div>
+          </Card>
+
+          <Card>
+            <CardTitle>Agregar invitado</CardTitle>
+            <form action={addClubCallupGuestAction.bind(null, clubId)} className="mt-4 grid gap-3 md:grid-cols-6">
+              <input name="callupId" type="hidden" value={selectedCallup.id} />
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre</label>
+                <Input name="guestName" required />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200">Posicion</label>
+                <Select name="position">
+                  <option value="">Sin posicion</option>
+                  {CLUB_PLAYER_POSITIONS.map((position) => (
+                    <option key={position} value={position}>{formatClubPlayerPosition(position)}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200">Estado</label>
+                <Select defaultValue="confirmed" name="status">
+                  {CALLUP_PLAYER_STATUS_OPTIONS.filter((option) => option.value).map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200">Pago</label>
+                <Select defaultValue="full" name="paymentStatus">
+                  {CALLUP_PAYMENT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200">Monto parte</label>
+                <Input min={0} name="partialAmount" placeholder="Parte" step="0.01" type="number" />
+              </div>
+              <div className="md:col-span-5">
+                <label className="mb-1 block text-sm font-semibold text-slate-200">Notas</label>
+                <Input name="notes" />
+              </div>
+              <div className="flex items-end">
+                <Button className="w-full" type="submit">Agregar</Button>
+              </div>
+            </form>
+
+            {selectedCallupGuests.length ? (
+              <div className="mt-4 overflow-x-auto">
+                <Table>
+                  <THead>
+                    <tr>
+                      <TH>Invitado</TH>
+                      <TH>Posicion</TH>
+                      <TH>Estado</TH>
+                      <TH>Pago</TH>
+                      <TH>Notas</TH>
+                    </tr>
+                  </THead>
+                  <TBody>
+                    {selectedCallupGuests.map((guest: ClubCallupGuestRecord) => {
+                      const guestPaymentMode = getCallupPaymentMode(guest.expected_cents, selectedCallup.full_payment_cents);
+
+                      return (
+                        <tr key={guest.id}>
+                          <TD className="font-semibold">
+                            {guest.guest_name}
+                            <Badge className="ml-2 bg-sky-500/15 text-sky-200">Temporal</Badge>
+                          </TD>
+                          <TD>{formatClubPlayerPosition(guest.position) || "Sin posicion"}</TD>
+                          <TD>
+                            <Badge className={getCallupPlayerStatusClass(guest.status)}>
+                              {getCallupPlayerStatusLabel(guest.status)}
+                            </Badge>
+                          </TD>
+                          <TD>
+                            <Badge className={guestPaymentMode === "none" ? "bg-slate-800 text-slate-300" : "bg-emerald-500/15 text-emerald-200"}>
+                              {getCallupPaymentModeLabel(guestPaymentMode)}
+                            </Badge>
+                            <p className="mt-1 text-xs text-slate-400">
+                              {formatCurrencyCents(guest.expected_cents ?? selectedCallup.full_payment_cents)}
+                            </p>
+                          </TD>
+                          <TD className="text-slate-400">{guest.notes ?? ""}</TD>
+                        </tr>
+                      );
+                    })}
+                  </TBody>
+                </Table>
+              </div>
+            ) : null}
           </Card>
         </>
       ) : (
@@ -1842,6 +2136,10 @@ export default async function AdminClubDetailPage({
     availablePosition?: string;
     availableSearch?: string;
     callupId?: string;
+    callupPosition?: string;
+    callupSearch?: string;
+    callupSort?: string;
+    callupSource?: string;
     error?: string;
     position?: string;
     rosterPosition?: string;
@@ -1870,6 +2168,12 @@ export default async function AdminClubDetailPage({
     availableSearch: resolvedSearchParams.availableSearch ?? "",
     rosterPosition: normalizeClubPlayerPosition(resolvedSearchParams.rosterPosition),
     rosterSearch: resolvedSearchParams.rosterSearch ?? ""
+  };
+  const callupFilters: CallupFilters = {
+    position: normalizeClubPlayerPosition(resolvedSearchParams.callupPosition),
+    search: resolvedSearchParams.callupSearch ?? "",
+    sort: normalizeCallupSortMode(resolvedSearchParams.callupSort),
+    source: normalizeCallupSourceFilter(resolvedSearchParams.callupSource)
   };
   const tabs = [
     { key: "summary", label: "Resumen" },
@@ -1957,6 +2261,7 @@ export default async function AdminClubDetailPage({
         <CallupsTab
           clubId={clubId}
           details={details}
+          filters={callupFilters}
           selectedCallupId={resolvedSearchParams.callupId ?? null}
         />
       ) : null}

@@ -49,6 +49,8 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import {
+  addClubCallupAction,
+  addClubCallupGuestAction,
   addClubMatchAction,
   addClubTeamAction,
   updateClubTeamAction
@@ -285,6 +287,85 @@ describe("club admin actions", () => {
     expect(paymentByName.get("Jugador Pago 3")).toMatchObject({
       expected_cents: 2000,
       paid_cents: 1200
+    });
+  });
+
+  it("crea convocatorias con pago estimado desde costo de cancha dividido por ideal", async () => {
+    const fake = createFakeSupabase({
+      club_teams: [
+        {
+          id: teamId,
+          club_id: clubId,
+          name: "La Quinta F7",
+          short_name: "LQ7",
+          modality: "7v7",
+          active: true
+        }
+      ]
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+
+    const formData = new FormData();
+    formData.set("teamId", teamId);
+    formData.set("scheduledDate", "2026-05-20");
+    formData.set("scheduledTime", "20:00");
+    formData.set("opponentName", "Rival");
+    formData.set("venue", "Complejo Sur");
+    formData.set("fieldCostAmount", "36000");
+    formData.set("idealPlayerCount", "14");
+    formData.set("maxPlayerCount", "16");
+    formData.set("notes", "");
+
+    await expect(addClubCallupAction(clubId, formData)).rejects.toMatchObject({
+      digest: expect.stringContaining(`/admin/clubs/${clubId}?tab=callups`)
+    });
+
+    const callup = fake.find("club_callups", (row) => row.club_team_id === teamId);
+    expect(callup).toMatchObject({
+      field_cost_cents: 3600000,
+      full_payment_cents: 257143,
+      ideal_player_count: 14,
+      target_payment_count: 14
+    });
+  });
+
+  it("agrega invitados temporales solo a la convocatoria", async () => {
+    const callupId = "00000000-0000-4000-8000-000000000700";
+    const fake = createFakeSupabase({
+      club_callups: [
+        {
+          id: callupId,
+          club_id: clubId,
+          club_team_id: teamId,
+          scheduled_at: "2026-05-20T23:00:00.000Z",
+          ideal_player_count: 14,
+          max_player_count: 16,
+          target_payment_count: 14,
+          full_payment_cents: 257143,
+          field_cost_cents: 3600000,
+          created_by: "00000000-0000-4000-8000-000000000001"
+        }
+      ]
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+
+    const formData = new FormData();
+    formData.set("callupId", callupId);
+    formData.set("guestName", "Invitado Semanal");
+    formData.set("position", "delantero");
+    formData.set("paymentStatus", "unpaid");
+    formData.set("notes", "Viene por esta fecha");
+
+    await expect(addClubCallupGuestAction(clubId, formData)).rejects.toMatchObject({
+      digest: expect.stringContaining(`/admin/clubs/${clubId}?tab=callups&callupId=${callupId}`)
+    });
+
+    expect(fake.table("club_players")).toHaveLength(0);
+    expect(fake.find("club_callup_guests", (row) => row.callup_id === callupId)).toMatchObject({
+      guest_name: "Invitado Semanal",
+      position: "delantero",
+      expected_cents: 0,
+      notes: "Viene por esta fecha"
     });
   });
 });

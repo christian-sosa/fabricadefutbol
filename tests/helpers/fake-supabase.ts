@@ -34,6 +34,9 @@ type TableName =
   | "club_players"
   | "club_teams"
   | "club_team_players"
+  | "club_callups"
+  | "club_callup_players"
+  | "club_callup_guests"
   | "club_matches"
   | "club_match_lineups"
   | "club_match_payments"
@@ -114,6 +117,9 @@ function createEmptyDatabase(): FakeDatabase {
     club_players: [],
     club_teams: [],
     club_team_players: [],
+    club_callups: [],
+    club_callup_players: [],
+    club_callup_guests: [],
     club_matches: [],
     club_match_lineups: [],
     club_match_payments: [],
@@ -386,6 +392,31 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!("modality" in normalized)) normalized.modality = "11v11";
       if (!("notes" in normalized)) normalized.notes = null;
       if (!("active" in normalized)) normalized.active = true;
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "club_callups":
+      if (!("opponent_name" in normalized)) normalized.opponent_name = null;
+      if (!("venue" in normalized)) normalized.venue = null;
+      if (!("status" in normalized)) normalized.status = "draft";
+      if (!("ideal_player_count" in normalized)) normalized.ideal_player_count = 14;
+      if (!("max_player_count" in normalized)) normalized.max_player_count = 16;
+      if (!("target_payment_count" in normalized)) normalized.target_payment_count = 14;
+      if (!("full_payment_cents" in normalized)) normalized.full_payment_cents = 2500000;
+      if (!("field_cost_cents" in normalized)) normalized.field_cost_cents = 0;
+      if (!("notes" in normalized)) normalized.notes = null;
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "club_callup_players":
+      if (!("status" in normalized)) normalized.status = "confirmed";
+      if (!("expected_cents" in normalized)) normalized.expected_cents = null;
+      if (!("notes" in normalized)) normalized.notes = null;
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "club_callup_guests":
+      if (!("position" in normalized)) normalized.position = null;
+      if (!("status" in normalized)) normalized.status = "confirmed";
+      if (!("expected_cents" in normalized)) normalized.expected_cents = null;
+      if (!("notes" in normalized)) normalized.notes = null;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "club_matches":
@@ -806,6 +837,11 @@ class FakeSupabaseState {
           .filter((row) => deletedClubIds.has(String(row.club_id)))
           .map((row) => String(row.id))
       );
+      const deletedCallupIds = new Set(
+        this.db.club_callups
+          .filter((row) => deletedClubIds.has(String(row.club_id)))
+          .map((row) => String(row.id))
+      );
       const deletedLineupIds = new Set(
         this.db.club_match_lineups
           .filter((row) => deletedMatchIds.has(String(row.match_id)))
@@ -818,6 +854,9 @@ class FakeSupabaseState {
       this.db.club_players = this.db.club_players.filter((row) => !deletedClubIds.has(String(row.club_id)));
       this.db.club_teams = this.db.club_teams.filter((row) => !deletedClubIds.has(String(row.club_id)));
       this.db.club_team_players = this.db.club_team_players.filter((row) => !deletedTeamIds.has(String(row.club_team_id)));
+      this.db.club_callups = this.db.club_callups.filter((row) => !deletedClubIds.has(String(row.club_id)));
+      this.db.club_callup_players = this.db.club_callup_players.filter((row) => !deletedCallupIds.has(String(row.callup_id)));
+      this.db.club_callup_guests = this.db.club_callup_guests.filter((row) => !deletedCallupIds.has(String(row.callup_id)));
       this.db.club_matches = this.db.club_matches.filter((row) => !deletedClubIds.has(String(row.club_id)));
       this.db.club_match_lineups = this.db.club_match_lineups.filter((row) => !deletedMatchIds.has(String(row.match_id)));
       this.db.club_match_payments = this.db.club_match_payments.filter(
@@ -880,6 +919,16 @@ class FakeSupabaseState {
       const deletedTeamIds = new Set(deletedRows.map((row) => String(row.id)));
       this.db.club_team_players = this.db.club_team_players.filter(
         (row) => !deletedTeamIds.has(String(row.club_team_id))
+      );
+    }
+
+    if (table === "club_callups") {
+      const deletedCallupIds = new Set(deletedRows.map((row) => String(row.id)));
+      this.db.club_callup_players = this.db.club_callup_players.filter(
+        (row) => !deletedCallupIds.has(String(row.callup_id))
+      );
+      this.db.club_callup_guests = this.db.club_callup_guests.filter(
+        (row) => !deletedCallupIds.has(String(row.callup_id))
       );
     }
 

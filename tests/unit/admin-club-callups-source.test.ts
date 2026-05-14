@@ -19,8 +19,12 @@ describe("admin club callups source", () => {
     expect(adminSource).toContain("buildClubCallupSummary");
     expect(actionsSource).toContain("addClubCallupAction");
     expect(actionsSource).toContain("updateClubCallupPlayerAction");
+    expect(actionsSource).toContain("addClubCallupGuestAction");
     expect(actionsSource).toContain("club_callups");
     expect(actionsSource).toContain("club_callup_players");
+    expect(actionsSource).toContain("club_callup_guests");
+    expect(adminSource).toContain("Buscar por nombre");
+    expect(adminSource).toContain("Agregar invitado");
     expect(publicSource).not.toContain("Convocatoria");
     expect(publicSource).not.toContain("club_callups");
   });
