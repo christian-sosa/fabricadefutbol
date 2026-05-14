@@ -9,6 +9,7 @@ export type GroupActivityValueInput = {
 export type GroupActivityValueState = {
   description: string;
   headline: string;
+  pendingResultsCount: number;
   stage: GroupActivityValueStage;
 };
 
@@ -18,36 +19,42 @@ function getStage(params: GroupActivityValueInput): GroupActivityValueStage {
   return "setup";
 }
 
-function getStageCopy(stage: GroupActivityValueStage) {
+function getStageCopy(stage: GroupActivityValueStage, pendingResultsCount: number) {
   switch (stage) {
     case "proven":
       return {
-        headline: "Resumen del grupo",
+        headline: "Estado del grupo",
         description:
-          "Jugadores, partidos y resultados en un solo lugar. Estos numeros te ayudan a ver si el grupo esta al dia antes de cargar el proximo partido."
+          pendingResultsCount > 0
+            ? `Faltan ${pendingResultsCount} resultados para que ranking e historial queden al dia.`
+            : "Todo al dia: los partidos cargados ya tienen resultado."
       };
     case "first_match":
       return {
-        headline: "Grupo en preparacion",
+        headline: "Estado del grupo",
         description:
-          "Ya hay jugadores o partidos cargados. El siguiente paso es cerrar un resultado para que ranking e historial empiecen a mostrarse completos."
+          pendingResultsCount > 0
+            ? `Faltan ${pendingResultsCount} resultados para activar ranking e historial.`
+            : "El grupo ya esta tomando forma. Arma el primer partido y carga el resultado para activar ranking e historial."
       };
     case "setup":
       return {
-        headline: "Primeros datos del grupo",
+        headline: "Estado del grupo",
         description:
-          "Carga jugadores y arma el primer partido. Cuando haya resultados, esta tarjeta va a mostrar el estado real del grupo."
+          "Carga jugadores y arma el primer partido. Cuando haya resultados, esta tarjeta muestra si el grupo esta al dia."
       };
   }
 }
 
 export function buildGroupActivityValueState(input: GroupActivityValueInput): GroupActivityValueState {
   const stage = getStage(input);
-  const stageCopy = getStageCopy(stage);
+  const pendingResultsCount = Math.max(input.totalMatches - input.finishedCount, 0);
+  const stageCopy = getStageCopy(stage, pendingResultsCount);
 
   return {
     description: stageCopy.description,
     headline: stageCopy.headline,
+    pendingResultsCount,
     stage
   };
 }

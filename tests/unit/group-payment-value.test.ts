@@ -24,9 +24,22 @@ describe("group activity value helpers", () => {
     });
 
     expect(state.stage).toBe("proven");
-    expect(state.headline).toBe("Resumen del grupo");
-    expect(state.description).toMatch(/Jugadores, partidos y resultados/i);
+    expect(state.headline).toBe("Estado del grupo");
+    expect(state.description).toMatch(/Faltan 2 resultados/i);
+    expect(state.pendingResultsCount).toBe(2);
     expect(state.description).not.toMatch(/trial|prueba|plan|pago|reactivar/i);
+  });
+
+  it("marca el grupo al dia cuando todos los partidos tienen resultado", () => {
+    const state = buildGroupActivityValueState({
+      playersCount: 21,
+      totalMatches: 10,
+      finishedCount: 10
+    });
+
+    expect(state.headline).toBe("Estado del grupo");
+    expect(state.description).toMatch(/Todo al dia/i);
+    expect(state.pendingResultsCount).toBe(0);
   });
 
   it.each<[GroupActivityValueInput, string]>([

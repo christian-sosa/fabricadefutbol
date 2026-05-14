@@ -15,6 +15,9 @@ describe("admin space media UX source", () => {
     const leagueDetailSource = readFileSync(leagueDetailPath, "utf8");
 
     expect(adminLandingSource).toContain("Cambiar imagen");
+    expect(adminLandingSource).toContain("Identidad publica");
+    expect(adminLandingSource).toContain("Escudo del grupo");
+    expect(adminLandingSource).toContain("Foto de portada");
     expect(adminLandingSource).toContain("<summary className=\"mt-4 flex w-fit cursor-pointer");
     expect(clubDetailSource).toContain("Cambiar escudo");
     expect(clubDetailSource).toContain("<summary className=\"inline-flex w-fit cursor-pointer");

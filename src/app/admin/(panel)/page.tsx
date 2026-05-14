@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 import {
   createOrganizationAction,
@@ -79,8 +80,8 @@ function getAnnualSeasonDisplayStart(season: OrganizationSeasonEntry) {
   return `${yearFromLabel ?? yearFromEnd}-01-01`;
 }
 
-function formatOrganizationSeasonRange(season: OrganizationSeasonEntry) {
-  return `${season.label}: ${formatDateOnlyEs(getAnnualSeasonDisplayStart(season))} a ${formatDateOnlyEs(season.endsAt)}`;
+function formatOrganizationSeasonDates(season: OrganizationSeasonEntry) {
+  return `${formatDateOnlyEs(getAnnualSeasonDisplayStart(season))} a ${formatDateOnlyEs(season.endsAt)}`;
 }
 
 function AdminFeedback({
@@ -453,6 +454,7 @@ export default async function AdminDashboardPage({
   const canWriteSelectedOrganization = organizationWriteAccess?.canWrite ?? false;
   const organizationSeasons = await getOrganizationSeasons(selectedOrganization.id);
   const activeSeason = organizationSeasons.find((season) => season.status === "active") ?? null;
+  const organizationImageSrc = getOrganizationImageUrl(selectedOrganization.id);
 
   return (
     <div className="space-y-4">
@@ -467,42 +469,56 @@ export default async function AdminDashboardPage({
       <GroupActivityValueCard
         finishedCount={dashboardData.finishedCount}
         playersCount={dashboardData.playersCount}
+        seasonLabel={activeSeason?.label}
+        seasonRange={activeSeason ? formatOrganizationSeasonDates(activeSeason) : undefined}
         totalMatches={dashboardData.draftsCount + dashboardData.confirmedCount + dashboardData.finishedCount}
       />
 
       <Card>
-        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div>
-            <CardTitle>Temporada del grupo</CardTitle>
-            <CardDescription className="mt-2">
-              Las temporadas son anuales y cierran el 31/12 a ultima hora. El ranking publico de temporada arranca en 1000; el acumulado historico se conserva para armar equipos.
-            </CardDescription>
-            <p className="mt-3 text-sm text-slate-300">
-              {activeSeason
-                ? formatOrganizationSeasonRange(activeSeason)
-                : "Todavia no hay temporada activa. Se creara automaticamente al cargar un resultado."}
-            </p>
-          </div>
-          <span className="inline-flex w-fit rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">
-            Cierre fijo anual
-          </span>
-        </div>
-      </Card>
-
-      <Card>
-        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <OrganizationImage
             alt={`Imagen de ${selectedOrganization.name}`}
             className="aspect-[16/9] min-h-[220px]"
             priority
-            src={getOrganizationImageUrl(selectedOrganization.id)}
+            src={organizationImageSrc}
           />
 
-          <div>
-            <CardTitle>Imagen del grupo</CardTitle>
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                Identidad publica
+              </p>
+              <CardTitle className="mt-2">Escudo y portada</CardTitle>
+            </div>
             <CardDescription className="mt-2">
-              Sube una foto que represente al grupo o una imagen post partido. Se mostrara en la vista publica de grupos.
+              El escudo identifica al grupo en el admin. La foto de portada representa al grupo en la vista publica.
             </CardDescription>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/55 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Escudo del grupo
+                </p>
+                <div className="relative mt-3 size-24 overflow-hidden rounded-2xl border border-emerald-400/25 bg-slate-950">
+                  <Image
+                    alt={`Escudo de ${selectedOrganization.name}`}
+                    className="object-cover"
+                    fill
+                    sizes="96px"
+                    src={organizationImageSrc}
+                    unoptimized
+                  />
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/55 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Foto de portada
+                </p>
+                <p className="mt-3 text-sm text-slate-300">
+                  Se usa como imagen principal del grupo y tambien como escudo cuando no hay un logo separado.
+                </p>
+              </div>
+            </div>
 
             <details>
               <summary className="mt-4 flex w-fit cursor-pointer list-none items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300">
