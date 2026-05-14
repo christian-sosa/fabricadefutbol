@@ -14,7 +14,7 @@ describe("LoginForm", () => {
   it("prioriza Google y conserva el destino seguro en el ingreso", () => {
     render(<LoginForm nextPath="/admin/clubs" />);
 
-    expect(screen.getByRole("heading", { name: "Entrar al panel" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ingresar" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continuar con Google" })).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.queryByLabelText("Nombre")).not.toBeInTheDocument();

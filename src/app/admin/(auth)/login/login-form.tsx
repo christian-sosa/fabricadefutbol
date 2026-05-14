@@ -91,7 +91,7 @@ export function LoginForm({ nextPath = "/admin" }: { nextPath?: string }) {
   return (
     <Card className="mx-auto max-w-md overflow-hidden rounded-lg border-slate-700/80 p-0 shadow-[0_24px_80px_-40px_rgba(16,185,129,0.85)]">
       <div className="border-b border-slate-800/90 bg-slate-950/35 px-5 py-4">
-        <CardTitle className="text-xl">{isRegisterMode ? "Crear cuenta" : "Entrar al panel"}</CardTitle>
+        <CardTitle className="text-xl">{isRegisterMode ? "Crear cuenta" : "Ingresar"}</CardTitle>
         <CardDescription className="mt-2">
           {isRegisterMode
             ? "Crea una cuenta para administrar tu grupo o aceptar invitaciones."
