@@ -30,6 +30,17 @@ describeSupabaseSql("organization security sql", () => {
     expect(policiesSql).toContain("and oi.expires_at > timezone('utc', now())");
   });
 
+  it("refuerza el maximo de admins activos aunque la escritura use service role", () => {
+    expect(schemaSql).toContain("create or replace function public.enforce_organization_admin_limit");
+    expect(schemaSql).toContain("from public.organization_admins oa");
+    expect(schemaSql).toContain("where oa.organization_id = new.organization_id");
+    expect(schemaSql).toContain("if current_count >= 4 then");
+    expect(schemaSql).toContain("Cada grupo admite hasta 4 administradores activos.");
+    expect(schemaSql).toContain("drop trigger if exists trg_organization_admins_limit on public.organization_admins;");
+    expect(schemaSql).toContain("before insert or update of organization_id on public.organization_admins");
+    expect(schemaSql).toContain("execute function public.enforce_organization_admin_limit();");
+  });
+
   it("mantiene aplicacion de pagos atomica e inmutable la fecha de alta", () => {
     expect(schemaSql).toContain("create or replace function public.apply_organization_billing_payment_period");
     expect(schemaSql).toContain("for update;");

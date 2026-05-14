@@ -11,6 +11,12 @@ function readSource(relativePath: string) {
 
 const inviteFlows = [
   {
+    action: "src/app/invite/[token]/actions.ts",
+    actionName: "acceptInviteAction",
+    forbiddenMutationTables: ["admins", "organization_admins", "organization_invites"],
+    page: "src/app/invite/[token]/page.tsx"
+  },
+  {
     action: "src/app/admin/tournaments/invite/[token]/actions.ts",
     actionName: "acceptTournamentAdminInviteAction",
     forbiddenMutationTables: ["admins", "league_admins", "league_admin_invites"],
@@ -61,5 +67,41 @@ describe("invite acceptance flow source", () => {
       expect(source).toContain("checkActionRateLimit");
       expect(source).toContain("formatActionRateLimitMessage");
     }
+  });
+
+  it("valida el maximo de admins activos antes de consumir invitaciones privilegiadas", () => {
+    const tournamentSource = readSource("src/app/admin/tournaments/invite/[token]/actions.ts");
+    const clubSource = readSource("src/app/admin/clubs/invite/[token]/actions.ts");
+
+    expect(tournamentSource).toContain('.from("league_admins")');
+    expect(tournamentSource).toContain('select("id", { count: "exact", head: true })');
+    expect(tournamentSource).toContain("(adminsCount ?? 0) >= 4");
+    expect(tournamentSource).toContain("Esta liga ya alcanzo el maximo de 4 administradores.");
+
+    expect(clubSource).toContain('.from("club_admins")');
+    expect(clubSource).toContain('select("id", { count: "exact", head: true })');
+    expect(clubSource).toContain("(adminsCount ?? 0) >= 4");
+  });
+
+  it("conserva el rastro de invitaciones admin aceptadas en torneos y clubs", () => {
+    const tournamentSource = readSource("src/app/admin/tournaments/invite/[token]/actions.ts");
+    const clubSource = readSource("src/app/admin/clubs/invite/[token]/actions.ts");
+
+    for (const source of [tournamentSource, clubSource]) {
+      expect(source).toContain('status: "accepted"');
+      expect(source).toContain("accepted_by: user.id");
+      expect(source).toContain("accepted_at: new Date().toISOString()");
+      expect(source).not.toMatch(/\.from\("(league_admin_invites|club_admin_invites)"\)[\s\S]{0,400}\.delete\(/);
+    }
+  });
+
+  it("revoca invitaciones admin de torneos y clubs sin borrar evidencia", () => {
+    const leaguePanelSource = readSource("src/app/admin/(panel)/tournaments/[id]/actions.ts");
+    const clubPanelSource = readSource("src/app/admin/(panel)/clubs/[clubId]/actions.ts");
+
+    expect(leaguePanelSource).toContain('.from("league_admin_invites")');
+    expect(leaguePanelSource).toContain('update({ status: "revoked" })');
+    expect(clubPanelSource).toContain('.from("club_admin_invites")');
+    expect(clubPanelSource).toContain('update({ status: "revoked" })');
   });
 });

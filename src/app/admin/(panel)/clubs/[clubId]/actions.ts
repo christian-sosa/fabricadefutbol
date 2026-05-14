@@ -1713,14 +1713,21 @@ export async function revokeClubAdminInviteAction(clubId: string, formData: Form
     }
 
     const supabase = await createSupabaseServerClient();
-    const { error } = await supabase
+    const { data: revokedInvite, error } = await supabase
       .from("club_admin_invites")
-      .delete()
+      .update({ status: "revoked" })
       .eq("id", parsed.data.inviteId)
-      .eq("club_id", clubId);
+      .eq("club_id", clubId)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       redirect(buildClubDetailPath({ clubId, tab: "admins", error: toUserMessage(error, "No se pudo cancelar la invitacion.") }));
+    }
+
+    if (!revokedInvite) {
+      redirect(buildClubDetailPath({ clubId, tab: "admins", error: "La invitacion ya fue usada o cancelada." }));
     }
 
     await revalidateClubPaths(clubId);

@@ -612,11 +612,18 @@ export async function revokeLeagueAdminInviteAction(leagueId: string, formData: 
     }
 
     const supabase = await createSupabaseServerClient();
-    const { error } = await supabase
+    const { data: revokedInvite, error } = await supabase
       .from("league_admin_invites")
-      .delete()
+      .update({ status: "revoked" })
       .eq("id", parsed.data.inviteId)
-      .eq("league_id", leagueId);
+      .eq("league_id", leagueId)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+
+    if (!revokedInvite && !error) {
+      redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: "La invitacion ya fue usada o cancelada." }));
+    }
 
     if (error) {
       redirect(buildLeagueDetailPath({ leagueId, tab: "admins", error: toUserMessage(error, "No se pudo cancelar la invitación.") }));

@@ -4,8 +4,10 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
+const schemaSqlPath = path.join(root, "supabase", "schema.sql");
 const policiesSqlPath = path.join(root, "supabase", "policies.sql");
-const hasPoliciesSql = existsSync(policiesSqlPath);
+const hasPoliciesSql = existsSync(schemaSqlPath) && existsSync(policiesSqlPath);
+const schemaSql = hasPoliciesSql ? readFileSync(schemaSqlPath, "utf8") : "";
 const policiesSql = hasPoliciesSql ? readFileSync(policiesSqlPath, "utf8") : "";
 const describeSupabaseSql = hasPoliciesSql ? describe : describe.skip;
 
@@ -35,5 +37,15 @@ describeSupabaseSql("tournament security sql", () => {
     expect(policiesSql).toMatch(
       /create policy competition_team_players_captain_write[\s\S]*public\.is_competition_team_captain\(competition_team_id\)[\s\S]*c\.status not in \('finished', 'archived'\)[\s\S]*with check[\s\S]*c\.status not in \('finished', 'archived'\)/
     );
+  });
+
+  it("refuerza en SQL el maximo de admins activos de liga", () => {
+    expect(schemaSql).toContain("create or replace function public.enforce_league_admin_limit");
+    expect(schemaSql).toContain("from public.league_admins la");
+    expect(schemaSql).toContain("where la.league_id = new.league_id");
+    expect(schemaSql).toContain("Cada liga admite hasta 4 administradores activos.");
+    expect(schemaSql).toContain("drop trigger if exists trg_league_admins_limit on public.league_admins;");
+    expect(schemaSql).toContain("before insert or update of league_id on public.league_admins");
+    expect(schemaSql).toContain("execute function public.enforce_league_admin_limit();");
   });
 });

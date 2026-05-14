@@ -105,6 +105,19 @@ export async function acceptTournamentAdminInviteAction(formData: FormData) {
     );
   }
 
+  const { count: adminsCount, error: adminsCountError } = await privilegedSupabase
+    .from("league_admins")
+    .select("id", { count: "exact", head: true })
+    .eq("league_id", pendingInvite.league_id);
+
+  if (adminsCountError) {
+    redirect(buildInvitePath(token, adminsCountError.message));
+  }
+
+  if ((adminsCount ?? 0) >= 4) {
+    redirect(buildInvitePath(token, "Esta liga ya alcanzo el maximo de 4 administradores."));
+  }
+
   const { error: ensureAdminError } = await privilegedSupabase.from("admins").upsert(
     {
       id: user.id,
@@ -131,15 +144,25 @@ export async function acceptTournamentAdminInviteAction(formData: FormData) {
     redirect(buildInvitePath(token, insertMembershipError.message));
   }
 
-  const { error: deleteInviteError } = await privilegedSupabase
+  const { data: acceptedInvite, error: acceptInviteError } = await privilegedSupabase
     .from("league_admin_invites")
-    .delete()
+    .update({
+      status: "accepted",
+      accepted_by: user.id,
+      accepted_at: new Date().toISOString()
+    })
     .eq("id", pendingInvite.id)
     .eq("status", "pending")
-    .eq("email", invitedEmail);
+    .eq("email", invitedEmail)
+    .select("id")
+    .maybeSingle();
 
-  if (deleteInviteError) {
-    redirect(buildInvitePath(token, deleteInviteError.message));
+  if (acceptInviteError) {
+    redirect(buildInvitePath(token, acceptInviteError.message));
+  }
+
+  if (!acceptedInvite) {
+    redirect(buildInvitePath(token, "La invitacion ya fue usada o cancelada."));
   }
 
   redirect(buildLeagueAdminPanelHref(pendingInvite.league_id));

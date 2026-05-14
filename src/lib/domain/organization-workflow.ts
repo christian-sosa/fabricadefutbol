@@ -9,6 +9,8 @@ type IdRow = {
   id: string;
 };
 
+const MAX_ORGANIZATION_ADMINS = 4;
+
 function collectIds(rows: Array<{ id?: unknown }> | null | undefined) {
   return (rows ?? [])
     .map((row) => (row.id == null ? null : String(row.id)))
@@ -31,6 +33,19 @@ export async function acceptOrganizationInvite(params: {
   userId: string;
 }) {
   const { supabase, inviteId, organizationId, invitedEmail, userId } = params;
+
+  const { count: currentAdmins, error: adminCountError } = await supabase
+    .from("organization_admins")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId);
+
+  if (adminCountError) {
+    throw new Error(adminCountError.message);
+  }
+
+  if ((currentAdmins ?? 0) >= MAX_ORGANIZATION_ADMINS) {
+    throw new Error("Este grupo ya alcanzo el maximo de 4 administradores.");
+  }
 
   const { data: acceptedInvite, error: acceptInviteError } = await supabase
     .from("organization_invites")

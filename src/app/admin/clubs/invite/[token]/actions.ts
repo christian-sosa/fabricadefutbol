@@ -143,15 +143,25 @@ export async function acceptClubAdminInviteAction(formData: FormData) {
     redirect(buildInvitePath(token, insertMembershipError.message));
   }
 
-  const { error: deleteInviteError } = await privilegedSupabase
+  const { data: acceptedInvite, error: acceptInviteError } = await privilegedSupabase
     .from("club_admin_invites")
-    .delete()
+    .update({
+      status: "accepted",
+      accepted_by: user.id,
+      accepted_at: new Date().toISOString()
+    })
     .eq("id", pendingInvite.id)
     .eq("status", "pending")
-    .eq("email", invitedEmail);
+    .eq("email", invitedEmail)
+    .select("id")
+    .maybeSingle();
 
-  if (deleteInviteError) {
-    redirect(buildInvitePath(token, deleteInviteError.message));
+  if (acceptInviteError) {
+    redirect(buildInvitePath(token, acceptInviteError.message));
+  }
+
+  if (!acceptedInvite) {
+    redirect(buildInvitePath(token, "La invitacion ya fue usada o cancelada."));
   }
 
   redirect(buildClubAdminPanelHref(pendingInvite.club_id));

@@ -3,6 +3,11 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import {
+  ACTION_RATE_LIMITS,
+  checkActionRateLimit,
+  formatActionRateLimitMessage
+} from "@/lib/action-rate-limit";
 import { deriveDisplayName } from "@/lib/auth/profile";
 import { buildAdminLoginPath } from "@/lib/auth/redirects";
 import { getOrganizationQueryKeyById } from "@/lib/auth/admin";
@@ -32,6 +37,16 @@ export async function acceptInviteAction(formData: FormData) {
   }
 
   const token = parsed.data.token;
+  const rateLimit = await checkActionRateLimit({
+    scope: "organization-admin-invite:accept",
+    organizationId: token,
+    ...ACTION_RATE_LIMITS.acceptInvite
+  });
+
+  if (!rateLimit.allowed) {
+    redirect(buildInvitePath(token, formatActionRateLimitMessage(rateLimit)));
+  }
+
   const loginHref = buildAdminLoginPath(`/invite/${token}`);
   const supabase = await createSupabaseServerClient();
   const privilegedSupabase = createSupabaseAdminClient() ?? supabase;
