@@ -1,9 +1,7 @@
 import Link from "next/link";
 
-import { PublicModuleToggle } from "@/components/layout/public-module-toggle";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { getCurrentUserIsSuperAdmin } from "@/lib/auth/super-admin";
-import { type PublicModuleContext, resolvePublicModule, withPublicQuery } from "@/lib/org";
+import { withPublicQuery } from "@/lib/org";
 
 type HelpSectionItem = {
   title: string;
@@ -15,384 +13,185 @@ type HelpFaqItem = {
   answer: string;
 };
 
-type HelpProblem = {
-  title: string;
-  description: string;
-  items: string[];
-};
+const capabilities = [
+  "Crear y administrar un grupo gratis desde tu cuenta.",
+  "Cargar jugadores con niveles simples, repetibles y editables.",
+  "Armar equipos parejos usando nivel, rendimiento, invitados y arqueros.",
+  "Publicar ranking, historial y proximos partidos para que cualquiera pueda consultarlos."
+] as const;
 
-type HelpFinalCta = {
-  title: string;
-  description: string;
-};
+const problemItems = [
+  "Equipos mas parejos",
+  "Ranking publico para el grupo",
+  "Historial de partidos terminado",
+  "Jugadores, invitados y arqueros contemplados",
+  "Menos carga para el admin"
+] as const;
 
-type HelpContent = {
-  eyebrow: string;
-  title: string;
-  description: string;
-  primaryCtaLabel: string;
-  listingCtaLabel: string;
-  capabilitiesLabel: string;
-  capabilities: string[];
-  focusTitle: string;
-  focusDescription: string;
-  problem?: HelpProblem;
-  gettingStartedLabel: string;
-  gettingStarted: HelpSectionItem[];
-  workflowLabel: string;
-  workflow: HelpSectionItem[];
-  detailLabel: string;
-  detail: HelpSectionItem[];
-  highlightCards: HelpSectionItem[];
-  faq: HelpFaqItem[];
-  finalCta?: HelpFinalCta;
-};
-
-const helpContentByModule: Record<PublicModuleContext, HelpContent> = {
-  organizations: {
-    eyebrow: "Ayuda para Grupos",
-    title: "Organizá tu grupo sin discusiones",
+const gettingStarted: HelpSectionItem[] = [
+  {
+    title: "1. Creas el grupo",
     description:
-      "Armá partidos parejos, cargá resultados y mantené un ranking real de tu grupo. Fábrica de Fútbol es gratis para Grupos y te ayuda a llevar historial, jugadores y próximos partidos en un solo lugar.",
-    primaryCtaLabel: "Crear mi grupo gratis",
-    listingCtaLabel: "Ver grupo de ejemplo",
-    capabilitiesLabel: "Qué podés hacer con Grupos",
-    capabilities: [
-      "Crear y administrar un grupo gratis desde tu cuenta.",
-      "Cargar jugadores con niveles simples, repetibles y editables.",
-      "Armar equipos parejos usando nivel, rendimiento, invitados y arqueros.",
-      "Publicar ranking, historial y próximos partidos para que cualquiera pueda consultarlos."
-    ],
-    focusTitle: "Fútbol ordenado, sin planillas eternas",
-    focusDescription:
-      "Grupos está pensado para el fútbol de todos los días: cargás jugadores, definís niveles, armás partidos parejos, guardás resultados y dejás ranking e historial listos para consultar.",
-    problem: {
-      title: "Menos discusiones, más fútbol",
-      description:
-        "Si siempre terminan armando equipos a ojo, discutiendo si quedaron desparejos o perdiendo el historial de los partidos, Grupos te ayuda a ordenar todo en un solo lugar.",
-      items: [
-        "Equipos más parejos",
-        "Ranking público para el grupo",
-        "Historial de partidos terminado",
-        "Jugadores, invitados y arqueros contemplados",
-        "Menos carga para el admin"
-      ]
-    },
-    gettingStartedLabel: "Primeros pasos",
-    gettingStarted: [
-      {
-        title: "1. Creás el grupo",
-        description:
-          "Cargás el nombre, una imagen representativa y dejás listo el espacio donde se van a organizar los partidos."
-      },
-      {
-        title: "2. Cargás jugadores",
-        description:
-          "Asignás un nivel inicial simple: Estrella, Figura, Muy bueno, Bueno, Intermedio, Recreativo o Principiante."
-      },
-      {
-        title: "3. Armás el partido",
-        description:
-          "Elegís convocados, invitados, arqueros y modalidad. La app te propone equipos parejos."
-      },
-      {
-        title: "4. Cargás el resultado",
-        description:
-          "El rendimiento se actualiza y el historial queda guardado para que todos puedan consultarlo."
-      }
-    ],
-    workflowLabel: "Cómo se usa semana a semana",
-    workflow: [
-      {
-        title: "Convocatoria real",
-        description:
-          "Solo entran al armado los jugadores disponibles para esa fecha. Si aparece un invitado, podés asignarle un nivel equivalente sin cargarlo como jugador fijo."
-      },
-      {
-        title: "Equipos parejos",
-        description:
-          "El armado mira el nivel base y el rendimiento actual. Si alguien viene rindiendo muy alto, la app lo considera más fuerte para emparejar mejor."
-      },
-      {
-        title: "Historial consultable",
-        description:
-          "Los partidos terminados quedan publicados con marcador, equipos y estadísticas. La información se mueve poco y queda lista para consultar."
-      }
-    ],
-    detailLabel: "Nivel, rendimiento y ranking explicado simple",
-    detail: [
-      {
-        title: "Nivel",
-        description:
-          "Lo define el admin para representar qué tan bueno es un jugador de base. No cambia solo por ganar o perder."
-      },
-      {
-        title: "Rendimiento",
-        description:
-          "Sube o baja según los resultados. Ayuda a reflejar quién viene jugando mejor dentro del grupo."
-      },
-      {
-        title: "Ranking",
-        description:
-          "Ordena a los jugadores según su rendimiento. Es la tabla deportiva del grupo, no una lista fija armada a mano."
-      },
-      {
-        title: "Armado de equipos",
-        description:
-          "Combina nivel + rendimiento para proponer partidos más parejos, sin mostrar fórmulas ni complicarle la vida al admin."
-      }
-    ],
-    highlightCards: [
-      {
-        title: "Lo que ve cualquier jugador",
-        description:
-          "Ranking, jugadores, historial y próximos partidos. No necesita iniciar sesión para consultar la información pública del grupo."
-      },
-      {
-        title: "Lo que controla el admin",
-        description:
-          "Jugadores, niveles, partidos, resultados, imagen del grupo y admins invitados."
-      }
-    ],
-    faq: [
-      {
-        question: "¿Necesitan registrarse todos los jugadores?",
-        answer:
-          "No. El admin puede cargar jugadores y el grupo puede consultar ranking, historial y próximos partidos públicamente."
-      },
-      {
-        question: "¿Puedo usarlo para fútbol 5, 6, 7 u 11?",
-        answer: "Sí. Podés adaptar la modalidad según cómo juegue tu grupo."
-      },
-      {
-        question: "¿La app arma los equipos sola?",
-        answer:
-          "La app propone equipos parejos, pero el admin siempre tiene la última palabra."
-      },
-      {
-        question: "¿Puedo tener dos jugadores con el mismo nivel?",
-        answer:
-          "Sí. Esa es la idea: el nivel representa una categoría de habilidad, no una posición única dentro del grupo."
-      },
-      {
-        question: "¿El nivel cambia solo?",
-        answer:
-          "No. El nivel lo edita el admin. Lo que cambia con cada resultado es el rendimiento competitivo."
-      },
-      {
-        question: "¿Qué pasa si mi grupo ya tiene jugadores cargados?",
-        answer:
-          "Podés mantener el plantel y empezar a registrar partidos desde ahora sin perder lo que ya cargaste."
-      },
-      {
-        question: "¿Cuánto cuesta usar Grupos?",
-        answer:
-          "Grupos es gratis para arrancar y usar con tu equipo. Si administrás varios grupos, escribinos desde Contacto y lo vemos."
-      },
-      {
-        question: "¿Cuántos admins puede tener un grupo?",
-        answer: "Hasta 4 administradores activos o pendientes de invitación por grupo."
-      },
-      {
-        question: "¿Dónde pido ayuda?",
-        answer:
-          "Desde Contacto podés escribirnos por formulario o mail. También podés mandar sugerencias de producto."
-      }
-    ],
-    finalCta: {
-      title: "¿Listo para organizar tu grupo como corresponde?",
-      description:
-        "Creá tu grupo gratis y empezá a armar partidos parejos con ranking e historial."
-    }
+      "Cargas el nombre, una foto representativa y dejas listo el espacio donde se van a organizar los partidos."
   },
-  tournaments: {
-    eyebrow: "Ayuda para Torneos",
-    title: "Administrá ligas y competencias sin mezclarlo con Grupos",
+  {
+    title: "2. Cargas jugadores",
     description:
-      "Torneos está pensado para organizadores: una liga contiene equipos maestros, admins y una o varias competencias públicas con fixture, tabla, resultados y estadísticas.",
-    primaryCtaLabel: "Ir al panel de torneos",
-    listingCtaLabel: "Ver torneos públicos",
-    capabilitiesLabel: "Qué podés hacer",
-    capabilities: [
-      "Crear una liga como contenedor principal.",
-      "Cargar equipos maestros y reutilizarlos en distintas competencias.",
-      "Crear competencias públicas para que visitantes consulten la información.",
-      "Elegir fixture automático o manual, con capitanes opcionales por equipo."
-    ],
-    focusTitle: "Qué conviene hacer primero",
-    focusDescription:
-      "Primero creás la liga, cargás los equipos maestros y definís si vas a usar capitanes. Después creás las competencias necesarias e inscribís solo los equipos que participan en cada una.",
-    gettingStartedLabel: "Primeros pasos",
-    gettingStarted: [
-      {
-        title: "1. Creás la liga",
-        description:
-          "La liga guarda nombre, logo, foto pública, sede, admins y facturación. Crear nuevas competencias dentro de esa liga no dispara un checkout nuevo."
-      },
-      {
-        title: "2. Cargás equipos maestros",
-        description:
-          "El catálogo de equipos vive en la liga. Luego elegís cuáles se inscriben en cada competencia."
-      },
-      {
-        title: "3. Creás una competencia",
-        description:
-          "La competencia define formato, temporada, cobertura de datos y equipos inscriptos. Todas las competencias quedan públicas por defecto."
-      },
-      {
-        title: "4. Gestionás fixture y resultados",
-        description:
-          "Podés generar fechas automáticamente o cargar cruces manuales. Luego registrás resultados y, si corresponde, estadísticas del acta."
-      }
-    ],
-    workflowLabel: "Cómo se opera una competencia",
-    workflow: [
-      {
-        title: "Competencias claras",
-        description:
-          "En el admin se listan primero las competencias activas. La creación queda en una pantalla aparte para no ocupar espacio cuando ya estás trabajando."
-      },
-      {
-        title: "Visibilidad para visitantes",
-        description:
-          "La información pública aparece cuando la liga y la competencia están activas o finalizadas. Así quien no está logueado puede consultar tabla, fixture y resultados."
-      },
-      {
-        title: "Capitanes opcionales",
-        description:
-          "Podés invitar capitanes para completar planteles y fotos, o manejar todo desde el equipo admin de la liga."
-      }
-    ],
-    detailLabel: "Tabla, fixture y estadísticas",
-    detail: [
-      {
-        title: "Tabla de posiciones",
-        description:
-          "Se calcula automáticamente con puntos, diferencia de gol, goles a favor y desempates consistentes."
-      },
-      {
-        title: "Fixture",
-        description:
-          "Round robin, copa o liga más copa. Si hay cantidad impar, se contempla fecha libre o pase de ronda cuando corresponde."
-      },
-      {
-        title: "Resultados",
-        description:
-          "Podés cerrar un partido solo con marcador. Si querés más detalle, agregás goles, figuras y tarjetas."
-      },
-      {
-        title: "Competencias públicas",
-        description:
-          "Podés dejar una competencia activa por URL directa y quitarla del listado público de la liga. Draft y archived no se muestran afuera."
-      }
-    ],
-    highlightCards: [
-      {
-        title: "Liga no es competencia",
-        description:
-          "La liga es el contenedor. La competencia es lo que se juega. Esto permite tener Viernes A, Viernes B o Copa dentro de la misma liga."
-      },
-      {
-        title: "Qué ve el público",
-        description:
-          "Listado de ligas, ficha pública, competencias activas, tabla, fixture, detalle de partidos y estadísticas cargadas."
-      }
-    ],
-    faq: [
-      {
-        question: "¿Crear una competencia nueva cobra otro mes?",
-        answer:
-          "No. La facturación de Torneos está asociada al alta de la liga. Dentro de una liga podés crear las competencias que necesites."
-      },
-      {
-        question: "¿Puedo ocultar una competencia?",
-        answer:
-          "Sí. Desactivá 'Mostrar en la ficha pública de la liga' para que no aparezca listada, pero siga accesible por URL si la liga y la competencia están activas."
-      },
-      {
-        question: "¿Los torneos usan los mismos jugadores que Grupos?",
-        answer: "No. Son flujos separados para no mezclar historial, planteles ni permisos."
-      },
-      {
-        question: "¿Cuántos admins puede tener una liga?",
-        answer: "Hasta 4 administradores por liga."
-      },
-      {
-        question: "¿Qué puede hacer un capitán?",
-        answer:
-          "Solo accede al equipo que el admin le asignó dentro de la competencia. Puede completar plantel y fotos, pero no administra la liga."
-      }
-    ]
+      "Asignas un nivel inicial simple: Estrella, Figura, Muy bueno, Bueno, Intermedio, Recreativo o Principiante."
+  },
+  {
+    title: "3. Armas el partido",
+    description:
+      "Elegis convocados, invitados, arqueros y modalidad. La app te propone equipos parejos."
+  },
+  {
+    title: "4. Cargas el resultado",
+    description:
+      "El rendimiento se actualiza y el historial queda guardado para que todos puedan consultarlo."
   }
-};
+];
+
+const weeklyWorkflow: HelpSectionItem[] = [
+  {
+    title: "Convocatoria real",
+    description:
+      "Solo entran al armado los jugadores disponibles para esa fecha. Si aparece un invitado, podes asignarle un nivel equivalente sin cargarlo como jugador fijo."
+  },
+  {
+    title: "Equipos parejos",
+    description:
+      "El armado mira el nivel base y el rendimiento actual. Si alguien viene rindiendo muy alto, la app lo considera mas fuerte para emparejar mejor."
+  },
+  {
+    title: "Historial consultable",
+    description:
+      "Los partidos terminados quedan publicados con marcador, equipos y estadisticas. La informacion se mueve poco y queda lista para consultar."
+  }
+];
+
+const rankingDetails: HelpSectionItem[] = [
+  {
+    title: "Nivel",
+    description:
+      "Lo define el admin para representar que tan bueno es un jugador de base. No cambia solo por ganar o perder."
+  },
+  {
+    title: "Rendimiento",
+    description:
+      "Sube o baja segun los resultados. Ayuda a reflejar quien viene jugando mejor dentro del grupo."
+  },
+  {
+    title: "Ranking",
+    description:
+      "Ordena a los jugadores segun su rendimiento. Es la tabla deportiva del grupo, no una lista fija armada a mano."
+  },
+  {
+    title: "Armado de equipos",
+    description:
+      "Combina nivel y rendimiento para proponer partidos mas parejos, sin mostrar formulas ni complicarle la vida al admin."
+  }
+];
+
+const highlightCards: HelpSectionItem[] = [
+  {
+    title: "Lo que ve cualquier jugador",
+    description:
+      "Ranking, jugadores, historial y proximos partidos. No necesita iniciar sesion para consultar la informacion publica del grupo."
+  },
+  {
+    title: "Lo que controla el admin",
+    description:
+      "Jugadores, niveles, partidos, resultados, foto de portada del grupo y admins invitados."
+  }
+];
+
+const faq: HelpFaqItem[] = [
+  {
+    question: "Necesitan registrarse todos los jugadores?",
+    answer:
+      "No. El admin puede cargar jugadores y el grupo puede consultar ranking, historial y proximos partidos publicamente."
+  },
+  {
+    question: "Puedo usarlo para futbol 5, 6, 7 u 11?",
+    answer: "Si. Podes adaptar la modalidad segun como juegue tu grupo."
+  },
+  {
+    question: "La app arma los equipos sola?",
+    answer:
+      "La app propone equipos parejos, pero el admin siempre tiene la ultima palabra."
+  },
+  {
+    question: "Puedo tener dos jugadores con el mismo nivel?",
+    answer:
+      "Si. Esa es la idea: el nivel representa una categoria de habilidad, no una posicion unica dentro del grupo."
+  },
+  {
+    question: "El nivel cambia solo?",
+    answer:
+      "No. El nivel lo edita el admin. Lo que cambia con cada resultado es el rendimiento competitivo."
+  },
+  {
+    question: "Que pasa si mi grupo ya tiene jugadores cargados?",
+    answer:
+      "Podes mantener el plantel y empezar a registrar partidos desde ahora sin perder lo que ya cargaste."
+  },
+  {
+    question: "Cuanto cuesta usar Grupos?",
+    answer:
+      "Grupos es gratis para arrancar y usar con tu equipo. Si administras varios grupos, escribinos desde Contacto y lo vemos."
+  },
+  {
+    question: "Cuantos admins puede tener un grupo?",
+    answer: "Hasta 4 administradores activos o pendientes de invitacion por grupo."
+  },
+  {
+    question: "Donde pido ayuda?",
+    answer:
+      "Desde Contacto podes escribirnos por formulario o mail. Tambien podes mandar sugerencias de producto."
+  }
+];
 
 export default async function HelpPage({
   searchParams
 }: {
-  searchParams: Promise<{ org?: string; module?: string }>;
+  searchParams: Promise<{ org?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
-  const canAccessTournaments = await getCurrentUserIsSuperAdmin();
-  const requestedModule = resolvePublicModule(resolvedSearchParams.module);
-  const currentModule = canAccessTournaments ? requestedModule : "organizations";
-  const content = helpContentByModule[currentModule];
-  const panelPath =
-    currentModule === "tournaments"
-      ? withPublicQuery("/admin/tournaments", { organizationKey })
-      : withPublicQuery("/admin", { organizationKey });
-  const listingPath =
-    currentModule === "tournaments"
-      ? withPublicQuery("/tournaments", {
-          organizationKey,
-          module: currentModule
-        })
-      : withPublicQuery("/groups", {
-          organizationKey,
-          module: currentModule
-        });
-  const guidesPath = withPublicQuery("/guides", {
-    organizationKey,
-    module: currentModule
-  });
-  const feedbackPath = withPublicQuery("/feedback", {
-    organizationKey,
-    module: currentModule
-  });
+  const panelPath = withPublicQuery("/admin", { organizationKey });
+  const listingPath = withPublicQuery("/groups", { organizationKey });
+  const guidesPath = withPublicQuery("/guides", { organizationKey });
+  const feedbackPath = withPublicQuery("/feedback", { organizationKey });
 
   return (
     <div className="space-y-6">
       <section className="rounded-3xl border border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.2),transparent_34%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.96))] p-5 shadow-[0_24px_40px_-30px_rgba(16,185,129,0.7)] md:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-400">{content.eyebrow}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-400">Ayuda para Grupos</p>
         <h1 className="mt-3 max-w-4xl text-4xl font-black leading-tight text-slate-100 md:text-6xl">
-          {content.title}
+          Organiza tu grupo sin discusiones
         </h1>
-        <p className="mt-4 max-w-4xl text-base leading-7 text-slate-300 md:text-lg">{content.description}</p>
-        <PublicModuleToggle
-          basePath="/help"
-          canAccessTournaments={canAccessTournaments}
-          className="mt-5"
-          currentModule={currentModule}
-          organizationKey={organizationKey}
-        />
+        <p className="mt-4 max-w-4xl text-base leading-7 text-slate-300 md:text-lg">
+          Arma partidos parejos, carga resultados y mantene un ranking real de tu grupo. Fabrica de Futbol es gratis para Grupos y te ayuda a llevar historial, jugadores y proximos partidos en un solo lugar.
+        </p>
+
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
             className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(16,185,129,1)] transition hover:brightness-110"
             href={panelPath}
           >
-            {content.primaryCtaLabel}
+            Crear mi grupo gratis
           </Link>
           <Link
             className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
             href={listingPath}
           >
-            {content.listingCtaLabel}
+            Ver grupo de ejemplo
           </Link>
           <Link
             className="rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
             href={guidesPath}
           >
-            Ver guías
+            Ver guias
           </Link>
           <Link
             className="rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
@@ -405,9 +204,9 @@ export default async function HelpPage({
 
       <section className="grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
         <Card className="p-5">
-          <CardTitle>{content.capabilitiesLabel}</CardTitle>
+          <CardTitle>Que podes hacer con Grupos</CardTitle>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {content.capabilities.map((item) => (
+            {capabilities.map((item) => (
               <p
                 className="rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-200"
                 key={item}
@@ -418,33 +217,35 @@ export default async function HelpPage({
           </div>
         </Card>
         <Card className="p-5">
-          <CardTitle>{content.focusTitle}</CardTitle>
-          <CardDescription className="mt-3 leading-6">{content.focusDescription}</CardDescription>
+          <CardTitle>Futbol ordenado, sin planillas eternas</CardTitle>
+          <CardDescription className="mt-3 leading-6">
+            Grupos esta pensado para el futbol de todos los dias: cargas jugadores, definis niveles, armas partidos parejos, guardas resultados y dejas ranking e historial listos para consultar.
+          </CardDescription>
         </Card>
       </section>
 
-      {content.problem ? (
-        <section className="rounded-3xl border border-emerald-400/20 bg-emerald-500/10 p-5 md:p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">El problema que resuelve</p>
-          <h2 className="mt-2 text-2xl font-black text-white md:text-3xl">{content.problem.title}</h2>
-          <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-300 md:text-base">{content.problem.description}</p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {content.problem.items.map((item) => (
-              <p
-                className="rounded-2xl border border-emerald-400/20 bg-slate-950/55 px-4 py-3 text-sm font-semibold text-emerald-50"
-                key={item}
-              >
-                {item}
-              </p>
-            ))}
-          </div>
-        </section>
-      ) : null}
+      <section className="rounded-3xl border border-emerald-400/20 bg-emerald-500/10 p-5 md:p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">El problema que resuelve</p>
+        <h2 className="mt-2 text-2xl font-black text-white md:text-3xl">Menos discusiones, mas futbol</h2>
+        <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-300 md:text-base">
+          Si siempre terminan armando equipos a ojo, discutiendo si quedaron desparejos o perdiendo el historial de los partidos, Grupos te ayuda a ordenar todo en un solo lugar.
+        </p>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {problemItems.map((item) => (
+            <p
+              className="rounded-2xl border border-emerald-400/20 bg-slate-950/55 px-4 py-3 text-sm font-semibold text-emerald-50"
+              key={item}
+            >
+              {item}
+            </p>
+          ))}
+        </div>
+      </section>
 
       <section className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{content.gettingStartedLabel}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Primeros pasos</p>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {content.gettingStarted.map((step) => (
+          {gettingStarted.map((step) => (
             <Card className="p-5" key={step.title}>
               <CardTitle>{step.title}</CardTitle>
               <CardDescription className="mt-2 leading-6">{step.description}</CardDescription>
@@ -454,9 +255,9 @@ export default async function HelpPage({
       </section>
 
       <section className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{content.workflowLabel}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Como se usa semana a semana</p>
         <div className="grid gap-4 md:grid-cols-3">
-          {content.workflow.map((item) => (
+          {weeklyWorkflow.map((item) => (
             <Card className="p-5" key={item.title}>
               <CardTitle>{item.title}</CardTitle>
               <CardDescription className="mt-2 leading-6">{item.description}</CardDescription>
@@ -466,9 +267,9 @@ export default async function HelpPage({
       </section>
 
       <section className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{content.detailLabel}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Nivel, rendimiento y ranking explicado simple</p>
         <div className="grid gap-4 md:grid-cols-2">
-          {content.detail.map((item) => (
+          {rankingDetails.map((item) => (
             <Card className="p-5" key={item.title}>
               <CardTitle>{item.title}</CardTitle>
               <CardDescription className="mt-2 leading-6">{item.description}</CardDescription>
@@ -478,7 +279,7 @@ export default async function HelpPage({
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        {content.highlightCards.map((item) => (
+        {highlightCards.map((item) => (
           <Card className="p-5" key={item.title}>
             <CardTitle>{item.title}</CardTitle>
             <CardDescription className="mt-2 leading-6">{item.description}</CardDescription>
@@ -489,7 +290,7 @@ export default async function HelpPage({
       <section className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Preguntas frecuentes</p>
         <div className="grid gap-3 md:grid-cols-2">
-          {content.faq.map((item) => (
+          {faq.map((item) => (
             <Card className="p-5" key={item.question}>
               <CardTitle className="text-base">{item.question}</CardTitle>
               <CardDescription className="mt-2 leading-6">{item.answer}</CardDescription>
@@ -498,35 +299,32 @@ export default async function HelpPage({
         </div>
       </section>
 
-      {content.finalCta ? (
-        <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5 text-center shadow-[0_24px_40px_-30px_rgba(16,185,129,0.7)] md:p-8">
-          <h2 className="text-3xl font-black text-white">{content.finalCta.title}</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
-            {content.finalCta.description}
-          </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link
-              className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
-              href={panelPath}
-            >
-              Crear mi grupo gratis
-            </Link>
-            <Link
-              className="rounded-md border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
-              href={guidesPath}
-            >
-              Ver guías
-            </Link>
-            <Link
-              className="rounded-md border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
-              href={feedbackPath}
-            >
-              Contactar soporte
-            </Link>
-          </div>
-        </section>
-      ) : null}
-
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5 text-center shadow-[0_24px_40px_-30px_rgba(16,185,129,0.7)] md:p-8">
+        <h2 className="text-3xl font-black text-white">Listo para organizar tu grupo como corresponde?</h2>
+        <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
+          Crea tu grupo gratis y empeza a armar partidos parejos con ranking e historial.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Link
+            className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+            href={panelPath}
+          >
+            Crear mi grupo gratis
+          </Link>
+          <Link
+            className="rounded-md border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
+            href={guidesPath}
+          >
+            Ver guias
+          </Link>
+          <Link
+            className="rounded-md border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
+            href={feedbackPath}
+          >
+            Contactar soporte
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

@@ -3,9 +3,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { getCurrentUserIsSuperAdmin } from "@/lib/auth/super-admin";
 import { ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS } from "@/lib/constants";
-import { resolvePublicModule, withPublicQuery } from "@/lib/org";
+import { withPublicQuery } from "@/lib/org";
 
 const LAST_UPDATED = "2 de mayo de 2026";
 
@@ -37,9 +36,6 @@ export default async function PrivacyPage({
 }) {
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
-  const canAccessTournaments = await getCurrentUserIsSuperAdmin();
-  const requestedModule = resolvePublicModule(resolvedSearchParams.module);
-  const currentModule = canAccessTournaments ? requestedModule : "organizations";
 
   return (
     <div className="space-y-5">
@@ -77,14 +73,7 @@ export default async function PrivacyPage({
               "Datos de cuenta y acceso: email, identificadores de usuario, sesiones, rol de administrador y fechas de alta.",
               "Datos de grupos: nombre, slug, configuracion, administradores, actividad e informacion publica asociada.",
               "Datos de jugadores: nombre, orden, nivel, ranking, rendimiento, estadisticas, asistencia a partidos, resultados y fotos si fueron cargadas.",
-              ...(canAccessTournaments
-                ? [
-                    "Datos de torneos: ligas, competencias, equipos, capitanes, planteles, fixture, tablas, resultados y estadisticas."
-                  ]
-                : []),
-              `Datos de soporte: nombre, email, tema, mensaje, ${
-                canAccessTournaments ? "grupo o torneo referido" : "grupo referido"
-              } y comunicaciones posteriores.`,
+              "Datos de soporte: nombre, email, tema, mensaje, grupo referido y comunicaciones posteriores.",
               "Datos de publicidad y navegacion: cookies de terceros, direccion IP, identificadores tecnicos, informacion del navegador, impresiones y eventos publicitarios cuando se habilite Google AdSense.",
               "Datos de pago solo para flujos historicos, integraciones futuras o contrataciones habilitadas: identificadores de operacion, proveedor, estado, periodo abonado, moneda, importe y fechas relevantes. No almacenamos datos completos de tarjeta."
             ]}
@@ -144,9 +133,7 @@ export default async function PrivacyPage({
 
         <PrivacySection title="7. Pagos y proveedores">
           <p>
-            {canAccessTournaments
-              ? "Grupos es gratis en esta etapa y no inicia pagos nuevos para crear o administrar grupos. Torneos, flujos historicos o integraciones futuras pueden usar Mercado Pago u otros proveedores."
-              : "Grupos es gratis en esta etapa y no inicia pagos nuevos para crear o administrar grupos. Flujos historicos, integraciones futuras o contrataciones habilitadas pueden usar Mercado Pago u otros proveedores."}
+            Grupos es gratis en esta etapa y no inicia pagos nuevos para crear o administrar grupos. Flujos historicos, integraciones futuras o contrataciones habilitadas pueden usar Mercado Pago u otros proveedores.
           </p>
           <p>
             Cuando exista un pago, esos proveedores tratan informacion segun sus propias politicas. Fabrica de Futbol
@@ -257,8 +244,7 @@ export default async function PrivacyPage({
       <Link
         className="inline-flex rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
         href={withPublicQuery("/feedback", {
-          organizationKey,
-          module: currentModule
+          organizationKey
         })}
       >
         Consultar privacidad

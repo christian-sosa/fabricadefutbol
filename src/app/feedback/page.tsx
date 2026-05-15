@@ -6,8 +6,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getCurrentUserIsSuperAdmin } from "@/lib/auth/super-admin";
-import { resolvePublicModule, withPublicQuery } from "@/lib/org";
+import { withPublicQuery } from "@/lib/org";
 
 type FeedbackPageProps = {
   searchParams: Promise<{
@@ -21,9 +20,7 @@ type FeedbackPageProps = {
 export default async function FeedbackPage({ searchParams }: FeedbackPageProps) {
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
-  const canAccessTournaments = await getCurrentUserIsSuperAdmin();
-  const requestedModule = resolvePublicModule(resolvedSearchParams.module);
-  const currentModule = canAccessTournaments ? requestedModule : "organizations";
+  const currentModule = "organizations";
   const submitAction = submitFeedbackAction.bind(null, organizationKey, currentModule);
   const homePath = withPublicQuery("/", {
     organizationKey,
@@ -33,12 +30,7 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
     organizationKey,
     module: currentModule
   });
-  const moduleDescription =
-    currentModule === "tournaments"
-      ? "Si tu consulta es por torneos, capitanes, fixture o resultados, la dejamos lista para soporte."
-      : "Si tu consulta es por grupos, ranking o partidos equilibrados, la recibimos por aqui.";
-  const targetPlaceholder =
-    currentModule === "tournaments" ? "Ej: Copa Apertura 2026" : "Ej: La Cantera de LQ";
+  const moduleDescription = "Si tu consulta es por grupos, ranking o partidos equilibrados, la recibimos por aqui.";
 
   return (
     <div className="space-y-4">
@@ -126,7 +118,6 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
               </label>
               <Select defaultValue={currentModule} id="module" name="module">
                 <option value="organizations">Grupos</option>
-                {canAccessTournaments ? <option value="tournaments">Torneos</option> : null}
                 <option value="both">General</option>
               </Select>
             </div>
@@ -134,9 +125,9 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="organization">
-              {canAccessTournaments ? "Grupo o torneo (opcional)" : "Grupo (opcional)"}
+              Grupo (opcional)
             </label>
-            <Input id="organization" name="organization" placeholder={targetPlaceholder} />
+            <Input id="organization" name="organization" placeholder="Ej: La Cantera de LQ" />
           </div>
 
           <div>

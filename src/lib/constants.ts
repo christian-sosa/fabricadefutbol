@@ -91,7 +91,6 @@ export function formatMatchModality(modality: MatchModality) {
 export const PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
   { href: "/groups", label: "Grupos" },
-  { href: "/tournaments", label: "Torneos" },
   { href: "/ranking", label: "Ranking" },
   { href: "/matches", label: "Historial" },
   { href: "/upcoming", label: "Proximos" },
@@ -103,7 +102,6 @@ export const PUBLIC_NAV_ITEMS = [
 export const PRIMARY_PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
   { href: "/groups", label: "Grupos" },
-  { href: "/tournaments", label: "Torneos" },
   { href: "/guides", label: "Guías" },
   { href: "/feedback", label: "Contacto" },
   { href: "/help", label: "Ayuda" }

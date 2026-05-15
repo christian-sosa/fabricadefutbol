@@ -4,10 +4,8 @@ import { TrackedLink } from "@/components/analytics/tracked-link";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import {
   ORGANIZATION_BILLING_CURRENCY,
-  ORGANIZATION_MONTHLY_PRICE_ARS,
-  TOURNAMENT_MONTHLY_PRICE_ARS
+  ORGANIZATION_MONTHLY_PRICE_ARS
 } from "@/lib/constants";
-import { getCurrentUserIsSuperAdmin } from "@/lib/auth/super-admin";
 import { GROWTH_EVENTS } from "@/lib/growth";
 
 function formatArs(amount: number) {
@@ -18,7 +16,6 @@ function formatArs(amount: number) {
 }
 
 export default async function PricingPage() {
-  const canAccessTournaments = await getCurrentUserIsSuperAdmin();
   const groupPlan = {
     title: "Grupos",
     eyebrow: "Para partidos recurrentes",
@@ -37,48 +34,22 @@ export default async function PricingPage() {
       "Hasta 4 administradores por grupo"
     ]
   };
-  const tournamentPlan = {
-    title: "Torneos",
-    eyebrow: "Para ligas y competencias",
-    price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(TOURNAMENT_MONTHLY_PRICE_ARS)} / mes`,
-    badge: "Por liga activa",
-    description:
-      "Para organizadores que necesitan publicar ligas con equipos, competencias, fixture, tablas y estadisticas.",
-    cta: "Crear liga",
-    href: "/admin/tournaments",
-    items: [
-      "Una liga con multiples competencias",
-      "Equipos maestros reutilizables",
-      "Competencias publicas para visitantes",
-      "Fixture automatico o manual",
-      "Capitanes opcionales por equipo",
-      "Tabla, resultados, goleadores y figuras"
-    ]
-  };
-  const plans = canAccessTournaments ? [groupPlan, tournamentPlan] : [groupPlan];
-  const pricingNotes = canAccessTournaments
-    ? [
-        "Grupos y Torneos se facturan por separado porque resuelven necesidades distintas.",
-        "La informacion publica sigue visible para jugadores y visitantes.",
-        "Cuando un periodo vence, el espacio queda protegido en modo lectura hasta reactivar el plan."
-      ]
-    : [
-        "La informacion publica sigue visible para jugadores y visitantes.",
-        "Cuando un periodo vence, el grupo queda protegido en modo lectura hasta reactivar el plan.",
-        "Puedes empezar con un grupo y ordenar la operacion sin mezclar herramientas externas."
-      ];
+  const plans = [groupPlan];
+  const pricingNotes = [
+    "La informacion publica sigue visible para jugadores y visitantes.",
+    "Cuando un periodo vence, el grupo queda protegido en modo lectura hasta reactivar el plan.",
+    "Puedes empezar con un grupo y ordenar la operacion sin mezclar herramientas externas."
+  ];
 
   return (
     <div className="space-y-6">
       <section className="rounded-[2rem] border border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.18),transparent_32%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-6 shadow-[0_28px_60px_-34px_rgba(16,185,129,0.7)] md:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Precios</p>
         <h1 className="mt-2 text-3xl font-black text-white md:text-5xl">
-          {canAccessTournaments ? "Elige el pack segun como organizas tu futbol." : "Un plan simple para ordenar tu grupo."}
+          Un plan simple para ordenar tu grupo.
         </h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-          {canAccessTournaments
-            ? "Puedes empezar con un grupo, sumar una liga cuando el proyecto crezca o usar ambos modulos sin mezclar datos ni flujos."
-            : "Empieza con jugadores, partidos, rendimiento, ranking publico e historial claro para todos."}
+          Empieza con jugadores, partidos, rendimiento, ranking publico e historial claro para todos.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <TrackedLink
@@ -98,7 +69,7 @@ export default async function PricingPage() {
         </div>
       </section>
 
-      <section className={`grid gap-4 ${canAccessTournaments ? "lg:grid-cols-2" : ""}`}>
+      <section className="grid gap-4">
         {plans.map((plan) => (
           <Card className="p-5" key={plan.title}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -132,7 +103,7 @@ export default async function PricingPage() {
               <TrackedLink
                 className="inline-flex rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
                 eventName={GROWTH_EVENTS.ctaClicked}
-                eventProperties={{ cta: plan.title === "Grupos" ? "create_group" : "create_league", source: "pricing_plan" }}
+                eventProperties={{ cta: "create_group", source: "pricing_plan" }}
                 href={plan.href}
               >
                 {plan.cta}
@@ -160,9 +131,7 @@ export default async function PricingPage() {
         <Card>
           <CardTitle>Necesitas algo mas grande?</CardTitle>
           <CardDescription className="mt-3">
-            {canAccessTournaments
-              ? "Si organizas varias ligas, muchos grupos o necesitas una configuracion especial, escribenos y lo revisamos contigo antes de que la operacion crezca sin control."
-              : "Si organizas muchos grupos o necesitas una configuracion especial, escribenos y lo revisamos contigo antes de que la operacion crezca sin control."}
+            Si organizas muchos grupos o necesitas una configuracion especial, escribenos y lo revisamos contigo antes de que la operacion crezca sin control.
           </CardDescription>
           <div className="mt-4">
             <Link

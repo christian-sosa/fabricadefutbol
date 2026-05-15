@@ -38,17 +38,13 @@ function FooterSectionTitle({
   );
 }
 
-function filterTournamentNavItems<T extends { href: string }>(items: readonly T[], canAccessTournaments: boolean) {
-  return canAccessTournaments ? items : items.filter((item) => item.href !== "/tournaments");
-}
-
 export function SiteFooter({ canAccessTournaments = false }: { canAccessTournaments?: boolean }) {
   const searchParams = useSearchParams();
   const organizationId = searchParams.get("org");
   const requestedPublicModule = parsePublicModule(searchParams.get("module"));
   const publicModule = canAccessTournaments ? requestedPublicModule : "organizations";
   const year = new Date().getFullYear();
-  const primaryNavItems = filterTournamentNavItems(PRIMARY_PUBLIC_NAV_ITEMS, canAccessTournaments);
+  const primaryNavItems = PRIMARY_PUBLIC_NAV_ITEMS;
   return (
     <footer className="relative mt-10 border-t border-slate-800/90 bg-slate-950/95">
       <div
@@ -162,7 +158,7 @@ export function SiteFooter({ canAccessTournaments = false }: { canAccessTourname
         <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/55 px-4 py-4 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
           <p>Copyright {year} Fábrica de Fútbol. Todos los derechos reservados.</p>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-            {canAccessTournaments ? "Ranking real para grupos y torneos" : "Ranking real para grupos"}
+            Ranking real para grupos
           </p>
         </div>
       </div>
