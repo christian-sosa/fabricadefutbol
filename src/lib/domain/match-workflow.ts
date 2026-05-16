@@ -698,7 +698,9 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
     await confirmTeamOption({
       supabase,
       matchId: match.id,
-      optionId: optionIdToConfirm
+      optionId: optionIdToConfirm,
+      teamALabel,
+      teamBLabel
     });
     return match.id;
   }
@@ -792,8 +794,10 @@ export async function confirmTeamOption(params: {
   matchId: string;
   optionId: string;
   organizationId?: string;
+  teamALabel?: string | null;
+  teamBLabel?: string | null;
 }) {
-  const { supabase, matchId, optionId, organizationId } = params;
+  const { supabase, matchId, optionId, organizationId, teamALabel, teamBLabel } = params;
 
   await assertMatchBelongsToOrganization({ supabase, matchId, organizationId });
 
@@ -812,7 +816,12 @@ export async function confirmTeamOption(params: {
 
   const { error: updateMatchError } = await supabase
     .from("matches")
-    .update({ status: "confirmed", confirmed_option_id: optionId })
+    .update({
+      status: "confirmed",
+      confirmed_option_id: optionId,
+      team_a_label: normalizeTeamLabel(teamALabel),
+      team_b_label: normalizeTeamLabel(teamBLabel)
+    })
     .eq("id", matchId);
   if (updateMatchError) throw new Error(`No se pudo actualizar estado del partido: ${updateMatchError.message}`);
 }

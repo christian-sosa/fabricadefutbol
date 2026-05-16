@@ -20,7 +20,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizeTeamLabel, TEAM_LABEL_MAX_LENGTH } from "@/lib/team-labels";
 
 const confirmSchema = z.object({
-  optionId: z.string().uuid()
+  optionId: z.string().uuid(),
+  teamALabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del primer equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),
+  teamBLabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del segundo equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional()
 });
 
 const resultSchema = z.object({
@@ -167,7 +169,9 @@ export async function confirmOptionAction(matchId: string, organizationId: strin
   try {
     await assertOrganizationAdminAction(organizationId);
     const parsed = confirmSchema.safeParse({
-      optionId: formData.get("optionId")
+      optionId: formData.get("optionId"),
+      teamALabel: String(formData.get("teamALabel") ?? ""),
+      teamBLabel: String(formData.get("teamBLabel") ?? "")
     });
     if (!parsed.success) {
       redirect(buildPath(matchId, organizationQueryKey, parsed.error.issues[0]?.message ?? "Opcion invalida."));
@@ -178,7 +182,9 @@ export async function confirmOptionAction(matchId: string, organizationId: strin
       supabase,
       matchId,
       optionId: parsed.data.optionId,
-      organizationId
+      organizationId,
+      teamALabel: normalizeTeamLabel(parsed.data.teamALabel),
+      teamBLabel: normalizeTeamLabel(parsed.data.teamBLabel)
     });
 
     revalidateMatchPaths(matchId);

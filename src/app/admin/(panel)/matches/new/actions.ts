@@ -242,8 +242,8 @@ export async function createMatchAction(formData: FormData) {
       teamCreationMode: creationMode,
       manualTeamAssignments,
       goalkeeperPlayerIds,
-      teamALabel: normalizeTeamLabel(parsed.data.teamALabel),
-      teamBLabel: normalizeTeamLabel(parsed.data.teamBLabel)
+      teamALabel: creationMode === "manual" ? normalizeTeamLabel(parsed.data.teamALabel) : null,
+      teamBLabel: creationMode === "manual" ? normalizeTeamLabel(parsed.data.teamBLabel) : null
     });
 
     await refreshOrganizationPublicSnapshotSafe(parsed.data.organizationId);

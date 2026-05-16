@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDraftMatchWithOptions,
+  confirmTeamOption,
   regenerateDraftTeamOptions,
   saveConfirmedMatchLineup,
   saveMatchResult
@@ -396,6 +397,44 @@ describe("match workflow", () => {
     const afterOptions = fake.table("team_options").filter((row) => row.match_id === matchId);
     expect(afterOptions).toHaveLength(3);
     expect(afterOptions.some((row) => beforeIds.has(String(row.id)))).toBe(false);
+  });
+
+  it("guarda nombres de equipos al confirmar una opcion generada", async () => {
+    const players = buildPlayers(10);
+    const fake = createFakeSupabase({
+      organizations: [{ id: ORG_ID, name: "Liga A", slug: "liga-a" }],
+      players
+    });
+
+    const matchId = await createDraftMatchWithOptions({
+      supabase: fake.client as never,
+      adminId: ADMIN_ID,
+      organizationId: ORG_ID,
+      scheduledAt: SCHEDULED_AT,
+      modality: "5v5",
+      selectedPlayerIds: players.map((player) => String(player.id)),
+      invitedGuests: []
+    });
+
+    const optionId = String(fake.table("team_options").find((row) => row.match_id === matchId)?.id);
+
+    await confirmTeamOption({
+      supabase: fake.client as never,
+      matchId,
+      optionId,
+      organizationId: ORG_ID,
+      teamALabel: "Los Pibes",
+      teamBLabel: "Veteranos"
+    });
+
+    expect(fake.find("matches", (row) => row.id === matchId)).toEqual(
+      expect.objectContaining({
+        status: "confirmed",
+        confirmed_option_id: optionId,
+        team_a_label: "Los Pibes",
+        team_b_label: "Veteranos"
+      })
+    );
   });
 
   it("guarda resultado con handicap, invitado nuevo y actualiza ratings", async () => {

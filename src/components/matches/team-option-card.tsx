@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import {
   formatGuestSkillLevelLabel,
@@ -7,7 +8,7 @@ import {
   formatRatingTrendLabel,
   formatSkillLevelLabel
 } from "@/lib/domain/skill-level";
-import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL } from "@/lib/team-labels";
+import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL, TEAM_LABEL_MAX_LENGTH } from "@/lib/team-labels";
 import { cn } from "@/lib/utils";
 
 type OptionPlayer = {
@@ -169,6 +170,8 @@ export function TeamOptionCard({
 }: TeamOptionCardProps) {
   const sortedTeamA = sortTeamPlayers(teamA);
   const sortedTeamB = sortTeamPlayers(teamB);
+  const teamALabelInputId = `teamALabel-${optionId}`;
+  const teamBLabelInputId = `teamBLabel-${optionId}`;
   const balanceSummary = buildBalanceSummary({
     ratingDiff,
     ratingSumA,
@@ -222,8 +225,38 @@ export function TeamOptionCard({
       </div>
 
       {!isConfirmed && confirmAction ? (
-        <form action={confirmAction} className="mt-4">
+        <form action={confirmAction} className="mt-4 space-y-3">
           <input name="optionId" type="hidden" value={optionId} />
+          <div className="rounded-lg border border-slate-800 bg-slate-950 p-3">
+            <p className="text-sm font-semibold text-slate-100">Nombres para compartir</p>
+            <p className="text-xs text-slate-400">
+              Si los dejas vacios se publican como {DEFAULT_TEAM_A_LABEL} y {DEFAULT_TEAM_B_LABEL}.
+            </p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={teamALabelInputId}>
+                  Nombre del primer equipo
+                </label>
+                <Input
+                  id={teamALabelInputId}
+                  maxLength={TEAM_LABEL_MAX_LENGTH}
+                  name="teamALabel"
+                  placeholder={DEFAULT_TEAM_A_LABEL}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={teamBLabelInputId}>
+                  Nombre del segundo equipo
+                </label>
+                <Input
+                  id={teamBLabelInputId}
+                  maxLength={TEAM_LABEL_MAX_LENGTH}
+                  name="teamBLabel"
+                  placeholder={DEFAULT_TEAM_B_LABEL}
+                />
+              </div>
+            </div>
+          </div>
           <Button type="submit">Confirmar esta opcion</Button>
         </form>
       ) : null}

@@ -283,39 +283,6 @@ export function NewMatchForm({
       </div>
 
       <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
-        <div>
-          <p className="text-sm font-semibold text-slate-100">Nombres para compartir</p>
-          <p className="text-xs text-slate-400">
-            Si los dejas vacios se publican como {DEFAULT_TEAM_A_LABEL} y {DEFAULT_TEAM_B_LABEL}.
-          </p>
-        </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="teamALabel">
-              Nombre del primer equipo
-            </label>
-            <Input
-              id="teamALabel"
-              maxLength={TEAM_LABEL_MAX_LENGTH}
-              name="teamALabel"
-              placeholder={DEFAULT_TEAM_A_LABEL}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="teamBLabel">
-              Nombre del segundo equipo
-            </label>
-            <Input
-              id="teamBLabel"
-              maxLength={TEAM_LABEL_MAX_LENGTH}
-              name="teamBLabel"
-              placeholder={DEFAULT_TEAM_B_LABEL}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-sm font-semibold text-slate-100">Jugadores registrados</p>
@@ -538,6 +505,37 @@ export function NewMatchForm({
               Los dos arqueros deben quedar en equipos separados.
             </p>
           ) : null}
+
+          <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950 p-3">
+            <p className="text-sm font-semibold text-slate-100">Nombres para compartir</p>
+            <p className="text-xs text-slate-400">
+              Si los dejas vacios se publican como {DEFAULT_TEAM_A_LABEL} y {DEFAULT_TEAM_B_LABEL}.
+            </p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="teamALabel">
+                  Nombre del primer equipo
+                </label>
+                <Input
+                  id="teamALabel"
+                  maxLength={TEAM_LABEL_MAX_LENGTH}
+                  name="teamALabel"
+                  placeholder={DEFAULT_TEAM_A_LABEL}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="teamBLabel">
+                  Nombre del segundo equipo
+                </label>
+                <Input
+                  id="teamBLabel"
+                  maxLength={TEAM_LABEL_MAX_LENGTH}
+                  name="teamBLabel"
+                  placeholder={DEFAULT_TEAM_B_LABEL}
+                />
+              </div>
+            </div>
+          </div>
 
           <div className="mt-3">
             <FormSubmitButton

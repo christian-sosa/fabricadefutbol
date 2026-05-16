@@ -79,6 +79,8 @@ describe("admin match result actions", () => {
   it("redirige al partido publico despues de confirmar una opcion", async () => {
     const formData = new FormData();
     formData.set("optionId", "00000000-0000-4000-8000-000000000101");
+    formData.set("teamALabel", "Los Pibes");
+    formData.set("teamBLabel", "Veteranos");
 
     await expect(confirmOptionAction("match-1", "org-1", formData)).rejects.toMatchObject({
       digest: expect.stringContaining("NEXT_REDIRECT")
@@ -94,7 +96,9 @@ describe("admin match result actions", () => {
     expect(confirmTeamOptionMock).toHaveBeenCalledWith(
       expect.objectContaining({
         matchId: "match-1",
-        organizationId: "org-1"
+        organizationId: "org-1",
+        teamALabel: "Los Pibes",
+        teamBLabel: "Veteranos"
       })
     );
   });

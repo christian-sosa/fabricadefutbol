@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { TeamOptionCard } from "@/components/matches/team-option-card";
 
@@ -13,6 +13,30 @@ function buildGuests(team: string) {
 }
 
 describe("TeamOptionCard", () => {
+  it("permite nombrar los equipos dentro de la opcion antes de confirmarla", () => {
+    render(
+      <TeamOptionCard
+        confirmAction={vi.fn()}
+        isConfirmed={false}
+        optionId="option-1"
+        optionNumber={1}
+        ratingDiff={100}
+        ratingSumA={1000}
+        ratingSumB={1100}
+        teamA={buildGuests("Negro")}
+        teamALabel="Negro"
+        teamB={buildGuests("Blanco")}
+        teamBLabel="Blanco"
+      />
+    );
+
+    expect(screen.getByLabelText("Nombre del primer equipo")).toHaveAttribute("name", "teamALabel");
+    expect(screen.getByLabelText("Nombre del segundo equipo")).toHaveAttribute("name", "teamBLabel");
+    expect(screen.getByPlaceholderText("Negro")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Blanco")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirmar esta opcion" })).toBeInTheDocument();
+  });
+
   it("muestra el balance de equipos con texto humano en lugar de totales internos", () => {
     render(
       <TeamOptionCard

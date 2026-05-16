@@ -34,10 +34,16 @@ function getCheckbox(container: HTMLElement, name: string, value: string) {
 }
 
 describe("NewMatchForm", () => {
-  it("permite nombrar los equipos antes de crear el partido", () => {
+  it("muestra nombres de equipos solo cuando se arma el partido manual", async () => {
+    const user = userEvent.setup();
     render(
       <NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={buildPlayers(10)} />
     );
+
+    expect(screen.queryByLabelText("Nombre del primer equipo")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Nombre del segundo equipo")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Armar equipos yo mismo" }));
 
     expect(screen.getByLabelText("Nombre del primer equipo")).toHaveAttribute("name", "teamALabel");
     expect(screen.getByLabelText("Nombre del segundo equipo")).toHaveAttribute("name", "teamBLabel");
