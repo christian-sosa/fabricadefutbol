@@ -60,11 +60,15 @@ test("login admin, crea partido, carga resultado y lo ve en publico", async ({ p
   await page.waitForURL("**/admin/matches/**");
   await expect(page.getByText("Opciones de equipos")).toBeVisible();
 
-  await page.getByRole("button", { name: "Confirmar esta opcion" }).first().click();
-  await expect(page.getByText(/Cargar resultado|Corregir resultado/)).toBeVisible();
-
   const matchId = page.url().match(/\/admin\/matches\/([^?]+)/)?.[1];
   expect(matchId).toBeTruthy();
+
+  await page.getByRole("button", { name: "Confirmar esta opcion" }).first().click();
+  await page.waitForURL(`**/matches/${matchId}**`);
+  await expect(page.getByText("Resultado pendiente.")).toBeVisible();
+
+  await page.goto(`/admin/matches/${matchId}/result?org=${ORG_SLUG}`);
+  await expect(page.getByText(/Cargar resultado|Corregir resultado/)).toBeVisible();
 
   await page.locator('input[name="scoreA"]').fill("3");
   await page.locator('input[name="scoreB"]').fill("2");

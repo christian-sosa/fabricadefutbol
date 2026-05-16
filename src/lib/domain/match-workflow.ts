@@ -10,6 +10,7 @@ import {
 } from "@/lib/domain/skill-level";
 import { generateBalancedTeamOptions } from "@/lib/domain/team-generator";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { normalizeTeamLabel } from "@/lib/team-labels";
 import type { MatchModality, MatchResultInput, ResultAssignmentTeam, TeamSide } from "@/types/domain";
 
 type DbClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
@@ -92,6 +93,8 @@ type CreateDraftInput = {
   teamCreationMode?: "auto" | "manual";
   manualTeamAssignments?: ManualTeamAssignmentInput[];
   goalkeeperPlayerIds?: string[];
+  teamALabel?: string | null;
+  teamBLabel?: string | null;
 };
 
 const PLAYER_PREFIX = "player:";
@@ -627,7 +630,9 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
     invitedGuests,
     teamCreationMode = "auto",
     manualTeamAssignments,
-    goalkeeperPlayerIds = []
+    goalkeeperPlayerIds = [],
+    teamALabel,
+    teamBLabel
   } = input;
   validatePlayerCount(modality, selectedPlayerIds.length, invitedGuests.length);
   validateGoalkeeperSelection(selectedPlayerIds, goalkeeperPlayerIds);
@@ -642,6 +647,8 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
       modality,
       status: "draft",
       location: location || null,
+      team_a_label: normalizeTeamLabel(teamALabel),
+      team_b_label: normalizeTeamLabel(teamBLabel),
       created_by: adminId
     })
     .select("id")

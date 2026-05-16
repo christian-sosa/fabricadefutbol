@@ -5,6 +5,7 @@
 /.next/
 /out/
 /coverage/
+/output/
 /playwright-report/
 /test-results/
 

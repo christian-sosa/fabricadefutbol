@@ -4,6 +4,7 @@ const {
   createSupabaseServerClientMock,
   redirectMock,
   revalidatePathMock,
+  confirmTeamOptionMock,
   refreshOrganizationPublicSnapshotSafeMock,
   saveMatchResultMock
 } = vi.hoisted(() => ({
@@ -15,6 +16,7 @@ const {
     throw error;
   }),
   revalidatePathMock: vi.fn(),
+  confirmTeamOptionMock: vi.fn(),
   refreshOrganizationPublicSnapshotSafeMock: vi.fn(),
   saveMatchResultMock: vi.fn()
 }));
@@ -54,13 +56,13 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 vi.mock("@/lib/domain/match-workflow", () => ({
-  confirmTeamOption: vi.fn(),
+  confirmTeamOption: confirmTeamOptionMock,
   regenerateDraftTeamOptions: vi.fn(),
   saveConfirmedMatchLineup: vi.fn(),
   saveMatchResult: saveMatchResultMock
 }));
 
-import { saveResultAction } from "@/app/admin/(panel)/matches/[id]/actions";
+import { confirmOptionAction, saveResultAction } from "@/app/admin/(panel)/matches/[id]/actions";
 
 describe("admin match result actions", () => {
   beforeEach(() => {
@@ -68,8 +70,33 @@ describe("admin match result actions", () => {
     redirectMock.mockClear();
     revalidatePathMock.mockClear();
     refreshOrganizationPublicSnapshotSafeMock.mockClear();
+    confirmTeamOptionMock.mockClear();
+    confirmTeamOptionMock.mockResolvedValue(undefined);
     saveMatchResultMock.mockClear();
     saveMatchResultMock.mockResolvedValue(undefined);
+  });
+
+  it("redirige al partido publico despues de confirmar una opcion", async () => {
+    const formData = new FormData();
+    formData.set("optionId", "00000000-0000-4000-8000-000000000101");
+
+    await expect(confirmOptionAction("match-1", "org-1", formData)).rejects.toMatchObject({
+      digest: expect.stringContaining("NEXT_REDIRECT")
+    });
+
+    const redirectedTo = redirectMock.mock.calls.at(-1)?.[0];
+    expect(typeof redirectedTo).toBe("string");
+    const redirectUrl = new URL(String(redirectedTo), "http://localhost");
+
+    expect(redirectUrl.pathname).toBe("/matches/match-1");
+    expect(redirectUrl.searchParams.get("org")).toBe("la-banda");
+    expect(String(redirectedTo)).not.toContain("/admin/matches/match-1");
+    expect(confirmTeamOptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        matchId: "match-1",
+        organizationId: "org-1"
+      })
+    );
   });
 
   it("vuelve al listado editable de partidos despues de cargar un resultado", async () => {

@@ -34,6 +34,17 @@ function getCheckbox(container: HTMLElement, name: string, value: string) {
 }
 
 describe("NewMatchForm", () => {
+  it("permite nombrar los equipos antes de crear el partido", () => {
+    render(
+      <NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={buildPlayers(10)} />
+    );
+
+    expect(screen.getByLabelText("Nombre del primer equipo")).toHaveAttribute("name", "teamALabel");
+    expect(screen.getByLabelText("Nombre del segundo equipo")).toHaveAttribute("name", "teamBLabel");
+    expect(screen.getByPlaceholderText("Negro")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Blanco")).toBeInTheDocument();
+  });
+
   it("muestra nivel cargado y solo destaca rendimiento alto o bajo al seleccionar convocados", () => {
     render(
       <NewMatchForm

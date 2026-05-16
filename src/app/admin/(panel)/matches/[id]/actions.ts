@@ -127,6 +127,10 @@ function buildAdminMatchesPath(organizationKey: string, success?: string) {
   return `${basePath}${separator}success=${encodeURIComponent(success)}`;
 }
 
+function buildPublicMatchPath(matchId: string, organizationKey: string) {
+  return withOrgQuery(`/matches/${matchId}`, organizationKey);
+}
+
 function revalidateMatchPaths(matchId: string) {
   revalidatePath("/admin");
   revalidatePath("/admin/matches");
@@ -178,7 +182,7 @@ export async function confirmOptionAction(matchId: string, organizationId: strin
     });
 
     revalidateMatchPaths(matchId);
-    redirect(buildPath(matchId, organizationQueryKey));
+    redirect(buildPublicMatchPath(matchId, organizationQueryKey));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     const message = error instanceof Error ? error.message : "No se pudo confirmar la opcion.";

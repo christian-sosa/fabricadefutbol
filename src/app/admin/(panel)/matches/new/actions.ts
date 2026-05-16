@@ -15,6 +15,7 @@ import { GROWTH_EVENTS, withGrowthEvent } from "@/lib/growth";
 import { withOrgQuery } from "@/lib/org";
 import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { normalizeTeamLabel, TEAM_LABEL_MAX_LENGTH } from "@/lib/team-labels";
 
 const schema = z.object({
   organizationId: z.string().uuid(),
@@ -22,6 +23,8 @@ const schema = z.object({
   scheduledTime: z.string().min(1, "La hora es obligatoria."),
   modality: z.enum(["5v5", "6v6", "7v7", "9v9", "11v11"]),
   location: z.string().optional(),
+  teamALabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del primer equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),
+  teamBLabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del segundo equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),
   playerIds: z.array(z.string().uuid())
 });
 
@@ -142,6 +145,8 @@ export async function createMatchAction(formData: FormData) {
       scheduledTime: String(formData.get("scheduledTime") ?? ""),
       modality: formData.get("modality"),
       location: formData.get("location"),
+      teamALabel: String(formData.get("teamALabel") ?? ""),
+      teamBLabel: String(formData.get("teamBLabel") ?? ""),
       playerIds: formData.getAll("playerIds")
     });
     if (!parsed.success) {
@@ -236,13 +241,18 @@ export async function createMatchAction(formData: FormData) {
       invitedGuests,
       teamCreationMode: creationMode,
       manualTeamAssignments,
-      goalkeeperPlayerIds
+      goalkeeperPlayerIds,
+      teamALabel: normalizeTeamLabel(parsed.data.teamALabel),
+      teamBLabel: normalizeTeamLabel(parsed.data.teamBLabel)
     });
 
     await refreshOrganizationPublicSnapshotSafe(parsed.data.organizationId);
     revalidatePath("/admin");
     revalidatePath("/admin/matches/new");
     revalidatePath(`/admin/matches/${matchId}`);
+    revalidatePath("/matches");
+    revalidatePath(`/matches/${matchId}`);
+    revalidatePath("/upcoming");
     logInfo("matches.create.succeeded", {
       organizationId: parsed.data.organizationId,
       matchId,
@@ -253,7 +263,11 @@ export async function createMatchAction(formData: FormData) {
       guestCount: invitedGuests.length,
       durationMs: Date.now() - startedAt
     });
-    redirect(withGrowthEvent(withOrgQuery(`/admin/matches/${matchId}`, organizationQueryKey), GROWTH_EVENTS.matchCreated));
+    const nextPath =
+      creationMode === "manual"
+        ? withOrgQuery(`/matches/${matchId}`, organizationQueryKey)
+        : withOrgQuery(`/admin/matches/${matchId}`, organizationQueryKey);
+    redirect(withGrowthEvent(nextPath, GROWTH_EVENTS.matchCreated));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     logError("matches.create.failed", error, {
