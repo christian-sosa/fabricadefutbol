@@ -15,14 +15,18 @@
 
 # private project folders
 /docs/
+/ops/
 /supabase/
 /PRODUCTION.md
+/LOCAL_DEV.md
 /brand-assets/
 /player-photo-import/
 /tmp/
 /public/players/
 /README.md
 /AGENTS.md
+*.md
+*.sql
 
 # misc
 .DS_Store
