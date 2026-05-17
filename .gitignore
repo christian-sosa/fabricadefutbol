@@ -6,6 +6,7 @@
 /out/
 /coverage/
 /output/
+/outputs/
 /playwright-report/
 /test-results/
 

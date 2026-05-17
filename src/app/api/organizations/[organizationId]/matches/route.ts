@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getPublicApiErrorMessage, logPublicApiError } from "@/lib/api-errors";
 import { getMatchHistoryCardsPage } from "@/lib/queries/public";
 
 const PUBLIC_CACHE_HEADER = "public, s-maxage=60, stale-while-revalidate=300";
@@ -34,7 +35,8 @@ export async function GET(
       }
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo obtener el historial.";
+    logPublicApiError("organization matches", error);
+    const message = getPublicApiErrorMessage(error, "No se pudo obtener el historial.");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

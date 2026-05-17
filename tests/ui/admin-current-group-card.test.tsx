@@ -23,8 +23,8 @@ vi.mock("@/lib/supabase/client", () => ({
 describe("AdminCurrentGroupCard", () => {
   const admin = {
     userId: "admin-1",
-    displayName: "Christian Sosa",
-    email: "sosa.christian.agustin@gmail.com",
+    displayName: "Admin Demo",
+    email: "admin@example.invalid",
     isSuperAdmin: true
   };
 
@@ -39,8 +39,8 @@ describe("AdminCurrentGroupCard", () => {
       />
     );
 
-    expect(screen.getByText("Modo administrador / Christian Sosa")).toBeInTheDocument();
-    expect(screen.getByText("sosa.christian.agustin@gmail.com")).toBeInTheDocument();
+    expect(screen.getByText("Modo administrador / Admin Demo")).toBeInTheDocument();
+    expect(screen.getByText("admin@example.invalid")).toBeInTheDocument();
     expect(screen.getByText("Grupo actual")).toBeInTheDocument();
     expect(screen.getByText("La Banda")).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: /La Banda/ })).not.toBeInTheDocument();

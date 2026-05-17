@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,6 +15,12 @@ import {
   PLAYER_AVATAR_QUALITY,
   PLAYER_AVATAR_SIZE_PX
 } from "@/lib/player-photos";
+
+const root = process.cwd();
+const playerPhotoRouteSource = readFileSync(
+  path.join(root, "src", "app", "api", "player-photo", "[id]", "route.ts"),
+  "utf8"
+);
 
 describe("media cost controls", () => {
   it("mantiene limites conservadores para fotos de jugadores", () => {
@@ -28,5 +37,15 @@ describe("media cost controls", () => {
     expect(ORGANIZATION_IMAGE_CACHE_CONTROL).toContain("public");
     expect(ORGANIZATION_IMAGE_CACHE_CONTROL).toContain("stale-while-revalidate");
     expect(ORGANIZATION_IMAGE_CACHE_CONTROL).not.toBe("no-store");
+  });
+
+  it("evita descargar fotos si puede redirigir a una URL firmada de storage", () => {
+    expect(playerPhotoRouteSource).toContain("createSignedStorageRedirect");
+    expect(playerPhotoRouteSource).toContain("getStoragePhotoResponse");
+  });
+
+  it("descarta ids invalidos antes de consultar storage o base de datos", () => {
+    expect(playerPhotoRouteSource).toContain("isUuidLikePlayerId");
+    expect(playerPhotoRouteSource).toMatch(/if \(!isUuidLikePlayerId\(playerId\)\)/);
   });
 });

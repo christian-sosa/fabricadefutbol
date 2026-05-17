@@ -17,6 +17,7 @@ import { calculateGuestDisplayRating } from "@/lib/domain/skill-level";
 import { calculatePlayerStats, type MatchWithTeams } from "@/lib/domain/stats";
 import { getCurrentMatchDateTimeIso } from "@/lib/match-datetime";
 import { normalizeEmail } from "@/lib/org";
+import { isMissingSupabaseConfigurationError } from "@/lib/env";
 import type { MatchHistoryItem, OrganizationMatchesResponse, OrganizationSeasonOption } from "@/lib/query/types";
 import type { Database } from "@/types/database";
 import type { PlayerComputedStats } from "@/types/domain";
@@ -140,7 +141,14 @@ function getDefaultOrganizationIndex(organizations: PublicOrganization[], contex
 }
 
 export async function getPublicOrganizations(): Promise<PublicOrganization[]> {
-  const supabase = await createSupabaseServerClient();
+  let supabase: SupabaseServerClient;
+  try {
+    supabase = await createSupabaseServerClient();
+  } catch (error) {
+    if (isMissingSupabaseConfigurationError(error)) return [];
+    throw error;
+  }
+
   const { data, error } = await supabase
     .from("organizations")
     .select("id, name, slug, is_public, created_at")
@@ -154,7 +162,14 @@ export async function getPublicOrganizations(): Promise<PublicOrganization[]> {
 export async function getOrganizationSeasons(organizationId: string | null): Promise<OrganizationSeasonOption[]> {
   if (!organizationId) return [];
 
-  const supabase = await createSupabaseServerClient();
+  let supabase: SupabaseServerClient;
+  try {
+    supabase = await createSupabaseServerClient();
+  } catch (error) {
+    if (isMissingSupabaseConfigurationError(error)) return [];
+    throw error;
+  }
+
   const { data, error } = await supabase
     .from("organization_seasons")
     .select("*")
@@ -203,7 +218,14 @@ async function resolveSeasonFilter(
 }
 
 export async function getViewerAdminOrganizations(): Promise<PublicOrganization[]> {
-  const supabase = await createSupabaseServerClient();
+  let supabase: SupabaseServerClient;
+  try {
+    supabase = await createSupabaseServerClient();
+  } catch (error) {
+    if (isMissingSupabaseConfigurationError(error)) return [];
+    throw error;
+  }
+
   const {
     data: { user }
   } = await supabase.auth.getUser();

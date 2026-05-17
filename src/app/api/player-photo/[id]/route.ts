@@ -5,9 +5,9 @@ import { NextResponse } from "next/server";
 
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import {
+  CONTENT_TYPE_BY_EXTENSION,
   getClubPlayerPhotoObjectPath,
   getCompetitionPlayerPhotoObjectPath,
-  CONTENT_TYPE_BY_EXTENSION,
   getLegacyPhotoPath,
   getOrganizationPlayerPhotoObjectPath,
   getPlayerPhotoPlaceholderPath,
@@ -16,8 +16,15 @@ import {
   PLAYER_PHOTO_CACHE_CONTROL,
   PLAYER_PHOTO_PLACEHOLDER_CACHE_CONTROL
 } from "@/lib/player-photos";
-import { createStorageObjectStreamResponse } from "@/lib/storage-image-responses";
+import { createSignedStorageRedirect, createStorageObjectStreamResponse } from "@/lib/storage-image-responses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+const UUID_LIKE_PLAYER_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuidLikePlayerId(playerId: string) {
+  return UUID_LIKE_PLAYER_ID_PATTERN.test(playerId);
+}
 
 async function fileExists(filePath: string) {
   try {
@@ -59,6 +66,27 @@ async function readPlaceholderResponse() {
   });
 }
 
+async function getStoragePhotoResponse(params: {
+  supabase: Parameters<typeof createSignedStorageRedirect>[0]["supabase"];
+  bucketName: string;
+  objectPath: string;
+}) {
+  const redirectResponse = await createSignedStorageRedirect({
+    supabase: params.supabase,
+    bucketName: params.bucketName,
+    objectPath: params.objectPath
+  });
+  if (redirectResponse) return redirectResponse;
+
+  return createStorageObjectStreamResponse({
+    supabase: params.supabase,
+    bucketName: params.bucketName,
+    objectPath: params.objectPath,
+    contentType: "image/webp",
+    cacheControl: PLAYER_PHOTO_CACHE_CONTROL
+  });
+}
+
 export async function GET(
   _: Request,
   context: {
@@ -66,6 +94,10 @@ export async function GET(
   }
 ) {
   const { id: playerId } = await context.params;
+  if (!isUuidLikePlayerId(playerId)) {
+    return readPlaceholderResponse();
+  }
+
   const supabase = await createSupabaseServerClient();
   const bucketName = getPlayerPhotosBucket();
   const schemaName = getSupabaseDbSchema();
@@ -83,15 +115,13 @@ export async function GET(
     ];
 
     for (const objectPath of objectPaths) {
-      const streamedResponse = await createStorageObjectStreamResponse({
+      const photoResponse = await getStoragePhotoResponse({
         supabase,
         bucketName,
-        objectPath,
-        contentType: "image/webp",
-        cacheControl: PLAYER_PHOTO_CACHE_CONTROL
+        objectPath
       });
 
-      if (streamedResponse) return streamedResponse;
+      if (photoResponse) return photoResponse;
     }
   }
 
@@ -108,15 +138,13 @@ export async function GET(
     ].filter(Boolean);
 
     for (const objectPath of objectPaths) {
-      const streamedResponse = await createStorageObjectStreamResponse({
+      const photoResponse = await getStoragePhotoResponse({
         supabase,
         bucketName,
-        objectPath,
-        contentType: "image/webp",
-        cacheControl: PLAYER_PHOTO_CACHE_CONTROL
+        objectPath
       });
 
-      if (streamedResponse) return streamedResponse;
+      if (photoResponse) return photoResponse;
     }
   }
 
@@ -139,15 +167,13 @@ export async function GET(
         competitionTeam.competition_id,
         playerId
       );
-      const streamedResponse = await createStorageObjectStreamResponse({
+      const photoResponse = await getStoragePhotoResponse({
         supabase,
         bucketName,
-        objectPath,
-        contentType: "image/webp",
-        cacheControl: PLAYER_PHOTO_CACHE_CONTROL
+        objectPath
       });
 
-      if (streamedResponse) return streamedResponse;
+      if (photoResponse) return photoResponse;
     }
   }
 
@@ -159,15 +185,13 @@ export async function GET(
 
   if (!tournamentPlayerError && tournamentPlayer?.tournament_id) {
     const objectPath = getTournamentPlayerPhotoObjectPath(schemaName, tournamentPlayer.tournament_id, playerId);
-    const streamedResponse = await createStorageObjectStreamResponse({
+    const photoResponse = await getStoragePhotoResponse({
       supabase,
       bucketName,
-      objectPath,
-      contentType: "image/webp",
-      cacheControl: PLAYER_PHOTO_CACHE_CONTROL
+      objectPath
     });
 
-    if (streamedResponse) return streamedResponse;
+    if (photoResponse) return photoResponse;
   }
 
   const legacyResponse = await readLegacyPhotoResponse(playerId);

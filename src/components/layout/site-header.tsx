@@ -75,6 +75,14 @@ function filterTournamentNavItems<T extends { href: string }>(items: readonly T[
   return canAccessTournaments ? items : items.filter((item) => item.href !== "/tournaments");
 }
 
+function tryCreateSupabaseBrowserClient() {
+  try {
+    return createSupabaseBrowserClient();
+  } catch {
+    return null;
+  }
+}
+
 export function SiteHeader({
   initialCanAccessTournaments = false,
   initialIsAuthenticated = false
@@ -116,14 +124,26 @@ export function SiteHeader({
   }, [initialCanAccessTournaments]);
 
   useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
+    const supabase = tryCreateSupabaseBrowserClient();
+    if (!supabase) {
+      setIsAuthenticated(false);
+      setCanAccessTournaments(false);
+      return;
+    }
 
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      setIsAuthenticated(Boolean(data.session?.user));
-      if (!data.session?.user) setCanAccessTournaments(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        setIsAuthenticated(Boolean(data.session?.user));
+        if (!data.session?.user) setCanAccessTournaments(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setIsAuthenticated(false);
+        setCanAccessTournaments(false);
+      });
 
     const {
       data: { subscription }
@@ -152,30 +172,40 @@ export function SiteHeader({
       }
 
       setCurrentOrganizationName(null);
-      const supabase = createSupabaseBrowserClient();
+      const supabase = tryCreateSupabaseBrowserClient();
       const normalizedKey = organizationKey.trim();
 
-      const { data: bySlug } = await supabase
-        .from("organizations")
-        .select("name")
-        .eq("slug", normalizedKey)
-        .maybeSingle();
-
-      if (cancelled) return;
-
-      if (bySlug?.name) {
-        setCurrentOrganizationName(String(bySlug.name));
+      if (!supabase) {
+        setCurrentOrganizationName(humanizeOrganizationKey(normalizedKey));
         return;
       }
 
-      const { data: byId } = await supabase
-        .from("organizations")
-        .select("name")
-        .eq("id", normalizedKey)
-        .maybeSingle();
+      try {
+        const { data: bySlug } = await supabase
+          .from("organizations")
+          .select("name")
+          .eq("slug", normalizedKey)
+          .maybeSingle();
 
-      if (cancelled) return;
-      setCurrentOrganizationName(byId?.name ? String(byId.name) : humanizeOrganizationKey(normalizedKey));
+        if (cancelled) return;
+
+        if (bySlug?.name) {
+          setCurrentOrganizationName(String(bySlug.name));
+          return;
+        }
+
+        const { data: byId } = await supabase
+          .from("organizations")
+          .select("name")
+          .eq("id", normalizedKey)
+          .maybeSingle();
+
+        if (cancelled) return;
+        setCurrentOrganizationName(byId?.name ? String(byId.name) : humanizeOrganizationKey(normalizedKey));
+      } catch {
+        if (cancelled) return;
+        setCurrentOrganizationName(humanizeOrganizationKey(normalizedKey));
+      }
     }
 
     resolveOrganizationName();
@@ -186,8 +216,10 @@ export function SiteHeader({
   }, [organizationKey]);
 
   const handleSignOut = async () => {
-    const supabase = createSupabaseBrowserClient();
-    await supabase.auth.signOut();
+    const supabase = tryCreateSupabaseBrowserClient();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
     setIsAuthenticated(false);
     setCanAccessTournaments(false);
     router.refresh();

@@ -207,6 +207,17 @@ export function getSupabaseAnonKey() {
   return value;
 }
 
+export function isMissingSupabaseConfigurationError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+
+  return (
+    error.message.includes("Falta la URL de Supabase") ||
+    error.message.includes("Falta clave publica de Supabase") ||
+    error.message.includes("NEXT_PUBLIC_SUPABASE_URL") ||
+    error.message.includes("NEXT_PUBLIC_SUPABASE_PUBLISHABLE")
+  );
+}
+
 export function getSupabaseServiceRoleKey() {
   const targetEnv = getSupabaseTargetEnv();
   const rawValue =

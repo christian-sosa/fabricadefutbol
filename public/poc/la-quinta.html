@@ -1,0 +1,1556 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>La Quinta | Club y Tienda</title>
+    <meta
+      name="description"
+      content="Sitio POC de La Quinta con identidad del club, informacion deportiva y catalogo con consulta por WhatsApp."
+    />
+    <style>
+      :root {
+        --bg: #090805;
+        --ink: #f8f4ec;
+        --muted: #b9aea1;
+        --line: rgba(248, 244, 236, 0.14);
+        --orange: #ff6a00;
+        --orange-2: #ff9f1c;
+        --blue: #164a74;
+        --green: #19c463;
+        --panel: rgba(20, 17, 12, 0.82);
+        --panel-strong: #14110c;
+        --shadow: 0 26px 90px rgba(0, 0, 0, 0.45);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        background:
+          radial-gradient(circle at 74% 12%, rgba(255, 106, 0, 0.26), transparent 28rem),
+          radial-gradient(circle at 18% 18%, rgba(22, 74, 116, 0.25), transparent 24rem),
+          linear-gradient(180deg, #0d0b07 0%, #090805 42%, #100c07 100%);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body::before {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        content: "";
+        background-image:
+          linear-gradient(rgba(248, 244, 236, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(248, 244, 236, 0.03) 1px, transparent 1px);
+        background-size: 72px 72px;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), transparent 78%);
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      button,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .page-shell {
+        overflow: hidden;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        border-bottom: 1px solid var(--line);
+        background: rgba(9, 8, 5, 0.78);
+        backdrop-filter: blur(18px);
+      }
+
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: min(1180px, calc(100% - 32px));
+        min-height: 74px;
+        margin: 0 auto;
+        gap: 20px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        min-width: 0;
+        gap: 12px;
+      }
+
+      .brand img {
+        width: 56px;
+        height: 56px;
+        border-radius: 10px;
+        background: #fff;
+        object-fit: contain;
+        padding: 5px;
+      }
+
+      .brand-name {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .brand-name strong {
+        font-size: 0.95rem;
+        font-weight: 950;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .brand-name span {
+        color: var(--muted);
+        font-size: 0.74rem;
+        font-weight: 700;
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+      }
+
+      .nav-links a {
+        border-radius: 999px;
+        padding: 10px 13px;
+        color: #d7d0c5;
+        font-size: 0.86rem;
+        font-weight: 750;
+        transition: background 180ms ease, color 180ms ease;
+      }
+
+      .nav-links a:hover {
+        background: rgba(248, 244, 236, 0.08);
+        color: #fff;
+      }
+
+      .whatsapp-link,
+      .primary-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        border: 0;
+        border-radius: 999px;
+        padding: 0 18px;
+        background: var(--orange);
+        color: #190e05;
+        font-size: 0.9rem;
+        font-weight: 900;
+        box-shadow: 0 16px 34px rgba(255, 106, 0, 0.25);
+        cursor: pointer;
+        transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+      }
+
+      .whatsapp-link {
+        background: var(--green);
+        box-shadow: 0 16px 34px rgba(25, 196, 99, 0.18);
+      }
+
+      .primary-button:hover,
+      .whatsapp-link:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 20px 42px rgba(255, 106, 0, 0.32);
+      }
+
+      .whatsapp-link:hover {
+        box-shadow: 0 20px 42px rgba(25, 196, 99, 0.28);
+      }
+
+      .hero {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(360px, 0.82fr);
+        align-items: center;
+        width: min(1180px, calc(100% - 32px));
+        min-height: calc(100vh - 74px);
+        margin: 0 auto;
+        gap: 48px;
+        padding: 72px 0 64px;
+      }
+
+      .hero-copy {
+        display: grid;
+        gap: 26px;
+      }
+
+      .hero h1 {
+        max-width: 720px;
+        margin: 0;
+        font-size: clamp(4.2rem, 12vw, 9.4rem);
+        font-weight: 1000;
+        line-height: 0.82;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .hero h1 span {
+        display: block;
+        color: var(--orange);
+      }
+
+      .hero-lead {
+        max-width: 620px;
+        margin: 0;
+        color: #ded6ca;
+        font-size: clamp(1.05rem, 2vw, 1.35rem);
+        font-weight: 650;
+        line-height: 1.55;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .secondary-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        border: 1px solid rgba(248, 244, 236, 0.22);
+        border-radius: 999px;
+        padding: 0 18px;
+        background: rgba(248, 244, 236, 0.04);
+        color: var(--ink);
+        font-size: 0.9rem;
+        font-weight: 850;
+        transition: border-color 180ms ease, background 180ms ease;
+      }
+
+      .secondary-button:hover {
+        border-color: rgba(255, 106, 0, 0.6);
+        background: rgba(255, 106, 0, 0.08);
+      }
+
+      .hero-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        max-width: 620px;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .stat {
+        padding: 18px 18px 18px 0;
+      }
+
+      .stat + .stat {
+        border-left: 1px solid var(--line);
+        padding-left: 18px;
+      }
+
+      .stat strong {
+        display: block;
+        font-size: clamp(1.7rem, 4vw, 2.5rem);
+        font-weight: 1000;
+        line-height: 1;
+      }
+
+      .stat span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.76rem;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .hero-visual {
+        position: relative;
+        min-height: 520px;
+      }
+
+      .crest-stage {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .crest-stage::before {
+        position: absolute;
+        width: min(470px, 84vw);
+        aspect-ratio: 1;
+        border-radius: 34px;
+        content: "";
+        background:
+          radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.18), transparent 34%),
+          conic-gradient(from 220deg, rgba(255, 106, 0, 0.88), rgba(255, 159, 28, 0.8), rgba(22, 74, 116, 0.7), rgba(255, 106, 0, 0.88));
+        filter: blur(28px);
+        opacity: 0.78;
+      }
+
+      .crest {
+        position: relative;
+        width: min(390px, 76vw);
+        height: auto;
+        border-radius: 18px;
+        background: #fff;
+        padding: 18px;
+        object-fit: contain;
+        box-shadow: var(--shadow);
+      }
+
+      .kit-card {
+        position: absolute;
+        right: 0;
+        bottom: 24px;
+        width: min(310px, 74vw);
+        border: 1px solid rgba(248, 244, 236, 0.16);
+        border-radius: 8px;
+        background: rgba(14, 12, 8, 0.88);
+        padding: 14px;
+        box-shadow: 0 24px 58px rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(14px);
+      }
+
+      .kit-card-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .kit-card strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 1.2rem;
+      }
+
+      .kit-stripes {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        height: 86px;
+        margin-top: 14px;
+        overflow: hidden;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .kit-stripes span:nth-child(odd) {
+        background: #070604;
+      }
+
+      .kit-stripes span:nth-child(even) {
+        background: linear-gradient(180deg, var(--orange), #9a3300);
+      }
+
+      section {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 24px;
+      }
+
+      .section-heading h2 {
+        max-width: 760px;
+        margin: 0;
+        font-size: clamp(2.2rem, 5vw, 4.6rem);
+        font-weight: 1000;
+        line-height: 0.92;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .section-heading p {
+        max-width: 360px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.98rem;
+        font-weight: 650;
+        line-height: 1.5;
+      }
+
+      .club-band {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 1px;
+        margin-top: -22px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .club-tile {
+        min-height: 220px;
+        padding: 28px;
+        background: rgba(15, 13, 9, 0.78);
+      }
+
+      .club-tile:nth-child(2) {
+        background:
+          linear-gradient(135deg, rgba(255, 106, 0, 0.28), transparent),
+          rgba(18, 15, 10, 0.88);
+      }
+
+      .club-tile span {
+        display: block;
+        color: var(--orange-2);
+        font-size: 0.78rem;
+        font-weight: 950;
+        text-transform: uppercase;
+      }
+
+      .club-tile strong {
+        display: block;
+        margin-top: 16px;
+        font-size: 1.65rem;
+        font-weight: 950;
+        line-height: 1.05;
+      }
+
+      .club-tile p {
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 0.96rem;
+        font-weight: 620;
+        line-height: 1.5;
+      }
+
+      .club-data-section {
+        padding: 86px 0 8px;
+      }
+
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+
+      .metric-card,
+      .data-panel,
+      .team-card,
+      .record-card {
+        border: 1px solid rgba(248, 244, 236, 0.13);
+        border-radius: 8px;
+        background: rgba(17, 14, 10, 0.82);
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+      }
+
+      .metric-card {
+        min-height: 128px;
+        padding: 18px;
+      }
+
+      .metric-card span,
+      .data-label {
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 900;
+        line-height: 1.25;
+        text-transform: uppercase;
+      }
+
+      .metric-card strong {
+        display: block;
+        margin-top: 14px;
+        font-size: clamp(1.6rem, 3vw, 2.4rem);
+        font-weight: 1000;
+        line-height: 1;
+      }
+
+      .club-data-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+        gap: 16px;
+        align-items: start;
+      }
+
+      .data-lower {
+        margin-top: 16px;
+      }
+
+      .data-panel {
+        padding: 22px;
+      }
+
+      .data-panel h3 {
+        margin: 0;
+        font-size: 1.35rem;
+        font-weight: 1000;
+        line-height: 1.1;
+        text-transform: uppercase;
+      }
+
+      .activity-list,
+      .match-list,
+      .leader-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .activity-item,
+      .match-item,
+      .leader-item {
+        display: grid;
+        gap: 6px;
+        border: 1px solid rgba(248, 244, 236, 0.1);
+        border-radius: 8px;
+        background: rgba(7, 6, 4, 0.58);
+        padding: 14px;
+      }
+
+      .activity-item strong,
+      .match-item strong,
+      .leader-item strong {
+        font-size: 0.98rem;
+        font-weight: 950;
+      }
+
+      .activity-item p,
+      .match-item p,
+      .leader-item p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.84rem;
+        font-weight: 700;
+        line-height: 1.4;
+      }
+
+      .teams-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin: 16px 0;
+      }
+
+      .team-card {
+        display: grid;
+        gap: 14px;
+        min-height: 180px;
+        padding: 18px;
+      }
+
+      .team-card h3 {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 950;
+      }
+
+      .team-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.84rem;
+        font-weight: 700;
+        line-height: 1.42;
+      }
+
+      .team-record {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+      }
+
+      .team-record span {
+        border: 1px solid rgba(255, 106, 0, 0.28);
+        border-radius: 999px;
+        padding: 6px 9px;
+        color: #ffd2aa;
+        font-size: 0.72rem;
+        font-weight: 900;
+      }
+
+      .data-table-wrap {
+        margin-top: 16px;
+        overflow-x: auto;
+      }
+
+      .data-table {
+        width: 100%;
+        min-width: 620px;
+        border-collapse: collapse;
+      }
+
+      .data-table th,
+      .data-table td {
+        border-bottom: 1px solid rgba(248, 244, 236, 0.1);
+        padding: 12px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .data-table th {
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 950;
+        text-transform: uppercase;
+      }
+
+      .data-table td {
+        color: #efe8dc;
+        font-size: 0.88rem;
+        font-weight: 760;
+      }
+
+      .score {
+        color: var(--orange-2);
+        font-weight: 1000;
+        white-space: nowrap;
+      }
+
+      .records-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .record-card {
+        min-height: 132px;
+        padding: 18px;
+      }
+
+      .record-card strong {
+        display: block;
+        margin-top: 10px;
+        font-size: 1.14rem;
+        font-weight: 1000;
+        line-height: 1.1;
+      }
+
+      .record-card p {
+        margin: 10px 0 0;
+        color: var(--orange-2);
+        font-size: 0.9rem;
+        font-weight: 950;
+      }
+
+      .catalog-section {
+        padding: 96px 0 72px;
+      }
+
+      .catalog-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 22px;
+      }
+
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .filter-button {
+        min-height: 38px;
+        border: 1px solid rgba(248, 244, 236, 0.16);
+        border-radius: 999px;
+        padding: 0 14px;
+        background: rgba(248, 244, 236, 0.04);
+        color: #d8d0c4;
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 850;
+        cursor: pointer;
+        transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+      }
+
+      .filter-button[aria-pressed="true"] {
+        border-color: rgba(255, 106, 0, 0.9);
+        background: rgba(255, 106, 0, 0.16);
+        color: #fff;
+      }
+
+      .catalog-note {
+        color: var(--muted);
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+
+      .product-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .product-card {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        min-height: 420px;
+        overflow: hidden;
+        border: 1px solid rgba(248, 244, 236, 0.13);
+        border-radius: 8px;
+        background: rgba(17, 14, 10, 0.82);
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+      }
+
+      .product-art {
+        display: grid;
+        place-items: center;
+        min-height: 220px;
+        background:
+          radial-gradient(circle at 52% 32%, rgba(255, 159, 28, 0.22), transparent 12rem),
+          linear-gradient(135deg, rgba(255, 106, 0, 0.08), rgba(22, 74, 116, 0.12));
+      }
+
+      .product-art svg {
+        width: min(72%, 210px);
+        height: auto;
+        filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.42));
+      }
+
+      .product-body {
+        display: grid;
+        gap: 16px;
+        padding: 20px;
+      }
+
+      .product-meta {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .product-title {
+        margin: 0;
+        font-size: 1.12rem;
+        font-weight: 950;
+        line-height: 1.15;
+      }
+
+      .product-category {
+        display: inline-flex;
+        width: fit-content;
+        border: 1px solid rgba(255, 106, 0, 0.34);
+        border-radius: 999px;
+        padding: 5px 9px;
+        color: #ffd2aa;
+        font-size: 0.68rem;
+        font-weight: 950;
+        text-transform: uppercase;
+      }
+
+      .product-price {
+        color: #fff;
+        font-size: 1rem;
+        font-weight: 950;
+        white-space: nowrap;
+      }
+
+      .product-desc {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+        font-weight: 620;
+        line-height: 1.48;
+      }
+
+      .sizes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .sizes span {
+        min-width: 34px;
+        border: 1px solid rgba(248, 244, 236, 0.16);
+        border-radius: 6px;
+        padding: 6px 8px;
+        color: #efe8dc;
+        font-size: 0.72rem;
+        font-weight: 900;
+        text-align: center;
+      }
+
+      .product-actions {
+        align-self: end;
+        display: grid;
+        gap: 10px;
+      }
+
+      .product-actions .whatsapp-link {
+        width: 100%;
+      }
+
+      .lookbook {
+        display: grid;
+        grid-template-columns: 1fr 0.82fr;
+        gap: 1px;
+        margin-bottom: 84px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .lookbook-panel {
+        min-height: 420px;
+        padding: clamp(28px, 5vw, 54px);
+        background:
+          linear-gradient(145deg, rgba(255, 106, 0, 0.14), transparent 46%),
+          rgba(15, 13, 9, 0.86);
+      }
+
+      .lookbook-panel h2 {
+        max-width: 600px;
+        margin: 0;
+        font-size: clamp(2.2rem, 6vw, 5rem);
+        font-weight: 1000;
+        line-height: 0.92;
+        text-transform: uppercase;
+      }
+
+      .lookbook-panel p {
+        max-width: 520px;
+        margin: 22px 0 0;
+        color: var(--muted);
+        font-size: 1.02rem;
+        font-weight: 650;
+        line-height: 1.55;
+      }
+
+      .lookbook-stack {
+        display: grid;
+        gap: 1px;
+      }
+
+      .look-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        min-height: 140px;
+        padding: 24px;
+        background: rgba(18, 15, 10, 0.84);
+      }
+
+      .look-row strong {
+        font-size: 1.14rem;
+        font-weight: 950;
+      }
+
+      .look-row span {
+        color: var(--muted);
+        font-size: 0.86rem;
+        font-weight: 750;
+      }
+
+      .look-dot {
+        flex: 0 0 auto;
+        width: 54px;
+        height: 54px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #070604 0 42%, var(--orange) 42% 70%, #fff 70%);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+      }
+
+      .look-row:nth-child(2) .look-dot {
+        background: linear-gradient(135deg, var(--orange) 0 48%, #0a0906 48% 74%, var(--blue) 74%);
+      }
+
+      .look-row:nth-child(3) .look-dot {
+        background: linear-gradient(135deg, #fff 0 34%, #0a0906 34% 70%, var(--orange) 70%);
+      }
+
+      .site-footer {
+        border-top: 1px solid var(--line);
+        padding: 30px 0;
+        color: var(--muted);
+      }
+
+      .footer-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        gap: 20px;
+        font-size: 0.88rem;
+        font-weight: 750;
+      }
+
+      .floating-whatsapp {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 30;
+        display: none;
+      }
+
+      @media (max-width: 980px) {
+        .nav-links {
+          display: none;
+        }
+
+        .hero {
+          grid-template-columns: 1fr;
+          min-height: auto;
+          padding-top: 48px;
+        }
+
+        .hero-visual {
+          min-height: 430px;
+        }
+
+        .club-band,
+        .product-grid,
+        .lookbook,
+        .club-data-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .metrics-grid,
+        .teams-grid,
+        .records-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .product-card {
+          min-height: 0;
+        }
+      }
+
+      @media (max-width: 680px) {
+        .nav {
+          width: min(100% - 24px, 1180px);
+          min-height: 66px;
+        }
+
+        .brand img {
+          width: 44px;
+          height: 44px;
+          border-radius: 8px;
+          padding: 4px;
+        }
+
+        .brand-name span {
+          display: none;
+        }
+
+        .nav > .whatsapp-link {
+          display: none;
+        }
+
+        .floating-whatsapp {
+          display: none;
+        }
+
+        .hero,
+        section,
+        .footer-inner {
+          width: min(100% - 24px, 1180px);
+        }
+
+        .hero h1 {
+          font-size: clamp(3.7rem, 22vw, 6.8rem);
+        }
+
+        .hero-stats {
+          grid-template-columns: 1fr;
+        }
+
+        .stat {
+          padding: 16px 0;
+        }
+
+        .stat + .stat {
+          border-top: 1px solid var(--line);
+          border-left: 0;
+          padding-left: 0;
+        }
+
+        .hero-actions,
+        .catalog-toolbar,
+        .section-heading,
+        .footer-inner {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .primary-button,
+        .secondary-button,
+        .whatsapp-link {
+          width: 100%;
+        }
+
+        .hero-visual {
+          min-height: 360px;
+        }
+
+        .kit-card {
+          right: 50%;
+          bottom: 0;
+          transform: translateX(50%);
+        }
+
+        .club-tile {
+          min-height: 190px;
+          padding: 24px;
+        }
+
+        .catalog-section {
+          padding-top: 72px;
+        }
+
+        .club-data-section {
+          padding-top: 64px;
+        }
+
+        .metrics-grid,
+        .teams-grid,
+        .records-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .data-panel {
+          padding: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <div class="nav">
+          <a class="brand" href="#inicio" aria-label="Ir al inicio">
+            <img src="/poc/la-quinta-logo.jpeg" alt="Escudo de La Quinta" />
+            <span class="brand-name">
+              <strong>La Quinta</strong>
+              <span>Futbol, barrio y pertenencia</span>
+            </span>
+          </a>
+          <nav class="nav-links" aria-label="Navegacion principal">
+            <a href="#club">Club</a>
+            <a href="#datos">Datos</a>
+            <a href="#catalogo">Catalogo</a>
+            <a href="#equipacion">Equipacion</a>
+          </nav>
+          <a class="whatsapp-link" data-whatsapp="general" href="https://wa.me/?text=Hola%20La%20Quinta%2C%20quiero%20hacer%20una%20consulta." target="_blank" rel="noreferrer">
+            WhatsApp
+          </a>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero" id="inicio">
+          <div class="hero-copy">
+            <h1>La <span>Quinta</span></h1>
+            <p class="hero-lead">
+              Club competitivo, indumentaria propia y una identidad naranja, amarilla y negra hecha para entrar a la cancha con presencia.
+            </p>
+            <div class="hero-actions">
+              <a class="primary-button" href="#catalogo">Ver catalogo</a>
+              <a class="secondary-button" href="#club">Conocer el club</a>
+            </div>
+            <div class="hero-stats" aria-label="Resumen del club">
+              <div class="stat">
+                <strong>32</strong>
+                <span>Jugadores</span>
+              </div>
+              <div class="stat">
+                <strong>18</strong>
+                <span>Partidos</span>
+              </div>
+              <div class="stat">
+                <strong>54</strong>
+                <span>Goles</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero-visual" aria-hidden="true">
+            <div class="crest-stage">
+              <img class="crest" src="/poc/la-quinta-logo.jpeg" alt="" />
+            </div>
+            <div class="kit-card">
+              <div class="kit-card-top">
+                <span>Indumentaria</span>
+                <span>2026</span>
+              </div>
+              <strong>Titular naranja/negro</strong>
+              <div class="kit-stripes">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="club">
+          <div class="club-band">
+            <article class="club-tile">
+              <span>Identidad</span>
+              <strong>Negro profundo, naranja de cancha y tres estrellas arriba.</strong>
+              <p>Una presencia simple y reconocible para partido, redes, fichas y productos del club.</p>
+            </article>
+            <article class="club-tile">
+              <span>Comunidad</span>
+              <strong>Un sitio propio sin perder el panel de Fabrica.</strong>
+              <p>El club puede mostrarse como marca, mientras la gestion queda centralizada en el admin.</p>
+            </article>
+            <article class="club-tile">
+              <span>Catalogo</span>
+              <strong>Productos consultables, sin carrito ni pagos online.</strong>
+              <p>Cada producto arma el mensaje y abre WhatsApp para cerrar stock, talle y entrega.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="club-data-section" id="datos">
+          <div class="section-heading">
+            <h2>Datos deportivos</h2>
+            <p>Informacion fake para validar como se veria la pagina propia usando el mismo tipo de contenido que hoy aparece en Clubs.</p>
+          </div>
+
+          <div class="metrics-grid" aria-label="Resumen deportivo">
+            <div class="metric-card">
+              <span>Jugadores</span>
+              <strong>32</strong>
+            </div>
+            <div class="metric-card">
+              <span>Equipos</span>
+              <strong>3</strong>
+            </div>
+            <div class="metric-card">
+              <span>Partidos</span>
+              <strong>18</strong>
+            </div>
+            <div class="metric-card">
+              <span>Goles</span>
+              <strong>54</strong>
+            </div>
+            <div class="metric-card">
+              <span>Promedio gol</span>
+              <strong>3.0</strong>
+            </div>
+            <div class="metric-card">
+              <span>Ultimo partido</span>
+              <strong>10/05</strong>
+            </div>
+          </div>
+
+          <div class="club-data-layout">
+            <article class="data-panel">
+              <h3>Actividad reciente</h3>
+              <div class="activity-list">
+                <div class="activity-item">
+                  <span class="data-label">Partido</span>
+                  <strong>La Quinta F7 vs Los Primos</strong>
+                  <p>Victoria 4 - 2 en Complejo Norte. Figura: Nacho Sosa.</p>
+                </div>
+                <div class="activity-item">
+                  <span class="data-label">Equipo</span>
+                  <strong>Reserva 5v5 creada</strong>
+                  <p>Nuevo equipo para turnos semanales y amistosos de mitad de semana.</p>
+                </div>
+                <div class="activity-item">
+                  <span class="data-label">Jugador</span>
+                  <strong>Thiago Ferreyra se sumo al plantel</strong>
+                  <p>Volante mixto, dorsal 8, disponible para F7 y 11v11.</p>
+                </div>
+              </div>
+            </article>
+
+            <article class="data-panel">
+              <h3>Equipos</h3>
+              <div class="teams-grid">
+                <div class="team-card">
+                  <span class="data-label">5 vs 5</span>
+                  <h3>La Quinta Reserva</h3>
+                  <p>12 jugadores, 6 partidos jugados y ritmo alto para turnos semanales.</p>
+                  <div class="team-record">
+                    <span>4 G</span>
+                    <span>1 E</span>
+                    <span>1 P</span>
+                  </div>
+                </div>
+                <div class="team-card">
+                  <span class="data-label">7 vs 7</span>
+                  <h3>La Quinta F7</h3>
+                  <p>Base competitiva del club, con calendario activo y convocatoria estable.</p>
+                  <div class="team-record">
+                    <span>7 G</span>
+                    <span>2 E</span>
+                    <span>3 P</span>
+                  </div>
+                </div>
+                <div class="team-card">
+                  <span class="data-label">11 vs 11</span>
+                  <h3>La Quinta Senior</h3>
+                  <p>Plantel amplio para torneos, amistosos grandes y partidos especiales.</p>
+                  <div class="team-record">
+                    <span>3 G</span>
+                    <span>1 E</span>
+                    <span>2 P</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="data-table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Equipo</th>
+                      <th>Rival</th>
+                      <th>Competencia</th>
+                      <th>Resultado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>10/05/2026</td>
+                      <td>La Quinta F7</td>
+                      <td>Los Primos</td>
+                      <td>Apertura Norte</td>
+                      <td class="score">4 - 2</td>
+                    </tr>
+                    <tr>
+                      <td>03/05/2026</td>
+                      <td>La Quinta Senior</td>
+                      <td>Defensores del Sur</td>
+                      <td>Amistoso</td>
+                      <td class="score">1 - 1</td>
+                    </tr>
+                    <tr>
+                      <td>26/04/2026</td>
+                      <td>La Quinta Reserva</td>
+                      <td>La Banda FC</td>
+                      <td>Turno semanal</td>
+                      <td class="score">6 - 3</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+          <div class="club-data-layout data-lower">
+            <article class="data-panel">
+              <h3>Jugadores destacados</h3>
+              <div class="leader-list">
+                <div class="leader-item">
+                  <strong>Nacho Sosa</strong>
+                  <p>12 PJ - 11 goles - 5 asistencias - 3 figuras</p>
+                </div>
+                <div class="leader-item">
+                  <strong>Facu Medina</strong>
+                  <p>15 PJ - 7 goles - 9 asistencias - 2 figuras</p>
+                </div>
+                <div class="leader-item">
+                  <strong>Thiago Ferreyra</strong>
+                  <p>9 PJ - 4 goles - 6 asistencias - 1 figura</p>
+                </div>
+              </div>
+            </article>
+
+            <article class="data-panel">
+              <h3>Records</h3>
+              <div class="records-grid">
+                <div class="record-card">
+                  <span class="data-label">Maximo goleador</span>
+                  <strong>Nacho Sosa</strong>
+                  <p>11 goles</p>
+                </div>
+                <div class="record-card">
+                  <span class="data-label">Maximo asistidor</span>
+                  <strong>Facu Medina</strong>
+                  <p>9 asistencias</p>
+                </div>
+                <div class="record-card">
+                  <span class="data-label">Mas presencias</span>
+                  <strong>Alan Rivas</strong>
+                  <p>17 presencias</p>
+                </div>
+                <div class="record-card">
+                  <span class="data-label">Mas figuras</span>
+                  <strong>Nacho Sosa</strong>
+                  <p>3 MVP</p>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="catalog-section" id="catalogo">
+          <div class="section-heading">
+            <h2>Catalogo del club</h2>
+            <p>La compra se coordina por WhatsApp. El sitio muestra productos, precios de referencia y talles disponibles.</p>
+          </div>
+
+          <div class="catalog-toolbar">
+            <div class="filters" aria-label="Filtros de catalogo">
+              <button class="filter-button" type="button" data-filter="todos" aria-pressed="true">Todos</button>
+              <button class="filter-button" type="button" data-filter="indumentaria" aria-pressed="false">Indumentaria</button>
+              <button class="filter-button" type="button" data-filter="accesorios" aria-pressed="false">Accesorios</button>
+              <button class="filter-button" type="button" data-filter="combos" aria-pressed="false">Combos</button>
+            </div>
+            <span class="catalog-note">WhatsApp con mensaje prearmado</span>
+          </div>
+
+          <div class="product-grid" id="productGrid"></div>
+        </section>
+
+        <section class="lookbook" id="equipacion">
+          <div class="lookbook-panel">
+            <h2>Una linea visual para crecer</h2>
+            <p>
+              Esta POC deja preparado un sistema: colores por club, escudo, productos, estados de disponibilidad y CTA directo a WhatsApp.
+            </p>
+          </div>
+          <div class="lookbook-stack">
+            <div class="look-row">
+              <div>
+                <strong>Titular</strong><br />
+                <span>Naranja protagonista con base negra.</span>
+              </div>
+              <span class="look-dot"></span>
+            </div>
+            <div class="look-row">
+              <div>
+                <strong>Entrenamiento</strong><br />
+                <span>Mas liviano, con detalle azul del escudo.</span>
+              </div>
+              <span class="look-dot"></span>
+            </div>
+            <div class="look-row">
+              <div>
+                <strong>Merch</strong><br />
+                <span>Piezas sobrias para usar fuera de la cancha.</span>
+              </div>
+              <span class="look-dot"></span>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <div class="footer-inner">
+          <span>La Quinta Futbol Club</span>
+          <span>POC visual para validar sitio propio y catalogo por WhatsApp</span>
+        </div>
+      </footer>
+
+      <a class="floating-whatsapp whatsapp-link" data-whatsapp="general" href="https://wa.me/?text=Hola%20La%20Quinta%2C%20quiero%20hacer%20una%20consulta." target="_blank" rel="noreferrer">
+        WhatsApp
+      </a>
+    </div>
+
+    <script>
+      const WHATSAPP_PHONE = "";
+
+      const products = [
+        {
+          id: "camiseta-titular",
+          category: "indumentaria",
+          label: "Indumentaria",
+          title: "Camiseta titular La Quinta",
+          price: "$ 28.000",
+          sizes: ["S", "M", "L", "XL", "XXL"],
+          description: "Base negra con franjas naranja, escudo aplicado y corte de partido.",
+          art: "shirt-home"
+        },
+        {
+          id: "camiseta-alternativa",
+          category: "indumentaria",
+          label: "Indumentaria",
+          title: "Camiseta alternativa blanca",
+          price: "$ 26.000",
+          sizes: ["S", "M", "L", "XL"],
+          description: "Version clara con detalle naranja y azul para entrenamientos o amistosos.",
+          art: "shirt-away"
+        },
+        {
+          id: "short-negro",
+          category: "indumentaria",
+          label: "Indumentaria",
+          title: "Short negro oficial",
+          price: "$ 16.000",
+          sizes: ["S", "M", "L", "XL"],
+          description: "Short liviano con cintura elastica y marca del club en pierna.",
+          art: "short"
+        },
+        {
+          id: "medias",
+          category: "accesorios",
+          label: "Accesorios",
+          title: "Medias naranja/negro",
+          price: "$ 9.500",
+          sizes: ["39-41", "42-44"],
+          description: "Medias de juego con puntera reforzada y bloque naranja.",
+          art: "socks"
+        },
+        {
+          id: "campera",
+          category: "indumentaria",
+          label: "Indumentaria",
+          title: "Campera rompeviento",
+          price: "$ 42.000",
+          sizes: ["M", "L", "XL"],
+          description: "Campera negra con cierre, detalle naranja y escudo en pecho.",
+          art: "jacket"
+        },
+        {
+          id: "combo-cancha",
+          category: "combos",
+          label: "Combos",
+          title: "Combo cancha completa",
+          price: "$ 48.000",
+          sizes: ["A coordinar"],
+          description: "Camiseta titular, short y medias. Ideal para nuevos jugadores del plantel.",
+          art: "combo"
+        }
+      ];
+
+      const productGrid = document.querySelector("#productGrid");
+      const filterButtons = Array.from(document.querySelectorAll("[data-filter]"));
+
+      function productSvg(type) {
+        const orange = "#ff6a00";
+        const black = "#080704";
+        const white = "#f8f4ec";
+        const blue = "#164a74";
+
+        if (type === "short") {
+          return `
+            <svg viewBox="0 0 220 180" role="img" aria-label="Short negro oficial">
+              <path d="M54 32h112l17 112-55 10-18-54-18 54-55-10L54 32Z" fill="${black}" stroke="${white}" stroke-opacity=".28" stroke-width="5"/>
+              <path d="M54 32h112v28H54z" fill="${orange}"/>
+              <path d="M110 60v41" stroke="${white}" stroke-opacity=".32" stroke-width="4"/>
+            </svg>
+          `;
+        }
+
+        if (type === "socks") {
+          return `
+            <svg viewBox="0 0 220 180" role="img" aria-label="Medias naranja y negro">
+              <path d="M68 25h39v92c0 21-15 34-36 34H45v-32h24V25Z" fill="${orange}" stroke="${white}" stroke-opacity=".28" stroke-width="5"/>
+              <path d="M121 25h39v92c0 21-15 34-36 34H98v-32h24V25Z" fill="${black}" stroke="${white}" stroke-opacity=".28" stroke-width="5"/>
+              <path d="M68 62h39M121 62h39" stroke="${white}" stroke-opacity=".38" stroke-width="7"/>
+            </svg>
+          `;
+        }
+
+        if (type === "jacket") {
+          return `
+            <svg viewBox="0 0 220 180" role="img" aria-label="Campera rompeviento">
+              <path d="M73 28h74l42 36-23 32-17-13v70H71V83L54 96 31 64l42-36Z" fill="${black}" stroke="${white}" stroke-opacity=".28" stroke-width="5"/>
+              <path d="M110 31v121" stroke="${orange}" stroke-width="7"/>
+              <path d="M73 28c13 23 61 23 74 0" fill="none" stroke="${orange}" stroke-width="6"/>
+              <circle cx="136" cy="69" r="9" fill="${blue}"/>
+            </svg>
+          `;
+        }
+
+        if (type === "combo") {
+          return `
+            <svg viewBox="0 0 220 180" role="img" aria-label="Combo cancha completa">
+              <path d="M54 28h54l29 24-18 27-12-9v72H55V70l-12 9-18-27 29-24Z" fill="${black}" stroke="${white}" stroke-opacity=".28" stroke-width="4"/>
+              <path d="M79 30h18v111H79zM55 30h13v111H55z" fill="${orange}"/>
+              <path d="M138 80h49l8 66-27 5-6-31-7 31-27-5 10-66Z" fill="${orange}" stroke="${white}" stroke-opacity=".25" stroke-width="4"/>
+              <path d="M159 25h24v49h-24z" fill="${black}" stroke="${white}" stroke-opacity=".25" stroke-width="4"/>
+            </svg>
+          `;
+        }
+
+        const away = type === "shirt-away";
+        return `
+          <svg viewBox="0 0 220 180" role="img" aria-label="${away ? "Camiseta alternativa blanca" : "Camiseta titular La Quinta"}">
+            <path d="M57 25h106l36 33-24 31-16-12v76H61V77L45 89 21 58l36-33Z" fill="${away ? white : black}" stroke="${white}" stroke-opacity=".28" stroke-width="5"/>
+            <path d="M77 28h22v122H77zM122 28h22v122h-22z" fill="${orange}"/>
+            <path d="M57 25c16 28 90 28 106 0" fill="none" stroke="${away ? blue : orange}" stroke-width="7"/>
+            <circle cx="137" cy="66" r="10" fill="${away ? black : blue}"/>
+          </svg>
+        `;
+      }
+
+      function buildWhatsAppUrl(product) {
+        const message = [
+          "Hola La Quinta, quiero consultar por este producto:",
+          "",
+          `${product.title}`,
+          `Precio de referencia: ${product.price}`,
+          `Talles: ${product.sizes.join(", ")}`,
+          "",
+          "Me pasan stock, formas de pago y entrega?"
+        ].join("\n");
+        const encoded = encodeURIComponent(message);
+        return WHATSAPP_PHONE
+          ? `https://wa.me/${WHATSAPP_PHONE}?text=${encoded}`
+          : `https://wa.me/?text=${encoded}`;
+      }
+
+      function renderProducts(filter = "todos") {
+        const visibleProducts = filter === "todos"
+          ? products
+          : products.filter((product) => product.category === filter);
+
+        productGrid.innerHTML = visibleProducts
+          .map((product) => `
+            <article class="product-card">
+              <div class="product-art">${productSvg(product.art)}</div>
+              <div class="product-body">
+                <div class="product-meta">
+                  <div>
+                    <span class="product-category">${product.label}</span>
+                    <h3 class="product-title">${product.title}</h3>
+                  </div>
+                  <span class="product-price">${product.price}</span>
+                </div>
+                <p class="product-desc">${product.description}</p>
+                <div class="sizes" aria-label="Talles disponibles">
+                  ${product.sizes.map((size) => `<span>${size}</span>`).join("")}
+                </div>
+                <div class="product-actions">
+                  <a class="whatsapp-link" href="${buildWhatsAppUrl(product)}" target="_blank" rel="noreferrer">
+                    Consultar por WhatsApp
+                  </a>
+                </div>
+              </div>
+            </article>
+          `)
+          .join("");
+      }
+
+      filterButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const nextFilter = button.dataset.filter || "todos";
+          filterButtons.forEach((item) => {
+            item.setAttribute("aria-pressed", String(item === button));
+          });
+          renderProducts(nextFilter);
+        });
+      });
+
+      renderProducts();
+    </script>
+  </body>
+</html>

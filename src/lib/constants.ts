@@ -5,6 +5,21 @@ import { shouldSkipTournamentCheckoutForDebug } from "@/lib/features";
 export const MATCH_MODALITIES: MatchModality[] = ["5v5", "6v6", "7v7", "9v9", "11v11"];
 export const MATCH_STATUSES: MatchStatus[] = ["draft", "confirmed", "finished", "cancelled"];
 
+const MISSING_SUPER_ADMIN_WARNING_FLAG = "__fdf_missing_super_admin_warning_logged__";
+
+function warnMissingSuperAdminEmailOnce() {
+  const globalState = globalThis as typeof globalThis & Record<string, boolean | undefined>;
+  if (globalState[MISSING_SUPER_ADMIN_WARNING_FLAG]) return;
+  globalState[MISSING_SUPER_ADMIN_WARNING_FLAG] = true;
+  console.warn(
+    "[constants] SUPER_ADMIN_EMAIL no esta definido. Ninguna cuenta obtendra privilegios de super admin."
+  );
+}
+
+function shouldWarnMissingSuperAdminEmail() {
+  return process.env.NODE_ENV !== "test" && process.env.npm_lifecycle_event !== "build";
+}
+
 // Email del super admin. Se resuelve unicamente desde la env `SUPER_ADMIN_EMAIL`
 // (solo servidor, nunca se expone al bundle cliente). Si la variable no esta
 // definida, ninguna cuenta obtiene privilegios de super admin y registramos una
@@ -19,10 +34,8 @@ function resolveSuperAdminEmail(): string {
   }
   const raw = (typeof process !== "undefined" ? process.env.SUPER_ADMIN_EMAIL : undefined)?.trim().toLowerCase();
   if (!raw) {
-    if (process.env.NODE_ENV !== "test") {
-      console.warn(
-        "[constants] SUPER_ADMIN_EMAIL no esta definido. Ninguna cuenta obtendra privilegios de super admin."
-      );
+    if (shouldWarnMissingSuperAdminEmail()) {
+      warnMissingSuperAdminEmailOnce();
     }
     return "";
   }
