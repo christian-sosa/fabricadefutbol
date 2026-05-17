@@ -16,6 +16,7 @@
 # private project folders
 /docs/
 /supabase/
+/PRODUCTION.md
 /brand-assets/
 /player-photo-import/
 /tmp/

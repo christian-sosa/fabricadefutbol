@@ -41,6 +41,15 @@ describeSupabaseSql("organization security sql", () => {
     expect(schemaSql).toContain("execute function public.enforce_organization_admin_limit();");
   });
 
+  it("evita que el seed del grupo default agregue todos los admins existentes", () => {
+    expect(schemaSql).not.toContain(
+      "select '00000000-0000-0000-0000-000000000001'::uuid, a.id, a.id\nfrom public.admins a"
+    );
+    expect(schemaSql).toContain("from public.organizations o");
+    expect(schemaSql).toContain("where o.id = '00000000-0000-0000-0000-000000000001'::uuid");
+    expect(schemaSql).toContain("where oa.organization_id = o.id");
+  });
+
   it("mantiene aplicacion de pagos atomica e inmutable la fecha de alta", () => {
     expect(schemaSql).toContain("create or replace function public.apply_organization_billing_payment_period");
     expect(schemaSql).toContain("for update;");
