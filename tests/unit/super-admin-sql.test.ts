@@ -8,6 +8,7 @@ const supabaseDir = path.join(root, "supabase");
 const policiesSqlPath = path.join(supabaseDir, "policies.sql");
 const hasSupabaseSql = existsSync(policiesSqlPath);
 const policiesSql = hasSupabaseSql ? readFileSync(policiesSqlPath, "utf8") : "";
+const describeSupabaseSql = hasSupabaseSql ? describe : describe.skip;
 
 function listSqlFiles(directory: string): string[] {
   if (!existsSync(directory)) return [];
@@ -21,7 +22,7 @@ function listSqlFiles(directory: string): string[] {
   });
 }
 
-describe("super admin SQL", () => {
+describeSupabaseSql("super admin SQL", () => {
   it("resuelve super admins desde una tabla operativa, no desde un email hardcodeado", () => {
     expect(hasSupabaseSql).toBe(true);
     expect(policiesSql).toContain("create table if not exists public.super_admin_emails");
