@@ -2,8 +2,13 @@ import sharp from "sharp";
 
 import type { ClubProductRecord, ClubSiteSettings } from "@/lib/domain/club-sites";
 
-export const MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB = 25;
+export const MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB = 30;
 export const MAX_CLUB_PRODUCT_IMAGE_SIZE_MB = 10;
+export const CLUB_SITE_HERO_WIDTH_PX = 2400;
+export const CLUB_SITE_HERO_HEIGHT_PX = 1600;
+export const CLUB_SITE_HERO_QUALITY = 92;
+export const CLUB_PRODUCT_IMAGE_SIZE_PX = 1000;
+export const CLUB_PRODUCT_IMAGE_QUALITY = 86;
 export const CLUB_SITE_HERO_CACHE_CONTROL = "no-store";
 export const CLUB_PRODUCT_IMAGE_CACHE_CONTROL = "no-store";
 
@@ -41,11 +46,11 @@ export async function optimizeClubSiteHeroImage(file: File) {
 
   return sharp(sourceBuffer)
     .rotate()
-    .resize(1800, 1100, {
-      fit: "cover",
-      position: "center"
+    .resize(CLUB_SITE_HERO_WIDTH_PX, CLUB_SITE_HERO_HEIGHT_PX, {
+      fit: "inside",
+      withoutEnlargement: true
     })
-    .webp({ quality: 86 })
+    .webp({ quality: CLUB_SITE_HERO_QUALITY })
     .toBuffer();
 }
 
@@ -54,10 +59,10 @@ export async function optimizeClubProductImage(file: File) {
 
   return sharp(sourceBuffer)
     .rotate()
-    .resize(1000, 1000, {
+    .resize(CLUB_PRODUCT_IMAGE_SIZE_PX, CLUB_PRODUCT_IMAGE_SIZE_PX, {
       fit: "cover",
       position: "center"
     })
-    .webp({ quality: 86 })
+    .webp({ quality: CLUB_PRODUCT_IMAGE_QUALITY })
     .toBuffer();
 }

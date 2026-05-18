@@ -134,9 +134,11 @@ describe("club site productizado", () => {
     expect(componentSource).toContain("Esta locura de amarte me impide ser normal");
     expect(componentSource).toContain("ClubSiteHomeHero");
     expect(componentSource).toContain("ClubSiteCategoryRail");
+    expect(componentSource).toContain("Catalogo online");
     expect(componentSource).toContain("Destacados");
     expect(componentSource).toContain("Tienda oficial");
     expect(componentSource).toContain("Consultar por WhatsApp");
+    expect(componentSource).toContain("aspect-[4/3]");
     expect(componentSource).toContain("object-contain");
     expect(componentSource).toContain("--club-line");
     expect(componentSource).toContain("--club-soft");
@@ -154,6 +156,8 @@ describe("club site productizado", () => {
 
     expect(componentSource).toContain("ClubSiteHeader");
     expect(componentSource).toContain("ClubSiteFooter");
+    expect(componentSource).toContain("ClubSiteLogoMark");
+    expect(componentSource).toContain("ClubSocialIcon");
     expect(componentSource).toContain("getCatalogCategories");
     expect(componentSource).toContain("resolveClubSocialLinks");
     expect(componentSource).toContain('active === "home" ?');

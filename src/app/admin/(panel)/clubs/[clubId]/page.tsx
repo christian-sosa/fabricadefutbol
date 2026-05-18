@@ -2251,14 +2251,14 @@ function SiteTab({
         <Card>
           <CardTitle>Foto principal</CardTitle>
           <CardDescription className="mt-2">
-            Esta imagen se reutiliza en home, catalogo y datos del equipo. JPG, PNG o WEBP hasta {MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB} MB.
+            Esta imagen se usa como cara publica del club. JPG, PNG o WEBP hasta {MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB} MB.
           </CardDescription>
           <div className="mt-4 overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
             <img alt={`Foto principal de ${details.club.name}`} className="aspect-[16/9] w-full object-cover" src={heroUrl} />
           </div>
           <form action={uploadClubSiteHeroAction.bind(null, clubId)} className="mt-4 flex flex-col gap-2">
             <OptimizedClubSiteImageInput
-              helperText={`JPG, PNG o WEBP hasta ${MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB} MB. Se optimiza antes de subir.`}
+              helperText={`JPG, PNG o WEBP hasta ${MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB} MB. Se prepara en alta calidad antes de subir.`}
               maxSourceSizeMb={MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB}
               name="hero"
               variant="hero"

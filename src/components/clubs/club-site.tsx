@@ -3,7 +3,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Barlow_Condensed, Manrope } from "next/font/google";
 
-import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { getClubProductImageUrl, getClubSiteHeroUrl } from "@/lib/club-site-media";
 import {
   buildClubProductContactHref,
@@ -26,6 +25,7 @@ type ClubSocialLink = {
   href: string;
   label: "Instagram" | "TikTok" | "YouTube" | "WhatsApp";
 };
+type ClubIconName = ClubSocialLink["label"] | "Shop";
 
 const clubBodyFont = Manrope({
   subsets: ["latin"],
@@ -47,6 +47,76 @@ const LA_QUINTA_EXTRA_SOCIAL_LINKS: ClubSocialLink[] = [
 
 function resolveClubLogoSrc(data: PublicClubSiteDetails) {
   return data.club.logo_path?.startsWith("/") ? data.club.logo_path : getClubLogoUrl(data.club.id);
+}
+
+function ClubSocialIcon({ label }: { label: ClubIconName }) {
+  if (label === "Instagram") {
+    return (
+      <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+        <rect height="16" rx="5" stroke="currentColor" strokeWidth="2" width="16" x="4" y="4" />
+        <circle cx="12" cy="12" r="3.4" stroke="currentColor" strokeWidth="2" />
+        <circle cx="17" cy="7" fill="currentColor" r="1.2" />
+      </svg>
+    );
+  }
+
+  if (label === "WhatsApp") {
+    return (
+      <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+        <path d="M5.4 19.1 6.5 15a7.4 7.4 0 1 1 3 2.8l-4.1 1.3Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="2" />
+        <path d="M9.2 8.7c.2-.4.4-.5.7-.5h.6c.2 0 .4.1.5.4l.7 1.6c.1.2.1.4-.1.6l-.4.5c-.1.1-.2.3 0 .5.4.8 1.1 1.5 2 2 .2.1.4.1.5 0l.6-.6c.2-.2.4-.2.7-.1l1.5.7c.3.1.4.3.4.6 0 .5-.1.9-.4 1.2-.3.4-.8.6-1.4.6-2.7-.1-6.3-3.3-6.6-6.2-.1-.5 0-.9.2-1.3Z" fill="currentColor" />
+      </svg>
+    );
+  }
+
+  if (label === "YouTube") {
+    return (
+      <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+        <rect height="12" rx="3.5" stroke="currentColor" strokeWidth="2" width="18" x="3" y="6" />
+        <path d="m11 10 4 2-4 2v-4Z" fill="currentColor" />
+      </svg>
+    );
+  }
+
+  if (label === "TikTok") {
+    return (
+      <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+        <path d="M14 4v8.9a4 4 0 1 1-3.8-4V12a1.8 1.8 0 1 0 1.8 1.8V4h2Z" fill="currentColor" />
+        <path d="M14 4c.5 2.6 2 4.1 4.4 4.5v2.2A7.7 7.7 0 0 1 14 8.9V4Z" fill="currentColor" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+      <path d="M7 9h10l-.8 10H7.8L7 9Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="2" />
+      <path d="M9 9a3 3 0 0 1 6 0" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function ClubSiteLogoMark({
+  data,
+  size = 70
+}: {
+  data: PublicClubSiteDetails;
+  size?: number;
+}) {
+  return (
+    <span
+      className="relative block overflow-visible"
+      style={{ height: size, width: size }}
+    >
+      <Image
+        alt={`Escudo de ${data.club.name}`}
+        className="object-contain mix-blend-multiply"
+        fill
+        sizes={`${size}px`}
+        src={resolveClubLogoSrc(data)}
+        unoptimized
+      />
+    </span>
+  );
 }
 
 function formatDate(value: string) {
@@ -185,14 +255,12 @@ function ClubSiteHeader({ active, data }: { active: ClubSitePageKey; data: Publi
   return (
     <header className="border-b border-[var(--club-line)] bg-white">
       <div className="mx-auto grid max-w-7xl gap-3 px-4 py-3 md:grid-cols-[1fr_auto_1fr] md:items-center md:px-6">
-        <p className="hidden text-[11px] font-black uppercase tracking-[0.18em] text-black/45 md:block">Tienda oficial</p>
+        <p className="hidden items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-black/45 md:flex">
+          <ClubSocialIcon label="Shop" />
+          <span>Catalogo online</span>
+        </p>
         <Link className="flex flex-col items-center gap-2 text-center" href={buildClubSitePublicHref(club, settings)}>
-          <LeagueLogo
-            alt={`Escudo de ${club.name}`}
-            className="rounded-sm border-[var(--club-line)] bg-white shadow-[0_18px_40px_-28px_rgba(0,0,0,0.7)]"
-            size={70}
-            src={resolveClubLogoSrc(data)}
-          />
+          <ClubSiteLogoMark data={data} />
           <div>
             <p className="text-4xl font-black uppercase leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)] md:text-5xl">
               {club.name}
@@ -251,7 +319,10 @@ function ClubSiteHomeHero({ active, data }: { active: ClubSitePageKey; data: Pub
     <section className="bg-white text-[var(--club-ink)]">
       <ClubSiteHeader active={active} data={data} />
       <div className="mx-auto max-w-5xl px-4 py-8 text-center md:px-6 md:py-11">
-        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-black/45">Tienda oficial</p>
+        <p className="inline-flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-[0.22em] text-black/45">
+          <ClubSocialIcon label="Shop" />
+          <span>Tienda oficial</span>
+        </p>
         <h1 className="mx-auto mt-3 max-w-3xl text-5xl font-black uppercase leading-[0.94] text-[var(--club-primary)] [font-family:var(--font-club-display)] md:text-7xl">
           {heroHeadline}
         </h1>
@@ -267,24 +338,27 @@ function ClubSiteHomeHero({ active, data }: { active: ClubSitePageKey; data: Pub
             </a>
           ) : null}
           <Link
-            className="rounded-full border border-black/15 bg-white px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:border-[var(--club-primary)] hover:text-[var(--club-primary)]"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-black/15 bg-white px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:border-[var(--club-primary)] hover:text-[var(--club-primary)]"
             href={buildClubSitePublicHref(club, settings, "/catalogo")}
           >
-            Ir al shop
+            <ClubSocialIcon label="Shop" />
+            <span>Ir al shop</span>
           </Link>
         </div>
       </div>
 
-      <div className="relative min-h-[300px] overflow-hidden bg-[var(--club-primary)] md:min-h-[470px]">
-        <Image
-          alt={`${club.name} Futbol Club`}
-          className="object-cover"
-          fill
-          priority
-          sizes="100vw"
-          src={heroUrl}
-          unoptimized
-        />
+      <div className="bg-white px-4 pb-8 md:px-6 md:pb-10">
+        <div className="relative mx-auto aspect-[4/3] max-w-6xl overflow-hidden bg-white md:aspect-[3/2]">
+          <Image
+            alt={`${club.name} Futbol Club`}
+            className="object-contain"
+            fill
+            priority
+            sizes="(min-width: 1280px) 1152px, 100vw"
+            src={heroUrl}
+            unoptimized
+          />
+        </div>
       </div>
 
       <ClubSiteStatsStrip data={data} />
@@ -299,12 +373,7 @@ function ClubSiteFooter({ data }: { data: PublicClubSiteDetails }) {
     <footer id="contacto" className="border-t border-[var(--club-line)] bg-white text-black">
       <div className="mx-auto flex max-w-7xl flex-col items-center gap-5 px-4 py-9 text-center md:px-6">
         <div className="flex flex-col items-center gap-3">
-          <LeagueLogo
-            alt={`Escudo de ${data.club.name}`}
-            className="rounded-sm border-[var(--club-line)] bg-white"
-            size={58}
-            src={resolveClubLogoSrc(data)}
-          />
+          <ClubSiteLogoMark data={data} size={58} />
           <div>
             <p className="text-4xl font-black uppercase leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)]">
               {data.club.name}
@@ -314,16 +383,18 @@ function ClubSiteFooter({ data }: { data: PublicClubSiteDetails }) {
         </div>
 
         {socialLinks.length ? (
-          <div className="flex flex-wrap justify-center gap-2">
+          <div className="flex flex-wrap justify-center gap-3">
             {socialLinks.map((link) => (
               <a
-                className="rounded-full border border-black/10 bg-[var(--club-soft)] px-4 py-2 text-sm font-black transition hover:border-[var(--club-primary)] hover:text-[var(--club-primary)]"
+                aria-label={link.label}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-black shadow-[0_18px_40px_-30px_rgba(0,0,0,0.7)] transition hover:border-[var(--club-primary)] hover:bg-[var(--club-primary)] hover:text-white"
                 href={link.href}
                 key={`${link.label}-${link.href}`}
                 rel="noreferrer"
                 target="_blank"
+                title={link.label}
               >
-                {link.label}
+                <ClubSocialIcon label={link.label} />
               </a>
             ))}
           </div>
@@ -413,19 +484,19 @@ function ProductCard({ data, product }: { data: PublicClubSiteDetails; product: 
       : "Disponible";
 
   return (
-    <article className="group overflow-hidden rounded-md border border-black/10 bg-white shadow-[0_28px_58px_-44px_rgba(0,0,0,0.62)] transition hover:-translate-y-0.5 hover:shadow-[0_34px_70px_-46px_rgba(0,0,0,0.75)]">
-      <div className="relative aspect-[4/5] overflow-hidden bg-[radial-gradient(circle_at_50%_42%,#ffffff_0%,#ffffff_45%,#f6f1eb_100%)] p-5">
+    <article className="group overflow-hidden rounded-sm border border-black/10 bg-white shadow-[0_26px_62px_-48px_rgba(0,0,0,0.7)] transition hover:-translate-y-0.5 hover:shadow-[0_34px_78px_-50px_rgba(0,0,0,0.78)]">
+      <div className="relative aspect-[4/5] overflow-hidden bg-white">
         {imageUrl ? (
           <Image
             alt={product.name}
-            className="object-contain drop-shadow-[0_22px_24px_rgba(0,0,0,0.22)] transition duration-300 group-hover:scale-[1.035]"
+            className="object-contain p-6 drop-shadow-[0_24px_22px_rgba(0,0,0,0.22)] transition duration-300 group-hover:scale-[1.035]"
             fill
             sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
             src={imageUrl}
             unoptimized
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center rounded-sm border border-black/10 bg-white p-8 text-center shadow-[inset_0_0_0_1px_rgba(255,255,255,0.75)]">
+          <div className="flex h-full w-full items-center justify-center rounded-sm border border-black/10 bg-white p-8 text-center shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)]">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-black/35">Producto oficial</p>
               <p className="mt-3 text-4xl font-black uppercase leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)]">
@@ -495,6 +566,7 @@ function ActivityItem({ item }: { item: ClubPublicActivity }) {
 export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
   const { products, settings, snapshot } = data;
   const featuredProducts = products.slice(0, 4);
+  const socialLinks = resolveClubSocialLinks(data);
 
   return (
     <ClubSiteShell active="home" data={data}>
@@ -547,35 +619,24 @@ export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
         </section>
       ) : null}
 
-      {settings.instagramUrl || settings.whatsappUrlOrPhone ? (
+      {socialLinks.length ? (
         <section className="mt-14 rounded-md border border-black/10 bg-[#101312] p-5 text-white shadow-[0_18px_44px_-34px_rgba(0,0,0,0.65)]">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Contacto</p>
           <h2 className="mt-2 text-4xl font-black uppercase leading-none [font-family:var(--font-club-display)]">Canales oficiales</h2>
-          <div className="mt-5 flex flex-wrap gap-2">
-            {settings.instagramUrl ? (
-              <a className="rounded-md border border-white/20 px-4 py-2 text-sm font-black transition hover:bg-white/10" href={settings.instagramUrl} rel="noreferrer" target="_blank">
-                Instagram
-              </a>
-            ) : null}
-            {settings.whatsappUrlOrPhone ? (
+          <div className="mt-5 flex flex-wrap gap-3">
+            {socialLinks.map((link) => (
               <a
-                className="rounded-md bg-[var(--club-accent)] px-4 py-2 text-sm font-black text-black transition hover:brightness-95"
-                href={buildClubProductContactHref({
-                  clubName: data.club.name,
-                  product: {
-                    contact_channel: "whatsapp",
-                    contact_message: `Hola ${data.club.name}, quiero hacer una consulta.`,
-                    contact_url: null,
-                    name: data.club.name
-                  },
-                  settings
-                })}
+                aria-label={link.label}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white text-black transition hover:border-[var(--club-primary)] hover:bg-[var(--club-primary)] hover:text-white"
+                href={link.href}
+                key={`${link.label}-${link.href}-home`}
                 rel="noreferrer"
                 target="_blank"
+                title={link.label}
               >
-                WhatsApp
+                <ClubSocialIcon label={link.label} />
               </a>
-            ) : null}
+            ))}
           </div>
         </section>
       ) : null}

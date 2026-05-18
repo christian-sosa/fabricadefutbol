@@ -4,16 +4,18 @@ import { useId, useState, type ReactNode } from "react";
 
 import { Input } from "@/components/ui/input";
 
-const MAX_DIRECT_ACTION_FILE_SIZE_MB = 3.5;
+const MAX_DIRECT_ACTION_FILE_SIZE_MB = 8;
 const MAX_DIRECT_ACTION_FILE_SIZE_BYTES = MAX_DIRECT_ACTION_FILE_SIZE_MB * 1024 * 1024;
 
 const IMAGE_PRESETS = {
   hero: {
-    height: 1100,
-    quality: 0.86,
-    width: 1800
+    fit: "contain",
+    height: 1600,
+    quality: 0.92,
+    width: 2400
   },
   product: {
+    fit: "cover",
     height: 1000,
     quality: 0.86,
     width: 1000
@@ -83,6 +85,19 @@ function getCoverCrop(sourceWidth: number, sourceHeight: number, targetWidth: nu
   };
 }
 
+function getContainDraw(sourceWidth: number, sourceHeight: number, targetWidth: number, targetHeight: number) {
+  const scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight, 1);
+  const width = sourceWidth * scale;
+  const height = sourceHeight * scale;
+
+  return {
+    height,
+    width,
+    x: (targetWidth - width) / 2,
+    y: (targetHeight - height) / 2
+  };
+}
+
 function canvasToWebpBlob(canvas: HTMLCanvasElement, quality: number) {
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
@@ -112,18 +127,25 @@ async function optimizeImageFile(file: File, variant: keyof typeof IMAGE_PRESETS
   canvas.width = preset.width;
   canvas.height = preset.height;
 
-  const crop = getCoverCrop(image.naturalWidth, image.naturalHeight, preset.width, preset.height);
-  context.drawImage(
-    image,
-    crop.x,
-    crop.y,
-    crop.width,
-    crop.height,
-    0,
-    0,
-    preset.width,
-    preset.height
-  );
+  if (preset.fit === "contain") {
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, preset.width, preset.height);
+    const draw = getContainDraw(image.naturalWidth, image.naturalHeight, preset.width, preset.height);
+    context.drawImage(image, draw.x, draw.y, draw.width, draw.height);
+  } else {
+    const crop = getCoverCrop(image.naturalWidth, image.naturalHeight, preset.width, preset.height);
+    context.drawImage(
+      image,
+      crop.x,
+      crop.y,
+      crop.width,
+      crop.height,
+      0,
+      0,
+      preset.width,
+      preset.height
+    );
+  }
 
   let quality = preset.quality;
   let blob = await canvasToWebpBlob(canvas, quality);
