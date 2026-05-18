@@ -122,36 +122,49 @@ describe("club site productizado", () => {
     expect(layoutSource).toContain("standaloneClubSite");
     expect(layoutSource).toContain("{standaloneClubSite ? (");
     expect(layoutSource).toContain('<main className="w-full" id="contenido-principal">');
-    expect(componentSource).toContain("Volver a Fabrica de Futbol");
+    expect(componentSource).toContain("Fabrica de Futbol");
     expect(componentSource).not.toContain("-my-6");
     expect(componentSource).not.toContain("bg-[#f7f3ec]");
   });
 
-  it("mantiene el inicio de La Quinta simple: slogan, foto y resumen numerico", () => {
+  it("convierte el inicio de La Quinta en vidriera de catalogo sin carrito", () => {
     const componentSource = readSource("src", "components", "clubs", "club-site.tsx");
 
     expect(componentSource).toContain("getClubHeroHeadline");
     expect(componentSource).toContain("Esta locura de amarte me impide ser normal");
     expect(componentSource).toContain("ClubSiteHomeHero");
+    expect(componentSource).toContain("ClubSiteCategoryRail");
+    expect(componentSource).toContain("Destacados");
+    expect(componentSource).toContain("Tienda oficial");
+    expect(componentSource).toContain("Consultar por WhatsApp");
+    expect(componentSource).toContain("object-contain");
     expect(componentSource).toContain("--club-line");
     expect(componentSource).toContain("--club-soft");
     expect(componentSource).not.toContain("Catalogo oficial");
-    expect(componentSource).not.toContain("Ver productos");
+    expect(componentSource).not.toContain("Agregar al carrito");
+    expect(componentSource).not.toMatch(/\bcarrito\b/i);
+    expect(componentSource).not.toMatch(/\bcheckout\b/i);
     expect(componentSource).not.toContain("Toda la info del club en un solo sitio.");
     expect(componentSource).not.toContain("mitiendanube.com");
     expect(componentSource).not.toContain("dcdn-us.mitiendanube.com");
   });
 
-  it("usa header compacto en Informacion y Catalogo, con footer de pertenencia a Fabrica", () => {
+  it("usa navegacion de tienda con categorias y footer social de pertenencia a Fabrica", () => {
     const componentSource = readSource("src", "components", "clubs", "club-site.tsx");
 
     expect(componentSource).toContain("ClubSiteHeader");
     expect(componentSource).toContain("ClubSiteFooter");
+    expect(componentSource).toContain("getCatalogCategories");
+    expect(componentSource).toContain("resolveClubSocialLinks");
     expect(componentSource).toContain('active === "home" ?');
-    expect(componentSource).toMatch(/label: "Inicio"[\s\S]*label: "Informacion"[\s\S]*label: "Catalogo"/);
+    expect(componentSource).toMatch(/label: "Inicio"[\s\S]*label: "Productos"[\s\S]*label: "Informacion"/);
     expect(componentSource).toContain('alt="Logo de Fabrica de Futbol"');
     expect(componentSource).toContain('src="/logo.png"');
-    expect(componentSource).toContain("Este sitio pertenece a Fabrica de Futbol");
+    expect(componentSource).toContain("Instagram");
+    expect(componentSource).toContain("TikTok");
+    expect(componentSource).toContain("YouTube");
+    expect(componentSource).toContain("WhatsApp");
+    expect(componentSource).toContain("Este catalogo pertenece a Fabrica de Futbol");
     expect(componentSource).not.toContain("Datos del equipo");
   });
 
