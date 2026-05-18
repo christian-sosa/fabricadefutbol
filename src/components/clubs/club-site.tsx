@@ -20,7 +20,7 @@ import type { PublicClubSiteDetails } from "@/lib/queries/clubs";
 import { getPublicAppUrl } from "@/lib/public-url";
 import { getClubLogoUrl } from "@/lib/team-logos";
 
-type ClubSitePageKey = "home" | "catalogo" | "equipo";
+type ClubSitePageKey = "home" | "catalogo" | "equipo" | "historia";
 type ClubSocialLink = {
   href: string;
   label: "Instagram" | "TikTok" | "YouTube" | "WhatsApp";
@@ -204,9 +204,9 @@ function ClubSiteNav({ active, data }: { active: ClubSitePageKey; data: PublicCl
       visible: settings.sectionVisibility.teamData
     },
     {
-      key: "contacto",
-      href: "#contacto",
-      label: "Contacto",
+      key: "historia",
+      href: buildClubSitePublicHref(club, settings, "/historia"),
+      label: "Historia",
       visible: true
     }
   ] as const;
@@ -255,9 +255,8 @@ function ClubSiteHeader({ active, data }: { active: ClubSitePageKey; data: Publi
   return (
     <header className="border-b border-[var(--club-line)] bg-white">
       <div className="mx-auto grid max-w-7xl gap-3 px-4 py-3 md:grid-cols-[1fr_auto_1fr] md:items-center md:px-6">
-        <p className="hidden items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-black/45 md:flex">
-          <ClubSocialIcon label="Shop" />
-          <span>Catalogo online</span>
+        <p className="hidden text-[11px] font-black uppercase tracking-[0.18em] text-black/45 md:block">
+          Sitio oficial
         </p>
         <Link className="flex flex-col items-center gap-2 text-center" href={buildClubSitePublicHref(club, settings)}>
           <ClubSiteLogoMark data={data} />
@@ -275,37 +274,7 @@ function ClubSiteHeader({ active, data }: { active: ClubSitePageKey; data: Publi
       <div className="border-t border-[var(--club-line)] px-4 py-3">
         <ClubSiteNav active={active} data={data} />
       </div>
-      {settings.sectionVisibility.catalog ? <ClubSiteCategoryRail data={data} selectedCategory={null} /> : null}
     </header>
-  );
-}
-
-function ClubSiteStatsStrip({ data }: { data: PublicClubSiteDetails }) {
-  const { snapshot } = data;
-
-  return (
-    <div className="bg-[var(--club-primary)] text-white">
-      <div className="mx-auto grid max-w-5xl grid-cols-3 gap-3 px-4 py-6 text-center md:px-6">
-        <div>
-          <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
-            {snapshot.summary.teamCount}
-          </p>
-          <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/78">Equipos</p>
-        </div>
-        <div>
-          <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
-            {snapshot.summary.playerCount}
-          </p>
-          <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/78">Jugadores</p>
-        </div>
-        <div>
-          <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
-            {snapshot.summary.totalMatches}
-          </p>
-          <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/78">Partidos</p>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -313,38 +282,14 @@ function ClubSiteHomeHero({ active, data }: { active: ClubSitePageKey; data: Pub
   const { club, settings } = data;
   const heroUrl = getClubSiteHeroUrl(club.id, settings);
   const heroHeadline = getClubHeroHeadline(data);
-  const contactHref = buildClubContactHref(data);
 
   return (
     <section className="bg-white text-[var(--club-ink)]">
       <ClubSiteHeader active={active} data={data} />
       <div className="mx-auto max-w-5xl px-4 py-8 text-center md:px-6 md:py-11">
-        <p className="inline-flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-[0.22em] text-black/45">
-          <ClubSocialIcon label="Shop" />
-          <span>Tienda oficial</span>
-        </p>
-        <h1 className="mx-auto mt-3 max-w-3xl text-5xl font-black uppercase leading-[0.94] text-[var(--club-primary)] [font-family:var(--font-club-display)] md:text-7xl">
+        <h1 className="mx-auto max-w-3xl text-5xl font-black uppercase leading-[0.94] text-[var(--club-primary)] [font-family:var(--font-club-display)] md:text-7xl">
           {heroHeadline}
         </h1>
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
-          {contactHref ? (
-            <a
-              className="rounded-full bg-black px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-white transition hover:bg-[var(--club-primary)]"
-              href={contactHref}
-              rel="noreferrer"
-              target="_blank"
-            >
-              Contactanos
-            </a>
-          ) : null}
-          <Link
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-black/15 bg-white px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:border-[var(--club-primary)] hover:text-[var(--club-primary)]"
-            href={buildClubSitePublicHref(club, settings, "/catalogo")}
-          >
-            <ClubSocialIcon label="Shop" />
-            <span>Ir al shop</span>
-          </Link>
-        </div>
       </div>
 
       <div className="bg-white px-4 pb-8 md:px-6 md:pb-10">
@@ -360,8 +305,6 @@ function ClubSiteHomeHero({ active, data }: { active: ClubSitePageKey; data: Pub
           />
         </div>
       </div>
-
-      <ClubSiteStatsStrip data={data} />
     </section>
   );
 }
@@ -378,7 +321,7 @@ function ClubSiteFooter({ data }: { data: PublicClubSiteDetails }) {
             <p className="text-4xl font-black uppercase leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)]">
               {data.club.name}
             </p>
-            <p className="mt-2 text-sm font-semibold text-black/55">Catalogo, redes y contacto oficial del club.</p>
+            <p className="mt-2 text-sm font-semibold text-black/55">Sitio oficial y canales del club.</p>
           </div>
         </div>
 
@@ -400,18 +343,6 @@ function ClubSiteFooter({ data }: { data: PublicClubSiteDetails }) {
           </div>
         ) : null}
 
-        <nav className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm font-black uppercase tracking-[0.14em] text-black/58">
-          <Link className="transition hover:text-[var(--club-primary)]" href={buildClubSitePublicHref(data.club, data.settings)}>
-            Inicio
-          </Link>
-          <Link className="transition hover:text-[var(--club-primary)]" href={buildClubSitePublicHref(data.club, data.settings, "/catalogo")}>
-            Productos
-          </Link>
-          <Link className="transition hover:text-[var(--club-primary)]" href={buildClubSitePublicHref(data.club, data.settings, "/equipo")}>
-            Informacion
-          </Link>
-        </nav>
-
         <div className="flex flex-col items-center gap-2 border-t border-[var(--club-line)] pt-5">
           <Image
             alt="Logo de Fabrica de Futbol"
@@ -423,7 +354,7 @@ function ClubSiteFooter({ data }: { data: PublicClubSiteDetails }) {
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-black/45">Fabrica de Futbol</p>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-black/55">
-              Este catalogo pertenece a Fabrica de Futbol. {data.club.name} administra su contenido publico desde la plataforma.
+              Este sitio pertenece a Fabrica de Futbol. {data.club.name} administra su contenido publico desde la plataforma.
             </p>
           </div>
         </div>
@@ -567,37 +498,11 @@ function ActivityItem({ item }: { item: ClubPublicActivity }) {
 }
 
 export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
-  const { products, settings, snapshot } = data;
-  const featuredProducts = products.slice(0, 4);
+  const { settings, snapshot } = data;
   const socialLinks = resolveClubSocialLinks(data);
 
   return (
     <ClubSiteShell active="home" data={data}>
-      {settings.sectionVisibility.catalog && featuredProducts.length ? (
-        <section>
-          <div className="overflow-hidden rounded-md border border-[var(--club-line)]">
-            <ClubSiteCategoryRail data={data} selectedCategory={null} />
-          </div>
-          <div className="mt-8 flex flex-col gap-3 text-center sm:items-center">
-            <div>
-              <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Shop</p>
-              <h2 className="mt-2 text-5xl font-black uppercase leading-none [font-family:var(--font-club-display)]">Destacados</h2>
-              <p className="mx-auto mt-3 max-w-2xl text-sm font-medium leading-6 text-black/58">
-                Catalogo visual del club. Cada consulta abre el canal que defina el equipo.
-              </p>
-            </div>
-            <Link className="w-fit rounded-full bg-black px-5 py-3 text-sm font-black uppercase tracking-[0.12em] text-white transition hover:bg-[var(--club-primary)]" href={buildClubSitePublicHref(data.club, settings, "/catalogo")}>
-              Tienda completa
-            </Link>
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 lg:grid-cols-4">
-            {featuredProducts.map((product) => (
-              <ProductCard data={data} key={product.id} product={product} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
       {settings.sectionVisibility.matches && snapshot.recentMatches.length ? (
         <section className="mt-14">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Equipo</p>
@@ -643,6 +548,35 @@ export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
           </div>
         </section>
       ) : null}
+    </ClubSiteShell>
+  );
+}
+
+export function ClubSiteHistory({ data }: { data: PublicClubSiteDetails }) {
+  const historyParagraphs = data.club.description
+    ?.split(/\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  const paragraphs = historyParagraphs?.length
+    ? historyParagraphs
+    : [
+        `La historia de ${data.club.name} se va a publicar aca.`,
+        "Este espacio queda preparado para cargar la historia del club y mantenerla separada de la tienda."
+      ];
+
+  return (
+    <ClubSiteShell active="historia" data={data}>
+      <section className="mx-auto max-w-4xl">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Historia</p>
+        <h1 className="mt-2 text-6xl font-black uppercase leading-[0.9] [font-family:var(--font-club-display)] md:text-7xl">
+          Acerca de {data.club.name}
+        </h1>
+        <div className="mt-6 space-y-4 rounded-md border border-black/10 bg-white p-5 text-base font-medium leading-8 text-black/68">
+          {paragraphs.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
+        </div>
+      </section>
     </ClubSiteShell>
   );
 }

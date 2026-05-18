@@ -15,12 +15,21 @@ function expectFile(...segments: string[]) {
   return readFileSync(filePath, "utf8");
 }
 
+function sourceSlice(source: string, start: string, end: string) {
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end, startIndex + start.length);
+  expect(startIndex, `No se encontro ${start}`).toBeGreaterThanOrEqual(0);
+  expect(endIndex, `No se encontro ${end}`).toBeGreaterThan(startIndex);
+  return source.slice(startIndex, endIndex);
+}
+
 describe("club site productizado", () => {
   it("separa landing, home, catalogo y datos del equipo usando la capa Club Site", () => {
     const listSource = expectFile("src", "app", "clubs", "page.tsx");
     const homeSource = expectFile("src", "app", "clubs", "[slug]", "page.tsx");
     const catalogSource = expectFile("src", "app", "clubs", "[slug]", "catalogo", "page.tsx");
     const teamDataSource = expectFile("src", "app", "clubs", "[slug]", "equipo", "page.tsx");
+    const historySource = expectFile("src", "app", "clubs", "[slug]", "historia", "page.tsx");
     const componentSource = expectFile("src", "components", "clubs", "club-site.tsx");
 
     expect(listSource).toContain("getPublicClubSites");
@@ -32,9 +41,11 @@ describe("club site productizado", () => {
     expect(homeSource).toContain("ClubSiteHome");
     expect(catalogSource).toContain("ClubSiteCatalog");
     expect(teamDataSource).toContain("ClubSiteTeamData");
+    expect(historySource).toContain("ClubSiteHistory");
     expect(componentSource).toContain("buildClubProductContactHref");
-    expect(componentSource).toContain("Catalogo");
+    expect(componentSource).toContain("Productos");
     expect(componentSource).toContain("Informacion");
+    expect(componentSource).toContain("Historia");
     expect(componentSource).not.toMatch(/\bcheckout\b/i);
     expect(componentSource).not.toMatch(/\bcarrito\b/i);
   });
@@ -103,6 +114,7 @@ describe("club site productizado", () => {
     expect(proxySource).toContain("hostBelongsToMainApp");
     expect(proxySource).toContain('"/catalogo/:path*"');
     expect(proxySource).toContain('"/equipo/:path*"');
+    expect(proxySource).toContain('"/historia/:path*"');
     expect(proxySource).toContain('"/clubs/:path*"');
   });
 
@@ -111,6 +123,7 @@ describe("club site productizado", () => {
     const rootSource = readSource("src", "app", "page.tsx");
     const catalogSource = expectFile("src", "app", "catalogo", "page.tsx");
     const teamDataSource = expectFile("src", "app", "equipo", "page.tsx");
+    const historySource = expectFile("src", "app", "historia", "page.tsx");
 
     expect(resolverSource).toContain("getPublicClubSiteByDomain");
     expect(rootSource).toContain("resolveClubSiteFromRequestHost");
@@ -119,6 +132,8 @@ describe("club site productizado", () => {
     expect(catalogSource).toContain("ClubSiteCatalog");
     expect(teamDataSource).toContain("resolveClubSiteFromRequestHost");
     expect(teamDataSource).toContain("ClubSiteTeamData");
+    expect(historySource).toContain("resolveClubSiteFromRequestHost");
+    expect(historySource).toContain("ClubSiteHistory");
   });
 
   it("renderiza dominios propios de club sin header, footer ni contenedor global de Fabrica", () => {
@@ -134,16 +149,25 @@ describe("club site productizado", () => {
     expect(componentSource).not.toContain("bg-[#f7f3ec]");
   });
 
-  it("convierte el inicio de La Quinta en vidriera de catalogo sin carrito", () => {
+  it("deja el inicio del club sin tienda, filtros de catalogo ni franja de estadisticas", () => {
     const componentSource = readSource("src", "components", "clubs", "club-site.tsx");
+    const homeSource = sourceSlice(componentSource, "export function ClubSiteHome", "function buildCategoryHref");
+    const heroSource = sourceSlice(componentSource, "function ClubSiteHomeHero", "function ClubSiteFooter");
+    const catalogSource = sourceSlice(componentSource, "export function ClubSiteCatalog", "function TeamCard");
 
     expect(componentSource).toContain("getClubHeroHeadline");
     expect(componentSource).toContain("Esta locura de amarte me impide ser normal");
     expect(componentSource).toContain("ClubSiteHomeHero");
     expect(componentSource).toContain("ClubSiteCategoryRail");
-    expect(componentSource).toContain("Catalogo online");
-    expect(componentSource).toContain("Destacados");
-    expect(componentSource).toContain("Tienda oficial");
+    expect(componentSource).toContain("Sitio oficial");
+    expect(homeSource).not.toContain("ClubSiteCategoryRail");
+    expect(homeSource).not.toContain("ProductCard");
+    expect(homeSource).not.toContain("Destacados");
+    expect(heroSource).not.toContain("Tienda oficial");
+    expect(heroSource).not.toContain("Contactanos");
+    expect(heroSource).not.toContain("Ir al shop");
+    expect(heroSource).not.toContain("ClubSiteStatsStrip");
+    expect(catalogSource.match(/<ClubSiteCategoryRail/g)).toHaveLength(1);
     expect(componentSource).toContain("Consultar por WhatsApp");
     expect(componentSource).toContain("aspect-[4/3]");
     expect(componentSource).toContain("object-contain");
@@ -153,6 +177,7 @@ describe("club site productizado", () => {
     expect(componentSource).toContain("aria-label={`${contactLabel}: ${product.name}`}");
     expect(componentSource).toContain("--club-line");
     expect(componentSource).toContain("--club-soft");
+    expect(componentSource).not.toContain("Catalogo online");
     expect(componentSource).not.toContain("Catalogo oficial");
     expect(componentSource).not.toContain("Agregar al carrito");
     expect(componentSource).not.toMatch(/\bcarrito\b/i);
@@ -163,8 +188,10 @@ describe("club site productizado", () => {
     expect(componentSource).not.toContain("drop-shadow-[0_24px_22px");
   });
 
-  it("usa navegacion de tienda con categorias y footer social de pertenencia a Fabrica", () => {
+  it("usa navegacion del sitio con Historia y deja las categorias solo en Catalogo", () => {
     const componentSource = readSource("src", "components", "clubs", "club-site.tsx");
+    const headerSource = sourceSlice(componentSource, "function ClubSiteHeader", "function ClubSiteHomeHero");
+    const footerSource = sourceSlice(componentSource, "function ClubSiteFooter", "export function ClubSiteShell");
 
     expect(componentSource).toContain("ClubSiteHeader");
     expect(componentSource).toContain("ClubSiteFooter");
@@ -173,14 +200,18 @@ describe("club site productizado", () => {
     expect(componentSource).toContain("getCatalogCategories");
     expect(componentSource).toContain("resolveClubSocialLinks");
     expect(componentSource).toContain('active === "home" ?');
-    expect(componentSource).toMatch(/label: "Inicio"[\s\S]*label: "Productos"[\s\S]*label: "Informacion"/);
+    expect(componentSource).toMatch(/label: "Inicio"[\s\S]*label: "Productos"[\s\S]*label: "Informacion"[\s\S]*label: "Historia"/);
+    expect(componentSource).not.toContain('label: "Contacto"');
+    expect(headerSource).not.toContain("<ClubSiteCategoryRail");
+    expect(footerSource).not.toContain("Productos");
+    expect(footerSource).not.toContain("Informacion");
     expect(componentSource).toContain('alt="Logo de Fabrica de Futbol"');
     expect(componentSource).toContain('src="/logo.png"');
     expect(componentSource).toContain("Instagram");
     expect(componentSource).toContain("TikTok");
     expect(componentSource).toContain("YouTube");
     expect(componentSource).toContain("WhatsApp");
-    expect(componentSource).toContain("Este catalogo pertenece a Fabrica de Futbol");
+    expect(componentSource).toContain("Este sitio pertenece a Fabrica de Futbol");
     expect(componentSource).not.toContain("Datos del equipo");
   });
 
@@ -196,10 +227,12 @@ describe("club site productizado", () => {
     const slugClubSource = readSource("src", "app", "clubs", "[slug]", "page.tsx");
     const catalogSource = readSource("src", "app", "catalogo", "page.tsx");
     const teamDataSource = readSource("src", "app", "equipo", "page.tsx");
+    const historySource = readSource("src", "app", "historia", "page.tsx");
 
     expect(rootClubSource).toContain("absolute: data.club.name");
     expect(slugClubSource).toContain("absolute: data.club.name");
     expect(catalogSource).toContain("absolute: `Catalogo - ${data.club.name}`");
     expect(teamDataSource).toContain("absolute: `Informacion - ${data.club.name}`");
+    expect(historySource).toContain("absolute: `Historia - ${data.club.name}`");
   });
 });

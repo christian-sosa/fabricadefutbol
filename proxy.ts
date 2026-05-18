@@ -51,6 +51,9 @@ function mapCustomDomainPathToClubPath(pathname: string, slug: string) {
   if (pathname === "/equipo" || pathname.startsWith("/equipo/")) {
     return `/clubs/${slug}${pathname}`;
   }
+  if (pathname === "/historia" || pathname.startsWith("/historia/")) {
+    return `/clubs/${slug}${pathname}`;
+  }
   return null;
 }
 
@@ -130,6 +133,7 @@ export const config = {
     "/clubs/:path*",
     "/catalogo/:path*",
     "/equipo/:path*",
+    "/historia/:path*",
     "/ranking/:path*",
     "/players/:path*",
     "/matches/:path*",
