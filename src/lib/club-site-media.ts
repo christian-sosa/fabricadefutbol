@@ -7,8 +7,9 @@ export const MAX_CLUB_PRODUCT_IMAGE_SIZE_MB = 10;
 export const CLUB_SITE_HERO_WIDTH_PX = 2400;
 export const CLUB_SITE_HERO_HEIGHT_PX = 1600;
 export const CLUB_SITE_HERO_QUALITY = 92;
-export const CLUB_PRODUCT_IMAGE_SIZE_PX = 1000;
-export const CLUB_PRODUCT_IMAGE_QUALITY = 86;
+export const CLUB_PRODUCT_IMAGE_WIDTH_PX = 1200;
+export const CLUB_PRODUCT_IMAGE_HEIGHT_PX = 1500;
+export const CLUB_PRODUCT_IMAGE_QUALITY = 90;
 export const CLUB_SITE_HERO_CACHE_CONTROL = "no-store";
 export const CLUB_PRODUCT_IMAGE_CACHE_CONTROL = "no-store";
 
@@ -59,9 +60,10 @@ export async function optimizeClubProductImage(file: File) {
 
   return sharp(sourceBuffer)
     .rotate()
-    .resize(CLUB_PRODUCT_IMAGE_SIZE_PX, CLUB_PRODUCT_IMAGE_SIZE_PX, {
-      fit: "cover",
-      position: "center"
+    .flatten({ background: "#ffffff" })
+    .resize(CLUB_PRODUCT_IMAGE_WIDTH_PX, CLUB_PRODUCT_IMAGE_HEIGHT_PX, {
+      fit: "inside",
+      withoutEnlargement: true
     })
     .webp({ quality: CLUB_PRODUCT_IMAGE_QUALITY })
     .toBuffer();

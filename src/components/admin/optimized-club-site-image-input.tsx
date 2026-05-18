@@ -15,10 +15,10 @@ const IMAGE_PRESETS = {
     width: 2400
   },
   product: {
-    fit: "cover",
-    height: 1000,
-    quality: 0.86,
-    width: 1000
+    fit: "contain",
+    height: 1500,
+    quality: 0.9,
+    width: 1200
   }
 } as const;
 

@@ -482,60 +482,63 @@ function ProductCard({ data, product }: { data: PublicClubSiteDetails; product: 
     : product.status === "sold_out"
       ? "Consultar disponibilidad"
       : "Disponible";
-
-  return (
-    <article className="group overflow-hidden rounded-sm border border-black/10 bg-white shadow-[0_26px_62px_-48px_rgba(0,0,0,0.7)] transition hover:-translate-y-0.5 hover:shadow-[0_34px_78px_-50px_rgba(0,0,0,0.78)]">
-      <div className="relative aspect-[4/5] overflow-hidden bg-white">
+  const visibleStatusLabel = product.status === "available" ? null : statusLabel;
+  const priceLabel = product.price_label?.trim();
+  const shouldShowPrice = Boolean(priceLabel && priceLabel.toLowerCase() !== "consultar precio");
+  const content = (
+    <>
+      <div className="relative mx-auto aspect-[4/5] w-full max-w-[180px] overflow-visible bg-white">
         {imageUrl ? (
           <Image
             alt={product.name}
-            className="object-contain p-6 drop-shadow-[0_24px_22px_rgba(0,0,0,0.22)] transition duration-300 group-hover:scale-[1.035]"
+            className="object-contain transition duration-300 group-hover:scale-[1.035]"
             fill
-            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            sizes="(min-width: 1024px) 180px, (min-width: 640px) 28vw, 44vw"
             src={imageUrl}
             unoptimized
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center rounded-sm border border-black/10 bg-white p-8 text-center shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)]">
+          <div className="flex h-full w-full items-center justify-center bg-white p-4 text-center">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-black/35">Producto oficial</p>
-              <p className="mt-3 text-4xl font-black uppercase leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)]">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black/32">Producto oficial</p>
+              <p className="mt-2 text-2xl font-black uppercase leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)]">
                 {product.name}
               </p>
             </div>
           </div>
         )}
-        <span className="absolute left-3 top-3 rounded-full bg-white/92 px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em] text-black shadow-[0_12px_24px_-20px_rgba(0,0,0,0.7)]">
-          {statusLabel}
-        </span>
+        {visibleStatusLabel ? (
+          <span className="absolute left-0 top-0 bg-[var(--club-primary)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.04em] text-white">
+            {visibleStatusLabel}
+          </span>
+        ) : null}
       </div>
-      <div className="space-y-3 p-4">
-        <div>
-          {product.category ? (
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-black/45">{product.category}</p>
-          ) : null}
-          <h2 className="mt-1 text-3xl font-black leading-none [font-family:var(--font-club-display)]">{product.name}</h2>
-        </div>
-        {product.description ? <p className="text-sm leading-6 text-black/62">{product.description}</p> : null}
-        <div className="flex flex-col gap-3 border-t border-black/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-black/35">Precio</p>
-            <p className="text-sm font-black text-black">{product.price_label ?? "Consultar precio"}</p>
-          </div>
-          {contactHref ? (
-            <a
-              className="rounded-full bg-[var(--club-accent)] px-4 py-2 text-center text-sm font-black text-black transition hover:brightness-95"
-              href={contactHref}
-              rel="noreferrer"
-              target="_blank"
-            >
-              {contactLabel}
-            </a>
-          ) : (
-            <span className="px-4 py-2 text-sm font-black text-black/50">Sin contacto</span>
-          )}
-        </div>
+      <div className="mt-3 text-center">
+        {product.category ? (
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-black/40">{product.category}</p>
+        ) : null}
+        <h2 className="mt-1 text-sm font-medium leading-5 text-[var(--club-primary)]">{product.name}</h2>
+        {shouldShowPrice ? <p className="mt-1 text-xs font-semibold text-black/55">{priceLabel}</p> : null}
+        {contactHref ? <p className="mt-2 text-[11px] font-black uppercase tracking-[0.08em] text-black/62">{contactLabel}</p> : null}
       </div>
+    </>
+  );
+
+  if (!contactHref) {
+    return <article className="group bg-white">{content}</article>;
+  }
+
+  return (
+    <article className="group bg-white">
+      <a
+        aria-label={`${contactLabel}: ${product.name}`}
+        className="block text-black transition hover:-translate-y-0.5 hover:text-[var(--club-primary)]"
+        href={contactHref}
+        rel="noreferrer"
+        target="_blank"
+      >
+        {content}
+      </a>
     </article>
   );
 }
@@ -587,7 +590,7 @@ export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
               Tienda completa
             </Link>
           </div>
-          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 lg:grid-cols-4">
             {featuredProducts.map((product) => (
               <ProductCard data={data} key={product.id} product={product} />
             ))}
@@ -713,7 +716,7 @@ export function ClubSiteCatalog({
         <ClubSiteCategoryRail data={data} selectedCategory={selectedCategory} />
       </div>
 
-      <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 lg:grid-cols-4">
         {products.map((product) => (
           <ProductCard data={data} key={product.id} product={product} />
         ))}

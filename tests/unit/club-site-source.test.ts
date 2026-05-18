@@ -140,6 +140,9 @@ describe("club site productizado", () => {
     expect(componentSource).toContain("Consultar por WhatsApp");
     expect(componentSource).toContain("aspect-[4/3]");
     expect(componentSource).toContain("object-contain");
+    expect(componentSource).toContain("grid-cols-2 gap-x-5 gap-y-9");
+    expect(componentSource).toContain("max-w-[180px]");
+    expect(componentSource).toContain("aria-label={`${contactLabel}: ${product.name}`}");
     expect(componentSource).toContain("--club-line");
     expect(componentSource).toContain("--club-soft");
     expect(componentSource).not.toContain("Catalogo oficial");
@@ -149,6 +152,7 @@ describe("club site productizado", () => {
     expect(componentSource).not.toContain("Toda la info del club en un solo sitio.");
     expect(componentSource).not.toContain("mitiendanube.com");
     expect(componentSource).not.toContain("dcdn-us.mitiendanube.com");
+    expect(componentSource).not.toContain("drop-shadow-[0_24px_22px");
   });
 
   it("usa navegacion de tienda con categorias y footer social de pertenencia a Fabrica", () => {

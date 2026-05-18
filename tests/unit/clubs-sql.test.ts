@@ -36,20 +36,22 @@ describeSupabaseSql("clubes sql", () => {
   });
 
   it("mantiene tablas privadas de clubes fuera del grant anon directo", () => {
-    expect(policiesSql).toContain("public.clubs, public.club_public_snapshots to anon, authenticated");
+    expect(policiesSql).toMatch(
+      /grant select on table[\s\S]*public\.clubs[\s\S]*public\.club_public_snapshots[\s\S]*public\.club_site_settings[\s\S]*public\.club_products[\s\S]*to anon, authenticated;/
+    );
 
     for (const table of privateClubTables) {
       expect(policiesSql).not.toMatch(new RegExp(`grant select on table[^;]*public\\.${table}[^;]*to anon`));
     }
   });
 
-  it("protege lecturas crudas de club con membresia admin y bloquea altas comunes", () => {
+  it("protege lecturas crudas de club con membresia admin o sitio publico publicado y bloquea altas comunes", () => {
     expect(policiesSql).toContain("create or replace function public.is_club_admin");
     expect(policiesSql).toContain("create or replace function public.can_read_club");
     expect(policiesSql).toContain("public.is_club_admin(club_id)");
     expect(policiesSql).toContain("public.can_read_club(club_id)");
     expect(policiesSql).toMatch(
-      /create or replace function public\.can_read_club\(club_id uuid\)[\s\S]*select public\.is_club_admin\(club_id\);/
+      /create or replace function public\.can_read_club\(club_id uuid\)[\s\S]*select public\.is_club_admin\(club_id\)[\s\S]*join public\.club_site_settings s on s\.club_id = c\.id[\s\S]*c\.status = 'active'[\s\S]*c\.is_public = true[\s\S]*s\.enabled = true[\s\S]*s\.published = true[\s\S]*;/
     );
     expect(policiesSql).toMatch(
       /create policy clubs_insert_authenticated[\s\S]*with check \([\s\S]*created_by = auth\.uid\(\)[\s\S]*and public\.is_super_admin\(\)[\s\S]*\);/
