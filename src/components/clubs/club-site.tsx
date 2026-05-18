@@ -79,16 +79,16 @@ function ClubSiteNav({ active, data }: { active: ClubSitePageKey; data: PublicCl
   const links = [
     { key: "home", href: buildClubSitePublicHref(club, settings), label: "Inicio", visible: true },
     {
+      key: "equipo",
+      href: buildClubSitePublicHref(club, settings, "/equipo"),
+      label: "Informacion",
+      visible: settings.sectionVisibility.teamData
+    },
+    {
       key: "catalogo",
       href: buildClubSitePublicHref(club, settings, "/catalogo"),
       label: "Catalogo",
       visible: settings.sectionVisibility.catalog
-    },
-    {
-      key: "equipo",
-      href: buildClubSitePublicHref(club, settings, "/equipo"),
-      label: "Datos",
-      visible: settings.sectionVisibility.teamData
     }
   ] as const;
 
@@ -111,71 +111,93 @@ function ClubSiteNav({ active, data }: { active: ClubSitePageKey; data: PublicCl
   );
 }
 
-function ClubSiteHero({ active, data }: { active: ClubSitePageKey; data: PublicClubSiteDetails }) {
-  const { club, settings, snapshot } = data;
-  const heroUrl = getClubSiteHeroUrl(club.id, settings);
+function PlatformBackLink() {
+  return (
+    <a
+      className="inline-flex min-h-11 w-fit items-center justify-center gap-2 rounded-xl border border-emerald-400/35 bg-slate-950 px-3 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-emerald-100 shadow-[0_16px_34px_-24px_rgba(16,185,129,0.9)] transition hover:border-emerald-300 hover:bg-slate-900 md:justify-self-end"
+      href={PLATFORM_URL}
+    >
+      <Image
+        alt="Logo de Fabrica de Futbol"
+        className="h-7 w-7 object-contain"
+        height={28}
+        src="/logo.png"
+        width={28}
+      />
+      <span>Volver a Fabrica de Futbol</span>
+    </a>
+  );
+}
+
+function ClubSiteHeader({ active, data }: { active: ClubSitePageKey; data: PublicClubSiteDetails }) {
+  const { club, settings } = data;
   const homeVenue = club.home_venue?.trim();
   const shouldShowHomeVenue = Boolean(homeVenue && homeVenue.toLowerCase() !== club.name.toLowerCase());
+  return (
+    <header className="border-b border-[var(--club-line)] bg-white/95">
+      <div className="mx-auto grid max-w-7xl gap-4 px-4 py-4 md:grid-cols-[1fr_auto_1fr] md:items-center md:px-6">
+        <Link className="flex w-fit items-center gap-3 md:justify-self-start" href={buildClubSitePublicHref(club, settings)}>
+          <LeagueLogo
+            alt={`Escudo de ${club.name}`}
+            className="rounded-sm border-[var(--club-line)] bg-white"
+            size={62}
+            src={resolveClubLogoSrc(data)}
+          />
+          <div>
+            <p className="text-2xl font-black leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)]">
+              {club.name}
+            </p>
+            {shouldShowHomeVenue ? <p className="mt-1 text-sm font-semibold text-black/50">{homeVenue}</p> : null}
+          </div>
+        </Link>
+        <ClubSiteNav active={active} data={data} />
+        <PlatformBackLink />
+      </div>
+    </header>
+  );
+}
+
+function ClubSiteStatsStrip({ data }: { data: PublicClubSiteDetails }) {
+  const { snapshot } = data;
+
+  return (
+    <div className="bg-[var(--club-primary)] text-white">
+      <div className="mx-auto grid max-w-5xl grid-cols-3 gap-3 px-4 py-6 text-center md:px-6">
+        <div>
+          <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
+            {snapshot.summary.teamCount}
+          </p>
+          <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/78">Equipos</p>
+        </div>
+        <div>
+          <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
+            {snapshot.summary.playerCount}
+          </p>
+          <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/78">Jugadores</p>
+        </div>
+        <div>
+          <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
+            {snapshot.summary.totalMatches}
+          </p>
+          <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/78">Partidos</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClubSiteHomeHero({ active, data }: { active: ClubSitePageKey; data: PublicClubSiteDetails }) {
+  const { club, settings } = data;
+  const heroUrl = getClubSiteHeroUrl(club.id, settings);
   const heroHeadline = getClubHeroHeadline(data);
 
   return (
     <section className="bg-white text-[var(--club-ink)]">
-      <header className="border-b border-[var(--club-line)] bg-white/95">
-        <div className="mx-auto grid max-w-7xl gap-4 px-4 py-4 md:grid-cols-[1fr_auto_1fr] md:items-center md:px-6">
-          <Link className="flex w-fit items-center gap-3 md:justify-self-start" href={buildClubSitePublicHref(club, settings)}>
-            <LeagueLogo
-              alt={`Escudo de ${club.name}`}
-              className="rounded-sm border-[var(--club-line)] bg-white"
-              size={62}
-              src={resolveClubLogoSrc(data)}
-            />
-            <div>
-              <p className="text-2xl font-black leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)]">
-                {club.name}
-              </p>
-              {shouldShowHomeVenue ? <p className="mt-1 text-sm font-semibold text-black/50">{homeVenue}</p> : null}
-            </div>
-          </Link>
-          <ClubSiteNav active={active} data={data} />
-          <a
-            className="inline-flex min-h-10 w-fit items-center justify-center rounded-sm border border-[var(--club-line)] bg-white px-4 text-sm font-extrabold text-[var(--club-primary)] transition hover:border-[var(--club-primary)] hover:bg-[var(--club-soft)] md:justify-self-end"
-            href={PLATFORM_URL}
-          >
-            Volver a Fabrica
-          </a>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-5xl px-4 py-10 text-center md:px-6 md:py-14">
-        <p className="text-sm font-extrabold text-[var(--club-primary)]">Catalogo oficial de {club.name}</p>
-        <h1 className="mx-auto mt-5 max-w-3xl text-5xl font-black uppercase leading-[0.94] text-[var(--club-primary)] [font-family:var(--font-club-display)] md:text-7xl">
+      <ClubSiteHeader active={active} data={data} />
+      <div className="mx-auto max-w-5xl px-4 py-9 text-center md:px-6 md:py-12">
+        <h1 className="mx-auto max-w-3xl text-5xl font-black uppercase leading-[0.94] text-[var(--club-primary)] [font-family:var(--font-club-display)] md:text-7xl">
           {heroHeadline}
         </h1>
-        {club.description ? (
-          <p className="mx-auto mt-5 max-w-2xl text-base font-semibold leading-7 text-black/58 md:text-lg">
-            {club.description}
-          </p>
-        ) : null}
-        <div className="mt-7 flex flex-wrap justify-center gap-3">
-          {settings.sectionVisibility.catalog ? (
-            <Link
-              className="rounded-sm bg-[var(--club-primary)] px-5 py-3 text-sm font-black text-white transition hover:brightness-95"
-              href={buildClubSitePublicHref(club, settings, "/catalogo")}
-            >
-              Ver productos
-            </Link>
-          ) : null}
-          {settings.instagramUrl ? (
-            <a
-              className="rounded-sm border border-[var(--club-line)] bg-white px-5 py-3 text-sm font-black text-[var(--club-primary)] transition hover:border-[var(--club-primary)] hover:bg-[var(--club-soft)]"
-              href={settings.instagramUrl}
-              rel="noreferrer"
-              target="_blank"
-            >
-              Instagram
-            </a>
-          ) : null}
-        </div>
       </div>
 
       <div className="relative min-h-[300px] overflow-hidden bg-[var(--club-primary)] md:min-h-[460px]">
@@ -190,29 +212,39 @@ function ClubSiteHero({ active, data }: { active: ClubSitePageKey; data: PublicC
         />
       </div>
 
-      <div className="bg-[var(--club-primary)] text-white">
-        <div className="mx-auto grid max-w-5xl grid-cols-3 gap-3 px-4 py-6 text-center md:px-6">
+      <ClubSiteStatsStrip data={data} />
+    </section>
+  );
+}
+
+function ClubSiteFooter({ data }: { data: PublicClubSiteDetails }) {
+  return (
+    <footer className="border-t border-slate-800 bg-slate-950 text-slate-100">
+      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-7 md:flex-row md:items-center md:justify-between md:px-6">
+        <div className="flex items-center gap-3">
+          <Image
+            alt="Logo de Fabrica de Futbol"
+            className="h-12 w-12 object-contain"
+            height={48}
+            src="/logo.png"
+            width={48}
+          />
           <div>
-            <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
-              {snapshot.summary.teamCount}
+            <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-200">Fabrica de Futbol</p>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-300">
+              Este sitio pertenece a Fabrica de Futbol. {data.club.name} administra su contenido publico desde la
+              plataforma.
             </p>
-            <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/78">Equipos</p>
-          </div>
-          <div>
-            <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
-              {snapshot.summary.playerCount}
-            </p>
-            <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/78">Jugadores</p>
-          </div>
-          <div>
-            <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
-              {snapshot.summary.totalMatches}
-            </p>
-            <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/78">Partidos</p>
           </div>
         </div>
+        <a
+          className="w-fit rounded-xl border border-emerald-400/35 px-4 py-2 text-sm font-extrabold text-emerald-100 transition hover:bg-emerald-500/10"
+          href={PLATFORM_URL}
+        >
+          Conocer Fabrica de Futbol
+        </a>
       </div>
-    </section>
+    </footer>
   );
 }
 
@@ -242,8 +274,9 @@ export function ClubSiteShell({
       className={`${clubBodyFont.variable} ${clubDisplayFont.variable} min-h-screen w-full overflow-hidden bg-[var(--club-page)] text-[var(--club-ink)]`}
       style={style}
     >
-      <ClubSiteHero active={active} data={data} />
+      {active === "home" ? <ClubSiteHomeHero active={active} data={data} /> : <ClubSiteHeader active={active} data={data} />}
       <div className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-14">{children}</div>
+      <ClubSiteFooter data={data} />
     </div>
   );
 }
@@ -339,56 +372,8 @@ export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
 
   return (
     <ClubSiteShell active="home" data={data}>
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <section>
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Resumen</p>
-          <h2 className="mt-2 max-w-3xl text-5xl font-black uppercase leading-[0.92] [font-family:var(--font-club-display)] md:text-6xl">
-            Toda la info del club en un solo sitio.
-          </h2>
-          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatTile label="Goles" value={snapshot.summary.totalGoals} />
-            <StatTile label="Promedio" value={snapshot.summary.avgGoalsPerMatch} />
-            <StatTile label="Asistencias" value={snapshot.summary.totalAttendances} />
-            <StatTile label="Jugadores" value={snapshot.summary.totalPlayersDistinct} />
-          </div>
-        </section>
-
-        {settings.instagramUrl || settings.whatsappUrlOrPhone ? (
-          <aside className="rounded-md border border-black/10 bg-[#101312] p-5 text-white shadow-[0_18px_44px_-34px_rgba(0,0,0,0.65)]">
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Contacto</p>
-            <h2 className="mt-2 text-4xl font-black uppercase leading-none [font-family:var(--font-club-display)]">Canales oficiales</h2>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {settings.instagramUrl ? (
-                <a className="rounded-md border border-white/20 px-4 py-2 text-sm font-black transition hover:bg-white/10" href={settings.instagramUrl} rel="noreferrer" target="_blank">
-                  Instagram
-                </a>
-              ) : null}
-              {settings.whatsappUrlOrPhone ? (
-                <a
-                  className="rounded-md bg-[var(--club-accent)] px-4 py-2 text-sm font-black text-black transition hover:brightness-95"
-                  href={buildClubProductContactHref({
-                    clubName: data.club.name,
-                    product: {
-                      contact_channel: "whatsapp",
-                      contact_message: `Hola ${data.club.name}, quiero hacer una consulta.`,
-                      contact_url: null,
-                      name: data.club.name
-                    },
-                    settings
-                  })}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  WhatsApp
-                </a>
-              ) : null}
-            </div>
-          </aside>
-        ) : null}
-      </div>
-
       {settings.sectionVisibility.catalog && featuredProducts.length ? (
-        <section className="mt-14">
+        <section>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Catalogo</p>
@@ -427,6 +412,39 @@ export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
               <ActivityItem item={item} key={`${item.type}-${item.createdAt}-${item.title}`} />
             ))}
           </ul>
+        </section>
+      ) : null}
+
+      {settings.instagramUrl || settings.whatsappUrlOrPhone ? (
+        <section className="mt-14 rounded-md border border-black/10 bg-[#101312] p-5 text-white shadow-[0_18px_44px_-34px_rgba(0,0,0,0.65)]">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Contacto</p>
+          <h2 className="mt-2 text-4xl font-black uppercase leading-none [font-family:var(--font-club-display)]">Canales oficiales</h2>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {settings.instagramUrl ? (
+              <a className="rounded-md border border-white/20 px-4 py-2 text-sm font-black transition hover:bg-white/10" href={settings.instagramUrl} rel="noreferrer" target="_blank">
+                Instagram
+              </a>
+            ) : null}
+            {settings.whatsappUrlOrPhone ? (
+              <a
+                className="rounded-md bg-[var(--club-accent)] px-4 py-2 text-sm font-black text-black transition hover:brightness-95"
+                href={buildClubProductContactHref({
+                  clubName: data.club.name,
+                  product: {
+                    contact_channel: "whatsapp",
+                    contact_message: `Hola ${data.club.name}, quiero hacer una consulta.`,
+                    contact_url: null,
+                    name: data.club.name
+                  },
+                  settings
+                })}
+                rel="noreferrer"
+                target="_blank"
+              >
+                WhatsApp
+              </a>
+            ) : null}
+          </div>
         </section>
       ) : null}
     </ClubSiteShell>
@@ -531,7 +549,7 @@ export function ClubSiteTeamData({ data }: { data: PublicClubSiteDetails }) {
   return (
     <ClubSiteShell active="equipo" data={data}>
       <section>
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Datos del equipo</p>
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Informacion</p>
         <h1 className="mt-2 text-6xl font-black uppercase leading-[0.9] [font-family:var(--font-club-display)] md:text-7xl">Rendimiento publico</h1>
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <StatTile label="Equipos" value={snapshot.summary.teamCount} />

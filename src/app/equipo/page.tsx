@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   if (!data || !data.settings.sectionVisibility.teamData) {
     return {
-      title: "Datos del equipo",
+      title: "Informacion",
       robots: {
         index: false,
         follow: false
@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: { absolute: `Datos - ${data.club.name}` },
+    title: { absolute: `Informacion - ${data.club.name}` },
     alternates: { canonical: buildClubSitePublicHref(data.club, data.settings, "/equipo") },
     robots: {
       index: true,

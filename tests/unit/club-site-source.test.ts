@@ -34,6 +34,7 @@ describe("club site productizado", () => {
     expect(teamDataSource).toContain("ClubSiteTeamData");
     expect(componentSource).toContain("buildClubProductContactHref");
     expect(componentSource).toContain("Catalogo");
+    expect(componentSource).toContain("Informacion");
     expect(componentSource).not.toMatch(/\bcheckout\b/i);
     expect(componentSource).not.toMatch(/\bcarrito\b/i);
   });
@@ -98,21 +99,37 @@ describe("club site productizado", () => {
     expect(layoutSource).toContain("standaloneClubSite");
     expect(layoutSource).toContain("{standaloneClubSite ? (");
     expect(layoutSource).toContain('<main className="w-full" id="contenido-principal">');
-    expect(componentSource).toContain("Volver a Fabrica");
+    expect(componentSource).toContain("Volver a Fabrica de Futbol");
     expect(componentSource).not.toContain("-my-6");
     expect(componentSource).not.toContain("bg-[#f7f3ec]");
   });
 
-  it("mantiene la estetica de club cerca de la referencia La Quinta sin copiar assets externos", () => {
+  it("mantiene el inicio de La Quinta simple: slogan, foto y resumen numerico", () => {
     const componentSource = readSource("src", "components", "clubs", "club-site.tsx");
 
     expect(componentSource).toContain("getClubHeroHeadline");
     expect(componentSource).toContain("Esta locura de amarte me impide ser normal");
+    expect(componentSource).toContain("ClubSiteHomeHero");
     expect(componentSource).toContain("--club-line");
     expect(componentSource).toContain("--club-soft");
-    expect(componentSource).toContain("Catalogo oficial");
+    expect(componentSource).not.toContain("Catalogo oficial");
+    expect(componentSource).not.toContain("Ver productos");
+    expect(componentSource).not.toContain("Toda la info del club en un solo sitio.");
     expect(componentSource).not.toContain("mitiendanube.com");
     expect(componentSource).not.toContain("dcdn-us.mitiendanube.com");
+  });
+
+  it("usa header compacto en Informacion y Catalogo, con footer de pertenencia a Fabrica", () => {
+    const componentSource = readSource("src", "components", "clubs", "club-site.tsx");
+
+    expect(componentSource).toContain("ClubSiteHeader");
+    expect(componentSource).toContain("ClubSiteFooter");
+    expect(componentSource).toContain('active === "home" ?');
+    expect(componentSource).toMatch(/label: "Inicio"[\s\S]*label: "Informacion"[\s\S]*label: "Catalogo"/);
+    expect(componentSource).toContain('alt="Logo de Fabrica de Futbol"');
+    expect(componentSource).toContain('src="/logo.png"');
+    expect(componentSource).toContain("Este sitio pertenece a Fabrica de Futbol");
+    expect(componentSource).not.toContain("Datos del equipo");
   });
 
   it("usa metadata absoluta para que el dominio de club no herede el sufijo de Fabrica", () => {
@@ -124,6 +141,6 @@ describe("club site productizado", () => {
     expect(rootClubSource).toContain("absolute: data.club.name");
     expect(slugClubSource).toContain("absolute: data.club.name");
     expect(catalogSource).toContain("absolute: `Catalogo - ${data.club.name}`");
-    expect(teamDataSource).toContain("absolute: `Datos - ${data.club.name}`");
+    expect(teamDataSource).toContain("absolute: `Informacion - ${data.club.name}`");
   });
 });
