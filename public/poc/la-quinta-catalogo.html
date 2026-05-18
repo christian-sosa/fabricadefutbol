@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>La Quinta | Catalogo</title>
+    <meta name="description" content="Catalogo oficial de La Quinta con consulta por WhatsApp." />
+    <link rel="stylesheet" href="/poc/la-quinta.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <button class="icon-button" type="button" aria-label="Buscar">⌕</button>
+        <a class="brand" href="/poc/la-quinta.html" aria-label="La Quinta inicio">
+          <img src="/poc/la-quinta-logo.jpeg" alt="La Quinta" />
+        </a>
+        <div class="utility-links">
+          <a href="/poc/la-quinta-datos.html">Datos</a>
+          <a href="/poc/la-quinta-catalogo.html" aria-current="page">Catalogo</a>
+        </div>
+      </div>
+      <nav class="nav-links" aria-label="Navegacion principal">
+        <a href="/poc/la-quinta.html">Inicio</a>
+        <a href="/poc/la-quinta-catalogo.html" aria-current="page">Productos</a>
+        <a href="/poc/la-quinta-datos.html">Equipo</a>
+      </nav>
+      <div class="mobile-search">
+        <input aria-label="Buscar productos" placeholder="Buscar" />
+      </div>
+    </header>
+
+    <main>
+      <section class="hero-copy">
+        <p>Catalogo oficial de La Quinta Futbol Club</p>
+        <h1>Productos oficiales y pedidos por WhatsApp</h1>
+        <a href="/poc/la-quinta-datos.html">Ver datos del equipo</a>
+      </section>
+
+      <section class="hero-media" aria-label="Foto principal de La Quinta">
+        <img src="/poc/la-quinta-hero.webp" alt="La Quinta Futbol Club" />
+      </section>
+
+      <section class="section" id="catalogo">
+        <div class="section-heading">
+          <h2>Destacados</h2>
+        </div>
+
+        <div class="product-toolbar" aria-label="Filtros de catalogo">
+          <button class="filter-button" type="button" data-filter="todos" aria-pressed="true">Todos</button>
+          <button class="filter-button" type="button" data-filter="camisetas" aria-pressed="false">Camisetas</button>
+          <button class="filter-button" type="button" data-filter="indumentaria" aria-pressed="false">Indumentaria</button>
+          <button class="filter-button" type="button" data-filter="accesorios" aria-pressed="false">Accesorios</button>
+          <button class="filter-button" type="button" data-filter="merch" aria-pressed="false">Merchandising Oficial</button>
+        </div>
+
+        <div class="product-grid" id="productGrid"></div>
+      </section>
+
+      <section class="section featured">
+        <div class="featured-art" aria-hidden="true">
+          <svg viewBox="0 0 260 280" role="img" aria-label="Remera Oversize negra">
+            <path d="M74 42h112l48 44-31 42-24-17v132H81V111l-24 17-31-42 48-44Z" fill="#060504" />
+            <path d="M103 48c10 18 44 18 54 0" fill="none" stroke="#ff9900" stroke-width="8" />
+            <path d="M129 56v180" stroke="#ff9900" stroke-width="5" />
+            <circle cx="160" cy="96" r="12" fill="#ff9900" />
+          </svg>
+        </div>
+        <div class="featured-info">
+          <h2>Remera Oversize negra</h2>
+          <a class="black-button" data-featured-whatsapp href="#" target="_blank" rel="noreferrer">Consultar precio</a>
+          <p>Remera pre-match oversize bordada oficial de La Quinta.</p>
+        </div>
+      </section>
+    </main>
+
+    <section class="service-band">
+      <div class="service-grid">
+        <article class="service-item"><span class="service-icon">□</span><h3>Retiro del producto</h3><p>Punto de encuentro a convenir.</p></article>
+        <article class="service-item"><span class="service-icon">$</span><h3>Medios de pago</h3><p>Solo transferencias por el total del producto.</p></article>
+        <article class="service-item"><span class="service-icon">↺</span><h3>Cambios y devoluciones</h3><p>Los cambios dependen del stock actual.</p></article>
+        <article class="service-item"><span class="service-icon">W</span><h3>Pedidos</h3><p>Para dudas, pedidos o reclamos.</p></article>
+      </div>
+    </section>
+
+    <section class="newsletter">
+      <h2>Newsletter</h2>
+      <p>Registrate y recibi nuestras ofertas.</p>
+      <form class="newsletter-form">
+        <input type="email" placeholder="Email" aria-label="Email" />
+        <button type="button">Enviar</button>
+      </form>
+    </section>
+
+    <footer class="site-footer">
+      <img class="footer-logo" src="/poc/la-quinta-logo.jpeg" alt="" />
+      <div class="footer-links">
+        <a href="/poc/la-quinta.html">Inicio</a>
+        <a href="/poc/la-quinta-catalogo.html">Productos</a>
+        <a href="/poc/la-quinta-datos.html">Equipo</a>
+      </div>
+      <p class="copyright">Copyright La Quinta - POC Fabrica de Futbol - 2026</p>
+    </footer>
+
+    <a class="whatsapp-float" data-whatsapp-general href="#" target="_blank" rel="noreferrer">WhatsApp</a>
+
+    <script src="/poc/la-quinta-catalogo.js"></script>
+  </body>
+</html>

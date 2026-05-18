@@ -6,6 +6,7 @@ import { getPublicAppUrl } from "@/lib/public-url";
 const STATIC_PUBLIC_PATHS = [
   "/",
   "/groups",
+  "/clubs",
   "/ranking",
   "/matches",
   "/upcoming",

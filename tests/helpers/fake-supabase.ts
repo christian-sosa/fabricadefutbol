@@ -42,6 +42,8 @@ type TableName =
   | "club_match_payments"
   | "club_match_player_stats"
   | "club_public_snapshots"
+  | "club_site_settings"
+  | "club_products"
   | "players"
   | "matches"
   | "match_players"
@@ -125,6 +127,8 @@ function createEmptyDatabase(): FakeDatabase {
     club_match_payments: [],
     club_match_player_stats: [],
     club_public_snapshots: [],
+    club_site_settings: [],
+    club_products: [],
     players: [],
     matches: [],
     match_players: [],
@@ -235,6 +239,33 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       break;
     case "organization_season_player_ratings":
       if (!("current_rating" in normalized)) normalized.current_rating = 1000;
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "club_site_settings":
+      if (!("enabled" in normalized)) normalized.enabled = false;
+      if (!("published" in normalized)) normalized.published = false;
+      if (!("domain" in normalized)) normalized.domain = null;
+      if (!("hero_image_path" in normalized)) normalized.hero_image_path = null;
+      if (!("primary_color" in normalized)) normalized.primary_color = "#ff9900";
+      if (!("secondary_color" in normalized)) normalized.secondary_color = "#0a0908";
+      if (!("accent_color" in normalized)) normalized.accent_color = "#25D366";
+      if (!("font_family" in normalized)) normalized.font_family = "system";
+      if (!("whatsapp_url_or_phone" in normalized)) normalized.whatsapp_url_or_phone = null;
+      if (!("instagram_url" in normalized)) normalized.instagram_url = null;
+      if (!("section_visibility" in normalized)) normalized.section_visibility = {};
+      if (!normalized.updated_at) normalized.updated_at = now;
+      break;
+    case "club_products":
+      if (!("description" in normalized)) normalized.description = null;
+      if (!("category" in normalized)) normalized.category = null;
+      if (!("image_path" in normalized)) normalized.image_path = null;
+      if (!("price_label" in normalized)) normalized.price_label = null;
+      if (!("status" in normalized)) normalized.status = "available";
+      if (!("visible" in normalized)) normalized.visible = true;
+      if (!("sort_order" in normalized)) normalized.sort_order = 0;
+      if (!("contact_channel" in normalized)) normalized.contact_channel = "whatsapp";
+      if (!("contact_url" in normalized)) normalized.contact_url = null;
+      if (!("contact_message" in normalized)) normalized.contact_message = null;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "leagues":
@@ -866,6 +897,8 @@ class FakeSupabaseState {
         (row) => !deletedMatchIds.has(String(row.match_id)) && !deletedLineupIds.has(String(row.lineup_id))
       );
       this.db.club_public_snapshots = this.db.club_public_snapshots.filter((row) => !deletedClubIds.has(String(row.club_id)));
+      this.db.club_site_settings = this.db.club_site_settings.filter((row) => !deletedClubIds.has(String(row.club_id)));
+      this.db.club_products = this.db.club_products.filter((row) => !deletedClubIds.has(String(row.club_id)));
     }
 
     if (table === "competition_matches") {

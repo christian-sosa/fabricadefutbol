@@ -1509,6 +1509,114 @@ export type Database = {
         };
         Relationships: [];
       };
+      club_site_settings: {
+        Row: {
+          accent_color: string | null;
+          club_id: string;
+          created_at: string;
+          domain: string | null;
+          enabled: boolean;
+          font_family: "system" | "inter" | "montserrat" | "oswald";
+          hero_image_path: string | null;
+          instagram_url: string | null;
+          primary_color: string | null;
+          published: boolean;
+          secondary_color: string | null;
+          section_visibility: Json;
+          updated_at: string;
+          whatsapp_url_or_phone: string | null;
+        };
+        Insert: {
+          accent_color?: string | null;
+          club_id: string;
+          created_at?: string;
+          domain?: string | null;
+          enabled?: boolean;
+          font_family?: "system" | "inter" | "montserrat" | "oswald";
+          hero_image_path?: string | null;
+          instagram_url?: string | null;
+          primary_color?: string | null;
+          published?: boolean;
+          secondary_color?: string | null;
+          section_visibility?: Json;
+          updated_at?: string;
+          whatsapp_url_or_phone?: string | null;
+        };
+        Update: {
+          accent_color?: string | null;
+          club_id?: string;
+          created_at?: string;
+          domain?: string | null;
+          enabled?: boolean;
+          font_family?: "system" | "inter" | "montserrat" | "oswald";
+          hero_image_path?: string | null;
+          instagram_url?: string | null;
+          primary_color?: string | null;
+          published?: boolean;
+          secondary_color?: string | null;
+          section_visibility?: Json;
+          updated_at?: string;
+          whatsapp_url_or_phone?: string | null;
+        };
+        Relationships: [];
+      };
+      club_products: {
+        Row: {
+          category: string | null;
+          club_id: string;
+          contact_channel: "whatsapp" | "instagram" | "custom";
+          contact_message: string | null;
+          contact_url: string | null;
+          created_at: string;
+          description: string | null;
+          id: string;
+          image_path: string | null;
+          name: string;
+          price_label: string | null;
+          slug: string;
+          sort_order: number;
+          status: "available" | "sold_out" | "preorder" | "hidden";
+          updated_at: string;
+          visible: boolean;
+        };
+        Insert: {
+          category?: string | null;
+          club_id: string;
+          contact_channel?: "whatsapp" | "instagram" | "custom";
+          contact_message?: string | null;
+          contact_url?: string | null;
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          image_path?: string | null;
+          name: string;
+          price_label?: string | null;
+          slug: string;
+          sort_order?: number;
+          status?: "available" | "sold_out" | "preorder" | "hidden";
+          updated_at?: string;
+          visible?: boolean;
+        };
+        Update: {
+          category?: string | null;
+          club_id?: string;
+          contact_channel?: "whatsapp" | "instagram" | "custom";
+          contact_message?: string | null;
+          contact_url?: string | null;
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          image_path?: string | null;
+          name?: string;
+          price_label?: string | null;
+          slug?: string;
+          sort_order?: number;
+          status?: "available" | "sold_out" | "preorder" | "hidden";
+          updated_at?: string;
+          visible?: boolean;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       public_match_cards: {

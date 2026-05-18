@@ -403,6 +403,35 @@ export function getTeamLogosBucket() {
   return value ?? "team-logos";
 }
 
+export function getClubSiteMediaBucket() {
+  const targetEnv = getSupabaseTargetEnv();
+  const selected =
+    targetEnv === "development"
+      ? firstDefined([
+          "SUPABASE_CLUB_SITE_MEDIA_BUCKET_DEV",
+          "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET_DEV",
+          "SUPABASE_CLUB_SITE_MEDIA_BUCKET",
+          "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET"
+        ])
+      : firstDefined([
+          "SUPABASE_CLUB_SITE_MEDIA_BUCKET",
+          "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET",
+          "SUPABASE_CLUB_SITE_MEDIA_BUCKET_PROD",
+          "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET_PROD"
+        ]);
+  const fallback = firstDefined([
+    "SUPABASE_CLUB_SITE_MEDIA_BUCKET",
+    "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET",
+    "SUPABASE_CLUB_SITE_MEDIA_BUCKET_DEV",
+    "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET_DEV",
+    "SUPABASE_CLUB_SITE_MEDIA_BUCKET_PROD",
+    "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET_PROD"
+  ]);
+  const value = selected ?? fallback;
+
+  return value ?? "club-site-media";
+}
+
 export function getMercadoPagoAccessToken() {
   const targetEnv = getSupabaseTargetEnv();
   const selected =

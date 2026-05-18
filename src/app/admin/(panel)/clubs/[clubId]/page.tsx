@@ -7,6 +7,7 @@ import {
   addClubCompetitionAction,
   addClubMatchAction,
   addClubPlayerAction,
+  addClubProductAction,
   addClubTeamAction,
   addClubTeamPlayersAction,
   bulkAddClubPlayersAction,
@@ -19,7 +20,11 @@ import {
   updateClubAction,
   updateClubCallupPlayerAction,
   updateClubMatchFinanceAction,
+  updateClubProductAction,
+  updateClubSiteSettingsAction,
   updateClubTeamAction,
+  uploadClubProductImageAction,
+  uploadClubSiteHeroAction,
   uploadClubLogoAction,
   uploadClubPlayerPhotoAction
 } from "@/app/admin/(panel)/clubs/[clubId]/actions";
@@ -64,6 +69,13 @@ import {
   type ClubTeamPlayerRecord,
   type ClubTeamRecord
 } from "@/lib/domain/clubs";
+import {
+  CLUB_SITE_SECTION_KEYS,
+  buildClubSitePublicHref,
+  type ClubProductRecord,
+  type ClubProductStatus
+} from "@/lib/domain/club-sites";
+import { getClubProductImageUrl, getClubSiteHeroUrl } from "@/lib/club-site-media";
 import { getAdminClubDetails } from "@/lib/queries/clubs";
 import { getClubLogoUrl } from "@/lib/team-logos";
 
@@ -163,6 +175,27 @@ const CALLUP_PLAYER_STATUS_OPTIONS: Array<{ value: ClubCallupPlayerStatus | ""; 
   { value: "injured", label: "Lesionado" },
   { value: "out", label: "Baja" }
 ];
+
+const CLUB_SITE_SECTION_LABELS: Record<(typeof CLUB_SITE_SECTION_KEYS)[number], string> = {
+  activity: "Actividad reciente",
+  catalog: "Catalogo",
+  matches: "Ultimos partidos",
+  playerStats: "Tabla de jugadores",
+  records: "Records",
+  teamData: "Datos del equipo",
+  teams: "Equipos"
+};
+
+const CLUB_PRODUCT_STATUS_OPTIONS: Array<{ label: string; value: ClubProductStatus }> = [
+  { label: "Disponible", value: "available" },
+  { label: "Preventa", value: "preorder" },
+  { label: "Consultar disponibilidad", value: "sold_out" },
+  { label: "Oculto", value: "hidden" }
+];
+
+function getProductStatusLabel(status: string) {
+  return CLUB_PRODUCT_STATUS_OPTIONS.find((option) => option.value === status)?.label ?? "Disponible";
+}
 
 function ModalityBadge({ modality }: { modality: ClubTeamRecord["modality"] }) {
   return (
@@ -2054,6 +2087,337 @@ function FinancesTab({
   );
 }
 
+function ProductEditor({
+  clubId,
+  product
+}: {
+  clubId: string;
+  product: ClubProductRecord;
+}) {
+  const imageUrl = getClubProductImageUrl(product);
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="h-32 w-full shrink-0 overflow-hidden rounded-lg border border-slate-800 bg-slate-900 lg:w-32">
+          {imageUrl ? (
+            <img alt={product.name} className="h-full w-full object-cover" src={imageUrl} />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs font-semibold text-slate-500">
+              Sin imagen
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-100">{product.name}</p>
+              <p className="text-xs text-slate-500">
+                {product.category ?? "Sin categoria"} - {getProductStatusLabel(product.status)}
+              </p>
+            </div>
+            <Badge className={product.visible && product.status !== "hidden" ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-700 text-slate-300"}>
+              {product.visible && product.status !== "hidden" ? "Visible" : "Oculto"}
+            </Badge>
+          </div>
+
+          <form action={updateClubProductAction.bind(null, clubId)} className="mt-4 grid gap-3 md:grid-cols-6">
+            <input name="productId" type="hidden" value={product.id} />
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-name-${product.id}`}>
+                Nombre
+              </label>
+              <Input defaultValue={product.name} id={`product-name-${product.id}`} name="name" required />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-category-${product.id}`}>
+                Categoria
+              </label>
+              <Input defaultValue={product.category ?? ""} id={`product-category-${product.id}`} name="category" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-price-${product.id}`}>
+                Precio
+              </label>
+              <Input defaultValue={product.price_label ?? ""} id={`product-price-${product.id}`} name="priceLabel" placeholder="Consultar precio" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-status-${product.id}`}>
+                Estado
+              </label>
+              <Select defaultValue={product.status} id={`product-status-${product.id}`} name="status">
+                {CLUB_PRODUCT_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-order-${product.id}`}>
+                Orden
+              </label>
+              <Input defaultValue={product.sort_order} id={`product-order-${product.id}`} min={0} name="sortOrder" type="number" />
+            </div>
+            <div className="md:col-span-3">
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-description-${product.id}`}>
+                Descripcion
+              </label>
+              <Textarea defaultValue={product.description ?? ""} id={`product-description-${product.id}`} name="description" rows={3} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-contact-${product.id}`}>
+                Contacto
+              </label>
+              <Select defaultValue={product.contact_channel} id={`product-contact-${product.id}`} name="contactChannel">
+                <option value="whatsapp">WhatsApp</option>
+                <option value="instagram">Instagram</option>
+                <option value="custom">Link custom</option>
+              </Select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-contact-url-${product.id}`}>
+                Override link/contacto
+              </label>
+              <Input defaultValue={product.contact_url ?? ""} id={`product-contact-url-${product.id}`} name="contactUrl" />
+            </div>
+            <div className="md:col-span-3">
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-message-${product.id}`}>
+                Mensaje
+              </label>
+              <Input defaultValue={product.contact_message ?? ""} id={`product-message-${product.id}`} name="contactMessage" />
+            </div>
+            <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-200">
+              <input defaultChecked={product.visible} name="visible" type="checkbox" />
+              Visible
+            </label>
+            <div className="md:col-span-2">
+              <Button type="submit" variant="secondary">Guardar producto</Button>
+            </div>
+          </form>
+
+          <form action={uploadClubProductImageAction.bind(null, clubId)} className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input name="productId" type="hidden" value={product.id} />
+            <Input accept="image/jpeg,image/png,image/webp" className="max-w-80" name="productImage" type="file" />
+            <Button className="w-fit" type="submit" variant="ghost">Subir imagen</Button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SiteTab({
+  clubId,
+  details
+}: {
+  clubId: string;
+  details: NonNullable<Awaited<ReturnType<typeof getAdminClubDetails>>>;
+}) {
+  const settings = details.siteSettings;
+  const publicHref = buildClubSitePublicHref(details.club, settings);
+  const heroUrl = getClubSiteHeroUrl(clubId, settings);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Sitio del club</CardTitle>
+            <CardDescription className="mt-2">
+              Configura identidad, contacto, secciones visibles y catalogo. El sitio se publica solo si esta habilitado y publicado.
+            </CardDescription>
+          </div>
+          <a className={adminContextPrimaryActionLinkClass} href={publicHref}>
+            Vista del sitio
+          </a>
+        </div>
+      </Card>
+
+      <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+        <Card>
+          <CardTitle>Foto principal</CardTitle>
+          <CardDescription className="mt-2">
+            Esta imagen se reutiliza en home, catalogo y datos del equipo.
+          </CardDescription>
+          <div className="mt-4 overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
+            <img alt={`Foto principal de ${details.club.name}`} className="aspect-[16/9] w-full object-cover" src={heroUrl} />
+          </div>
+          <form action={uploadClubSiteHeroAction.bind(null, clubId)} className="mt-4 flex flex-col gap-2">
+            <Input accept="image/jpeg,image/png,image/webp" name="hero" type="file" />
+            <Button className="w-fit" type="submit" variant="secondary">
+              Subir foto principal
+            </Button>
+          </form>
+        </Card>
+
+        <Card>
+          <CardTitle>Identidad y publicacion</CardTitle>
+          <form action={updateClubSiteSettingsAction.bind(null, clubId)} className="mt-4 grid gap-3 md:grid-cols-3">
+            <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm font-semibold text-slate-200">
+              <input defaultChecked={settings.enabled} name="enabled" type="checkbox" />
+              Sitio habilitado
+            </label>
+            <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm font-semibold text-slate-200">
+              <input defaultChecked={settings.published} name="published" type="checkbox" />
+              Publicado
+            </label>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="fontFamily">
+                Fuente
+              </label>
+              <Select defaultValue={settings.fontFamily} id="fontFamily" name="fontFamily">
+                <option value="system">Sistema</option>
+                <option value="inter">Inter</option>
+                <option value="montserrat">Montserrat</option>
+                <option value="oswald">Oswald</option>
+              </Select>
+            </div>
+            <div className="md:col-span-3">
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="domain">
+                Dominio propio
+              </label>
+              <Input defaultValue={settings.domain ?? ""} id="domain" name="domain" placeholder="laquinta.com.ar" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="primaryColor">
+                Color primario
+              </label>
+              <Input className="h-11 p-1" defaultValue={settings.primaryColor} id="primaryColor" name="primaryColor" type="color" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="secondaryColor">
+                Color secundario
+              </label>
+              <Input className="h-11 p-1" defaultValue={settings.secondaryColor} id="secondaryColor" name="secondaryColor" type="color" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="accentColor">
+                Color contacto
+              </label>
+              <Input className="h-11 p-1" defaultValue={settings.accentColor} id="accentColor" name="accentColor" type="color" />
+            </div>
+            <div className="md:col-span-3">
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="whatsappUrlOrPhone">
+                WhatsApp
+              </label>
+              <Input defaultValue={settings.whatsappUrlOrPhone ?? ""} id="whatsappUrlOrPhone" name="whatsappUrlOrPhone" placeholder="54911..." />
+            </div>
+            <div className="md:col-span-3">
+              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="instagramUrl">
+                Instagram
+              </label>
+              <Input defaultValue={settings.instagramUrl ?? ""} id="instagramUrl" name="instagramUrl" placeholder="https://instagram.com/club" />
+            </div>
+            <div className="md:col-span-3">
+              <p className="text-sm font-semibold text-slate-200">Secciones visibles</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {CLUB_SITE_SECTION_KEYS.map((key) => (
+                  <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200" key={key}>
+                    <input defaultChecked={settings.sectionVisibility[key]} name={`section:${key}`} type="checkbox" />
+                    {CLUB_SITE_SECTION_LABELS[key]}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="md:col-span-3">
+              <Button type="submit">Guardar sitio</Button>
+            </div>
+          </form>
+        </Card>
+      </section>
+
+      <Card>
+        <CardTitle>Nuevo producto</CardTitle>
+        <CardDescription className="mt-2">
+          El catalogo no vende directo: cada producto deriva a WhatsApp, Instagram o un link custom.
+        </CardDescription>
+        <form action={addClubProductAction.bind(null, clubId)} className="mt-4 grid gap-3 md:grid-cols-6">
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-name">
+              Nombre
+            </label>
+            <Input id="new-product-name" name="name" required />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-category">
+              Categoria
+            </label>
+            <Input id="new-product-category" name="category" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-price">
+              Precio
+            </label>
+            <Input id="new-product-price" name="priceLabel" placeholder="Consultar precio" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-status">
+              Estado
+            </label>
+            <Select defaultValue="available" id="new-product-status" name="status">
+              {CLUB_PRODUCT_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-order">
+              Orden
+            </label>
+            <Input defaultValue={details.products.length + 1} id="new-product-order" min={0} name="sortOrder" type="number" />
+          </div>
+          <div className="md:col-span-3">
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-description">
+              Descripcion
+            </label>
+            <Textarea id="new-product-description" name="description" rows={3} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-contact">
+              Contacto
+            </label>
+            <Select defaultValue="whatsapp" id="new-product-contact" name="contactChannel">
+              <option value="whatsapp">WhatsApp</option>
+              <option value="instagram">Instagram</option>
+              <option value="custom">Link custom</option>
+            </Select>
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-contact-url">
+              Override link/contacto
+            </label>
+            <Input id="new-product-contact-url" name="contactUrl" />
+          </div>
+          <div className="md:col-span-3">
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-message">
+              Mensaje
+            </label>
+            <Input id="new-product-message" name="contactMessage" />
+          </div>
+          <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm font-semibold text-slate-200">
+            <input defaultChecked name="visible" type="checkbox" />
+            Visible
+          </label>
+          <div className="md:col-span-2">
+            <Button type="submit">Crear producto</Button>
+          </div>
+        </form>
+      </Card>
+
+      <Card>
+        <CardTitle>Productos cargados</CardTitle>
+        <div className="mt-4 space-y-4">
+          {details.products.map((product) => (
+            <ProductEditor clubId={clubId} key={product.id} product={product} />
+          ))}
+          {!details.products.length ? (
+            <p className="text-sm text-slate-400">Todavia no hay productos. Crea el primero para poblar el catalogo.</p>
+          ) : null}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function AdminsTab({
   clubId,
   details
@@ -2176,6 +2540,7 @@ export default async function AdminClubDetailPage({
   };
   const tabs = [
     { key: "summary", label: "Resumen" },
+    { key: "site", label: "Sitio" },
     { key: "players", label: "Jugadores" },
     { key: "teams", label: "Equipos" },
     { key: "competitions", label: "Torneos" },
@@ -2184,6 +2549,7 @@ export default async function AdminClubDetailPage({
     { key: "finances", label: "Finanzas" },
     { key: "admins", label: "Admins" }
   ];
+  const clubSitePublicHref = buildClubSitePublicHref(details.club, details.siteSettings);
 
   return (
     <div className="space-y-4">
@@ -2212,9 +2578,9 @@ export default async function AdminClubDetailPage({
             <Link className={adminContextActionLinkClass} href="/admin">
               Cambiar espacio
             </Link>
-            <Link className={adminContextPrimaryActionLinkClass} href={`/clubs/${details.club.slug}`}>
+            <a className={adminContextPrimaryActionLinkClass} href={clubSitePublicHref}>
               Vista del club
-            </Link>
+            </a>
           </div>
         </div>
       </Card>
@@ -2232,6 +2598,7 @@ export default async function AdminClubDetailPage({
       <Feedback error={resolvedSearchParams.error} success={resolvedSearchParams.success} />
 
       {selectedTab === "summary" ? <SummaryTab clubId={clubId} details={details} /> : null}
+      {selectedTab === "site" ? <SiteTab clubId={clubId} details={details} /> : null}
       {selectedTab === "players" ? (
         <PlayersTab
           clubId={clubId}

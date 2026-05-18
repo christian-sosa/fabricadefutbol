@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
-import { ClubSiteHome } from "@/components/clubs/club-site";
+import { ClubSiteTeamData } from "@/components/clubs/club-site";
 import { buildClubSitePublicHref, isClubSiteCustomDomainHost } from "@/lib/domain/club-sites";
 import { getPublicClubSiteBySlug } from "@/lib/queries/clubs";
 
@@ -17,9 +17,8 @@ export async function generateMetadata({
   const isCustomDomain = data ? isClubSiteCustomDomainHost(requestHeaders.get("host"), data.settings) : false;
 
   return {
-    title: data ? data.club.name : "Club",
-    description: data?.club.description ?? "Sitio publico del club en Fabrica de Futbol.",
-    alternates: data ? { canonical: buildClubSitePublicHref(data.club, data.settings) } : undefined,
+    title: data ? `Datos - ${data.club.name}` : "Datos del equipo",
+    alternates: data ? { canonical: buildClubSitePublicHref(data.club, data.settings, "/equipo") } : undefined,
     robots: {
       index: isCustomDomain,
       follow: true
@@ -27,14 +26,14 @@ export async function generateMetadata({
   };
 }
 
-export default async function ClubSiteHomePage({
+export default async function ClubSiteTeamDataPage({
   params
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
   const data = await getPublicClubSiteBySlug(slug);
-  if (!data) notFound();
+  if (!data || !data.settings.sectionVisibility.teamData) notFound();
 
-  return <ClubSiteHome data={data} />;
+  return <ClubSiteTeamData data={data} />;
 }

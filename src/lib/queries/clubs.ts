@@ -30,6 +30,15 @@ import {
   type ClubTeamPlayerRecord,
   type ClubTeamRecord
 } from "@/lib/domain/clubs";
+import {
+  buildClubSitePublicHref,
+  filterVisibleClubProducts,
+  normalizeClubSiteSettings,
+  type ClubProductRecord,
+  type ClubSiteSettings,
+  type ClubSiteSettingsRow
+} from "@/lib/domain/club-sites";
+import { isMissingSupabaseConfigurationError } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -66,6 +75,8 @@ export type AdminClubDetails = {
   payments: ClubMatchPaymentRecord[];
   financialSummary: ClubFinancialSummary;
   publicSnapshot: ClubPublicSnapshot;
+  siteSettings: ClubSiteSettings;
+  products: ClubProductRecord[];
   admins: ClubAdminListItem[];
   pendingInvites: ClubAdminInviteListItem[];
   competitions: ClubCompetitionRecord[];
@@ -103,6 +114,345 @@ type ClubSnapshotRow = {
   available_modalities: ClubPublicSnapshot["availableModalities"] | null;
   by_modality: ClubPublicSnapshot["byModality"] | null;
 };
+
+type ClubProductRow = ClubProductRecord;
+
+export type PublicClubSiteListItem = {
+  club: ClubRecord;
+  settings: ClubSiteSettings;
+  productCount: number;
+  publicHref: string;
+};
+
+export type PublicClubSiteDetails = {
+  club: ClubRecord;
+  settings: ClubSiteSettings;
+  products: ClubProductRecord[];
+  snapshot: ClubPublicSnapshot;
+};
+
+function shouldUseClubSiteDemoFallback() {
+  return process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_ENABLE_CLUB_SITE_DEMO === "true";
+}
+
+function isMissingClubSiteSchemaError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: string; message?: string };
+  return candidate.code === "42P01" || /club_site_settings|club_products/i.test(candidate.message ?? "");
+}
+
+function buildLaQuintaDemoSite(): PublicClubSiteDetails {
+  const now = "2026-05-17T00:00:00.000Z";
+  const club: ClubRecord = {
+    id: "la-quinta-demo",
+    name: "La Quinta",
+    slug: "la-quinta",
+    description: "Futbol, amigos y comunidad. Un espacio para seguir al club, ver datos del equipo y consultar productos oficiales.",
+    home_venue: "La Quinta",
+    logo_path: "/poc/la-quinta-logo.jpeg",
+    is_public: true,
+    status: "active",
+    created_at: now
+  };
+  const settings = normalizeClubSiteSettings(
+    {
+      club_id: club.id,
+      enabled: true,
+      published: true,
+      hero_image_path: "/poc/la-quinta-hero.webp",
+      primary_color: "#f7951d",
+      secondary_color: "#111111",
+      accent_color: "#25D366",
+      font_family: "montserrat",
+      whatsapp_url_or_phone: "5491112345678",
+      instagram_url: "https://instagram.com/laquintafc",
+      section_visibility: {
+        activity: true,
+        catalog: true,
+        matches: true,
+        playerStats: true,
+        records: true,
+        teamData: true,
+        teams: true
+      }
+    },
+    club
+  );
+  const products: ClubProductRecord[] = [
+    {
+      id: "demo-product-1",
+      club_id: club.id,
+      name: "Camiseta titular",
+      slug: "camiseta-titular",
+      description: "Modelo naranja y negro para jugar o alentar.",
+      category: "Camisetas",
+      image_path: null,
+      price_label: "Consultar precio",
+      status: "available",
+      visible: true,
+      sort_order: 1,
+      contact_channel: "whatsapp",
+      contact_url: null,
+      contact_message: null,
+      created_at: now,
+      updated_at: now
+    },
+    {
+      id: "demo-product-2",
+      club_id: club.id,
+      name: "Buzo entrenamiento",
+      slug: "buzo-entrenamiento",
+      description: "Abrigo liviano con identidad del equipo.",
+      category: "Indumentaria",
+      image_path: null,
+      price_label: "Consultar precio",
+      status: "preorder",
+      visible: true,
+      sort_order: 2,
+      contact_channel: "whatsapp",
+      contact_url: null,
+      contact_message: null,
+      created_at: now,
+      updated_at: now
+    },
+    {
+      id: "demo-product-3",
+      club_id: club.id,
+      name: "Short oficial",
+      slug: "short-oficial",
+      description: "Short negro con detalle naranja.",
+      category: "Indumentaria",
+      image_path: null,
+      price_label: "Consultar precio",
+      status: "available",
+      visible: true,
+      sort_order: 3,
+      contact_channel: "instagram",
+      contact_url: null,
+      contact_message: null,
+      created_at: now,
+      updated_at: now
+    },
+    {
+      id: "demo-product-4",
+      club_id: club.id,
+      name: "Pack stickers",
+      slug: "pack-stickers",
+      description: "Stickers del escudo y frases del club.",
+      category: "Merch",
+      image_path: null,
+      price_label: "Consultar precio",
+      status: "available",
+      visible: true,
+      sort_order: 4,
+      contact_channel: "whatsapp",
+      contact_url: null,
+      contact_message: null,
+      created_at: now,
+      updated_at: now
+    }
+  ];
+  const playerStats: ClubPublicPlayerStat[] = [
+    {
+      playerId: "demo-player-1",
+      name: "Mateo Alvarez",
+      teamNames: ["Primera"],
+      attendances: 18,
+      presentNotPlayed: 0,
+      matchesPlayed: 18,
+      goals: 22,
+      assists: 7,
+      mvps: 5,
+      lastMatchDate: "2026-05-10T18:00:00.000Z"
+    },
+    {
+      playerId: "demo-player-2",
+      name: "Santi Rojas",
+      teamNames: ["Primera"],
+      attendances: 17,
+      presentNotPlayed: 1,
+      matchesPlayed: 16,
+      goals: 9,
+      assists: 14,
+      mvps: 4,
+      lastMatchDate: "2026-05-10T18:00:00.000Z"
+    },
+    {
+      playerId: "demo-player-3",
+      name: "Nico Ferreyra",
+      teamNames: ["Senior"],
+      attendances: 21,
+      presentNotPlayed: 0,
+      matchesPlayed: 21,
+      goals: 5,
+      assists: 3,
+      mvps: 2,
+      lastMatchDate: "2026-05-03T18:00:00.000Z"
+    }
+  ];
+  const snapshot: ClubPublicSnapshot = {
+    summary: {
+      clubName: club.name,
+      teamCount: 2,
+      playerCount: 28,
+      playedMatches: 24,
+      goalsFor: 76,
+      goalsAgainst: 51,
+      totalMatches: 24,
+      totalGoals: 127,
+      avgGoalsPerMatch: 5.3,
+      totalPlayersDistinct: 28,
+      totalAttendances: 312,
+      presentNotPlayedCount: 6,
+      firstMatchDate: "2026-02-01T18:00:00.000Z",
+      lastMatchDate: "2026-05-10T18:00:00.000Z"
+    },
+    activity: [
+      {
+        type: "match_played",
+        title: "Triunfo 5-3 ante Los Pibes",
+        description: "La Quinta cerro el partido con dos goles en los ultimos diez minutos.",
+        createdAt: "2026-05-10T18:00:00.000Z",
+        entityId: "demo-match-1"
+      },
+      {
+        type: "team_created",
+        title: "Senior ya tiene plantel cargado",
+        description: "El admin completo la base inicial para seguir rendimiento por equipo.",
+        createdAt: "2026-05-02T18:00:00.000Z",
+        entityId: "demo-team-2"
+      }
+    ],
+    teams: [
+      {
+        id: "demo-team-1",
+        name: "Primera",
+        shortName: "LQ",
+        logoPath: null,
+        modality: "5v5",
+        players: [
+          { id: "demo-player-1", name: "Mateo Alvarez", position: "delantero", shirtNumber: 9 },
+          { id: "demo-player-2", name: "Santi Rojas", position: "volante", shirtNumber: 10 }
+        ],
+        matches: [],
+        playerCount: 16,
+        matchesPlayed: 16,
+        wins: 10,
+        draws: 2,
+        losses: 4,
+        goalsFor: 54,
+        goalsAgainst: 33,
+        lastMatchDate: "2026-05-10T18:00:00.000Z"
+      },
+      {
+        id: "demo-team-2",
+        name: "Senior",
+        shortName: "LQS",
+        logoPath: null,
+        modality: "7v7",
+        players: [
+          { id: "demo-player-3", name: "Nico Ferreyra", position: "defensor", shirtNumber: 4 }
+        ],
+        matches: [],
+        playerCount: 12,
+        matchesPlayed: 8,
+        wins: 4,
+        draws: 1,
+        losses: 3,
+        goalsFor: 22,
+        goalsAgainst: 18,
+        lastMatchDate: "2026-05-03T18:00:00.000Z"
+      }
+    ],
+    recentMatches: [
+      {
+        id: "demo-match-1",
+        playedAt: "2026-05-10T18:00:00.000Z",
+        modality: "5v5",
+        teamId: "demo-team-1",
+        teamName: "Primera",
+        competitionId: null,
+        competitionName: "Amistoso",
+        opponentName: "Los Pibes",
+        venue: "La Quinta",
+        goalsFor: 5,
+        goalsAgainst: 3
+      },
+      {
+        id: "demo-match-2",
+        playedAt: "2026-05-03T18:00:00.000Z",
+        modality: "7v7",
+        teamId: "demo-team-2",
+        teamName: "Senior",
+        competitionId: null,
+        competitionName: "Amistoso",
+        opponentName: "Barrio Norte",
+        venue: "La Quinta",
+        goalsFor: 2,
+        goalsAgainst: 2
+      }
+    ],
+    playerStats,
+    records: {
+      topScorerAllTime: playerStats[0],
+      topAssistsAllTime: playerStats[1],
+      mostMvps: playerStats[0],
+      mostAttendances: playerStats[2],
+      mostMatchesPlayed: playerStats[2],
+      bestWinStreak: null
+    },
+    topScorers: [],
+    topAssisters: [],
+    topFigures: [],
+    competitionStats: [],
+    availableModalities: ["5v5", "7v7"],
+    byModality: {}
+  };
+
+  return {
+    club,
+    products,
+    settings,
+    snapshot
+  };
+}
+
+function getDemoPublicClubSiteBySlug(slug: string) {
+  return slug === "la-quinta" ? buildLaQuintaDemoSite() : null;
+}
+
+function getDemoPublicClubSites(): PublicClubSiteListItem[] {
+  const site = buildLaQuintaDemoSite();
+  return [
+    {
+      club: site.club,
+      settings: site.settings,
+      productCount: site.products.length,
+      publicHref: buildClubSitePublicHref(site.club, site.settings)
+    }
+  ];
+}
+
+function normalizeClubProducts(rows: ClubProductRow[] | null | undefined): ClubProductRecord[] {
+  return (rows ?? []).map((row) => ({
+    id: String(row.id),
+    club_id: String(row.club_id),
+    name: String(row.name ?? ""),
+    slug: String(row.slug ?? ""),
+    description: row.description ?? null,
+    category: row.category ?? null,
+    image_path: row.image_path ?? null,
+    price_label: row.price_label ?? null,
+    status: row.status ?? "available",
+    visible: Boolean(row.visible),
+    sort_order: Number.isFinite(Number(row.sort_order)) ? Number(row.sort_order) : 0,
+    contact_channel: row.contact_channel ?? "whatsapp",
+    contact_url: row.contact_url ?? null,
+    contact_message: row.contact_message ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  }));
+}
 
 function emptySnapshot(clubName: string): ClubPublicSnapshot {
   return {
@@ -235,6 +585,35 @@ function normalizeSnapshot(row: ClubSnapshotRow | null, clubName: string): ClubP
     availableModalities,
     byModality
   };
+}
+
+async function loadClubSiteSettings(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  club: ClubRecord
+) {
+  const { data, error } = await supabase
+    .from("club_site_settings")
+    .select("club_id, enabled, published, domain, hero_image_path, primary_color, secondary_color, accent_color, font_family, whatsapp_url_or_phone, instagram_url, section_visibility")
+    .eq("club_id", club.id)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return normalizeClubSiteSettings((data ?? null) as ClubSiteSettingsRow | null, club);
+}
+
+async function loadClubProducts(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  clubId: string
+) {
+  const { data, error } = await supabase
+    .from("club_products")
+    .select("id, club_id, name, slug, description, category, image_path, price_label, status, visible, sort_order, contact_channel, contact_url, contact_message, created_at, updated_at")
+    .eq("club_id", clubId)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return normalizeClubProducts((data ?? []) as ClubProductRow[]);
 }
 
 async function resolveAdminEmailsById(adminIds: string[]) {
@@ -421,7 +800,9 @@ export async function getAdminClubDetails(clubId: string): Promise<AdminClubDeta
   const [
     { data: snapshotRow, error: snapshotError },
     { data: adminsData, error: adminsError },
-    { data: invitesData, error: invitesError }
+    { data: invitesData, error: invitesError },
+    siteSettings,
+    products
   ] = await Promise.all([
     supabase
       .from("club_public_snapshots")
@@ -438,7 +819,9 @@ export async function getAdminClubDetails(clubId: string): Promise<AdminClubDeta
       .select("id, club_id, email, invite_token, expires_at, created_at, status")
       .eq("club_id", clubId)
       .eq("status", "pending")
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: false }),
+    loadClubSiteSettings(supabase, privateData.club),
+    loadClubProducts(supabase, clubId)
   ]);
 
   if (snapshotError) throw new Error(snapshotError.message);
@@ -457,6 +840,8 @@ export async function getAdminClubDetails(clubId: string): Promise<AdminClubDeta
       payments: privateData.payments
     }),
     publicSnapshot: normalizeSnapshot((snapshotRow ?? null) as ClubSnapshotRow | null, privateData.club.name),
+    siteSettings,
+    products,
     admins: adminRows.map((row) => {
       const relation = row.admins;
       const adminRow = Array.isArray(relation) ? relation[0] ?? null : relation ?? null;
@@ -509,4 +894,124 @@ export async function getPublicClubBySlug(slug: string) {
     club: club as ClubRecord,
     snapshot: normalizeSnapshot((snapshot ?? null) as ClubSnapshotRow | null, String(club.name))
   };
+}
+
+export async function getPublicClubSites(): Promise<PublicClubSiteListItem[]> {
+  noStore();
+  let supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  try {
+    supabase = await createSupabaseServerClient();
+  } catch (error) {
+    if (shouldUseClubSiteDemoFallback() && isMissingSupabaseConfigurationError(error)) {
+      return getDemoPublicClubSites();
+    }
+    throw error;
+  }
+  const { data: settingsRows, error: settingsError } = await supabase
+    .from("club_site_settings")
+    .select("club_id, enabled, published, domain, hero_image_path, primary_color, secondary_color, accent_color, font_family, whatsapp_url_or_phone, instagram_url, section_visibility")
+    .eq("enabled", true)
+    .eq("published", true);
+
+  if (settingsError) {
+    if (shouldUseClubSiteDemoFallback() && isMissingClubSiteSchemaError(settingsError)) {
+      return getDemoPublicClubSites();
+    }
+    throw new Error(settingsError.message);
+  }
+
+  const settingsByClubId = new Map(
+    ((settingsRows ?? []) as ClubSiteSettingsRow[]).map((row) => [row.club_id, row])
+  );
+  const clubIds = Array.from(settingsByClubId.keys());
+  if (!clubIds.length) return shouldUseClubSiteDemoFallback() ? getDemoPublicClubSites() : [];
+
+  const [
+    { data: clubs, error: clubsError },
+    { data: products, error: productsError }
+  ] = await Promise.all([
+    supabase
+      .from("clubs")
+      .select("id, name, slug, description, home_venue, logo_path, is_public, status, created_at")
+      .in("id", clubIds)
+      .eq("status", "active")
+      .order("name", { ascending: true }),
+    supabase
+      .from("club_products")
+      .select("id, club_id, name, slug, description, category, image_path, price_label, status, visible, sort_order, contact_channel, contact_url, contact_message, created_at, updated_at")
+      .in("club_id", clubIds)
+      .eq("visible", true)
+  ]);
+
+  if (clubsError) throw new Error(clubsError.message);
+  if (productsError) {
+    if (shouldUseClubSiteDemoFallback() && isMissingClubSiteSchemaError(productsError)) {
+      return getDemoPublicClubSites();
+    }
+    throw new Error(productsError.message);
+  }
+
+  const visibleProducts = filterVisibleClubProducts(normalizeClubProducts((products ?? []) as ClubProductRow[]));
+  const productCountByClubId = visibleProducts.reduce<Map<string, number>>((counts, product) => {
+    counts.set(product.club_id, (counts.get(product.club_id) ?? 0) + 1);
+    return counts;
+  }, new Map());
+
+  return ((clubs ?? []) as ClubRecord[]).map((club) => {
+    const settings = normalizeClubSiteSettings(settingsByClubId.get(club.id), club);
+    return {
+      club,
+      settings,
+      productCount: productCountByClubId.get(club.id) ?? 0,
+      publicHref: buildClubSitePublicHref(club, settings)
+    };
+  });
+}
+
+export async function getPublicClubSiteBySlug(slug: string): Promise<PublicClubSiteDetails | null> {
+  noStore();
+  let data: Awaited<ReturnType<typeof getPublicClubBySlug>>;
+  try {
+    data = await getPublicClubBySlug(slug);
+  } catch (error) {
+    const demo = shouldUseClubSiteDemoFallback() ? getDemoPublicClubSiteBySlug(slug) : null;
+    if (demo && (isMissingClubSiteSchemaError(error) || isMissingSupabaseConfigurationError(error))) return demo;
+    throw error;
+  }
+  if (!data) return shouldUseClubSiteDemoFallback() ? getDemoPublicClubSiteBySlug(slug) : null;
+
+  const supabase = await createSupabaseServerClient();
+  let settings: ClubSiteSettings;
+  let products: ClubProductRecord[];
+  try {
+    [settings, products] = await Promise.all([
+      loadClubSiteSettings(supabase, data.club),
+      loadClubProducts(supabase, data.club.id)
+    ]);
+  } catch (error) {
+    const demo = shouldUseClubSiteDemoFallback() ? getDemoPublicClubSiteBySlug(slug) : null;
+    if (demo && isMissingClubSiteSchemaError(error)) return demo;
+    throw error;
+  }
+
+  if (!settings.enabled || !settings.published || data.club.status !== "active") return null;
+
+  return {
+    club: data.club,
+    settings,
+    products: filterVisibleClubProducts(products),
+    snapshot: data.snapshot
+  };
+}
+
+export async function getPublicClubSiteByDomain(host: string): Promise<PublicClubSiteDetails | null> {
+  noStore();
+  const normalizedHost = host.toLowerCase().replace(/^www\./, "").split(":")[0] ?? "";
+  if (!normalizedHost) return null;
+
+  const sites = await getPublicClubSites();
+  const site = sites.find((item) => item.settings.domain?.toLowerCase().replace(/^www\./, "") === normalizedHost);
+  if (!site) return null;
+
+  return getPublicClubSiteBySlug(site.club.slug);
 }

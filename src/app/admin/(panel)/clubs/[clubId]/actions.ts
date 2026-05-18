@@ -6,6 +6,14 @@ import { z } from "zod";
 
 import { assertClubWriteAction, getClubSlugById } from "@/lib/auth/clubs";
 import {
+  getClubProductImageObjectPath,
+  getClubSiteHeroObjectPath,
+  isSupportedClubSiteImageFile,
+  MAX_CLUB_SITE_IMAGE_SIZE_MB,
+  optimizeClubProductImage,
+  optimizeClubSiteHeroImage
+} from "@/lib/club-site-media";
+import {
   CLUB_PLAYER_POSITIONS,
   calculateCallupEstimatedPaymentCents,
   normalizeClubPlayerPosition,
@@ -15,7 +23,12 @@ import {
   type ClubPaymentStatus,
   type ClubMatchSheetParticipantInput
 } from "@/lib/domain/clubs";
-import { getPlayerPhotosBucket, getSupabaseDbSchema, getTeamLogosBucket } from "@/lib/env";
+import {
+  CLUB_SITE_SECTION_KEYS,
+  type ClubProductContactChannel,
+  type ClubProductStatus
+} from "@/lib/domain/club-sites";
+import { getClubSiteMediaBucket, getPlayerPhotosBucket, getSupabaseDbSchema, getTeamLogosBucket } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
 import { matchDateAndTimeToIso } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
@@ -183,6 +196,35 @@ const clubAdminInviteDeleteSchema = z.object({
   inviteId: z.string().uuid()
 });
 
+const clubSiteSettingsSchema = z.object({
+  enabled: z.boolean(),
+  published: z.boolean(),
+  domain: z.string().max(160).optional(),
+  primaryColor: z.string().max(20).optional(),
+  secondaryColor: z.string().max(20).optional(),
+  accentColor: z.string().max(20).optional(),
+  fontFamily: z.enum(["system", "inter", "montserrat", "oswald"]),
+  whatsappUrlOrPhone: z.string().max(180).optional(),
+  instagramUrl: z.string().max(180).optional()
+});
+
+const clubProductStatusSchema = z.enum(["available", "sold_out", "preorder", "hidden"]);
+const clubProductContactChannelSchema = z.enum(["whatsapp", "instagram", "custom"]);
+
+const clubProductSchema = z.object({
+  productId: z.string().uuid().optional(),
+  name: z.string().min(2, "El producto debe tener al menos 2 caracteres.").max(100),
+  description: z.string().max(500).optional(),
+  category: z.string().max(60).optional(),
+  priceLabel: z.string().max(80).optional(),
+  status: clubProductStatusSchema,
+  visible: z.boolean(),
+  sortOrder: z.coerce.number().int().min(0).max(9999),
+  contactChannel: clubProductContactChannelSchema,
+  contactUrl: z.string().max(220).optional(),
+  contactMessage: z.string().max(300).optional()
+});
+
 function buildClubDetailPath(params: {
   clubId: string;
   callupId?: string;
@@ -344,7 +386,10 @@ async function revalidateClubPaths(clubId: string) {
   const slug = await getClubSlugById(clubId);
   revalidatePath("/admin/clubs");
   revalidatePath(`/admin/clubs/${clubId}`);
+  revalidatePath("/clubs");
   revalidatePath(`/clubs/${slug}`);
+  revalidatePath(`/clubs/${slug}/catalogo`);
+  revalidatePath(`/clubs/${slug}/equipo`);
 }
 
 async function clubAlreadyHasAdminWithEmail(params: {
@@ -428,6 +473,34 @@ async function resolveUniqueClubCompetitionSlug(params: {
   const baseSlug = slugifyClubName(params.normalizedName) || `torneo-${Date.now()}`;
   const { data, error } = await params.supabase
     .from("club_competitions")
+    .select("slug")
+    .eq("club_id", params.clubId)
+    .ilike("slug", `${baseSlug}%`);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return parseNextSlug(
+    baseSlug,
+    (data ?? []).map((row) => String(row.slug).toLowerCase())
+  );
+}
+
+function parseClubSiteSectionVisibility(formData: FormData) {
+  return Object.fromEntries(
+    CLUB_SITE_SECTION_KEYS.map((key) => [key, formData.get(`section:${key}`) === "on"])
+  );
+}
+
+async function resolveUniqueClubProductSlug(params: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  clubId: string;
+  normalizedName: string;
+}) {
+  const baseSlug = slugifyClubName(params.normalizedName) || `producto-${Date.now()}`;
+  const { data, error } = await params.supabase
+    .from("club_products")
     .select("slug")
     .eq("club_id", params.clubId)
     .ilike("slug", `${baseSlug}%`);
@@ -622,6 +695,276 @@ export async function toggleClubPlayerAction(clubId: string, formData: FormData)
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildClubDetailPath({ clubId, tab: "players", error: toUserMessage(error, "No se pudo actualizar el jugador.") }));
+  }
+}
+
+function validateClubSiteImageFile(file: File, clubId: string) {
+  const sizeLimitBytes = MAX_CLUB_SITE_IMAGE_SIZE_MB * 1024 * 1024;
+  if (file.size > sizeLimitBytes) {
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: `La imagen no puede superar ${MAX_CLUB_SITE_IMAGE_SIZE_MB} MB.` }));
+  }
+
+  if (!isSupportedClubSiteImageFile(file)) {
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: "Formato no soportado. Usa JPG, PNG o WEBP." }));
+  }
+}
+
+export async function updateClubSiteSettingsAction(clubId: string, formData: FormData) {
+  try {
+    await assertClubWriteAction(clubId);
+    const parsed = clubSiteSettingsSchema.safeParse({
+      enabled: formData.get("enabled") === "on",
+      published: formData.get("published") === "on",
+      domain: formData.get("domain"),
+      primaryColor: formData.get("primaryColor"),
+      secondaryColor: formData.get("secondaryColor"),
+      accentColor: formData.get("accentColor"),
+      fontFamily: formData.get("fontFamily") || "system",
+      whatsappUrlOrPhone: formData.get("whatsappUrlOrPhone"),
+      instagramUrl: formData.get("instagramUrl")
+    });
+
+    if (!parsed.success) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: parsed.error.issues[0]?.message ?? "Datos invalidos." }));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.from("club_site_settings").upsert(
+      {
+        club_id: clubId,
+        enabled: parsed.data.enabled,
+        published: parsed.data.published,
+        domain: parsed.data.domain?.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "") || null,
+        primary_color: parsed.data.primaryColor?.trim() || null,
+        secondary_color: parsed.data.secondaryColor?.trim() || null,
+        accent_color: parsed.data.accentColor?.trim() || null,
+        font_family: parsed.data.fontFamily,
+        whatsapp_url_or_phone: parsed.data.whatsappUrlOrPhone?.trim() || null,
+        instagram_url: parsed.data.instagramUrl?.trim() || null,
+        section_visibility: parseClubSiteSectionVisibility(formData)
+      },
+      { onConflict: "club_id" }
+    );
+
+    if (error) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(error, "No se pudo guardar el sitio.") }));
+    }
+
+    await revalidateClubPaths(clubId);
+    redirect(buildClubDetailPath({ clubId, tab: "site", success: "Sitio actualizado." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(error, "No se pudo guardar el sitio.") }));
+  }
+}
+
+export async function uploadClubSiteHeroAction(clubId: string, formData: FormData) {
+  try {
+    await assertClubWriteAction(clubId);
+    const file = getRequiredFile(formData, "hero");
+    if (!file) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: "Selecciona una foto principal para subir." }));
+    }
+    validateClubSiteImageFile(file, clubId);
+
+    const supabase = await createSupabaseServerClient();
+    const optimizedBuffer = await optimizeClubSiteHeroImage(file);
+    const objectPath = getClubSiteHeroObjectPath(getSupabaseDbSchema(), clubId);
+    const { error: uploadError } = await supabase.storage
+      .from(getClubSiteMediaBucket())
+      .upload(objectPath, optimizedBuffer, {
+        upsert: true,
+        contentType: "image/webp",
+        cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
+      });
+
+    if (uploadError) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(uploadError, "No se pudo guardar la foto principal.") }));
+    }
+
+    const { error: updateError } = await supabase.from("club_site_settings").upsert(
+      {
+        club_id: clubId,
+        hero_image_path: objectPath
+      },
+      { onConflict: "club_id" }
+    );
+
+    if (updateError) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(updateError, "No se pudo vincular la foto al sitio.") }));
+    }
+
+    revalidatePath(`/api/club-site-hero/${clubId}`);
+    await revalidateClubPaths(clubId);
+    redirect(buildClubDetailPath({ clubId, tab: "site", success: "Foto principal actualizada." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(error, "No se pudo subir la foto principal.") }));
+  }
+}
+
+export async function addClubProductAction(clubId: string, formData: FormData) {
+  try {
+    await assertClubWriteAction(clubId);
+    const parsed = clubProductSchema.safeParse({
+      name: formData.get("name"),
+      description: String(formData.get("description") ?? ""),
+      category: String(formData.get("category") ?? ""),
+      priceLabel: String(formData.get("priceLabel") ?? ""),
+      status: formData.get("status") || "available",
+      visible: formData.get("visible") === "on",
+      sortOrder: formData.get("sortOrder") || 0,
+      contactChannel: formData.get("contactChannel") || "whatsapp",
+      contactUrl: String(formData.get("contactUrl") ?? ""),
+      contactMessage: String(formData.get("contactMessage") ?? "")
+    });
+
+    if (!parsed.success) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: parsed.error.issues[0]?.message ?? "Datos invalidos." }));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const slug = await resolveUniqueClubProductSlug({
+      supabase,
+      clubId,
+      normalizedName: parsed.data.name.trim()
+    });
+    const { error } = await supabase.from("club_products").insert({
+      club_id: clubId,
+      name: parsed.data.name.trim(),
+      slug,
+      description: parsed.data.description?.trim() || null,
+      category: parsed.data.category?.trim() || null,
+      price_label: parsed.data.priceLabel?.trim() || null,
+      status: parsed.data.status as ClubProductStatus,
+      visible: parsed.data.visible,
+      sort_order: parsed.data.sortOrder,
+      contact_channel: parsed.data.contactChannel as ClubProductContactChannel,
+      contact_url: parsed.data.contactUrl?.trim() || null,
+      contact_message: parsed.data.contactMessage?.trim() || null
+    });
+
+    if (error) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(error, "No se pudo crear el producto.") }));
+    }
+
+    await revalidateClubPaths(clubId);
+    redirect(buildClubDetailPath({ clubId, tab: "site", success: "Producto creado." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(error, "No se pudo crear el producto.") }));
+  }
+}
+
+export async function updateClubProductAction(clubId: string, formData: FormData) {
+  try {
+    await assertClubWriteAction(clubId);
+    const parsed = clubProductSchema.safeParse({
+      productId: String(formData.get("productId") ?? ""),
+      name: formData.get("name"),
+      description: String(formData.get("description") ?? ""),
+      category: String(formData.get("category") ?? ""),
+      priceLabel: String(formData.get("priceLabel") ?? ""),
+      status: formData.get("status") || "available",
+      visible: formData.get("visible") === "on",
+      sortOrder: formData.get("sortOrder") || 0,
+      contactChannel: formData.get("contactChannel") || "whatsapp",
+      contactUrl: String(formData.get("contactUrl") ?? ""),
+      contactMessage: String(formData.get("contactMessage") ?? "")
+    });
+
+    if (!parsed.success || !parsed.data.productId) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: parsed.success ? "Producto invalido." : parsed.error.issues[0]?.message ?? "Datos invalidos." }));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase
+      .from("club_products")
+      .update({
+        name: parsed.data.name.trim(),
+        description: parsed.data.description?.trim() || null,
+        category: parsed.data.category?.trim() || null,
+        price_label: parsed.data.priceLabel?.trim() || null,
+        status: parsed.data.status as ClubProductStatus,
+        visible: parsed.data.visible,
+        sort_order: parsed.data.sortOrder,
+        contact_channel: parsed.data.contactChannel as ClubProductContactChannel,
+        contact_url: parsed.data.contactUrl?.trim() || null,
+        contact_message: parsed.data.contactMessage?.trim() || null
+      })
+      .eq("id", parsed.data.productId)
+      .eq("club_id", clubId);
+
+    if (error) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(error, "No se pudo actualizar el producto.") }));
+    }
+
+    await revalidateClubPaths(clubId);
+    redirect(buildClubDetailPath({ clubId, tab: "site", success: "Producto actualizado." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(error, "No se pudo actualizar el producto.") }));
+  }
+}
+
+export async function uploadClubProductImageAction(clubId: string, formData: FormData) {
+  try {
+    await assertClubWriteAction(clubId);
+    const parsed = z.object({ productId: z.string().uuid() }).safeParse({
+      productId: formData.get("productId")
+    });
+    if (!parsed.success) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: "Producto invalido." }));
+    }
+
+    const file = getRequiredFile(formData, "productImage");
+    if (!file) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: "Selecciona una imagen de producto." }));
+    }
+    validateClubSiteImageFile(file, clubId);
+
+    const supabase = await createSupabaseServerClient();
+    const { data: product, error: productError } = await supabase
+      .from("club_products")
+      .select("id")
+      .eq("id", parsed.data.productId)
+      .eq("club_id", clubId)
+      .maybeSingle();
+
+    if (productError || !product) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: "No se encontro el producto." }));
+    }
+
+    const optimizedBuffer = await optimizeClubProductImage(file);
+    const objectPath = getClubProductImageObjectPath(getSupabaseDbSchema(), clubId, parsed.data.productId);
+    const { error: uploadError } = await supabase.storage
+      .from(getClubSiteMediaBucket())
+      .upload(objectPath, optimizedBuffer, {
+        upsert: true,
+        contentType: "image/webp",
+        cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
+      });
+
+    if (uploadError) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(uploadError, "No se pudo guardar la imagen del producto.") }));
+    }
+
+    const { error: updateError } = await supabase
+      .from("club_products")
+      .update({ image_path: objectPath })
+      .eq("id", parsed.data.productId)
+      .eq("club_id", clubId);
+
+    if (updateError) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(updateError, "No se pudo vincular la imagen al producto.") }));
+    }
+
+    revalidatePath(`/api/club-product-image/${parsed.data.productId}`);
+    await revalidateClubPaths(clubId);
+    redirect(buildClubDetailPath({ clubId, tab: "site", success: "Imagen de producto actualizada." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(error, "No se pudo subir la imagen del producto.") }));
   }
 }
 

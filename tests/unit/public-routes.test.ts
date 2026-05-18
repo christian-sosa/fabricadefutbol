@@ -10,15 +10,16 @@ describe("public routes for crawlers", () => {
       rules: {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin", "/api", "/captain", "/clubs", "/invite", "/tournaments"]
+        disallow: ["/admin", "/api", "/captain", "/invite", "/tournaments"]
       }
     });
   });
 
-  it("publica home, ayuda y guias en sitemap sin precios", () => {
+  it("publica home, clubes, ayuda y guias en sitemap sin precios", () => {
     const urls = sitemap().map((entry) => entry.url);
 
     expect(urls).toContain("https://fabricadefutbol.com.ar/");
+    expect(urls).toContain("https://fabricadefutbol.com.ar/clubs");
     expect(urls).toContain("https://fabricadefutbol.com.ar/help");
     expect(urls).toContain("https://fabricadefutbol.com.ar/guides");
     for (const guide of GUIDES) {
