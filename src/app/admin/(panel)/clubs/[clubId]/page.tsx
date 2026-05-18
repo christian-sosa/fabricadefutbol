@@ -75,7 +75,12 @@ import {
   type ClubProductRecord,
   type ClubProductStatus
 } from "@/lib/domain/club-sites";
-import { getClubProductImageUrl, getClubSiteHeroUrl } from "@/lib/club-site-media";
+import {
+  getClubProductImageUrl,
+  getClubSiteHeroUrl,
+  MAX_CLUB_PRODUCT_IMAGE_SIZE_MB,
+  MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB
+} from "@/lib/club-site-media";
 import { getAdminClubDetails } from "@/lib/queries/clubs";
 import { getClubLogoUrl } from "@/lib/team-logos";
 
@@ -2153,15 +2158,17 @@ function ProductEditor({
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-order-${product.id}`}>
-                Orden
+                Orden en catalogo
               </label>
               <Input defaultValue={product.sort_order} id={`product-order-${product.id}`} min={0} name="sortOrder" type="number" />
+              <p className="mt-1 text-xs text-slate-500">Menor numero aparece primero.</p>
             </div>
             <div className="md:col-span-3">
               <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-description-${product.id}`}>
-                Descripcion
+                Descripcion publica
               </label>
               <Textarea defaultValue={product.description ?? ""} id={`product-description-${product.id}`} name="description" rows={3} />
+              <p className="mt-1 text-xs text-slate-500">Texto visible en la ficha del producto.</p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-contact-${product.id}`}>
@@ -2175,15 +2182,16 @@ function ProductEditor({
             </div>
             <div className="md:col-span-2">
               <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-contact-url-${product.id}`}>
-                Override link/contacto
+                Link de contacto propio
               </label>
-              <Input defaultValue={product.contact_url ?? ""} id={`product-contact-url-${product.id}`} name="contactUrl" />
+              <Input defaultValue={product.contact_url ?? ""} id={`product-contact-url-${product.id}`} name="contactUrl" placeholder="Opcional" />
             </div>
             <div className="md:col-span-3">
               <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`product-message-${product.id}`}>
-                Mensaje
+                Mensaje de consulta
               </label>
-              <Input defaultValue={product.contact_message ?? ""} id={`product-message-${product.id}`} name="contactMessage" />
+              <Input defaultValue={product.contact_message ?? ""} id={`product-message-${product.id}`} name="contactMessage" placeholder="Opcional: mensaje prearmado para WhatsApp" />
+              <p className="mt-1 text-xs text-slate-500">No se muestra en la ficha; se usa al abrir el canal de contacto.</p>
             </div>
             <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-200">
               <input defaultChecked={product.visible} name="visible" type="checkbox" />
@@ -2199,6 +2207,7 @@ function ProductEditor({
             <Input accept="image/jpeg,image/png,image/webp" className="max-w-80" name="productImage" type="file" />
             <Button className="w-fit" type="submit" variant="ghost">Subir imagen</Button>
           </form>
+          <p className="mt-2 text-xs text-slate-500">JPG, PNG o WEBP hasta {MAX_CLUB_PRODUCT_IMAGE_SIZE_MB} MB. Se recorta en formato cuadrado.</p>
         </div>
       </div>
     </div>
@@ -2236,7 +2245,7 @@ function SiteTab({
         <Card>
           <CardTitle>Foto principal</CardTitle>
           <CardDescription className="mt-2">
-            Esta imagen se reutiliza en home, catalogo y datos del equipo.
+            Esta imagen se reutiliza en home, catalogo y datos del equipo. JPG, PNG o WEBP hasta {MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB} MB.
           </CardDescription>
           <div className="mt-4 overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
             <img alt={`Foto principal de ${details.club.name}`} className="aspect-[16/9] w-full object-cover" src={heroUrl} />
@@ -2252,14 +2261,23 @@ function SiteTab({
         <Card>
           <CardTitle>Identidad y publicacion</CardTitle>
           <form action={updateClubSiteSettingsAction.bind(null, clubId)} className="mt-4 grid gap-3 md:grid-cols-3">
-            <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm font-semibold text-slate-200">
-              <input defaultChecked={settings.enabled} name="enabled" type="checkbox" />
-              Sitio habilitado
+            <label className="flex items-start gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200">
+              <input className="mt-1" defaultChecked={settings.enabled} name="enabled" type="checkbox" />
+              <span>
+                <span className="block font-semibold">Sitio habilitado</span>
+                <span className="mt-1 block text-xs text-slate-500">Switch general del sitio del club.</span>
+              </span>
             </label>
-            <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm font-semibold text-slate-200">
-              <input defaultChecked={settings.published} name="published" type="checkbox" />
-              Publicado
+            <label className="flex items-start gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200">
+              <input className="mt-1" defaultChecked={settings.published} name="published" type="checkbox" />
+              <span>
+                <span className="block font-semibold">Publicado</span>
+                <span className="mt-1 block text-xs text-slate-500">Permite mostrarlo hacia afuera.</span>
+              </span>
             </label>
+            <p className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100 md:col-span-3">
+              Tiene que estar habilitado y publicado para verse en la URL publica y en el listado de clubes.
+            </p>
             <div>
               <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="fontFamily">
                 Fuente
@@ -2361,15 +2379,17 @@ function SiteTab({
           </div>
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-order">
-              Orden
+              Orden en catalogo
             </label>
             <Input defaultValue={details.products.length + 1} id="new-product-order" min={0} name="sortOrder" type="number" />
+            <p className="mt-1 text-xs text-slate-500">Menor numero aparece primero.</p>
           </div>
           <div className="md:col-span-3">
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-description">
-              Descripcion
+              Descripcion publica
             </label>
             <Textarea id="new-product-description" name="description" rows={3} />
+            <p className="mt-1 text-xs text-slate-500">Texto visible en la ficha del producto.</p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-contact">
@@ -2383,15 +2403,23 @@ function SiteTab({
           </div>
           <div className="md:col-span-2">
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-contact-url">
-              Override link/contacto
+              Link de contacto propio
             </label>
-            <Input id="new-product-contact-url" name="contactUrl" />
+            <Input id="new-product-contact-url" name="contactUrl" placeholder="Opcional" />
           </div>
           <div className="md:col-span-3">
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-message">
-              Mensaje
+              Mensaje de consulta
             </label>
-            <Input id="new-product-message" name="contactMessage" />
+            <Input id="new-product-message" name="contactMessage" placeholder="Opcional: mensaje prearmado para WhatsApp" />
+            <p className="mt-1 text-xs text-slate-500">No se muestra en la ficha; se usa al abrir el canal de contacto.</p>
+          </div>
+          <div className="md:col-span-3">
+            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-image">
+              Imagen del producto
+            </label>
+            <Input accept="image/jpeg,image/png,image/webp" id="new-product-image" name="productImage" type="file" />
+            <p className="mt-1 text-xs text-slate-500">Opcional. JPG, PNG o WEBP hasta {MAX_CLUB_PRODUCT_IMAGE_SIZE_MB} MB. Se recorta en formato cuadrado.</p>
           </div>
           <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm font-semibold text-slate-200">
             <input defaultChecked name="visible" type="checkbox" />

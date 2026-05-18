@@ -2,7 +2,8 @@ import sharp from "sharp";
 
 import type { ClubProductRecord, ClubSiteSettings } from "@/lib/domain/club-sites";
 
-export const MAX_CLUB_SITE_IMAGE_SIZE_MB = 10;
+export const MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB = 25;
+export const MAX_CLUB_PRODUCT_IMAGE_SIZE_MB = 10;
 export const CLUB_SITE_HERO_CACHE_CONTROL = "no-store";
 export const CLUB_PRODUCT_IMAGE_CACHE_CONTROL = "no-store";
 

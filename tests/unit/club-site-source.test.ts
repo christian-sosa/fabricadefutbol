@@ -52,6 +52,24 @@ describe("club site productizado", () => {
     expect(adminPageSource).toContain('name={`section:${key}`}');
   });
 
+  it("explica limites y campos comerciales del sitio en el admin", () => {
+    const adminPageSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "page.tsx");
+    const actionsSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "actions.ts");
+
+    expect(adminPageSource).toContain("JPG, PNG o WEBP hasta");
+    expect(adminPageSource).toContain("MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB");
+    expect(adminPageSource).toContain("MAX_CLUB_PRODUCT_IMAGE_SIZE_MB");
+    expect(adminPageSource).toContain("Tiene que estar habilitado y publicado");
+    expect(adminPageSource).toContain("Orden en catalogo");
+    expect(adminPageSource).toContain("Descripcion publica");
+    expect(adminPageSource).toContain("Mensaje de consulta");
+    expect(adminPageSource).toContain('id="new-product-image"');
+    expect(actionsSource).toContain('const productImage = getRequiredFile(formData, "productImage");');
+    expect(actionsSource).toContain("La foto principal no puede superar");
+    expect(actionsSource).toContain("La imagen del producto no puede superar");
+    expect(actionsSource).toContain("No se pudo procesar la imagen");
+  });
+
   it("declara tipos de base para settings y catalogo sin depender de HTML estatico", () => {
     const databaseSource = readSource("src", "types", "database.ts");
     const querySource = readSource("src", "lib", "queries", "clubs.ts");

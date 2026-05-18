@@ -11,6 +11,10 @@ const { createSupabaseServerClientMock, redirectMock, revalidatePathMock } = vi.
   revalidatePathMock: vi.fn()
 }));
 
+const { optimizeClubProductImageMock } = vi.hoisted(() => ({
+  optimizeClubProductImageMock: vi.fn(async () => Buffer.from("optimized-product-image"))
+}));
+
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock
 }));
@@ -42,6 +46,14 @@ vi.mock("@/lib/queries/clubs", async (importOriginal) => {
   return {
     ...actual,
     refreshClubPublicSnapshot: vi.fn()
+  };
+});
+
+vi.mock("@/lib/club-site-media", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/club-site-media")>();
+  return {
+    ...actual,
+    optimizeClubProductImage: optimizeClubProductImageMock
   };
 });
 
@@ -143,5 +155,47 @@ describe("club site admin actions", () => {
       contact_channel: "whatsapp",
       contact_url: null
     });
+  });
+
+  it("permite crear un producto con imagen inicial", async () => {
+    const fake = createFakeSupabase();
+    const uploadedObjects: Array<{ bucket: string; path: string; contentType?: string }> = [];
+    createSupabaseServerClientMock.mockResolvedValue({
+      ...fake.client,
+      storage: {
+        from: (bucket: string) => ({
+          upload: async (path: string, _body: unknown, options?: { contentType?: string }) => {
+            uploadedObjects.push({ bucket, path, contentType: options?.contentType });
+            return { data: { path }, error: null };
+          }
+        })
+      }
+    });
+
+    const formData = new FormData();
+    formData.set("name", "Campera concentracion");
+    formData.set("description", "Abrigo oficial para previa y viajes.");
+    formData.set("category", "Indumentaria");
+    formData.set("priceLabel", "Consultar precio");
+    formData.set("status", "available");
+    formData.set("visible", "on");
+    formData.set("sortOrder", "3");
+    formData.set("contactChannel", "whatsapp");
+    formData.set("productImage", new File(["image"], "campera.png", { type: "image/png" }));
+
+    await expect(addClubProductAction(clubId, formData)).rejects.toMatchObject({
+      digest: expect.stringContaining(`/admin/clubs/${clubId}?tab=site`)
+    });
+
+    const product = fake.find("club_products", (row) => row.name === "Campera concentracion");
+    expect(product?.image_path).toBe(`public/clubs/${clubId}/products/${product?.id}.webp`);
+    expect(uploadedObjects).toEqual([
+      {
+        bucket: "club-site-media",
+        path: `public/clubs/${clubId}/products/${product?.id}.webp`,
+        contentType: "image/webp"
+      }
+    ]);
+    expect(optimizeClubProductImageMock).toHaveBeenCalledWith(expect.any(File));
   });
 });

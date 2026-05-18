@@ -9,7 +9,8 @@ import {
   getClubProductImageObjectPath,
   getClubSiteHeroObjectPath,
   isSupportedClubSiteImageFile,
-  MAX_CLUB_SITE_IMAGE_SIZE_MB,
+  MAX_CLUB_PRODUCT_IMAGE_SIZE_MB,
+  MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB,
   optimizeClubProductImage,
   optimizeClubSiteHeroImage
 } from "@/lib/club-site-media";
@@ -698,15 +699,81 @@ export async function toggleClubPlayerAction(clubId: string, formData: FormData)
   }
 }
 
-function validateClubSiteImageFile(file: File, clubId: string) {
-  const sizeLimitBytes = MAX_CLUB_SITE_IMAGE_SIZE_MB * 1024 * 1024;
+function validateClubSiteHeroImageFile(file: File, clubId: string) {
+  const sizeLimitBytes = MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB * 1024 * 1024;
   if (file.size > sizeLimitBytes) {
-    redirect(buildClubDetailPath({ clubId, tab: "site", error: `La imagen no puede superar ${MAX_CLUB_SITE_IMAGE_SIZE_MB} MB.` }));
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: `La foto principal no puede superar ${MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB} MB.` }));
   }
 
   if (!isSupportedClubSiteImageFile(file)) {
     redirect(buildClubDetailPath({ clubId, tab: "site", error: "Formato no soportado. Usa JPG, PNG o WEBP." }));
   }
+}
+
+function validateClubProductImageFile(file: File, clubId: string) {
+  const sizeLimitBytes = MAX_CLUB_PRODUCT_IMAGE_SIZE_MB * 1024 * 1024;
+  if (file.size > sizeLimitBytes) {
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: `La imagen del producto no puede superar ${MAX_CLUB_PRODUCT_IMAGE_SIZE_MB} MB.` }));
+  }
+
+  if (!isSupportedClubSiteImageFile(file)) {
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: "Formato no soportado. Usa JPG, PNG o WEBP." }));
+  }
+}
+
+async function optimizeClubSiteHeroImageForUpload(file: File, clubId: string) {
+  try {
+    return await optimizeClubSiteHeroImage(file);
+  } catch {
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: `No se pudo procesar la foto principal. Usa JPG, PNG o WEBP y proba con un archivo menor a ${MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB} MB.` }));
+  }
+}
+
+async function optimizeClubProductImageForUpload(file: File, clubId: string) {
+  try {
+    return await optimizeClubProductImage(file);
+  } catch {
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: `No se pudo procesar la imagen del producto. Usa JPG, PNG o WEBP y proba con un archivo menor a ${MAX_CLUB_PRODUCT_IMAGE_SIZE_MB} MB.` }));
+  }
+}
+
+async function uploadClubProductImageForProduct({
+  clubId,
+  file,
+  productId,
+  supabase
+}: {
+  clubId: string;
+  file: File;
+  productId: string;
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+}) {
+  const optimizedBuffer = await optimizeClubProductImageForUpload(file, clubId);
+  const objectPath = getClubProductImageObjectPath(getSupabaseDbSchema(), clubId, productId);
+  const { error: uploadError } = await supabase.storage
+    .from(getClubSiteMediaBucket())
+    .upload(objectPath, optimizedBuffer, {
+      upsert: true,
+      contentType: "image/webp",
+      cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
+    });
+
+  if (uploadError) {
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(uploadError, "No se pudo guardar la imagen del producto.") }));
+  }
+
+  const { error: updateError } = await supabase
+    .from("club_products")
+    .update({ image_path: objectPath })
+    .eq("id", productId)
+    .eq("club_id", clubId);
+
+  if (updateError) {
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(updateError, "No se pudo vincular la imagen al producto.") }));
+  }
+
+  revalidatePath(`/api/club-product-image/${productId}`);
+  return objectPath;
 }
 
 export async function updateClubSiteSettingsAction(clubId: string, formData: FormData) {
@@ -765,10 +832,10 @@ export async function uploadClubSiteHeroAction(clubId: string, formData: FormDat
     if (!file) {
       redirect(buildClubDetailPath({ clubId, tab: "site", error: "Selecciona una foto principal para subir." }));
     }
-    validateClubSiteImageFile(file, clubId);
+    validateClubSiteHeroImageFile(file, clubId);
 
     const supabase = await createSupabaseServerClient();
-    const optimizedBuffer = await optimizeClubSiteHeroImage(file);
+    const optimizedBuffer = await optimizeClubSiteHeroImageForUpload(file, clubId);
     const objectPath = getClubSiteHeroObjectPath(getSupabaseDbSchema(), clubId);
     const { error: uploadError } = await supabase.storage
       .from(getClubSiteMediaBucket())
@@ -829,7 +896,12 @@ export async function addClubProductAction(clubId: string, formData: FormData) {
       clubId,
       normalizedName: parsed.data.name.trim()
     });
-    const { error } = await supabase.from("club_products").insert({
+    const productImage = getRequiredFile(formData, "productImage");
+    if (productImage) {
+      validateClubProductImageFile(productImage, clubId);
+    }
+
+    const { data: product, error } = await supabase.from("club_products").insert({
       club_id: clubId,
       name: parsed.data.name.trim(),
       slug,
@@ -842,10 +914,19 @@ export async function addClubProductAction(clubId: string, formData: FormData) {
       contact_channel: parsed.data.contactChannel as ClubProductContactChannel,
       contact_url: parsed.data.contactUrl?.trim() || null,
       contact_message: parsed.data.contactMessage?.trim() || null
-    });
+    }).select("id").single();
 
-    if (error) {
+    if (error || !product?.id) {
       redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(error, "No se pudo crear el producto.") }));
+    }
+
+    if (productImage) {
+      await uploadClubProductImageForProduct({
+        clubId,
+        file: productImage,
+        productId: String(product.id),
+        supabase
+      });
     }
 
     await revalidateClubPaths(clubId);
@@ -921,7 +1002,7 @@ export async function uploadClubProductImageAction(clubId: string, formData: For
     if (!file) {
       redirect(buildClubDetailPath({ clubId, tab: "site", error: "Selecciona una imagen de producto." }));
     }
-    validateClubSiteImageFile(file, clubId);
+    validateClubProductImageFile(file, clubId);
 
     const supabase = await createSupabaseServerClient();
     const { data: product, error: productError } = await supabase
@@ -935,31 +1016,12 @@ export async function uploadClubProductImageAction(clubId: string, formData: For
       redirect(buildClubDetailPath({ clubId, tab: "site", error: "No se encontro el producto." }));
     }
 
-    const optimizedBuffer = await optimizeClubProductImage(file);
-    const objectPath = getClubProductImageObjectPath(getSupabaseDbSchema(), clubId, parsed.data.productId);
-    const { error: uploadError } = await supabase.storage
-      .from(getClubSiteMediaBucket())
-      .upload(objectPath, optimizedBuffer, {
-        upsert: true,
-        contentType: "image/webp",
-        cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
-      });
-
-    if (uploadError) {
-      redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(uploadError, "No se pudo guardar la imagen del producto.") }));
-    }
-
-    const { error: updateError } = await supabase
-      .from("club_products")
-      .update({ image_path: objectPath })
-      .eq("id", parsed.data.productId)
-      .eq("club_id", clubId);
-
-    if (updateError) {
-      redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(updateError, "No se pudo vincular la imagen al producto.") }));
-    }
-
-    revalidatePath(`/api/club-product-image/${parsed.data.productId}`);
+    await uploadClubProductImageForProduct({
+      clubId,
+      file,
+      productId: parsed.data.productId,
+      supabase
+    });
     await revalidateClubPaths(clubId);
     redirect(buildClubDetailPath({ clubId, tab: "site", success: "Imagen de producto actualizada." }));
   } catch (error) {
