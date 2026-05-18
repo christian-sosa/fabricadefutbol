@@ -2,7 +2,7 @@ import { getFeedbackFromEmail, getFeedbackInboxEmail, getResendApiKey } from "@/
 import { normalizeEmail } from "@/lib/org";
 
 export type FeedbackCategory = "sugerencia" | "queja" | "error" | "otro";
-export type FeedbackModule = "organizations" | "tournaments" | "both";
+export type FeedbackModule = "organizations" | "tournaments" | "clubs" | "both";
 
 type SendFeedbackEmailInput = {
   fullName: string;
@@ -33,6 +33,8 @@ function moduleLabel(module: FeedbackModule) {
   switch (module) {
     case "organizations":
       return "Grupos";
+    case "clubs":
+      return "Clubes";
     case "tournaments":
       return "Torneos";
     default:
@@ -63,7 +65,7 @@ export async function sendFeedbackEmail(input: SendFeedbackEmailInput) {
     `Tema: ${moduleName}`,
     `Nombre: ${input.fullName}`,
     `Email: ${normalizedSenderEmail}`,
-    `Grupo / torneo: ${input.organization ?? "No informado"}`,
+    `Grupo / club / torneo: ${input.organization ?? "No informado"}`,
     `Enviado: ${input.submittedAtIso}`,
     `User-Agent: ${input.userAgent ?? "No informado"}`,
     `Referer: ${input.referer ?? "No informado"}`,

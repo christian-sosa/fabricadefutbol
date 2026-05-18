@@ -14,7 +14,7 @@ const feedbackSchema = z.object({
   fullName: z.string().trim().min(2, "Escribe tu nombre.").max(80, "El nombre es demasiado largo."),
   email: z.string().trim().email("Ingresa un email valido."),
   category: z.enum(["sugerencia", "queja", "error", "otro"]),
-  module: z.enum(["organizations", "tournaments", "both"]),
+  module: z.enum(["organizations", "tournaments", "clubs", "both"]),
   organization: z
     .string()
     .trim()
@@ -32,7 +32,7 @@ function normalizeFeedbackModule(
   value: FormDataEntryValue | null,
   fallback: PublicModuleContext
 ): FeedbackModule {
-  if (value === "organizations" || value === "tournaments" || value === "both") {
+  if (value === "organizations" || value === "tournaments" || value === "clubs" || value === "both") {
     return value;
   }
 
@@ -42,12 +42,14 @@ function normalizeFeedbackModule(
 function toPageModule(module: FeedbackModule, fallback: PublicModuleContext): PublicModuleContext {
   if (module === "tournaments") return "tournaments";
   if (module === "organizations") return "organizations";
+  if (module === "clubs") return "organizations";
   return fallback;
 }
 
 function buildFeedbackPath(params: {
   organizationKey: string | null;
   module: PublicModuleContext;
+  intent?: "club" | null;
   sent?: boolean;
   error?: string;
 }) {
@@ -56,17 +58,22 @@ function buildFeedbackPath(params: {
     module: params.module
   });
 
+  const intentSeparator = basePath.includes("?") ? "&" : "?";
+  const pathWithIntent = params.intent === "club"
+    ? `${basePath}${intentSeparator}intent=club`
+    : basePath;
+
   if (params.sent) {
-    const separator = basePath.includes("?") ? "&" : "?";
-    return `${basePath}${separator}sent=1`;
+    const separator = pathWithIntent.includes("?") ? "&" : "?";
+    return `${pathWithIntent}${separator}sent=1`;
   }
 
   if (params.error) {
-    const separator = basePath.includes("?") ? "&" : "?";
-    return `${basePath}${separator}error=${encodeURIComponent(params.error)}`;
+    const separator = pathWithIntent.includes("?") ? "&" : "?";
+    return `${pathWithIntent}${separator}error=${encodeURIComponent(params.error)}`;
   }
 
-  return basePath;
+  return pathWithIntent;
 }
 
 function buildFriendlyFeedbackErrorMessage(error: unknown) {
@@ -93,6 +100,7 @@ function buildFriendlyFeedbackErrorMessage(error: unknown) {
 export async function submitFeedbackAction(
   organizationKey: string | null,
   defaultModule: PublicModuleContext,
+  defaultIntent: "club" | null,
   formData: FormData
 ) {
   const canAccessTournaments = await getCurrentUserIsSuperAdmin();
@@ -116,6 +124,7 @@ export async function submitFeedbackAction(
       buildFeedbackPath({
         organizationKey,
         module: pageModule,
+        intent: defaultIntent,
         error: parsed.error.issues[0]?.message ?? "No se pudo enviar tu mensaje."
       })
     );
@@ -126,6 +135,7 @@ export async function submitFeedbackAction(
       buildFeedbackPath({
         organizationKey,
         module: pageModule,
+        intent: defaultIntent,
         sent: true
       })
     );
@@ -145,6 +155,7 @@ export async function submitFeedbackAction(
       buildFeedbackPath({
         organizationKey,
         module: pageModule,
+        intent: defaultIntent,
         error: `Enviaste demasiados mensajes seguidos. Proba de nuevo en ${retryMinutes} minuto(s).`
       })
     );
@@ -168,6 +179,7 @@ export async function submitFeedbackAction(
       buildFeedbackPath({
         organizationKey,
         module: pageModule,
+        intent: defaultIntent,
         error: buildFriendlyFeedbackErrorMessage(error)
       })
     );
@@ -177,6 +189,7 @@ export async function submitFeedbackAction(
     buildFeedbackPath({
       organizationKey,
       module: pageModule,
+      intent: defaultIntent,
       sent: true
     })
   );

@@ -25,7 +25,9 @@ describe("club site productizado", () => {
 
     expect(listSource).toContain("getPublicClubSites");
     expect(listSource).toContain("Ver sitio");
-    expect(listSource).toContain("¿Querés traer tu club a Fábrica de Fútbol?");
+    expect(listSource).toContain("¿Querés traer tu club o equipo?");
+    expect(listSource).toContain("/feedback?intent=club");
+    expect(listSource).toContain("Quiero traer mi club");
     expect(homeSource).toContain("getPublicClubSiteBySlug");
     expect(homeSource).toContain("ClubSiteHome");
     expect(catalogSource).toContain("ClubSiteCatalog");
@@ -99,6 +101,18 @@ describe("club site productizado", () => {
     expect(componentSource).toContain("Volver a Fabrica");
     expect(componentSource).not.toContain("-my-6");
     expect(componentSource).not.toContain("bg-[#f7f3ec]");
+  });
+
+  it("mantiene la estetica de club cerca de la referencia La Quinta sin copiar assets externos", () => {
+    const componentSource = readSource("src", "components", "clubs", "club-site.tsx");
+
+    expect(componentSource).toContain("getClubHeroHeadline");
+    expect(componentSource).toContain("Esta locura de amarte me impide ser normal");
+    expect(componentSource).toContain("--club-line");
+    expect(componentSource).toContain("--club-soft");
+    expect(componentSource).toContain("Catalogo oficial");
+    expect(componentSource).not.toContain("mitiendanube.com");
+    expect(componentSource).not.toContain("dcdn-us.mitiendanube.com");
   });
 
   it("usa metadata absoluta para que el dominio de club no herede el sufijo de Fabrica", () => {

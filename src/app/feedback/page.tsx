@@ -12,6 +12,7 @@ type FeedbackPageProps = {
   searchParams: Promise<{
     org?: string;
     module?: string;
+    intent?: string;
     sent?: string;
     error?: string;
   }>;
@@ -20,8 +21,15 @@ type FeedbackPageProps = {
 export default async function FeedbackPage({ searchParams }: FeedbackPageProps) {
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
+  const isClubInquiry = resolvedSearchParams.intent === "club";
   const currentModule = "organizations";
-  const submitAction = submitFeedbackAction.bind(null, organizationKey, currentModule);
+  const currentFeedbackModule = isClubInquiry ? "clubs" : currentModule;
+  const submitAction = submitFeedbackAction.bind(
+    null,
+    organizationKey,
+    currentModule,
+    isClubInquiry ? "club" : null
+  );
   const homePath = withPublicQuery("/", {
     organizationKey,
     module: currentModule
@@ -30,15 +38,21 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
     organizationKey,
     module: currentModule
   });
-  const moduleDescription = "Si tu consulta es por grupos, ranking o partidos equilibrados, la recibimos por aqui.";
+  const moduleDescription = isClubInquiry
+    ? "Si queres traer un club o equipo, contanos nombre, redes, dominio si ya lo tenes y que secciones necesitarias."
+    : "Si tu consulta es por grupos, ranking o partidos equilibrados, la recibimos por aqui.";
 
   return (
     <div className="space-y-4">
       <Card className="rounded-[2rem] p-5 md:p-6">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Contacto</p>
-        <CardTitle className="mt-2 text-3xl">Necesitas ayuda?</CardTitle>
+        <CardTitle className="mt-2 text-3xl">
+          {isClubInquiry ? "Traer un club o equipo" : "Necesitas ayuda?"}
+        </CardTitle>
         <CardDescription className="mt-3 text-base">
-          Estamos para ayudarte a configurar tu grupo, resolver dudas y ordenar tu flujo sin romper nada.
+          {isClubInquiry
+            ? "Te ayudamos a publicar una presencia independiente para tu club dentro de Fabrica de Futbol."
+            : "Estamos para ayudarte a configurar tu grupo, resolver dudas y ordenar tu flujo sin romper nada."}
         </CardDescription>
         <p className="mt-3 text-sm text-slate-300">{moduleDescription}</p>
 
@@ -54,9 +68,13 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
             <p className="mt-2 text-sm text-slate-400">Canal principal de soporte y consultas comerciales.</p>
           </div>
           <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sugerencias</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              {isClubInquiry ? "Clubes" : "Sugerencias"}
+            </p>
             <p className="mt-2 text-sm text-slate-300">
-              Si tienes una idea para mejorar Fabrica de Futbol, tambien puedes escribirnos. Las sugerencias son bienvenidas.
+              {isClubInquiry
+                ? "Podemos preparar URL propia, catalogo consultivo, identidad visual y datos deportivos publicos."
+                : "Si tienes una idea para mejorar Fabrica de Futbol, tambien puedes escribirnos. Las sugerencias son bienvenidas."}
             </p>
           </div>
         </div>
@@ -116,8 +134,9 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
               <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="module">
                 Tema
               </label>
-              <Select defaultValue={currentModule} id="module" name="module">
+              <Select defaultValue={currentFeedbackModule} id="module" name="module">
                 <option value="organizations">Grupos</option>
+                <option value="clubs">Clubes / equipos</option>
                 <option value="both">General</option>
               </Select>
             </div>
@@ -125,9 +144,13 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="organization">
-              Grupo (opcional)
+              {isClubInquiry ? "Club o equipo (opcional)" : "Grupo (opcional)"}
             </label>
-            <Input id="organization" name="organization" placeholder="Ej: La Cantera de LQ" />
+            <Input
+              id="organization"
+              name="organization"
+              placeholder={isClubInquiry ? "Ej: La Quinta FC" : "Ej: La Cantera de LQ"}
+            />
           </div>
 
           <div>
@@ -139,7 +162,11 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
               maxLength={2500}
               minLength={10}
               name="message"
-              placeholder="Cuentanos que paso o que te gustaria mejorar."
+              placeholder={
+                isClubInquiry
+                  ? "Contanos que club queres traer, si ya tiene dominio, redes, catalogo o fotos propias."
+                  : "Cuentanos que paso o que te gustaria mejorar."
+              }
               required
               rows={7}
             />

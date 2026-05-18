@@ -59,11 +59,19 @@ function formatRecordValue(label: string, row: ClubPublicPlayerStat) {
 
 function StatTile({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="rounded-md border border-black/10 bg-white p-4 text-black shadow-[0_16px_40px_-34px_rgba(0,0,0,0.5)]">
+    <div className="rounded-sm border border-[var(--club-line)] bg-white p-4 text-black shadow-[0_18px_44px_rgba(85,47,9,0.08)]">
       <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-black/45">{label}</p>
       <p className="mt-2 text-4xl font-black leading-none [font-family:var(--font-club-display)]">{value}</p>
     </div>
   );
+}
+
+function getClubHeroHeadline(data: PublicClubSiteDetails) {
+  if (data.club.slug === "la-quinta") {
+    return "Esta locura de amarte me impide ser normal";
+  }
+
+  return data.club.name;
 }
 
 function ClubSiteNav({ active, data }: { active: ClubSitePageKey; data: PublicClubSiteDetails }) {
@@ -85,13 +93,13 @@ function ClubSiteNav({ active, data }: { active: ClubSitePageKey; data: PublicCl
   ] as const;
 
   return (
-    <nav className="flex flex-wrap items-center gap-2">
+    <nav className="flex flex-wrap items-center justify-center gap-2">
       {links.filter((link) => link.visible).map((link) => (
         <Link
           className={
             active === link.key
-              ? "rounded-md bg-[var(--club-primary)] px-4 py-2 text-sm font-extrabold text-black shadow-[0_14px_30px_-22px_var(--club-primary)]"
-              : "rounded-md border border-white/20 bg-white/5 px-4 py-2 text-sm font-bold text-white/90 transition hover:border-[var(--club-primary)] hover:bg-white/10 hover:text-white"
+              ? "rounded-sm bg-[var(--club-primary)] px-4 py-2 text-sm font-extrabold text-white"
+              : "rounded-sm border border-[var(--club-line)] bg-white px-4 py-2 text-sm font-extrabold text-[var(--club-primary)] transition hover:border-[var(--club-primary)] hover:bg-[var(--club-soft)]"
           }
           href={link.href}
           key={link.key}
@@ -108,96 +116,99 @@ function ClubSiteHero({ active, data }: { active: ClubSitePageKey; data: PublicC
   const heroUrl = getClubSiteHeroUrl(club.id, settings);
   const homeVenue = club.home_venue?.trim();
   const shouldShowHomeVenue = Boolean(homeVenue && homeVenue.toLowerCase() !== club.name.toLowerCase());
+  const heroHeadline = getClubHeroHeadline(data);
 
   return (
-    <section
-      className="relative isolate min-h-[620px] overflow-hidden bg-[#0d0f0d] bg-cover bg-center text-white"
-      style={{
-        backgroundImage: `linear-gradient(90deg, rgba(7,9,8,0.94) 0%, rgba(7,9,8,0.78) 42%, rgba(7,9,8,0.24) 100%), url("${heroUrl}")`
-      }}
-    >
-      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#f8f8f5] to-transparent" />
-      <div className="relative mx-auto flex min-h-[620px] max-w-7xl flex-col px-4 md:px-6">
-        <header className="flex flex-col gap-4 border-b border-white/15 py-5 md:flex-row md:items-center md:justify-between">
-          <Link className="flex w-fit items-center gap-3" href={buildClubSitePublicHref(club, settings)}>
+    <section className="bg-white text-[var(--club-ink)]">
+      <header className="border-b border-[var(--club-line)] bg-white/95">
+        <div className="mx-auto grid max-w-7xl gap-4 px-4 py-4 md:grid-cols-[1fr_auto_1fr] md:items-center md:px-6">
+          <Link className="flex w-fit items-center gap-3 md:justify-self-start" href={buildClubSitePublicHref(club, settings)}>
             <LeagueLogo
               alt={`Escudo de ${club.name}`}
-              className="rounded-md border-white/25 bg-white/10"
-              size={56}
+              className="rounded-sm border-[var(--club-line)] bg-white"
+              size={62}
               src={resolveClubLogoSrc(data)}
             />
             <div>
-              <p className="text-2xl font-black leading-none [font-family:var(--font-club-display)]">{club.name}</p>
-              {shouldShowHomeVenue ? <p className="mt-1 text-sm font-semibold text-white/62">{homeVenue}</p> : null}
+              <p className="text-2xl font-black leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)]">
+                {club.name}
+              </p>
+              {shouldShowHomeVenue ? <p className="mt-1 text-sm font-semibold text-black/50">{homeVenue}</p> : null}
             </div>
           </Link>
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
-            <ClubSiteNav active={active} data={data} />
-            <a
-              className="rounded-md border border-white/25 bg-white px-4 py-2 text-sm font-extrabold text-black transition hover:bg-[var(--club-primary)]"
-              href={PLATFORM_URL}
+          <ClubSiteNav active={active} data={data} />
+          <a
+            className="inline-flex min-h-10 w-fit items-center justify-center rounded-sm border border-[var(--club-line)] bg-white px-4 text-sm font-extrabold text-[var(--club-primary)] transition hover:border-[var(--club-primary)] hover:bg-[var(--club-soft)] md:justify-self-end"
+            href={PLATFORM_URL}
+          >
+            Volver a Fabrica
+          </a>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-5xl px-4 py-10 text-center md:px-6 md:py-14">
+        <p className="text-sm font-extrabold text-[var(--club-primary)]">Catalogo oficial de {club.name}</p>
+        <h1 className="mx-auto mt-5 max-w-3xl text-5xl font-black uppercase leading-[0.94] text-[var(--club-primary)] [font-family:var(--font-club-display)] md:text-7xl">
+          {heroHeadline}
+        </h1>
+        {club.description ? (
+          <p className="mx-auto mt-5 max-w-2xl text-base font-semibold leading-7 text-black/58 md:text-lg">
+            {club.description}
+          </p>
+        ) : null}
+        <div className="mt-7 flex flex-wrap justify-center gap-3">
+          {settings.sectionVisibility.catalog ? (
+            <Link
+              className="rounded-sm bg-[var(--club-primary)] px-5 py-3 text-sm font-black text-white transition hover:brightness-95"
+              href={buildClubSitePublicHref(club, settings, "/catalogo")}
             >
-              Volver a Fabrica
-            </a>
-          </div>
-        </header>
-
-        <div className="grid flex-1 items-end gap-8 pb-16 pt-14 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="max-w-3xl">
-            <h1 className="text-6xl font-black uppercase leading-[0.86] text-white [font-family:var(--font-club-display)] md:text-8xl">
-              {club.name}
-            </h1>
-          {club.description ? (
-            <p className="mt-6 max-w-2xl text-base font-semibold leading-7 text-white/80 md:text-lg">
-              {club.description}
-            </p>
+              Ver productos
+            </Link>
           ) : null}
-            <div className="mt-8 flex flex-wrap gap-3">
-              {settings.sectionVisibility.catalog ? (
-                <Link
-                  className="rounded-md bg-[var(--club-primary)] px-5 py-3 text-sm font-black text-black transition hover:brightness-95"
-                  href={buildClubSitePublicHref(club, settings, "/catalogo")}
-                >
-                  Ver catalogo
-                </Link>
-              ) : null}
-              {settings.instagramUrl ? (
-                <a
-                  className="rounded-md border border-white/25 bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white/20"
-                  href={settings.instagramUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  Instagram
-                </a>
-              ) : null}
-            </div>
-          </div>
+          {settings.instagramUrl ? (
+            <a
+              className="rounded-sm border border-[var(--club-line)] bg-white px-5 py-3 text-sm font-black text-[var(--club-primary)] transition hover:border-[var(--club-primary)] hover:bg-[var(--club-soft)]"
+              href={settings.instagramUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Instagram
+            </a>
+          ) : null}
+        </div>
+      </div>
 
-          <div className="rounded-md border border-white/15 bg-black/45 p-4 backdrop-blur-sm">
-            <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">
-              Temporada del club
+      <div className="relative min-h-[300px] overflow-hidden bg-[var(--club-primary)] md:min-h-[460px]">
+        <Image
+          alt={`${club.name} Futbol Club`}
+          className="object-cover"
+          fill
+          priority
+          sizes="100vw"
+          src={heroUrl}
+          unoptimized
+        />
+      </div>
+
+      <div className="bg-[var(--club-primary)] text-white">
+        <div className="mx-auto grid max-w-5xl grid-cols-3 gap-3 px-4 py-6 text-center md:px-6">
+          <div>
+            <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
+              {snapshot.summary.teamCount}
             </p>
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              <div>
-                <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
-                  {snapshot.summary.teamCount}
-                </p>
-                <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/55">Equipos</p>
-              </div>
-              <div>
-                <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
-                  {snapshot.summary.playerCount}
-                </p>
-                <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/55">Jugadores</p>
-              </div>
-              <div>
-                <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
-                  {snapshot.summary.totalMatches}
-                </p>
-                <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/55">Partidos</p>
-              </div>
-            </div>
+            <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/78">Equipos</p>
+          </div>
+          <div>
+            <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
+              {snapshot.summary.playerCount}
+            </p>
+            <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/78">Jugadores</p>
+          </div>
+          <div>
+            <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
+              {snapshot.summary.totalMatches}
+            </p>
+            <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/78">Partidos</p>
           </div>
         </div>
       </div>
@@ -219,7 +230,9 @@ export function ClubSiteShell({
     "--club-primary": settings.primaryColor,
     "--club-secondary": settings.secondaryColor,
     "--club-accent": settings.accentColor,
-    "--club-page": "#f8f8f5",
+    "--club-page": "#ffffff",
+    "--club-soft": "#fff8ef",
+    "--club-line": "#f2e1cd",
     "--club-ink": "#151515",
     fontFamily: formatClubSiteFontFamily(settings.fontFamily)
   } as CSSProperties;

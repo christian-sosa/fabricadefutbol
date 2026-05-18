@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   description: "Clubes con sitio publico en Fabrica de Futbol."
 };
 
+const CLUB_FEEDBACK_HREF = "/feedback?intent=club";
+
 function resolveLogoSrc(clubId: string, logoPath: string | null) {
   return logoPath?.startsWith("/") ? logoPath : getClubLogoUrl(clubId);
 }
@@ -22,20 +24,31 @@ export default async function PublicClubsPage() {
     <div className="space-y-6">
       <section className="rounded-2xl border border-slate-800 bg-slate-950/80 p-5 sm:p-7">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Clubes</p>
-        <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="mt-3">
+          <h1 className="max-w-3xl text-4xl font-black text-white md:text-5xl">
+            Sitios oficiales de clubes en Fabrica de Futbol
+          </h1>
+          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-300">
+            Cada club puede tener identidad propia, catalogo consultivo y datos deportivos publicados desde el admin.
+          </p>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-orange-300/30 bg-[linear-gradient(135deg,#ff9900_0%,#ff8500_58%,#0a0908_58%,#0a0908_100%)] p-[1px]">
+        <div className="grid gap-5 rounded-2xl bg-slate-950/92 p-5 md:grid-cols-[1fr_auto] md:items-center md:p-6">
           <div>
-            <h1 className="max-w-3xl text-4xl font-black text-white md:text-5xl">
-              Sitios oficiales de clubes en Fabrica de Futbol
-            </h1>
-            <p className="mt-3 max-w-2xl text-base leading-7 text-slate-300">
-              Cada club puede tener identidad propia, catalogo consultivo y datos deportivos publicados desde el admin.
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-orange-300">Clubes y equipos</p>
+            <h2 className="mt-2 text-2xl font-black text-white md:text-3xl">¿Querés traer tu club o equipo?</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300 md:text-base">
+              Armamos una URL propia para tu club, con identidad visual, catalogo consultivo y datos deportivos
+              administrados desde Fabrica de Futbol.
             </p>
           </div>
           <Link
-            className="w-fit rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
-            href="/feedback"
+            className="inline-flex min-h-11 w-fit items-center justify-center rounded-md bg-orange-400 px-5 text-sm font-black text-black transition hover:bg-orange-300"
+            href={CLUB_FEEDBACK_HREF}
           >
-            ¿Querés traer tu club a Fábrica de Fútbol?
+            Quiero traer mi club
           </Link>
         </div>
       </section>
