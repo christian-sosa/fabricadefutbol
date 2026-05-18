@@ -55,8 +55,10 @@ describe("club site productizado", () => {
   it("explica limites y campos comerciales del sitio en el admin", () => {
     const adminPageSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "page.tsx");
     const actionsSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "actions.ts");
+    const uploadInputSource = expectFile("src", "components", "admin", "optimized-club-site-image-input.tsx");
 
     expect(adminPageSource).toContain("JPG, PNG o WEBP hasta");
+    expect(adminPageSource).toContain("OptimizedClubSiteImageInput");
     expect(adminPageSource).toContain("MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB");
     expect(adminPageSource).toContain("MAX_CLUB_PRODUCT_IMAGE_SIZE_MB");
     expect(adminPageSource).toContain("Tiene que estar habilitado y publicado");
@@ -68,6 +70,9 @@ describe("club site productizado", () => {
     expect(actionsSource).toContain("La foto principal no puede superar");
     expect(actionsSource).toContain("La imagen del producto no puede superar");
     expect(actionsSource).toContain("No se pudo procesar la imagen");
+    expect(uploadInputSource).toContain("canvas.toBlob");
+    expect(uploadInputSource).toContain("new DataTransfer()");
+    expect(uploadInputSource).toContain("image/webp");
   });
 
   it("declara tipos de base para settings y catalogo sin depender de HTML estatico", () => {

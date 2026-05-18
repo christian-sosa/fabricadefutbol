@@ -32,6 +32,7 @@ import {
   adminContextActionLinkClass,
   adminContextPrimaryActionLinkClass
 } from "@/components/admin/admin-context-actions";
+import { OptimizedClubSiteImageInput } from "@/components/admin/optimized-club-site-image-input";
 import { MatchGuestFields } from "@/app/admin/(panel)/clubs/[clubId]/match-guest-fields";
 import { MatchPlayerPicker } from "@/app/admin/(panel)/clubs/[clubId]/match-player-picker";
 import { MatchDateTimeFields } from "@/components/admin/match-date-time-fields";
@@ -2204,10 +2205,15 @@ function ProductEditor({
 
           <form action={uploadClubProductImageAction.bind(null, clubId)} className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
             <input name="productId" type="hidden" value={product.id} />
-            <Input accept="image/jpeg,image/png,image/webp" className="max-w-80" name="productImage" type="file" />
+            <OptimizedClubSiteImageInput
+              className="max-w-80"
+              helperText={`JPG, PNG o WEBP hasta ${MAX_CLUB_PRODUCT_IMAGE_SIZE_MB} MB. Se optimiza antes de subir.`}
+              maxSourceSizeMb={MAX_CLUB_PRODUCT_IMAGE_SIZE_MB}
+              name="productImage"
+              variant="product"
+            />
             <Button className="w-fit" type="submit" variant="ghost">Subir imagen</Button>
           </form>
-          <p className="mt-2 text-xs text-slate-500">JPG, PNG o WEBP hasta {MAX_CLUB_PRODUCT_IMAGE_SIZE_MB} MB. Se recorta en formato cuadrado.</p>
         </div>
       </div>
     </div>
@@ -2251,7 +2257,12 @@ function SiteTab({
             <img alt={`Foto principal de ${details.club.name}`} className="aspect-[16/9] w-full object-cover" src={heroUrl} />
           </div>
           <form action={uploadClubSiteHeroAction.bind(null, clubId)} className="mt-4 flex flex-col gap-2">
-            <Input accept="image/jpeg,image/png,image/webp" name="hero" type="file" />
+            <OptimizedClubSiteImageInput
+              helperText={`JPG, PNG o WEBP hasta ${MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB} MB. Se optimiza antes de subir.`}
+              maxSourceSizeMb={MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB}
+              name="hero"
+              variant="hero"
+            />
             <Button className="w-fit" type="submit" variant="secondary">
               Subir foto principal
             </Button>
@@ -2418,8 +2429,13 @@ function SiteTab({
             <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="new-product-image">
               Imagen del producto
             </label>
-            <Input accept="image/jpeg,image/png,image/webp" id="new-product-image" name="productImage" type="file" />
-            <p className="mt-1 text-xs text-slate-500">Opcional. JPG, PNG o WEBP hasta {MAX_CLUB_PRODUCT_IMAGE_SIZE_MB} MB. Se recorta en formato cuadrado.</p>
+            <OptimizedClubSiteImageInput
+              helperText={`Opcional. JPG, PNG o WEBP hasta ${MAX_CLUB_PRODUCT_IMAGE_SIZE_MB} MB. Se optimiza antes de subir.`}
+              id="new-product-image"
+              maxSourceSizeMb={MAX_CLUB_PRODUCT_IMAGE_SIZE_MB}
+              name="productImage"
+              variant="product"
+            />
           </div>
           <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm font-semibold text-slate-200">
             <input defaultChecked name="visible" type="checkbox" />

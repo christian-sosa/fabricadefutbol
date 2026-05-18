@@ -39,6 +39,14 @@ describe("next config security", () => {
     expect(config.experimental?.serverActions?.allowedOrigins).toEqual(config.allowedDevOrigins);
   });
 
+  it("permite Server Actions con imagenes optimizadas del admin", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    const config = await loadNextConfig("server-action-body-size");
+
+    expect(config.experimental?.serverActions?.bodySizeLimit).toBe("30mb");
+  });
+
   it("declara headers de seguridad globales que no rompen scripts de Next", async () => {
     vi.stubEnv("NODE_ENV", "production");
 
