@@ -30,6 +30,11 @@ export function hostBelongsToMainApp(host: string) {
   }
 }
 
+export function isClubSiteStandaloneHost(host: string | null | undefined) {
+  const normalizedHost = normalizeRequestHost(host);
+  return Boolean(normalizedHost && !hostBelongsToMainApp(normalizedHost));
+}
+
 export async function resolveClubSiteFromRequestHost(): Promise<ClubSiteRequestResolution> {
   const requestHeaders = await headers();
   const host = normalizeRequestHost(requestHeaders.get("host"));

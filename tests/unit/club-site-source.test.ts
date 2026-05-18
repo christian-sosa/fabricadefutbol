@@ -87,4 +87,29 @@ describe("club site productizado", () => {
     expect(teamDataSource).toContain("resolveClubSiteFromRequestHost");
     expect(teamDataSource).toContain("ClubSiteTeamData");
   });
+
+  it("renderiza dominios propios de club sin header, footer ni contenedor global de Fabrica", () => {
+    const layoutSource = readSource("src", "app", "layout.tsx");
+    const componentSource = readSource("src", "components", "clubs", "club-site.tsx");
+
+    expect(layoutSource).toContain("isClubSiteStandaloneHost");
+    expect(layoutSource).toContain("standaloneClubSite");
+    expect(layoutSource).toContain("{standaloneClubSite ? (");
+    expect(layoutSource).toContain('<main className="w-full" id="contenido-principal">');
+    expect(componentSource).toContain("Volver a Fabrica");
+    expect(componentSource).not.toContain("-my-6");
+    expect(componentSource).not.toContain("bg-[#f7f3ec]");
+  });
+
+  it("usa metadata absoluta para que el dominio de club no herede el sufijo de Fabrica", () => {
+    const rootClubSource = readSource("src", "app", "page.tsx");
+    const slugClubSource = readSource("src", "app", "clubs", "[slug]", "page.tsx");
+    const catalogSource = readSource("src", "app", "catalogo", "page.tsx");
+    const teamDataSource = readSource("src", "app", "equipo", "page.tsx");
+
+    expect(rootClubSource).toContain("absolute: data.club.name");
+    expect(slugClubSource).toContain("absolute: data.club.name");
+    expect(catalogSource).toContain("absolute: `Catalogo - ${data.club.name}`");
+    expect(teamDataSource).toContain("absolute: `Datos - ${data.club.name}`");
+  });
 });

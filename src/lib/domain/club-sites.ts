@@ -224,12 +224,12 @@ export function filterVisibleClubProducts(products: ClubProductRecord[]) {
 export function formatClubSiteFontFamily(fontFamily: ClubSiteFontFamily) {
   switch (fontFamily) {
     case "inter":
-      return "Inter, ui-sans-serif, system-ui, sans-serif";
+      return "var(--font-club-body), Inter, ui-sans-serif, system-ui, sans-serif";
     case "montserrat":
-      return "Montserrat, Inter, ui-sans-serif, system-ui, sans-serif";
+      return "Montserrat, var(--font-club-body), Inter, ui-sans-serif, system-ui, sans-serif";
     case "oswald":
-      return "Oswald, Impact, Inter, ui-sans-serif, system-ui, sans-serif";
+      return "var(--font-club-display), Oswald, Impact, Inter, ui-sans-serif, system-ui, sans-serif";
     case "system":
-      return "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif";
+      return "var(--font-club-body), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif";
   }
 }

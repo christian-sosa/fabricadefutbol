@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Script from "next/script";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
@@ -10,6 +11,7 @@ import { BetaNotice } from "@/components/layout/beta-notice";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ReactQueryProvider } from "@/components/providers/react-query-provider";
+import { isClubSiteStandaloneHost } from "@/lib/club-site-request";
 import { getAdsenseClientId, shouldRenderAds, shouldRenderSpeedInsights } from "@/lib/env";
 import { getPublicAppUrl } from "@/lib/public-url";
 
@@ -68,13 +70,15 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const requestHeaders = await headers();
+  const standaloneClubSite = isClubSiteStandaloneHost(requestHeaders.get("host"));
   const adsenseClientId = getAdsenseClientId();
-  const adsEnabled = shouldRenderAds() && Boolean(adsenseClientId);
+  const adsEnabled = !standaloneClubSite && shouldRenderAds() && Boolean(adsenseClientId);
   const speedInsightsEnabled = shouldRenderSpeedInsights();
 
   return (
     <html lang="es">
-      <body>
+      <body className={standaloneClubSite ? "club-site-standalone" : undefined}>
         <ReactQueryProvider>
           {adsEnabled && adsenseClientId ? (
             <Script
@@ -88,19 +92,27 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <a className="skip-link" href="#contenido-principal">
             Saltar al contenido
           </a>
-          <Suspense fallback={<div className="sticky top-0 z-30 h-[57px] border-b border-slate-800 bg-slate-950/85" />}>
-            <SiteHeader
-              initialCanAccessTournaments={false}
-              initialIsAuthenticated={false}
-            />
-          </Suspense>
-          <BetaNotice />
-          <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8" id="contenido-principal">
-            {children}
-          </main>
-          <Suspense fallback={<div className="h-[280px] border-t border-slate-800 bg-slate-950/80" />}>
-            <SiteFooter canAccessTournaments={false} />
-          </Suspense>
+          {standaloneClubSite ? (
+            <main className="w-full" id="contenido-principal">
+              {children}
+            </main>
+          ) : (
+            <>
+              <Suspense fallback={<div className="sticky top-0 z-30 h-[57px] border-b border-slate-800 bg-slate-950/85" />}>
+                <SiteHeader
+                  initialCanAccessTournaments={false}
+                  initialIsAuthenticated={false}
+                />
+              </Suspense>
+              <BetaNotice />
+              <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8" id="contenido-principal">
+                {children}
+              </main>
+              <Suspense fallback={<div className="h-[280px] border-t border-slate-800 bg-slate-950/80" />}>
+                <SiteFooter canAccessTournaments={false} />
+              </Suspense>
+            </>
+          )}
         </ReactQueryProvider>
         <Suspense fallback={null}>
           <GrowthEventTracker />

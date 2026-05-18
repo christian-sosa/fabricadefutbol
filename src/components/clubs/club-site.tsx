@@ -1,5 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import { Barlow_Condensed, Manrope } from "next/font/google";
 
 import { LeagueLogo } from "@/components/tournaments/league-logo";
 import { getClubProductImageUrl, getClubSiteHeroUrl } from "@/lib/club-site-media";
@@ -16,9 +18,24 @@ import type {
   ClubPublicTeam
 } from "@/lib/domain/clubs";
 import type { PublicClubSiteDetails } from "@/lib/queries/clubs";
+import { getPublicAppUrl } from "@/lib/public-url";
 import { getClubLogoUrl } from "@/lib/team-logos";
 
 type ClubSitePageKey = "home" | "catalogo" | "equipo";
+
+const clubBodyFont = Manrope({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-club-body"
+});
+
+const clubDisplayFont = Barlow_Condensed({
+  subsets: ["latin"],
+  weight: ["600", "700", "800", "900"],
+  variable: "--font-club-display"
+});
+
+const PLATFORM_URL = getPublicAppUrl();
 
 function resolveClubLogoSrc(data: PublicClubSiteDetails) {
   return data.club.logo_path?.startsWith("/") ? data.club.logo_path : getClubLogoUrl(data.club.id);
@@ -42,9 +59,9 @@ function formatRecordValue(label: string, row: ClubPublicPlayerStat) {
 
 function StatTile({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="border border-black/10 bg-white p-4 text-black shadow-[0_14px_28px_-24px_rgba(0,0,0,0.45)]">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-black/50">{label}</p>
-      <p className="mt-2 text-3xl font-black">{value}</p>
+    <div className="rounded-md border border-black/10 bg-white p-4 text-black shadow-[0_16px_40px_-34px_rgba(0,0,0,0.5)]">
+      <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-black/45">{label}</p>
+      <p className="mt-2 text-4xl font-black leading-none [font-family:var(--font-club-display)]">{value}</p>
     </div>
   );
 }
@@ -73,8 +90,8 @@ function ClubSiteNav({ active, data }: { active: ClubSitePageKey; data: PublicCl
         <Link
           className={
             active === link.key
-              ? "bg-[var(--club-primary)] px-4 py-2 text-sm font-black text-black"
-              : "border border-white/20 px-4 py-2 text-sm font-bold text-white/90 transition hover:border-[var(--club-primary)] hover:text-white"
+              ? "rounded-md bg-[var(--club-primary)] px-4 py-2 text-sm font-extrabold text-black shadow-[0_14px_30px_-22px_var(--club-primary)]"
+              : "rounded-md border border-white/20 bg-white/5 px-4 py-2 text-sm font-bold text-white/90 transition hover:border-[var(--club-primary)] hover:bg-white/10 hover:text-white"
           }
           href={link.href}
           key={link.key}
@@ -89,50 +106,97 @@ function ClubSiteNav({ active, data }: { active: ClubSitePageKey; data: PublicCl
 function ClubSiteHero({ active, data }: { active: ClubSitePageKey; data: PublicClubSiteDetails }) {
   const { club, settings, snapshot } = data;
   const heroUrl = getClubSiteHeroUrl(club.id, settings);
+  const homeVenue = club.home_venue?.trim();
+  const shouldShowHomeVenue = Boolean(homeVenue && homeVenue.toLowerCase() !== club.name.toLowerCase());
 
   return (
     <section
-      className="min-h-[360px] bg-black bg-cover bg-center text-white md:min-h-[430px]"
+      className="relative isolate min-h-[620px] overflow-hidden bg-[#0d0f0d] bg-cover bg-center text-white"
       style={{
-        backgroundImage: `linear-gradient(90deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.72) 44%, rgba(0,0,0,0.22) 100%), url("${heroUrl}")`
+        backgroundImage: `linear-gradient(90deg, rgba(7,9,8,0.94) 0%, rgba(7,9,8,0.78) 42%, rgba(7,9,8,0.24) 100%), url("${heroUrl}")`
       }}
     >
-      <div className="mx-auto flex min-h-[360px] max-w-6xl flex-col justify-between px-4 py-5 md:min-h-[430px] md:px-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <Link className="flex items-center gap-3" href={buildClubSitePublicHref(club, settings)}>
-            <LeagueLogo alt={`Escudo de ${club.name}`} size={56} src={resolveClubLogoSrc(data)} />
+      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#f8f8f5] to-transparent" />
+      <div className="relative mx-auto flex min-h-[620px] max-w-7xl flex-col px-4 md:px-6">
+        <header className="flex flex-col gap-4 border-b border-white/15 py-5 md:flex-row md:items-center md:justify-between">
+          <Link className="flex w-fit items-center gap-3" href={buildClubSitePublicHref(club, settings)}>
+            <LeagueLogo
+              alt={`Escudo de ${club.name}`}
+              className="rounded-md border-white/25 bg-white/10"
+              size={56}
+              src={resolveClubLogoSrc(data)}
+            />
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--club-primary)]">
-                Sitio oficial
-              </p>
-              <p className="text-xl font-black">{club.name}</p>
+              <p className="text-2xl font-black leading-none [font-family:var(--font-club-display)]">{club.name}</p>
+              {shouldShowHomeVenue ? <p className="mt-1 text-sm font-semibold text-white/62">{homeVenue}</p> : null}
             </div>
           </Link>
-          <ClubSiteNav active={active} data={data} />
-        </div>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <ClubSiteNav active={active} data={data} />
+            <a
+              className="rounded-md border border-white/25 bg-white px-4 py-2 text-sm font-extrabold text-black transition hover:bg-[var(--club-primary)]"
+              href={PLATFORM_URL}
+            >
+              Volver a Fabrica
+            </a>
+          </div>
+        </header>
 
-        <div className="max-w-3xl pb-3">
-          <p className="w-fit bg-[var(--club-primary)] px-3 py-1 text-xs font-black uppercase tracking-[0.2em] text-black">
-            {club.home_venue ?? "Futbol amateur"}
-          </p>
-          <h1 className="mt-5 text-5xl font-black leading-none text-white md:text-7xl">{club.name}</h1>
+        <div className="grid flex-1 items-end gap-8 pb-16 pt-14 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="max-w-3xl">
+            <h1 className="text-6xl font-black uppercase leading-[0.86] text-white [font-family:var(--font-club-display)] md:text-8xl">
+              {club.name}
+            </h1>
           {club.description ? (
-            <p className="mt-5 max-w-2xl text-base font-medium leading-7 text-white/78 md:text-lg">
+            <p className="mt-6 max-w-2xl text-base font-semibold leading-7 text-white/80 md:text-lg">
               {club.description}
             </p>
           ) : null}
-          <div className="mt-7 grid max-w-xl grid-cols-3 border border-white/15 bg-black/35 backdrop-blur-sm">
-            <div className="border-r border-white/15 p-3">
-              <p className="text-2xl font-black">{snapshot.summary.teamCount}</p>
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/55">Equipos</p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              {settings.sectionVisibility.catalog ? (
+                <Link
+                  className="rounded-md bg-[var(--club-primary)] px-5 py-3 text-sm font-black text-black transition hover:brightness-95"
+                  href={buildClubSitePublicHref(club, settings, "/catalogo")}
+                >
+                  Ver catalogo
+                </Link>
+              ) : null}
+              {settings.instagramUrl ? (
+                <a
+                  className="rounded-md border border-white/25 bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white/20"
+                  href={settings.instagramUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Instagram
+                </a>
+              ) : null}
             </div>
-            <div className="border-r border-white/15 p-3">
-              <p className="text-2xl font-black">{snapshot.summary.playerCount}</p>
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/55">Jugadores</p>
-            </div>
-            <div className="p-3">
-              <p className="text-2xl font-black">{snapshot.summary.totalMatches}</p>
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/55">Partidos</p>
+          </div>
+
+          <div className="rounded-md border border-white/15 bg-black/45 p-4 backdrop-blur-sm">
+            <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">
+              Temporada del club
+            </p>
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              <div>
+                <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
+                  {snapshot.summary.teamCount}
+                </p>
+                <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/55">Equipos</p>
+              </div>
+              <div>
+                <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
+                  {snapshot.summary.playerCount}
+                </p>
+                <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/55">Jugadores</p>
+              </div>
+              <div>
+                <p className="text-4xl font-black leading-none [font-family:var(--font-club-display)]">
+                  {snapshot.summary.totalMatches}
+                </p>
+                <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/55">Partidos</p>
+              </div>
             </div>
           </div>
         </div>
@@ -155,16 +219,18 @@ export function ClubSiteShell({
     "--club-primary": settings.primaryColor,
     "--club-secondary": settings.secondaryColor,
     "--club-accent": settings.accentColor,
+    "--club-page": "#f8f8f5",
+    "--club-ink": "#151515",
     fontFamily: formatClubSiteFontFamily(settings.fontFamily)
   } as CSSProperties;
 
   return (
     <div
-      className="-my-6 w-full overflow-hidden bg-[#f7f3ec] text-black md:-my-8"
+      className={`${clubBodyFont.variable} ${clubDisplayFont.variable} min-h-screen w-full overflow-hidden bg-[var(--club-page)] text-[var(--club-ink)]`}
       style={style}
     >
       <ClubSiteHero active={active} data={data} />
-      <div className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-12">{children}</div>
+      <div className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-14">{children}</div>
     </div>
   );
 }
@@ -183,16 +249,19 @@ function ProductCard({ data, product }: { data: PublicClubSiteDetails; product: 
       : "Disponible";
 
   return (
-    <article className="group border border-black/10 bg-white shadow-[0_18px_40px_-32px_rgba(0,0,0,0.55)]">
-      <div className="aspect-square overflow-hidden bg-[#171717]">
+    <article className="group overflow-hidden rounded-md border border-black/10 bg-white shadow-[0_18px_44px_-34px_rgba(0,0,0,0.55)]">
+      <div className="relative aspect-[4/5] overflow-hidden bg-[#151515]">
         {imageUrl ? (
-          <img
+          <Image
             alt={product.name}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            className="object-cover transition duration-300 group-hover:scale-[1.03]"
+            fill
+            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
             src={imageUrl}
+            unoptimized
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#111_0%,#2a2a2a_52%,#f7951d_53%,#f7951d_100%)] p-8 text-center text-3xl font-black uppercase text-white">
+          <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#111_0%,#272727_52%,var(--club-primary)_53%,var(--club-primary)_100%)] p-8 text-center text-4xl font-black uppercase leading-none text-white [font-family:var(--font-club-display)]">
             {product.name}
           </div>
         )}
@@ -201,18 +270,18 @@ function ProductCard({ data, product }: { data: PublicClubSiteDetails; product: 
         <div className="flex items-start justify-between gap-3">
           <div>
             {product.category ? (
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-black/45">{product.category}</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-black/45">{product.category}</p>
             ) : null}
-            <h2 className="mt-1 text-xl font-black leading-tight">{product.name}</h2>
+            <h2 className="mt-1 text-3xl font-black leading-none [font-family:var(--font-club-display)]">{product.name}</h2>
           </div>
-          <span className="shrink-0 bg-black px-2 py-1 text-xs font-black text-white">{statusLabel}</span>
+          <span className="shrink-0 rounded-sm bg-black px-2 py-1 text-xs font-black text-white">{statusLabel}</span>
         </div>
         {product.description ? <p className="text-sm leading-6 text-black/62">{product.description}</p> : null}
         <div className="flex items-center justify-between gap-3 border-t border-black/10 pt-3">
           <p className="text-sm font-black text-black">{product.price_label ?? "Consultar precio"}</p>
           {contactHref ? (
             <a
-              className="bg-[var(--club-accent)] px-4 py-2 text-sm font-black text-black transition hover:brightness-95"
+              className="rounded-md bg-[var(--club-accent)] px-4 py-2 text-sm font-black text-black transition hover:brightness-95"
               href={contactHref}
               rel="noreferrer"
               target="_blank"
@@ -230,12 +299,12 @@ function ProductCard({ data, product }: { data: PublicClubSiteDetails; product: 
 
 function LatestMatch({ match }: { match: ClubPublicMatch }) {
   return (
-    <div className="border border-black/10 bg-white p-4">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-black/45">{formatDate(match.playedAt)}</p>
-      <p className="mt-2 text-lg font-black">
+    <div className="rounded-md border border-black/10 bg-white p-4">
+      <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-black/45">{formatDate(match.playedAt)}</p>
+      <p className="mt-2 text-lg font-extrabold">
         {match.teamName} vs {match.opponentName}
       </p>
-      <p className="mt-1 text-3xl font-black text-[var(--club-primary)]">
+      <p className="mt-2 text-5xl font-black leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)]">
         {match.goalsFor} - {match.goalsAgainst}
       </p>
     </div>
@@ -244,8 +313,8 @@ function LatestMatch({ match }: { match: ClubPublicMatch }) {
 
 function ActivityItem({ item }: { item: ClubPublicActivity }) {
   return (
-    <li className="border-b border-black/10 py-3 last:border-0">
-      <p className="text-sm font-black">{item.title}</p>
+    <li className="border-b border-black/10 py-4 last:border-0">
+      <p className="text-sm font-extrabold">{item.title}</p>
       {item.description ? <p className="mt-1 text-sm text-black/60">{item.description}</p> : null}
     </li>
   );
@@ -257,11 +326,13 @@ export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
 
   return (
     <ClubSiteShell active="home" data={data}>
-      <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <section>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--club-primary)]">Resumen</p>
-          <h2 className="mt-2 text-4xl font-black leading-tight md:text-5xl">Toda la info del club en un solo sitio.</h2>
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Resumen</p>
+          <h2 className="mt-2 max-w-3xl text-5xl font-black uppercase leading-[0.92] [font-family:var(--font-club-display)] md:text-6xl">
+            Toda la info del club en un solo sitio.
+          </h2>
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatTile label="Goles" value={snapshot.summary.totalGoals} />
             <StatTile label="Promedio" value={snapshot.summary.avgGoalsPerMatch} />
             <StatTile label="Asistencias" value={snapshot.summary.totalAttendances} />
@@ -270,18 +341,18 @@ export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
         </section>
 
         {settings.instagramUrl || settings.whatsappUrlOrPhone ? (
-          <aside className="border border-black/10 bg-black p-5 text-white">
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--club-primary)]">Contacto</p>
-            <h2 className="mt-2 text-3xl font-black">Canales oficiales</h2>
+          <aside className="rounded-md border border-black/10 bg-[#101312] p-5 text-white shadow-[0_18px_44px_-34px_rgba(0,0,0,0.65)]">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Contacto</p>
+            <h2 className="mt-2 text-4xl font-black uppercase leading-none [font-family:var(--font-club-display)]">Canales oficiales</h2>
             <div className="mt-5 flex flex-wrap gap-2">
               {settings.instagramUrl ? (
-                <a className="border border-white/20 px-4 py-2 text-sm font-black" href={settings.instagramUrl} rel="noreferrer" target="_blank">
+                <a className="rounded-md border border-white/20 px-4 py-2 text-sm font-black transition hover:bg-white/10" href={settings.instagramUrl} rel="noreferrer" target="_blank">
                   Instagram
                 </a>
               ) : null}
               {settings.whatsappUrlOrPhone ? (
                 <a
-                  className="bg-[var(--club-accent)] px-4 py-2 text-sm font-black text-black"
+                  className="rounded-md bg-[var(--club-accent)] px-4 py-2 text-sm font-black text-black transition hover:brightness-95"
                   href={buildClubProductContactHref({
                     clubName: data.club.name,
                     product: {
@@ -304,13 +375,13 @@ export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
       </div>
 
       {settings.sectionVisibility.catalog && featuredProducts.length ? (
-        <section className="mt-12">
+        <section className="mt-14">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--club-primary)]">Catalogo</p>
-              <h2 className="mt-2 text-3xl font-black">Productos destacados</h2>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Catalogo</p>
+              <h2 className="mt-2 text-5xl font-black uppercase leading-none [font-family:var(--font-club-display)]">Productos destacados</h2>
             </div>
-            <Link className="w-fit bg-black px-4 py-2 text-sm font-black text-white" href={buildClubSitePublicHref(data.club, settings, "/catalogo")}>
+            <Link className="w-fit rounded-md bg-black px-4 py-2 text-sm font-black text-white transition hover:bg-[var(--club-primary)] hover:text-black" href={buildClubSitePublicHref(data.club, settings, "/catalogo")}>
               Ver catalogo
             </Link>
           </div>
@@ -323,9 +394,9 @@ export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
       ) : null}
 
       {settings.sectionVisibility.matches && snapshot.recentMatches.length ? (
-        <section className="mt-12">
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--club-primary)]">Equipo</p>
-          <h2 className="mt-2 text-3xl font-black">Ultimos partidos</h2>
+        <section className="mt-14">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Equipo</p>
+          <h2 className="mt-2 text-5xl font-black uppercase leading-none [font-family:var(--font-club-display)]">Ultimos partidos</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-3">
             {snapshot.recentMatches.slice(0, 3).map((match) => (
               <LatestMatch key={match.id} match={match} />
@@ -335,9 +406,9 @@ export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
       ) : null}
 
       {settings.sectionVisibility.activity && snapshot.activity.length ? (
-        <section className="mt-12 border border-black/10 bg-white p-5">
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--club-primary)]">Actividad</p>
-          <h2 className="mt-2 text-3xl font-black">Novedades recientes</h2>
+        <section className="mt-14 rounded-md border border-black/10 bg-white p-5">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Actividad</p>
+          <h2 className="mt-2 text-5xl font-black uppercase leading-none [font-family:var(--font-club-display)]">Novedades recientes</h2>
           <ul className="mt-4">
             {snapshot.activity.slice(0, 5).map((item) => (
               <ActivityItem item={item} key={`${item.type}-${item.createdAt}-${item.title}`} />
@@ -375,9 +446,9 @@ export function ClubSiteCatalog({
     <ClubSiteShell active="catalogo" data={data}>
       <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--club-primary)]">Catalogo</p>
-          <h1 className="mt-2 text-4xl font-black md:text-5xl">Productos del club</h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-black/62">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Catalogo</p>
+          <h1 className="mt-2 text-6xl font-black uppercase leading-[0.9] [font-family:var(--font-club-display)] md:text-7xl">Productos del club</h1>
+          <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-black/62">
             Elegis el producto y coordinas la compra por WhatsApp, Instagram o el canal que defina el club.
           </p>
         </div>
@@ -386,14 +457,14 @@ export function ClubSiteCatalog({
       {categories.length ? (
         <nav className="mt-7 flex gap-2 overflow-x-auto pb-2">
           <Link
-            className={!selectedCategory ? "shrink-0 bg-black px-4 py-2 text-sm font-black text-white" : "shrink-0 border border-black/15 bg-white px-4 py-2 text-sm font-black text-black"}
+            className={!selectedCategory ? "shrink-0 rounded-md bg-black px-4 py-2 text-sm font-black text-white" : "shrink-0 rounded-md border border-black/15 bg-white px-4 py-2 text-sm font-black text-black transition hover:border-black/35"}
             href={buildCategoryHref(data, null)}
           >
             Todo
           </Link>
           {categories.map((item) => (
             <Link
-              className={selectedCategory === item ? "shrink-0 bg-black px-4 py-2 text-sm font-black text-white" : "shrink-0 border border-black/15 bg-white px-4 py-2 text-sm font-black text-black"}
+              className={selectedCategory === item ? "shrink-0 rounded-md bg-black px-4 py-2 text-sm font-black text-white" : "shrink-0 rounded-md border border-black/15 bg-white px-4 py-2 text-sm font-black text-black transition hover:border-black/35"}
               href={buildCategoryHref(data, item)}
               key={item}
             >
@@ -410,8 +481,8 @@ export function ClubSiteCatalog({
       </div>
 
       {!products.length ? (
-        <div className="mt-6 border border-black/10 bg-white p-6">
-          <p className="text-lg font-black">Todavia no hay productos visibles.</p>
+        <div className="mt-6 rounded-md border border-black/10 bg-white p-6">
+          <p className="text-lg font-extrabold">Todavia no hay productos visibles.</p>
           <p className="mt-2 text-sm text-black/60">Cuando el admin publique productos, aparecen automaticamente aca.</p>
         </div>
       ) : null}
@@ -421,9 +492,9 @@ export function ClubSiteCatalog({
 
 function TeamCard({ team }: { team: ClubPublicTeam }) {
   return (
-    <article className="border border-black/10 bg-white p-4">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-black/45">{team.modality}</p>
-      <h2 className="mt-1 text-2xl font-black">{team.name}</h2>
+    <article className="rounded-md border border-black/10 bg-white p-4">
+      <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-black/45">{team.modality}</p>
+      <h2 className="mt-1 text-4xl font-black leading-none [font-family:var(--font-club-display)]">{team.name}</h2>
       {team.players.length ? (
         <p className="mt-3 text-sm leading-6 text-black/62">{team.players.slice(0, 8).map((player) => player.name).join(" / ")}</p>
       ) : null}
@@ -447,8 +518,8 @@ export function ClubSiteTeamData({ data }: { data: PublicClubSiteDetails }) {
   return (
     <ClubSiteShell active="equipo" data={data}>
       <section>
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--club-primary)]">Datos del equipo</p>
-        <h1 className="mt-2 text-4xl font-black md:text-5xl">Rendimiento publico</h1>
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Datos del equipo</p>
+        <h1 className="mt-2 text-6xl font-black uppercase leading-[0.9] [font-family:var(--font-club-display)] md:text-7xl">Rendimiento publico</h1>
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <StatTile label="Equipos" value={snapshot.summary.teamCount} />
           <StatTile label="Jugadores" value={snapshot.summary.playerCount} />
@@ -459,9 +530,9 @@ export function ClubSiteTeamData({ data }: { data: PublicClubSiteDetails }) {
       </section>
 
       {settings.sectionVisibility.teams && snapshot.teams.length ? (
-        <section className="mt-12">
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--club-primary)]">Planteles</p>
-          <h2 className="mt-2 text-3xl font-black">Equipos activos</h2>
+        <section className="mt-14">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Planteles</p>
+          <h2 className="mt-2 text-5xl font-black uppercase leading-none [font-family:var(--font-club-display)]">Equipos activos</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-3">
             {snapshot.teams.map((team) => (
               <TeamCard key={team.id} team={team} />
@@ -471,15 +542,15 @@ export function ClubSiteTeamData({ data }: { data: PublicClubSiteDetails }) {
       ) : null}
 
       {settings.sectionVisibility.records && records.length ? (
-        <section className="mt-12">
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--club-primary)]">Records</p>
-          <h2 className="mt-2 text-3xl font-black">Referentes historicos</h2>
+        <section className="mt-14">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Records</p>
+          <h2 className="mt-2 text-5xl font-black uppercase leading-none [font-family:var(--font-club-display)]">Referentes historicos</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-4">
             {records.map((record) => (
-              <div className="border border-black/10 bg-white p-4" key={record.label}>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-black/45">{record.label}</p>
-                <p className="mt-2 text-xl font-black">{record.row.name}</p>
-                <p className="mt-2 text-3xl font-black text-[var(--club-primary)]">
+              <div className="rounded-md border border-black/10 bg-white p-4" key={record.label}>
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-black/45">{record.label}</p>
+                <p className="mt-2 text-xl font-extrabold">{record.row.name}</p>
+                <p className="mt-2 text-5xl font-black leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)]">
                   {formatRecordValue(record.label, record.row)}
                 </p>
               </div>
@@ -489,10 +560,10 @@ export function ClubSiteTeamData({ data }: { data: PublicClubSiteDetails }) {
       ) : null}
 
       {settings.sectionVisibility.playerStats && snapshot.playerStats.length ? (
-        <section className="mt-12 overflow-hidden border border-black/10 bg-white">
+        <section className="mt-14 overflow-hidden rounded-md border border-black/10 bg-white">
           <div className="p-5">
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--club-primary)]">Jugadores</p>
-            <h2 className="mt-2 text-3xl font-black">Tabla destacada</h2>
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Jugadores</p>
+            <h2 className="mt-2 text-5xl font-black uppercase leading-none [font-family:var(--font-club-display)]">Tabla destacada</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] border-collapse text-left text-sm">

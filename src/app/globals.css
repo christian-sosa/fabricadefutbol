@@ -18,6 +18,12 @@ body {
   font-family: "Segoe UI", "Trebuchet MS", "Tahoma", sans-serif;
 }
 
+body.club-site-standalone {
+  color-scheme: light;
+  background: #f8f8f5;
+  color: #151515;
+}
+
 * {
   box-sizing: border-box;
 }

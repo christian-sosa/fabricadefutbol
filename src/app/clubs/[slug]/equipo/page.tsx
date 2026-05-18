@@ -17,7 +17,7 @@ export async function generateMetadata({
   const isCustomDomain = data ? isClubSiteCustomDomainHost(requestHeaders.get("host"), data.settings) : false;
 
   return {
-    title: data ? `Datos - ${data.club.name}` : "Datos del equipo",
+    title: data ? { absolute: `Datos - ${data.club.name}` } : { absolute: "Datos del equipo" },
     alternates: data ? { canonical: buildClubSitePublicHref(data.club, data.settings, "/equipo") } : undefined,
     robots: {
       index: isCustomDomain,

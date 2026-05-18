@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: `Datos - ${data.club.name}`,
+    title: { absolute: `Datos - ${data.club.name}` },
     alternates: { canonical: buildClubSitePublicHref(data.club, data.settings, "/equipo") },
     robots: {
       index: true,

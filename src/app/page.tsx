@@ -70,7 +70,7 @@ export async function generateMetadata(): Promise<Metadata> {
   if (!data) return {};
 
   return {
-    title: data.club.name,
+    title: { absolute: data.club.name },
     description: data.club.description ?? `Sitio oficial de ${data.club.name}.`,
     alternates: { canonical: buildClubSitePublicHref(data.club, data.settings) },
     robots: {
