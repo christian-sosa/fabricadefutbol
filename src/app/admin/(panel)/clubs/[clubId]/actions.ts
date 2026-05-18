@@ -238,6 +238,7 @@ function buildClubDetailPath(params: {
   view?: string;
   error?: string;
   success?: string;
+  sitePanel?: string;
 }) {
   const basePath = `/admin/clubs/${params.clubId}`;
   const searchParams = new URLSearchParams();
@@ -251,6 +252,7 @@ function buildClubDetailPath(params: {
   if (params.view) searchParams.set("view", params.view);
   if (params.error) searchParams.set("error", params.error);
   if (params.success) searchParams.set("success", params.success);
+  if (params.sitePanel) searchParams.set("sitePanel", params.sitePanel);
   const search = searchParams.toString();
   return search ? `${basePath}?${search}` : basePath;
 }
@@ -1027,6 +1029,53 @@ export async function uploadClubProductImageAction(clubId: string, formData: For
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(error, "No se pudo subir la imagen del producto.") }));
+  }
+}
+
+export async function deleteClubProductAction(clubId: string, formData: FormData) {
+  try {
+    await assertClubWriteAction(clubId);
+    const parsed = z.object({ productId: z.string().uuid() }).safeParse({
+      productId: formData.get("productId")
+    });
+
+    if (!parsed.success) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: "Producto invalido." }));
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { data: product, error: productError } = await supabase
+      .from("club_products")
+      .select("id, image_path")
+      .eq("id", parsed.data.productId)
+      .eq("club_id", clubId)
+      .maybeSingle();
+
+    if (productError || !product) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: "No se encontro el producto." }));
+    }
+
+    const { error } = await supabase
+      .from("club_products")
+      .delete()
+      .eq("id", parsed.data.productId)
+      .eq("club_id", clubId);
+
+    if (error) {
+      redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(error, "No se pudo eliminar el producto.") }));
+    }
+
+    const imagePath = typeof product.image_path === "string" ? product.image_path : null;
+    if (imagePath) {
+      await supabase.storage.from(getClubSiteMediaBucket()).remove([imagePath]);
+      revalidatePath(`/api/club-product-image/${parsed.data.productId}`);
+    }
+
+    await revalidateClubPaths(clubId);
+    redirect(buildClubDetailPath({ clubId, tab: "site", sitePanel: "products", success: "Producto eliminado." }));
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildClubDetailPath({ clubId, tab: "site", error: toUserMessage(error, "No se pudo eliminar el producto.") }));
   }
 }
 

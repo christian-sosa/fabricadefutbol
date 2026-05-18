@@ -63,6 +63,7 @@ vi.mock("@/lib/supabase/server", () => ({
 
 import {
   addClubProductAction,
+  deleteClubProductAction,
   updateClubSiteSettingsAction
 } from "@/app/admin/(panel)/clubs/[clubId]/actions";
 import { createFakeSupabase } from "../helpers/fake-supabase";
@@ -197,5 +198,45 @@ describe("club site admin actions", () => {
       }
     ]);
     expect(optimizeClubProductImageMock).toHaveBeenCalledWith(expect.any(File));
+  });
+
+  it("elimina productos cargados y limpia su imagen", async () => {
+    const productId = "00000000-0000-4000-8000-000000000301";
+    const imagePath = `public/clubs/${clubId}/products/${productId}.webp`;
+    const fake = createFakeSupabase({
+      club_products: [
+        {
+          id: productId,
+          club_id: clubId,
+          image_path: imagePath,
+          name: "Camiseta suplente",
+          slug: "camiseta-suplente",
+          status: "available",
+          visible: true
+        }
+      ]
+    });
+    const removedObjects: Array<{ bucket: string; paths: string[] }> = [];
+    createSupabaseServerClientMock.mockResolvedValue({
+      ...fake.client,
+      storage: {
+        from: (bucket: string) => ({
+          remove: async (paths: string[]) => {
+            removedObjects.push({ bucket, paths });
+            return { data: [], error: null };
+          }
+        })
+      }
+    });
+
+    const formData = new FormData();
+    formData.set("productId", productId);
+
+    await expect(deleteClubProductAction(clubId, formData)).rejects.toMatchObject({
+      digest: expect.stringContaining(`/admin/clubs/${clubId}?tab=site`)
+    });
+
+    expect(fake.find("club_products", (row) => row.id === productId)).toBeNull();
+    expect(removedObjects).toEqual([{ bucket: "club-site-media", paths: [imagePath] }]);
   });
 });

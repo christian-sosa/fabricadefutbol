@@ -45,11 +45,18 @@ describe("club site productizado", () => {
     expect(adminPageSource).toContain("updateClubSiteSettingsAction");
     expect(adminPageSource).toContain("addClubProductAction");
     expect(adminPageSource).toContain("updateClubProductAction");
+    expect(adminPageSource).toContain("deleteClubProductAction");
     expect(adminPageSource).toContain('function SiteTab');
     expect(adminPageSource).toContain('{ key: "site", label: "Sitio" }');
     expect(adminPageSource).toContain("details.siteSettings");
     expect(adminPageSource).toContain("details.products");
     expect(adminPageSource).toContain('name={`section:${key}`}');
+    expect(adminPageSource).toContain("Cargar nuevo producto");
+    expect(adminPageSource).toContain("Ver productos actuales");
+    expect(adminPageSource).toContain('name="productSearch"');
+    expect(adminPageSource).toContain('name="productStatus"');
+    expect(adminPageSource).toContain("Eliminar");
+    expect(adminPageSource).toContain("Sin stock");
   });
 
   it("explica limites y campos comerciales del sitio en el admin", () => {
@@ -141,7 +148,8 @@ describe("club site productizado", () => {
     expect(componentSource).toContain("aspect-[4/3]");
     expect(componentSource).toContain("object-contain");
     expect(componentSource).toContain("grid-cols-2 gap-x-5 gap-y-9");
-    expect(componentSource).toContain("max-w-[180px]");
+    expect(componentSource).toContain("max-w-[230px]");
+    expect(componentSource).toContain("Sin stock");
     expect(componentSource).toContain("aria-label={`${contactLabel}: ${product.name}`}");
     expect(componentSource).toContain("--club-line");
     expect(componentSource).toContain("--club-soft");

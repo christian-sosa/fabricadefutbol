@@ -480,20 +480,20 @@ function ProductCard({ data, product }: { data: PublicClubSiteDetails; product: 
   const statusLabel = product.status === "preorder"
     ? "Preventa"
     : product.status === "sold_out"
-      ? "Consultar disponibilidad"
+      ? "Sin stock"
       : "Disponible";
   const visibleStatusLabel = product.status === "available" ? null : statusLabel;
   const priceLabel = product.price_label?.trim();
   const shouldShowPrice = Boolean(priceLabel && priceLabel.toLowerCase() !== "consultar precio");
   const content = (
     <>
-      <div className="relative mx-auto aspect-[4/5] w-full max-w-[180px] overflow-visible bg-white">
+      <div className="relative mx-auto aspect-[4/5] w-full max-w-[230px] overflow-visible bg-white">
         {imageUrl ? (
           <Image
             alt={product.name}
             className="object-contain transition duration-300 group-hover:scale-[1.035]"
             fill
-            sizes="(min-width: 1024px) 180px, (min-width: 640px) 28vw, 44vw"
+            sizes="(min-width: 1024px) 230px, (min-width: 640px) 30vw, 46vw"
             src={imageUrl}
             unoptimized
           />
@@ -501,7 +501,7 @@ function ProductCard({ data, product }: { data: PublicClubSiteDetails; product: 
           <div className="flex h-full w-full items-center justify-center bg-white p-4 text-center">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black/32">Producto oficial</p>
-              <p className="mt-2 text-2xl font-black uppercase leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)]">
+              <p className="mt-2 text-3xl font-black uppercase leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)]">
                 {product.name}
               </p>
             </div>
@@ -517,7 +517,7 @@ function ProductCard({ data, product }: { data: PublicClubSiteDetails; product: 
         {product.category ? (
           <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-black/40">{product.category}</p>
         ) : null}
-        <h2 className="mt-1 text-sm font-medium leading-5 text-[var(--club-primary)]">{product.name}</h2>
+        <h2 className="mt-1 text-[15px] font-medium leading-5 text-[var(--club-primary)]">{product.name}</h2>
         {shouldShowPrice ? <p className="mt-1 text-xs font-semibold text-black/55">{priceLabel}</p> : null}
         {contactHref ? <p className="mt-2 text-[11px] font-black uppercase tracking-[0.08em] text-black/62">{contactLabel}</p> : null}
       </div>
