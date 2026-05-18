@@ -132,6 +132,13 @@ describe("club site productizado", () => {
     expect(componentSource).not.toContain("Datos del equipo");
   });
 
+  it("empuja el footer al borde inferior cuando una pagina de club tiene poco contenido", () => {
+    const componentSource = readSource("src", "components", "clubs", "club-site.tsx");
+
+    expect(componentSource).toContain("min-h-screen w-full flex-col");
+    expect(componentSource).toContain("max-w-7xl flex-1");
+  });
+
   it("usa metadata absoluta para que el dominio de club no herede el sufijo de Fabrica", () => {
     const rootClubSource = readSource("src", "app", "page.tsx");
     const slugClubSource = readSource("src", "app", "clubs", "[slug]", "page.tsx");

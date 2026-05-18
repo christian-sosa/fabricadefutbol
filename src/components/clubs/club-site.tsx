@@ -271,11 +271,11 @@ export function ClubSiteShell({
 
   return (
     <div
-      className={`${clubBodyFont.variable} ${clubDisplayFont.variable} min-h-screen w-full overflow-hidden bg-[var(--club-page)] text-[var(--club-ink)]`}
+      className={`${clubBodyFont.variable} ${clubDisplayFont.variable} flex min-h-screen w-full flex-col overflow-hidden bg-[var(--club-page)] text-[var(--club-ink)]`}
       style={style}
     >
       {active === "home" ? <ClubSiteHomeHero active={active} data={data} /> : <ClubSiteHeader active={active} data={data} />}
-      <div className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-14">{children}</div>
+      <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-10 md:px-6 md:py-14">{children}</div>
       <ClubSiteFooter data={data} />
     </div>
   );
