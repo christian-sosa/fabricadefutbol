@@ -72,4 +72,19 @@ describe("club site productizado", () => {
     expect(proxySource).toContain('"/equipo/:path*"');
     expect(proxySource).toContain('"/clubs/:path*"');
   });
+
+  it("resuelve el dominio propio del club desde rutas limpias", () => {
+    const resolverSource = expectFile("src", "lib", "club-site-request.ts");
+    const rootSource = readSource("src", "app", "page.tsx");
+    const catalogSource = expectFile("src", "app", "catalogo", "page.tsx");
+    const teamDataSource = expectFile("src", "app", "equipo", "page.tsx");
+
+    expect(resolverSource).toContain("getPublicClubSiteByDomain");
+    expect(rootSource).toContain("resolveClubSiteFromRequestHost");
+    expect(rootSource).toContain("ClubSiteHome");
+    expect(catalogSource).toContain("resolveClubSiteFromRequestHost");
+    expect(catalogSource).toContain("ClubSiteCatalog");
+    expect(teamDataSource).toContain("resolveClubSiteFromRequestHost");
+    expect(teamDataSource).toContain("ClubSiteTeamData");
+  });
 });

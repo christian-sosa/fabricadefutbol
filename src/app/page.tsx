@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
 import { TrackedLink } from "@/components/analytics/tracked-link";
+import { ClubSiteHome } from "@/components/clubs/club-site";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { resolveClubSiteFromRequestHost } from "@/lib/club-site-request";
+import { buildClubSitePublicHref } from "@/lib/domain/club-sites";
 import { GROWTH_EVENTS } from "@/lib/growth";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery, withPublicQuery } from "@/lib/org";
@@ -59,11 +64,31 @@ const exampleRankingPreview = [
   { name: "Diego", rendimiento: 960, matchesPlayed: 54 }
 ] as const;
 
+export async function generateMetadata(): Promise<Metadata> {
+  const { data } = await resolveClubSiteFromRequestHost();
+
+  if (!data) return {};
+
+  return {
+    title: data.club.name,
+    description: data.club.description ?? `Sitio oficial de ${data.club.name}.`,
+    alternates: { canonical: buildClubSitePublicHref(data.club, data.settings) },
+    robots: {
+      index: true,
+      follow: true
+    }
+  };
+}
+
 export default async function HomePage({
   searchParams
 }: {
   searchParams: Promise<{ org?: string }>;
 }) {
+  const clubSiteResolution = await resolveClubSiteFromRequestHost();
+  if (clubSiteResolution.data) return <ClubSiteHome data={clubSiteResolution.data} />;
+  if (!clubSiteResolution.isMainAppHost) notFound();
+
   const resolvedSearchParams = await searchParams;
   const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
     resolvePublicOrganization(resolvedSearchParams.org, { defaultContext: "home" }),
