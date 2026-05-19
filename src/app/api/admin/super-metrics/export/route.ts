@@ -53,13 +53,6 @@ export async function GET() {
     ["meta", "generated_at", metrics.generatedAt],
     ["current_month", "label", metrics.currentMonth.label],
     ["current_month", "timezone", metrics.currentMonth.timezone],
-    ["current_month", "approved_revenue_ars", metrics.currentMonth.approvedRevenueArs],
-    ["current_month", "approved_payments", metrics.currentMonth.approvedPayments],
-    [
-      "current_month",
-      "organizations_with_approved_payments",
-      metrics.currentMonth.organizationsWithApprovedPayments
-    ],
     ["totals", "organizations", metrics.totals.organizations],
     ["totals", "admins", metrics.totals.admins],
     ["totals", "org_admin_memberships", metrics.totals.orgAdminMemberships],
@@ -79,14 +72,6 @@ export async function GET() {
     ["derived", "completion_rate_percent", metrics.derived.completionRatePercent],
     ["derived", "organizations_without_players", metrics.derived.organizationsWithoutPlayers],
     ["derived", "organizations_without_admins", metrics.derived.organizationsWithoutAdmins],
-    ["business", "active_paid_organizations", metrics.business.activePaidOrganizations],
-    ["business", "free_trial_organizations", metrics.business.freeTrialOrganizations],
-    ["business", "expired_without_plan_organizations", metrics.business.expiredWithoutPlanOrganizations],
-    [
-      "business",
-      "organizations_with_any_approved_payment",
-      metrics.business.organizationsWithAnyApprovedPayment
-    ],
     ["last_30_days", "organizations_created", metrics.last30Days.organizationsCreated],
     ["last_30_days", "players_created", metrics.last30Days.playersCreated],
     ["last_30_days", "matches_created", metrics.last30Days.matchesCreated],
@@ -102,9 +87,6 @@ export async function GET() {
       "active_players",
       "matches",
       "finished_matches",
-      "commercial_status",
-      "trial_ends_at",
-      "subscription_current_period_end",
       "admins",
       "pending_invites",
       "created_at"
@@ -117,9 +99,6 @@ export async function GET() {
       organization.activePlayers,
       organization.matches,
       organization.finishedMatches,
-      organization.commercialStatus,
-      organization.trialEndsAt,
-      organization.subscriptionCurrentPeriodEnd ?? "",
       organization.admins,
       organization.pendingInvites,
       organization.createdAt

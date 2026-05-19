@@ -203,20 +203,6 @@ describe("organization workflow", () => {
       organization_invites: [
         { id: "invite-1", organization_id: ORG_ID, email: "test@example.com", invited_by: "admin-1" }
       ],
-      organization_billing_subscriptions: [
-        { id: "subscription-1", organization_id: ORG_ID, status: "active" },
-        { id: "subscription-2", organization_id: OTHER_ORG_ID, status: "active" }
-      ],
-      organization_billing_payments: [
-        { id: "payment-1", organization_id: ORG_ID, status: "approved", purpose: "organization_subscription" },
-        {
-          id: "payment-2",
-          organization_id: OTHER_ORG_ID,
-          status: "approved",
-          purpose: "organization_creation",
-          created_organization_id: ORG_ID
-        }
-      ],
       players: [
         { id: PLAYER_ID, organization_id: ORG_ID, full_name: "Jugador 1", initial_rank: 1 },
         { id: "player-2", organization_id: OTHER_ORG_ID, full_name: "Jugador 2", initial_rank: 1 }
@@ -282,18 +268,6 @@ describe("organization workflow", () => {
       })
     ]);
     expect(fake.table("organization_invites")).toHaveLength(0);
-    expect(fake.table("organization_billing_subscriptions")).toEqual([
-      expect.objectContaining({
-        organization_id: OTHER_ORG_ID
-      })
-    ]);
-    expect(fake.table("organization_billing_payments")).toEqual([
-      expect.objectContaining({
-        id: "payment-2",
-        organization_id: OTHER_ORG_ID,
-        created_organization_id: null
-      })
-    ]);
     expect(fake.table("players")).toEqual([
       expect.objectContaining({
         organization_id: OTHER_ORG_ID

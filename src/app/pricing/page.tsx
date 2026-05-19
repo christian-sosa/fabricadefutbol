@@ -2,25 +2,14 @@ import Link from "next/link";
 
 import { TrackedLink } from "@/components/analytics/tracked-link";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import {
-  ORGANIZATION_BILLING_CURRENCY,
-  ORGANIZATION_MONTHLY_PRICE_ARS
-} from "@/lib/constants";
 import { GROWTH_EVENTS } from "@/lib/growth";
-
-function formatArs(amount: number) {
-  return new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount);
-}
 
 export default async function PricingPage() {
   const groupPlan = {
     title: "Grupos",
     eyebrow: "Para partidos recurrentes",
-    price: `${ORGANIZATION_BILLING_CURRENCY} ${formatArs(ORGANIZATION_MONTHLY_PRICE_ARS)} / mes`,
-    badge: "30 dias gratis para empezar",
+    price: "Gratis",
+    badge: "Sin checkout",
     description:
       "Para amigos, equipos y grupos que juegan seguido y quieren ordenar convocatorias, equipos, rendimiento e historial.",
     cta: "Crear mi grupo",
@@ -36,8 +25,8 @@ export default async function PricingPage() {
   };
   const plans = [groupPlan];
   const pricingNotes = [
-    "La informacion publica sigue visible para jugadores y visitantes.",
-    "Cuando un periodo vence, el grupo queda protegido en modo lectura hasta reactivar el plan.",
+    "La informacion publica queda visible para jugadores y visitantes.",
+    "La gestion de grupos no requiere pago ni periodo de prueba.",
     "Puedes empezar con un grupo y ordenar la operacion sin mezclar herramientas externas."
   ];
 
@@ -46,7 +35,7 @@ export default async function PricingPage() {
       <section className="rounded-[2rem] border border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.18),transparent_32%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-6 shadow-[0_28px_60px_-34px_rgba(16,185,129,0.7)] md:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Precios</p>
         <h1 className="mt-2 text-3xl font-black text-white md:text-5xl">
-          Un plan simple para ordenar tu grupo.
+          Grupos gratis para ordenar partidos.
         </h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
           Empieza con jugadores, partidos, rendimiento, ranking publico e historial claro para todos.
@@ -81,7 +70,7 @@ export default async function PricingPage() {
                 </p>
               </div>
               <div className="rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-left sm:text-right">
-                <p className="text-sm font-semibold text-slate-400">Desde</p>
+                <p className="text-sm font-semibold text-slate-400">Plan</p>
                 <p className="mt-1 text-xl font-black text-white">{plan.price}</p>
               </div>
             </div>
@@ -123,9 +112,9 @@ export default async function PricingPage() {
 
       <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
         <Card>
-          <CardTitle>Que pasa cuando vence un periodo?</CardTitle>
+          <CardTitle>Hay vencimiento?</CardTitle>
           <CardDescription className="mt-3">
-            El espacio no desaparece. La idea es conservar la informacion y pausar la edicion hasta reactivar el plan. En Grupos, las fotos de jugadores tienen una ventana de retencion para evitar costos innecesarios sin borrar el historial deportivo.
+            No hay vencimiento comercial para Grupos. La retencion de fotos de jugadores se mantiene como control operativo para cuidar almacenamiento sin borrar historial deportivo.
           </CardDescription>
         </Card>
         <Card>

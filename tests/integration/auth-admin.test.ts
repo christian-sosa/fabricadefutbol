@@ -133,19 +133,7 @@ describe("admin group creation access", () => {
 
     await expect(getOrganizationWriteAccess(ADMIN_SESSION, "org-1")).resolves.toMatchObject({
       canWrite: true,
-      reason: null,
-      accessValidUntil: null,
-      writeLockedAt: null,
-      organizationTrialEndsAt: null,
-      organizationTrialExpired: false,
-      adminTrialEndsAt: null,
-      adminTrialExpired: false,
-      subscriptionStatus: null,
-      subscriptionCurrentPeriodEnd: null,
-      subscriptionActive: false,
-      playerPhotosPurgeAt: null,
-      playerPhotosRetentionExpired: false,
-      playerPhotosPurgedAt: null
+      reason: null
     });
   });
 });

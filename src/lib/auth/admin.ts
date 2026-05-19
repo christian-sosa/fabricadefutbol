@@ -29,18 +29,6 @@ type FreeTrialStatus = {
 export type OrganizationWriteAccess = {
   canWrite: boolean;
   reason: string | null;
-  accessValidUntil: string | null;
-  writeLockedAt: string | null;
-  organizationTrialEndsAt: string | null;
-  organizationTrialExpired: boolean;
-  adminTrialEndsAt: string | null;
-  adminTrialExpired: boolean;
-  subscriptionStatus: string | null;
-  subscriptionCurrentPeriodEnd: string | null;
-  subscriptionActive: boolean;
-  playerPhotosPurgeAt: string | null;
-  playerPhotosRetentionExpired: boolean;
-  playerPhotosPurgedAt: string | null;
 };
 
 function findOrganizationByKey(organizations: AdminOrganization[], organizationKey?: string | null) {
@@ -186,19 +174,7 @@ export async function getOrganizationWriteAccess(
   if (admin.isSuperAdmin) {
     return {
       canWrite: true,
-      reason: null,
-      accessValidUntil: null,
-      writeLockedAt: null,
-      organizationTrialEndsAt: null,
-      organizationTrialExpired: false,
-      adminTrialEndsAt: null,
-      adminTrialExpired: false,
-      subscriptionStatus: null,
-      subscriptionCurrentPeriodEnd: null,
-      subscriptionActive: false,
-      playerPhotosPurgeAt: null,
-      playerPhotosRetentionExpired: false,
-      playerPhotosPurgedAt: null
+      reason: null
     };
   }
 
@@ -219,19 +195,7 @@ export async function getOrganizationWriteAccess(
 
   return {
     canWrite: true,
-    reason: null,
-    accessValidUntil: null,
-    writeLockedAt: null,
-    organizationTrialEndsAt: null,
-    organizationTrialExpired: false,
-    adminTrialEndsAt: null,
-    adminTrialExpired: false,
-    subscriptionStatus: null,
-    subscriptionCurrentPeriodEnd: null,
-    subscriptionActive: false,
-    playerPhotosPurgeAt: null,
-    playerPhotosRetentionExpired: false,
-    playerPhotosPurgedAt: null
+    reason: null
   };
 }
 

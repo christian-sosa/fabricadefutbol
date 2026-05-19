@@ -15,7 +15,7 @@ import {
   getLeagueSlugById
 } from "@/lib/auth/tournaments";
 import {
-  ORGANIZATION_BILLING_CURRENCY,
+  BILLING_CURRENCY,
   TEMP_SKIP_TOURNAMENT_CHECKOUT,
   TOURNAMENT_MONTHLY_CHECKOUT_PRICE_ARS
 } from "@/lib/constants";
@@ -245,7 +245,7 @@ export async function createLeagueAction(formData: FormData) {
         requested_league_name: normalizedName,
         requested_league_slug: requestedSlug,
         amount: TOURNAMENT_MONTHLY_CHECKOUT_PRICE_ARS,
-        currency_id: ORGANIZATION_BILLING_CURRENCY,
+        currency_id: BILLING_CURRENCY,
         status: "pending",
         mp_external_reference: externalReference,
         purpose: "league_creation"
@@ -294,7 +294,7 @@ export async function createLeagueAction(formData: FormData) {
     const preference = await createCheckoutProPreference({
       title: `Crear liga (${normalizedName})`,
       unitPrice: TOURNAMENT_MONTHLY_CHECKOUT_PRICE_ARS,
-      currencyId: ORGANIZATION_BILLING_CURRENCY,
+      currencyId: BILLING_CURRENCY,
       quantity: 1,
       externalReference,
       notificationUrl: `${publicBaseUrl}${notificationPath}`,
@@ -397,7 +397,7 @@ export async function startLeagueCheckoutAction(formData: FormData) {
         requested_league_slug: String(league.slug),
         created_league_id: league.id,
         amount: TOURNAMENT_MONTHLY_CHECKOUT_PRICE_ARS,
-        currency_id: ORGANIZATION_BILLING_CURRENCY,
+        currency_id: BILLING_CURRENCY,
         status: "pending",
         mp_external_reference: externalReference,
         purpose: "league_subscription"
@@ -417,7 +417,7 @@ export async function startLeagueCheckoutAction(formData: FormData) {
     const preference = await createCheckoutProPreference({
       title: `Plan mensual ${league.name}`,
       unitPrice: TOURNAMENT_MONTHLY_CHECKOUT_PRICE_ARS,
-      currencyId: ORGANIZATION_BILLING_CURRENCY,
+      currencyId: BILLING_CURRENCY,
       quantity: 1,
       externalReference,
       notificationUrl: `${publicBaseUrl}${notificationPath}`,

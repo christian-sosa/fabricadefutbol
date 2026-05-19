@@ -1,29 +1,6 @@
-import { FREE_TRIAL_DAYS, ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS } from "@/lib/constants";
-
-export type OrganizationSubscriptionSnapshot = {
-  status: string | null;
-  current_period_end: string | null;
-};
-
 export type LeagueSubscriptionSnapshot = {
   status: string | null;
   current_period_end: string | null;
-};
-
-export type BillingPaymentPeriodSnapshot = {
-  status: string | null;
-  period_end: string | null;
-};
-
-export type OrganizationWriteWindow = {
-  canWrite: boolean;
-  organizationTrialEndsAt: string;
-  organizationTrialExpired: boolean;
-  subscriptionActive: boolean;
-  accessValidUntil: string;
-  writeLockedAt: string | null;
-  playerPhotosPurgeAt: string | null;
-  playerPhotosRetentionExpired: boolean;
 };
 
 export type LeagueWriteWindow = {
@@ -55,98 +32,6 @@ export function addMonthsToIsoDate(isoDate: string, months: number) {
 
 export function isIsoDateExpired(isoDate: string) {
   return Date.now() > new Date(isoDate).getTime();
-}
-
-export function getOrganizationTrialEndsAt(organizationCreatedAt: string) {
-  return addDaysToIsoDate(organizationCreatedAt, FREE_TRIAL_DAYS);
-}
-
-export function hasActiveOrganizationSubscription(
-  subscription: OrganizationSubscriptionSnapshot | null | undefined
-) {
-  if (!subscription?.current_period_end) return false;
-  if ((subscription.status ?? "").toLowerCase() !== "active") return false;
-  return !isIsoDateExpired(subscription.current_period_end);
-}
-
-export function resolveOrganizationWriteWindow(params: {
-  organizationCreatedAt: string;
-  subscription: OrganizationSubscriptionSnapshot | null | undefined;
-}): OrganizationWriteWindow {
-  const organizationTrialEndsAt = getOrganizationTrialEndsAt(params.organizationCreatedAt);
-  const organizationTrialExpired = isIsoDateExpired(organizationTrialEndsAt);
-  const subscriptionActive = hasActiveOrganizationSubscription(params.subscription);
-  const accessValidUntil = params.subscription?.current_period_end ?? organizationTrialEndsAt;
-  const canWrite = subscriptionActive || !organizationTrialExpired;
-  const writeLockedAt = canWrite ? null : accessValidUntil;
-  const playerPhotosPurgeAt = writeLockedAt
-    ? addDaysToIsoDate(writeLockedAt, ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS)
-    : null;
-
-  return {
-    canWrite,
-    organizationTrialEndsAt,
-    organizationTrialExpired,
-    subscriptionActive,
-    accessValidUntil,
-    writeLockedAt,
-    playerPhotosPurgeAt,
-    playerPhotosRetentionExpired: playerPhotosPurgeAt ? isIsoDateExpired(playerPhotosPurgeAt) : false
-  };
-}
-
-function getLatestIsoDate(values: Array<string | null | undefined>) {
-  return values.reduce<string | null>((latest, value) => {
-    if (!value) return latest;
-
-    const candidateTime = new Date(value).getTime();
-    if (!Number.isFinite(candidateTime)) return latest;
-
-    if (!latest) return value;
-
-    const latestTime = new Date(latest).getTime();
-    return candidateTime > latestTime ? value : latest;
-  }, null);
-}
-
-export function resolveOrganizationVisibleAccessValidUntil(params: {
-  subscription: OrganizationSubscriptionSnapshot | null | undefined;
-  payments: BillingPaymentPeriodSnapshot[];
-  fallbackAccessValidUntil?: string | null | undefined;
-}) {
-  const approvedPaymentEnds = params.payments
-    .filter((payment) => (payment.status ?? "").toLowerCase() === "approved")
-    .map((payment) => payment.period_end);
-
-  return getLatestIsoDate([
-    params.fallbackAccessValidUntil,
-    params.subscription?.current_period_end,
-    ...approvedPaymentEnds
-  ]);
-}
-
-export function resolveNextOrganizationBillingPeriod(
-  previousPeriodEnd: string | null | undefined,
-  accessValidUntil?: string | null | undefined
-) {
-  const now = new Date();
-  const candidateDates = [previousPeriodEnd, accessValidUntil]
-    .map((value) => (value ? new Date(value) : null))
-    .filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()));
-
-  const futureCandidate = candidateDates.reduce<Date | null>((latest, candidate) => {
-    if (candidate.getTime() <= now.getTime()) return latest;
-    if (!latest) return candidate;
-    return candidate.getTime() > latest.getTime() ? candidate : latest;
-  }, null);
-
-  const periodStart = futureCandidate ? futureCandidate.toISOString() : now.toISOString();
-  const periodEnd = addMonthsToIsoDate(periodStart, 1);
-
-  return {
-    periodStart,
-    periodEnd
-  };
 }
 
 export function hasActiveLeagueSubscription(

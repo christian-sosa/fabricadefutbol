@@ -24,7 +24,7 @@ async function resolveAppBaseUrl() {
   return `${protocol}://${host}`;
 }
 
-const DEFAULT_TARGET = "/admin/billing?checkout=failure";
+const DEFAULT_TARGET = "/admin/tournaments?checkout=failure";
 
 function normalizeTargetPath(target: string | null, appBaseUrl: string) {
   if (!target) return DEFAULT_TARGET;

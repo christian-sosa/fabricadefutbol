@@ -1,9 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import crypto from "node:crypto";
 import { z } from "zod";
 
 import {
@@ -11,24 +9,13 @@ import {
   checkActionRateLimit,
   formatActionRateLimitMessage
 } from "@/lib/action-rate-limit";
-import { SERVER_ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import {
   assertAdminAction,
   assertCanCreateOrganization,
   assertOrganizationAdminAction,
-  assertOrganizationMembershipAction,
-  getAdminOrganizationCreationAccess,
   getOrganizationQueryKeyById
 } from "@/lib/auth/admin";
-import {
-  ORGANIZATION_BILLING_CURRENCY,
-  ORGANIZATION_MONTHLY_PRICE_ARS
-} from "@/lib/constants";
-import {
-  cleanupStalePendingOrganizationBillingPayments,
-  syncOrganizationBillingPaymentFromMercadoPago
-} from "@/lib/domain/billing-workflow";
 import { recordOrganizationAuditEvent } from "@/lib/domain/organization-audit";
 import {
   deleteOrganizationDeep,
@@ -40,9 +27,7 @@ import {
 import {
   getPlayerPhotosBucket,
   getOrganizationImagesBucket,
-  getMercadoPagoWebhookBaseUrl,
-  getSupabaseDbSchema,
-  shouldUseMercadoPagoSandboxCheckout
+  getSupabaseDbSchema
 } from "@/lib/env";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { logError, logInfo } from "@/lib/observability/log";
@@ -55,7 +40,6 @@ import {
 } from "@/lib/organization-images";
 import { toUserMessage } from "@/lib/errors";
 import { GROWTH_EVENTS, withGrowthEvent } from "@/lib/growth";
-import { createCheckoutProPreference } from "@/lib/payments/mercadopago";
 import { REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL } from "@/lib/storage-image-responses";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -86,23 +70,6 @@ const deleteOrganizationSchema = z.object({
   organizationId: z.string().uuid()
 });
 
-const startCheckoutSchema = z.object({
-  organizationId: z.string().uuid()
-});
-
-const startOrganizationCreationCheckoutSchema = z.object({
-  organizationId: z.string().uuid(),
-  name: z
-    .string()
-    .min(3, "El nombre del grupo debe tener al menos 3 caracteres.")
-    .max(80, "El nombre del grupo es demasiado largo.")
-});
-
-const syncCheckoutPaymentSchema = z.object({
-  organizationId: z.string().uuid(),
-  paymentId: z.string().min(1, "paymentId invalido.")
-});
-
 const uploadOrganizationImageSchema = z.object({
   organizationId: z.string().uuid()
 });
@@ -111,17 +78,8 @@ const startOrganizationSeasonSchema = z.object({
   organizationId: z.string().uuid()
 });
 
-const MERCADOPAGO_PREFERENCE_TTL_MS = 24 * 60 * 60 * 1000;
-
 function buildAdminPath(organizationKey?: string, error?: string) {
   const basePath = withOrgQuery("/admin", organizationKey ?? null);
-  if (!error) return basePath;
-  const separator = basePath.includes("?") ? "&" : "?";
-  return `${basePath}${separator}error=${encodeURIComponent(error)}`;
-}
-
-function buildBillingPath(organizationKey?: string, error?: string) {
-  const basePath = withOrgQuery("/admin/billing", organizationKey ?? null);
   if (!error) return basePath;
   const separator = basePath.includes("?") ? "&" : "?";
   return `${basePath}${separator}error=${encodeURIComponent(error)}`;
@@ -132,20 +90,6 @@ function buildAdminAdminsPath(organizationKey?: string, error?: string) {
   if (!error) return basePath;
   const separator = basePath.includes("?") ? "&" : "?";
   return `${basePath}${separator}error=${encodeURIComponent(error)}`;
-}
-
-function stripTrailingSlashes(value: string) {
-  return value.replace(/\/+$/, "");
-}
-
-function buildMercadoPagoReturnUrl(baseUrl: string, targetPath: string) {
-  const url = new URL("/api/payments/mercadopago/return", `${baseUrl}/`);
-  url.searchParams.set("target", targetPath);
-  return url.toString();
-}
-
-function buildMercadoPagoPreferenceExpirationDate() {
-  return new Date(Date.now() + MERCADOPAGO_PREFERENCE_TTL_MS).toISOString();
 }
 
 async function organizationAlreadyHasAdminWithEmail(params: {
@@ -192,26 +136,6 @@ async function resolveAdminEmailById(adminId: string) {
   const { data, error } = await supabaseAdmin.auth.admin.getUserById(adminId);
   if (error) return null;
   return data?.user?.email?.toLowerCase() ?? null;
-}
-
-async function resolveServerBaseUrl() {
-  const configuredPublicBaseUrl = getMercadoPagoWebhookBaseUrl();
-  if (configuredPublicBaseUrl) {
-    return stripTrailingSlashes(configuredPublicBaseUrl);
-  }
-
-  const headerStore = await headers();
-  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
-  const protocol =
-    headerStore.get("x-forwarded-proto") ?? (host?.includes("localhost") ? "http" : "https");
-
-  if (host) {
-    return stripTrailingSlashes(`${protocol}://${host}`);
-  }
-
-  throw new Error(
-    "No pude resolver la URL base del servidor. Configura MERCADOPAGO_WEBHOOK_BASE_URL o APP_URL."
-  );
 }
 
 function parseNextSlug(baseSlug: string, existingSlugs: string[]) {
@@ -367,391 +291,6 @@ export async function startOrganizationSeasonAction(formData: FormData) {
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(buildAdminPath(organizationQueryKey, toUserMessage(error, "No se pudo iniciar la temporada.")));
-  }
-}
-
-export async function startOrganizationCreationCheckoutAction(formData: FormData) {
-  try {
-    const parsed = startOrganizationCreationCheckoutSchema.safeParse({
-      organizationId: formData.get("organizationId"),
-      name: formData.get("name")
-    });
-
-    if (!parsed.success) {
-      redirect(buildAdminPath(undefined, parsed.error.issues[0]?.message ?? "Datos invalidos."));
-    }
-
-    const admin = await assertOrganizationMembershipAction(parsed.data.organizationId);
-    const creationAccess = await getAdminOrganizationCreationAccess(admin);
-    const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
-
-    if (creationAccess.canCreateOrganization) {
-      redirect(
-        buildAdminPath(
-          organizationQueryKey,
-          "Tu cuenta ya puede crear un nuevo grupo sin necesidad de pagar."
-        )
-      );
-    }
-
-    const supabaseAdmin = createSupabaseAdminClient();
-    if (!supabaseAdmin) {
-      redirect(
-        buildAdminPath(
-          organizationQueryKey,
-          "Falta SUPABASE_SERVICE_ROLE_KEY para iniciar el pago de un nuevo grupo."
-        )
-      );
-    }
-
-    const normalizedOrgName = parsed.data.name.trim();
-    const baseSlug = slugifyOrganizationName(normalizedOrgName) || `grupo-${Date.now()}`;
-    const { data: existingSlugsRows, error: existingSlugsError } = await supabaseAdmin
-      .from("organizations")
-      .select("slug")
-      .ilike("slug", `${baseSlug}%`);
-
-    if (existingSlugsError) {
-      redirect(buildAdminPath(organizationQueryKey, toUserMessage(existingSlugsError, "No se pudo iniciar el pago.")));
-    }
-
-    const existingSlugs = (existingSlugsRows ?? []).map((row) => row.slug.toLowerCase());
-    const requestedSlug = parseNextSlug(baseSlug, existingSlugs);
-
-    const externalReference = `${parsed.data.organizationId}:${Date.now()}:${crypto
-      .randomUUID()
-      .slice(0, 8)}`;
-    const publicBaseUrl = await resolveServerBaseUrl();
-    const successPath = withGrowthEvent(
-      withOrgQuery("/admin?checkout=success&flow=create-org", organizationQueryKey),
-      GROWTH_EVENTS.paymentReturned,
-      "mercadopago"
-    );
-    const failurePath = withGrowthEvent(
-      withOrgQuery("/admin?checkout=failure&flow=create-org", organizationQueryKey),
-      GROWTH_EVENTS.paymentReturned,
-      "mercadopago"
-    );
-    const pendingPath = withGrowthEvent(
-      withOrgQuery("/admin?checkout=pending&flow=create-org", organizationQueryKey),
-      GROWTH_EVENTS.paymentReturned,
-      "mercadopago"
-    );
-    const notificationPath = "/api/payments/mercadopago/webhook";
-
-    await cleanupStalePendingOrganizationBillingPayments({
-      supabase: supabaseAdmin,
-      organizationId: parsed.data.organizationId
-    });
-
-    const { data: insertedPayment, error: insertPaymentError } = await supabaseAdmin
-      .from("organization_billing_payments")
-      .insert({
-        organization_id: parsed.data.organizationId,
-        created_by: admin.userId,
-        amount: ORGANIZATION_MONTHLY_PRICE_ARS,
-        currency_id: ORGANIZATION_BILLING_CURRENCY,
-        status: "pending",
-        mp_external_reference: externalReference,
-        purpose: "organization_creation",
-        requested_organization_name: normalizedOrgName,
-        requested_organization_slug: requestedSlug,
-        requested_by_admin_id: admin.userId
-      })
-      .select("id")
-      .single();
-
-    if (insertPaymentError || !insertedPayment) {
-      redirect(
-        buildAdminPath(
-          organizationQueryKey,
-          toUserMessage(insertPaymentError, "No se pudo registrar el pago para crear el grupo.")
-        )
-      );
-    }
-    await recordAnalyticsEvent({
-      eventName: SERVER_ANALYTICS_EVENTS.paymentCreated,
-      source: "mercadopago",
-      adminId: admin.userId,
-      organizationId: parsed.data.organizationId,
-      entityType: "payment",
-      entityId: insertedPayment.id,
-      path: withOrgQuery("/admin", organizationQueryKey),
-      properties: {
-        purpose: "organization_creation",
-        amount: ORGANIZATION_MONTHLY_PRICE_ARS,
-        currency: ORGANIZATION_BILLING_CURRENCY,
-        status: "pending"
-      }
-    });
-
-    const preference = await createCheckoutProPreference({
-      title: `Crear nuevo grupo (${normalizedOrgName})`,
-      unitPrice: ORGANIZATION_MONTHLY_PRICE_ARS,
-      currencyId: ORGANIZATION_BILLING_CURRENCY,
-      quantity: 1,
-      externalReference,
-      notificationUrl: `${publicBaseUrl}${notificationPath}`,
-      successUrl: buildMercadoPagoReturnUrl(publicBaseUrl, successPath),
-      failureUrl: buildMercadoPagoReturnUrl(publicBaseUrl, failurePath),
-      pendingUrl: buildMercadoPagoReturnUrl(publicBaseUrl, pendingPath),
-      expiresAt: buildMercadoPagoPreferenceExpirationDate(),
-      payerEmail: admin.email,
-      metadata: {
-        organization_id: parsed.data.organizationId,
-        billing_payment_id: insertedPayment.id,
-        purpose: "organization_creation"
-      }
-    });
-
-    const { error: updatePaymentError } = await supabaseAdmin
-      .from("organization_billing_payments")
-      .update({
-        mp_preference_id: preference.id,
-        checkout_url: preference.init_point,
-        checkout_sandbox_url: preference.sandbox_init_point
-      })
-      .eq("id", insertedPayment.id);
-
-    if (updatePaymentError) {
-      redirect(buildAdminPath(organizationQueryKey, toUserMessage(updatePaymentError, "No se pudo guardar la preferencia de pago.")));
-    }
-
-    const redirectUrl = shouldUseMercadoPagoSandboxCheckout()
-      ? preference.sandbox_init_point ?? preference.init_point
-      : preference.init_point ?? preference.sandbox_init_point;
-
-    if (!redirectUrl) {
-      redirect(
-        buildAdminPath(
-          organizationQueryKey,
-          "Mercado Pago no devolvio una URL valida para continuar el pago."
-        )
-      );
-    }
-
-    await recordAnalyticsEvent({
-      eventName: GROWTH_EVENTS.billingStarted,
-      source: "mercadopago",
-      adminId: admin.userId,
-      organizationId: parsed.data.organizationId,
-      entityType: "payment",
-      entityId: insertedPayment.id,
-      path: withOrgQuery("/admin", organizationQueryKey),
-      properties: {
-        purpose: "organization_creation",
-        checkout: shouldUseMercadoPagoSandboxCheckout() ? "sandbox" : "production"
-      }
-    });
-
-    redirect(redirectUrl);
-  } catch (error) {
-    if (isNextRedirectError(error)) throw error;
-    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo iniciar el pago para crear el nuevo grupo.")));
-  }
-}
-
-export async function startOrganizationCheckoutProAction(formData: FormData) {
-  try {
-    const parsed = startCheckoutSchema.safeParse({
-      organizationId: formData.get("organizationId")
-    });
-
-    if (!parsed.success) {
-      redirect(buildBillingPath(undefined, parsed.error.issues[0]?.message ?? "Datos invalidos."));
-    }
-
-    const admin = await assertOrganizationMembershipAction(parsed.data.organizationId);
-    const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
-    const supabaseAdmin = createSupabaseAdminClient();
-    if (!supabaseAdmin) {
-      redirect(
-        buildBillingPath(
-          organizationQueryKey,
-          "Falta SUPABASE_SERVICE_ROLE_KEY para iniciar el checkout de Mercado Pago."
-        )
-      );
-    }
-
-    const { data: organization, error: organizationError } = await supabaseAdmin
-      .from("organizations")
-      .select("id, name")
-      .eq("id", parsed.data.organizationId)
-      .maybeSingle();
-
-    if (organizationError || !organization) {
-      redirect(
-        buildBillingPath(
-          organizationQueryKey,
-          toUserMessage(organizationError, "No se pudo leer el grupo para facturar.")
-        )
-      );
-    }
-
-    const externalReference = `${organization.id}:${Date.now()}:${crypto
-      .randomUUID()
-      .slice(0, 8)}`;
-    const publicBaseUrl = await resolveServerBaseUrl();
-    const successPath = withGrowthEvent(
-      withOrgQuery("/admin/billing?checkout=success", organizationQueryKey),
-      GROWTH_EVENTS.paymentReturned,
-      "mercadopago"
-    );
-    const failurePath = withGrowthEvent(
-      withOrgQuery("/admin/billing?checkout=failure", organizationQueryKey),
-      GROWTH_EVENTS.paymentReturned,
-      "mercadopago"
-    );
-    const pendingPath = withGrowthEvent(
-      withOrgQuery("/admin/billing?checkout=pending", organizationQueryKey),
-      GROWTH_EVENTS.paymentReturned,
-      "mercadopago"
-    );
-    const notificationPath = "/api/payments/mercadopago/webhook";
-
-    await cleanupStalePendingOrganizationBillingPayments({
-      supabase: supabaseAdmin,
-      organizationId: organization.id
-    });
-
-    const { data: insertedPayment, error: insertPaymentError } = await supabaseAdmin
-      .from("organization_billing_payments")
-      .insert({
-        organization_id: organization.id,
-        created_by: admin.userId,
-        amount: ORGANIZATION_MONTHLY_PRICE_ARS,
-        currency_id: ORGANIZATION_BILLING_CURRENCY,
-        status: "pending",
-        mp_external_reference: externalReference,
-        purpose: "organization_subscription"
-      })
-      .select("id")
-      .single();
-
-    if (insertPaymentError || !insertedPayment) {
-      redirect(
-        buildBillingPath(
-          organizationQueryKey,
-          toUserMessage(insertPaymentError, "No se pudo registrar el intento de pago.")
-        )
-      );
-    }
-    await recordAnalyticsEvent({
-      eventName: SERVER_ANALYTICS_EVENTS.paymentCreated,
-      source: "mercadopago",
-      adminId: admin.userId,
-      organizationId: organization.id,
-      entityType: "payment",
-      entityId: insertedPayment.id,
-      path: withOrgQuery("/admin/billing", organizationQueryKey),
-      properties: {
-        purpose: "organization_subscription",
-        amount: ORGANIZATION_MONTHLY_PRICE_ARS,
-        currency: ORGANIZATION_BILLING_CURRENCY,
-        status: "pending"
-      }
-    });
-
-    const preference = await createCheckoutProPreference({
-      title: `Plan mensual ${organization.name}`,
-      unitPrice: ORGANIZATION_MONTHLY_PRICE_ARS,
-      currencyId: ORGANIZATION_BILLING_CURRENCY,
-      quantity: 1,
-      externalReference,
-      notificationUrl: `${publicBaseUrl}${notificationPath}`,
-      successUrl: buildMercadoPagoReturnUrl(publicBaseUrl, successPath),
-      failureUrl: buildMercadoPagoReturnUrl(publicBaseUrl, failurePath),
-      pendingUrl: buildMercadoPagoReturnUrl(publicBaseUrl, pendingPath),
-      expiresAt: buildMercadoPagoPreferenceExpirationDate(),
-      payerEmail: admin.email,
-      metadata: {
-        organization_id: organization.id,
-        billing_payment_id: insertedPayment.id
-      }
-    });
-
-    const { error: updatePaymentError } = await supabaseAdmin
-      .from("organization_billing_payments")
-      .update({
-        mp_preference_id: preference.id,
-        checkout_url: preference.init_point,
-        checkout_sandbox_url: preference.sandbox_init_point
-      })
-      .eq("id", insertedPayment.id);
-
-    if (updatePaymentError) {
-      redirect(buildBillingPath(organizationQueryKey, toUserMessage(updatePaymentError, "No se pudo guardar la preferencia de pago.")));
-    }
-
-    const redirectUrl = shouldUseMercadoPagoSandboxCheckout()
-      ? preference.sandbox_init_point ?? preference.init_point
-      : preference.init_point ?? preference.sandbox_init_point;
-
-    if (!redirectUrl) {
-      redirect(
-        buildBillingPath(
-          organizationQueryKey,
-          "Mercado Pago no devolvio una URL de checkout para continuar."
-        )
-      );
-    }
-
-    await recordAnalyticsEvent({
-      eventName: GROWTH_EVENTS.billingStarted,
-      source: "mercadopago",
-      adminId: admin.userId,
-      organizationId: organization.id,
-      entityType: "payment",
-      entityId: insertedPayment.id,
-      path: withOrgQuery("/admin/billing", organizationQueryKey),
-      properties: {
-        purpose: "organization_subscription",
-        checkout: shouldUseMercadoPagoSandboxCheckout() ? "sandbox" : "production"
-      }
-    });
-
-    redirect(redirectUrl);
-  } catch (error) {
-    if (isNextRedirectError(error)) throw error;
-    redirect(buildBillingPath(undefined, toUserMessage(error, "No se pudo iniciar el pago en Mercado Pago.")));
-  }
-}
-
-export async function syncOrganizationCheckoutPaymentAction(formData: FormData) {
-  try {
-    const parsed = syncCheckoutPaymentSchema.safeParse({
-      organizationId: formData.get("organizationId"),
-      paymentId: formData.get("paymentId")
-    });
-
-    if (!parsed.success) {
-      redirect(buildBillingPath(undefined, parsed.error.issues[0]?.message ?? "Datos invalidos."));
-    }
-
-    await assertOrganizationMembershipAction(parsed.data.organizationId);
-    const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
-    const supabaseAdmin = createSupabaseAdminClient();
-    if (!supabaseAdmin) {
-      redirect(
-        buildBillingPath(
-          organizationQueryKey,
-          "Falta SUPABASE_SERVICE_ROLE_KEY para sincronizar pagos de Mercado Pago."
-        )
-      );
-    }
-
-    await syncOrganizationBillingPaymentFromMercadoPago({
-      supabase: supabaseAdmin,
-      mercadopagoPaymentId: parsed.data.paymentId,
-      expectedOrganizationId: parsed.data.organizationId
-    });
-
-    revalidatePath("/admin");
-    revalidatePath("/admin/billing");
-    redirect(withOrgQuery("/admin/billing?checkout=sync", organizationQueryKey));
-  } catch (error) {
-    if (isNextRedirectError(error)) throw error;
-    redirect(buildBillingPath(undefined, toUserMessage(error, "No se pudo sincronizar el pago.")));
   }
 }
 

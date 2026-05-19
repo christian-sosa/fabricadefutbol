@@ -16,7 +16,7 @@
     "admin_app": ["src/app/admin/(panel)", "src/components/admin"],
     "auth": ["src/app/admin/(auth)", "src/app/auth", "src/lib/auth"],
     "supabase": ["src/lib/supabase", "src/types/database.ts"],
-    "payments": ["src/lib/domain/billing-workflow.ts", "src/lib/domain/tournament-billing-workflow.ts", "src/lib/payments"],
+    "payments": ["src/lib/domain/tournament-billing-workflow.ts", "src/lib/payments"],
     "analytics_events": ["src/lib/analytics", "src/lib/growth.ts", "src/app/api/analytics/events/route.ts"],
     "super_admin_metrics": ["src/lib/queries/admin.ts", "src/app/admin/(panel)/super/page.tsx"]
   },
@@ -44,6 +44,15 @@
       "rules": [
         "Analytics reads from the analytics schema with a read-only role.",
         "Do not use service role credentials in the analytics repo."
+      ]
+    },
+    {
+      "name": "organization_groups_are_free",
+      "source_of_truth": "app_prod.organizations",
+      "rules": [
+        "Groups/organizations do not have a billing table, paid status, trial period or MercadoPago checkout.",
+        "Do not reintroduce organization_billing_payments or organization_billing_subscriptions for groups.",
+        "League/tournament billing and club match payments are separate domains and may still exist."
       ]
     }
   ],

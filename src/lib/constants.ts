@@ -50,13 +50,11 @@ export function isSuperAdminConfigured() {
   return SUPER_ADMIN_EMAIL.length > 0;
 }
 
-export const FREE_TRIAL_DAYS = 30;
 export const ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS = 180;
-export const ORGANIZATION_MONTHLY_PRICE_ARS = 5000;
 export const TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS = 100;
 export const MAX_TOURNAMENT_PLAYERS_PER_TEAM = 20;
 export const TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS = 50000;
-export const ORGANIZATION_BILLING_CURRENCY = "ARS";
+export const BILLING_CURRENCY = "ARS";
 
 function resolveTournamentMonthlyPriceArs() {
   const raw = process.env.TOURNAMENT_MONTHLY_PRICE_ARS?.trim();

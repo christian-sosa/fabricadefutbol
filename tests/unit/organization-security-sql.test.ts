@@ -12,10 +12,9 @@ const policiesSql = hasSupabaseSql ? readFileSync(policiesSqlPath, "utf8") : "";
 const describeSupabaseSql = hasSupabaseSql ? describe : describe.skip;
 
 describeSupabaseSql("organization security sql", () => {
-  it("centraliza escrituras de grupos en la ventana comercial activa", () => {
+  it("centraliza escrituras de grupos en la membresia del admin", () => {
     expect(policiesSql).toContain("create or replace function public.can_write_org");
-    expect(policiesSql).toContain("o.created_at + interval '30 days' >= timezone('utc', now())");
-    expect(policiesSql).toContain("lower(s.status) = 'active'");
+    expect(policiesSql).toContain("public.is_org_admin(org_id)");
     expect(policiesSql).toContain("using (public.can_write_org(organization_id))");
     expect(policiesSql).toContain("and public.can_write_org(m.organization_id)");
     expect(policiesSql).toContain("%1$I.can_write_org(p.organization_id)");
@@ -50,12 +49,9 @@ describeSupabaseSql("organization security sql", () => {
     expect(schemaSql).toContain("where oa.organization_id = o.id");
   });
 
-  it("mantiene aplicacion de pagos atomica e inmutable la fecha de alta", () => {
-    expect(schemaSql).toContain("create or replace function public.apply_organization_billing_payment_period");
-    expect(schemaSql).toContain("for update;");
+  it("mantiene inmutable la fecha de alta del grupo", () => {
     expect(schemaSql).toContain("create or replace function public.prevent_organization_security_column_changes");
     expect(schemaSql).toContain("before update of created_at, created_by on public.organizations");
-    expect(policiesSql).toContain("grant execute on function public.apply_organization_billing_payment_period");
   });
 
   it("agrega auditoria append-only para eventos sensibles de grupos", () => {

@@ -137,20 +137,6 @@ async function deleteByIds(params: {
   }
 }
 
-async function clearOrganizationReferenceFromCreationPayments(params: {
-  supabase: DbClient;
-  organizationId: string;
-}) {
-  const { supabase, organizationId } = params;
-  const { error } = await supabase
-    .from("organization_billing_payments")
-    .update({
-      created_organization_id: null
-    })
-    .eq("created_organization_id", organizationId);
-  if (error) throw new Error(error.message);
-}
-
 async function deletePlayerPhotoObjects(params: {
   supabase: DbClient;
   organizationId: string;
@@ -275,14 +261,7 @@ export async function deleteOrganizationDeep(params: {
     ids: matchIds
   });
 
-  await clearOrganizationReferenceFromCreationPayments({
-    supabase,
-    organizationId
-  });
-
   const organizationScopedTables = [
-    "organization_billing_payments",
-    "organization_billing_subscriptions",
     "organization_invites",
     "organization_admins",
     "matches",
