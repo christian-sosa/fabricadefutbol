@@ -242,7 +242,8 @@ type TeamRosterFilters = {
 };
 
 type ClubPlayersView = "new" | "bulk" | "pool";
-type SiteProductPanel = "products" | "new";
+type SiteProductPanel = "products" | "new" | null;
+type ActiveSiteProductPanel = Exclude<SiteProductPanel, null>;
 type SiteProductStatusFilter = "all" | ClubProductStatus;
 type SiteProductFilters = {
   category: string;
@@ -255,7 +256,9 @@ function normalizeClubPlayersView(view?: string): ClubPlayersView | null {
 }
 
 function normalizeSiteProductPanel(panel?: string): SiteProductPanel {
-  return panel === "new" ? "new" : "products";
+  if (panel === "products") return "products";
+  if (panel === "new") return "new";
+  return null;
 }
 
 function normalizeSiteProductStatusFilter(status?: string): SiteProductStatusFilter {
@@ -271,7 +274,7 @@ function buildSiteProductPath({
 }: {
   clubId: string;
   filters?: Partial<SiteProductFilters>;
-  panel: SiteProductPanel;
+  panel: ActiveSiteProductPanel;
 }) {
   const searchParams = new URLSearchParams({
     sitePanel: panel,

@@ -313,15 +313,17 @@ function ClubSiteFooter({ data }: { data: PublicClubSiteDetails }) {
   const socialLinks = resolveClubSocialLinks(data);
 
   return (
-    <footer id="contacto" className="border-t border-[var(--club-line)] bg-white text-black">
+    <footer id="contacto" className="border-t border-black bg-[#101312] text-white">
       <div className="mx-auto flex max-w-7xl flex-col items-center gap-5 px-4 py-9 text-center md:px-6">
         <div className="flex flex-col items-center gap-3">
-          <ClubSiteLogoMark data={data} size={58} />
+          <span className="rounded-full bg-white p-2 shadow-[0_18px_40px_-30px_rgba(255,255,255,0.8)]">
+            <ClubSiteLogoMark data={data} size={58} />
+          </span>
           <div>
             <p className="text-4xl font-black uppercase leading-none text-[var(--club-primary)] [font-family:var(--font-club-display)]">
               {data.club.name}
             </p>
-            <p className="mt-2 text-sm font-semibold text-black/55">Sitio oficial y canales del club.</p>
+            <p className="mt-2 text-sm font-semibold text-white/65">Sitio oficial y canales del club.</p>
           </div>
         </div>
 
@@ -330,7 +332,7 @@ function ClubSiteFooter({ data }: { data: PublicClubSiteDetails }) {
             {socialLinks.map((link) => (
               <a
                 aria-label={link.label}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-black shadow-[0_18px_40px_-30px_rgba(0,0,0,0.7)] transition hover:border-[var(--club-primary)] hover:bg-[var(--club-primary)] hover:text-white"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white text-black shadow-[0_18px_40px_-30px_rgba(255,255,255,0.8)] transition hover:border-[var(--club-primary)] hover:bg-[var(--club-primary)] hover:text-white"
                 href={link.href}
                 key={`${link.label}-${link.href}`}
                 rel="noreferrer"
@@ -343,7 +345,7 @@ function ClubSiteFooter({ data }: { data: PublicClubSiteDetails }) {
           </div>
         ) : null}
 
-        <div className="flex flex-col items-center gap-2 border-t border-[var(--club-line)] pt-5">
+        <div className="flex flex-col items-center gap-2 border-t border-white/10 pt-5">
           <Image
             alt="Logo de Fabrica de Futbol"
             className="h-10 w-10 object-contain"
@@ -352,8 +354,8 @@ function ClubSiteFooter({ data }: { data: PublicClubSiteDetails }) {
             width={40}
           />
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-black/45">Fabrica de Futbol</p>
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-black/55">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-white/45">Fabrica de Futbol</p>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-white/55">
               Este sitio pertenece a Fabrica de Futbol. {data.club.name} administra su contenido publico desde la plataforma.
             </p>
           </div>
@@ -499,7 +501,6 @@ function ActivityItem({ item }: { item: ClubPublicActivity }) {
 
 export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
   const { settings, snapshot } = data;
-  const socialLinks = resolveClubSocialLinks(data);
 
   return (
     <ClubSiteShell active="home" data={data}>
@@ -524,28 +525,6 @@ export function ClubSiteHome({ data }: { data: PublicClubSiteDetails }) {
               <ActivityItem item={item} key={`${item.type}-${item.createdAt}-${item.title}`} />
             ))}
           </ul>
-        </section>
-      ) : null}
-
-      {socialLinks.length ? (
-        <section className="mt-14 rounded-md border border-black/10 bg-[#101312] p-5 text-white shadow-[0_18px_44px_-34px_rgba(0,0,0,0.65)]">
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--club-primary)]">Contacto</p>
-          <h2 className="mt-2 text-4xl font-black uppercase leading-none [font-family:var(--font-club-display)]">Canales oficiales</h2>
-          <div className="mt-5 flex flex-wrap gap-3">
-            {socialLinks.map((link) => (
-              <a
-                aria-label={link.label}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white text-black transition hover:border-[var(--club-primary)] hover:bg-[var(--club-primary)] hover:text-white"
-                href={link.href}
-                key={`${link.label}-${link.href}-home`}
-                rel="noreferrer"
-                target="_blank"
-                title={link.label}
-              >
-                <ClubSocialIcon label={link.label} />
-              </a>
-            ))}
-          </div>
         </section>
       ) : null}
     </ClubSiteShell>

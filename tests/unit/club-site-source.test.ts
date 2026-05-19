@@ -70,6 +70,23 @@ describe("club site productizado", () => {
     expect(adminPageSource).toContain("Sin stock");
   });
 
+  it("mantiene Productos cargados oculto hasta abrir Ver productos actuales", () => {
+    const adminPageSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "page.tsx");
+    const normalizePanelSource = sourceSlice(
+      adminPageSource,
+      "function normalizeSiteProductPanel",
+      "function normalizeSiteProductStatusFilter"
+    );
+    const siteTabSource = sourceSlice(adminPageSource, "function SiteTab", "function AdminsTab");
+
+    expect(adminPageSource).toContain('type SiteProductPanel = "products" | "new" | null');
+    expect(normalizePanelSource).toContain('panel === "products"');
+    expect(normalizePanelSource).toContain('panel === "new"');
+    expect(normalizePanelSource).toContain("return null");
+    expect(siteTabSource).toContain('{productPanel === "products" ? (');
+    expect(siteTabSource).toContain('href={buildSiteProductPath({ clubId, filters: productFilters, panel: "products" })}');
+  });
+
   it("explica limites y campos comerciales del sitio en el admin", () => {
     const adminPageSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "page.tsx");
     const actionsSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "actions.ts");
@@ -163,6 +180,9 @@ describe("club site productizado", () => {
     expect(homeSource).not.toContain("ClubSiteCategoryRail");
     expect(homeSource).not.toContain("ProductCard");
     expect(homeSource).not.toContain("Destacados");
+    expect(homeSource).not.toContain("Canales oficiales");
+    expect(homeSource).not.toContain("Contacto");
+    expect(homeSource).not.toContain("resolveClubSocialLinks");
     expect(heroSource).not.toContain("Tienda oficial");
     expect(heroSource).not.toContain("Contactanos");
     expect(heroSource).not.toContain("Ir al shop");
@@ -188,7 +208,7 @@ describe("club site productizado", () => {
     expect(componentSource).not.toContain("drop-shadow-[0_24px_22px");
   });
 
-  it("usa navegacion del sitio con Historia y deja las categorias solo en Catalogo", () => {
+  it("usa navegacion del sitio con Historia y deja contacto solo en el footer", () => {
     const componentSource = readSource("src", "components", "clubs", "club-site.tsx");
     const headerSource = sourceSlice(componentSource, "function ClubSiteHeader", "function ClubSiteHomeHero");
     const footerSource = sourceSlice(componentSource, "function ClubSiteFooter", "export function ClubSiteShell");
@@ -205,6 +225,11 @@ describe("club site productizado", () => {
     expect(headerSource).not.toContain("<ClubSiteCategoryRail");
     expect(footerSource).not.toContain("Productos");
     expect(footerSource).not.toContain("Informacion");
+    expect(footerSource).toContain('className="border-t border-black bg-[#101312] text-white"');
+    expect(footerSource).toContain("ClubSiteLogoMark");
+    expect(footerSource).toContain("resolveClubSocialLinks");
+    expect(footerSource).toContain("border-white/15 bg-white text-black");
+    expect(footerSource).toContain("text-white/55");
     expect(componentSource).toContain('alt="Logo de Fabrica de Futbol"');
     expect(componentSource).toContain('src="/logo.png"');
     expect(componentSource).toContain("Instagram");
