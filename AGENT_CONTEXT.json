@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "project": "fabricadefutbol",
+  "type": "operational_app",
+  "sibling_repositories": {
+    "analytics": "C:\\Users\\Christian\\Documents\\fabrica-de-futbol-analytics"
+  },
+  "runtime": {
+    "framework": "Next.js App Router",
+    "database": "Supabase Postgres",
+    "production_schema": "app_prod",
+    "verification": ["npm run guardrails", "npm run verify"]
+  },
+  "orientation": {
+    "public_app": ["src/app/(public)", "src/app/groups", "src/app/matches", "src/app/players"],
+    "admin_app": ["src/app/admin/(panel)", "src/components/admin"],
+    "auth": ["src/app/admin/(auth)", "src/app/auth", "src/lib/auth"],
+    "supabase": ["src/lib/supabase", "src/types/database.ts"],
+    "payments": ["src/lib/domain/billing-workflow.ts", "src/lib/domain/tournament-billing-workflow.ts", "src/lib/payments"],
+    "analytics_events": ["src/lib/analytics", "src/lib/growth.ts", "src/app/api/analytics/events/route.ts"],
+    "super_admin_metrics": ["src/lib/queries/admin.ts", "src/app/admin/(panel)/super/page.tsx"]
+  },
+  "contracts": [
+    {
+      "name": "analytics_events",
+      "source_of_truth": "src/lib/analytics/events.ts",
+      "supabase_table": "app_prod.analytics_events",
+      "analytics_consumers": [
+        "fdf_analytics/schemas.py",
+        "fdf_analytics/extract.py",
+        "fdf_analytics/build_marts.py",
+        "app.py"
+      ],
+      "rules": [
+        "Never store raw emails, passwords, tokens, phone numbers or service keys in event properties.",
+        "Every event name must be allowlisted in src/lib/analytics/events.ts and app_prod.analytics_events.",
+        "If the event name, entity id, properties shape or Supabase schema changes, review analytics marts before completion."
+      ]
+    },
+    {
+      "name": "analytics_reader",
+      "source_of_truth": "Supabase schema analytics",
+      "analytics_consumers": ["fdf_analytics/extract.py", ".env"],
+      "rules": [
+        "Analytics reads from the analytics schema with a read-only role.",
+        "Do not use service role credentials in the analytics repo."
+      ]
+    }
+  ],
+  "impact_rules": [
+    {
+      "id": "analytics-event-contract",
+      "description": "Analytics event allowlist, client/server recorder or endpoint changed.",
+      "regex": ["^src/lib/analytics/", "^src/lib/growth\\.ts$", "^src/app/api/analytics/"],
+      "review_repository": "C:\\Users\\Christian\\Documents\\fabrica-de-futbol-analytics",
+      "review_files": ["fdf_analytics/schemas.py", "fdf_analytics/build_marts.py", "app.py"],
+      "suggested_commands": ["python -m fdf_analytics.extract --sample", "python -m fdf_analytics.build_marts", "python -m pytest", "python -m ruff check ."]
+    },
+    {
+      "id": "auth-admin-usage",
+      "description": "Login, registration or OAuth behavior can affect admin usage and retention marts.",
+      "regex": ["^src/app/admin/\\(auth\\)/", "^src/app/auth/", "^src/lib/auth/"],
+      "review_repository": "C:\\Users\\Christian\\Documents\\fabrica-de-futbol-analytics",
+      "review_files": ["fdf_analytics/build_marts.py", "app.py"],
+      "suggested_marts": ["mart_admin_usage", "mart_retention"]
+    },
+    {
+      "id": "product-activity",
+      "description": "Groups, players or matches changed; product activity marts may need updates.",
+      "regex": ["^src/app/admin/\\(panel\\)/matches", "^src/app/admin/\\(panel\\)/actions\\.ts$", "^src/lib/domain/match", "^src/lib/queries/public\\.ts$"],
+      "review_repository": "C:\\Users\\Christian\\Documents\\fabrica-de-futbol-analytics",
+      "review_files": ["fdf_analytics/schemas.py", "fdf_analytics/build_marts.py"],
+      "suggested_marts": ["mart_product_activity", "mart_entity_ranking", "mart_retention"]
+    },
+    {
+      "id": "finance",
+      "description": "Billing or payments changed; finance mart may need updates.",
+      "regex": ["^src/lib/domain/.*billing.*\\.ts$", "^src/lib/payments/", "^src/app/api/payments/", "^src/app/admin/\\(panel\\)/tournaments/actions\\.ts$"],
+      "review_repository": "C:\\Users\\Christian\\Documents\\fabrica-de-futbol-analytics",
+      "review_files": ["fdf_analytics/schemas.py", "fdf_analytics/build_marts.py", "app.py"],
+      "suggested_marts": ["mart_finance", "mart_growth_daily"]
+    },
+    {
+      "id": "super-admin-metrics",
+      "description": "Super admin metrics changed; decide whether Streamlit should mirror or extend them.",
+      "regex": ["^src/lib/queries/admin\\.ts$", "^src/app/admin/\\(panel\\)/super/", "^src/app/api/admin/super-metrics/"],
+      "review_repository": "C:\\Users\\Christian\\Documents\\fabrica-de-futbol-analytics",
+      "review_files": ["app.py", "fdf_analytics/build_marts.py"]
+    },
+    {
+      "id": "database-contract",
+      "description": "Supabase Database type contract changed; analytics extraction schema may need updates.",
+      "regex": ["^src/types/database\\.ts$", "^supabase/"],
+      "review_repository": "C:\\Users\\Christian\\Documents\\fabrica-de-futbol-analytics",
+      "review_files": ["fdf_analytics/schemas.py", "sql/analytics_events.sql"]
+    }
+  ]
+}

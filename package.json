@@ -16,6 +16,7 @@
     "test:coverage": "vitest run --coverage --project unit --project integration --project ui",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
+    "agent:impact": "node scripts/check-agent-impact.mjs",
     "guardrails": "node scripts/check-git-guardrails.mjs",
     "verify": "npm run guardrails && npm run lint && npm run typecheck && npm run test:coverage && npm run build",
     "verify:smoke": "npm run verify && npm run test:e2e",
