@@ -2,6 +2,7 @@ import { slugifyOrganizationName } from "@/lib/org";
 
 type TableName =
   | "admins"
+  | "analytics_events"
   | "organizations"
   | "organization_admins"
   | "organization_invites"
@@ -87,6 +88,7 @@ function cloneRow<T>(value: T): T {
 function createEmptyDatabase(): FakeDatabase {
   return {
     admins: [],
+    analytics_events: [],
     organizations: [],
     organization_admins: [],
     organization_invites: [],
@@ -220,6 +222,17 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!normalized.purpose) normalized.purpose = "organization_subscription";
       if (!normalized.updated_at) normalized.updated_at = now;
       if (!("subscription_applied_at" in normalized)) normalized.subscription_applied_at = null;
+      break;
+    case "analytics_events":
+      if (!normalized.source) normalized.source = "server";
+      if (!("admin_id" in normalized)) normalized.admin_id = null;
+      if (!("organization_id" in normalized)) normalized.organization_id = null;
+      if (!("club_id" in normalized)) normalized.club_id = null;
+      if (!("league_id" in normalized)) normalized.league_id = null;
+      if (!("entity_type" in normalized)) normalized.entity_type = null;
+      if (!("entity_id" in normalized)) normalized.entity_id = null;
+      if (!("path" in normalized)) normalized.path = null;
+      if (!("properties" in normalized)) normalized.properties = {};
       break;
     case "organization_audit_events":
       if (!("details" in normalized)) normalized.details = {};

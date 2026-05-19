@@ -1,3 +1,5 @@
+import { SERVER_ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { getMercadoPagoPaymentById } from "@/lib/payments/mercadopago";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -12,6 +14,7 @@ type BillingPaymentRow = {
   mp_external_reference: string | null;
   mp_payment_id: string | null;
   status: string;
+  created_by?: string | null;
   created_at?: string | null;
   subscription_applied_at: string | null;
   purpose: string | null;
@@ -249,6 +252,19 @@ export async function syncOrganizationBillingPaymentFromMercadoPago(params: {
         });
       }
 
+      await recordAnalyticsEvent({
+        eventName: SERVER_ANALYTICS_EVENTS.paymentApproved,
+        source: "mercadopago",
+        adminId: paymentRow.requested_by_admin_id ?? paymentRow.created_by ?? null,
+        organizationId: createdOrganizationId ?? paymentRow.organization_id,
+        entityType: "payment",
+        entityId: paymentRow.id,
+        properties: {
+          purpose: normalizedPurpose,
+          status: normalizedStatus
+        }
+      });
+
       return {
         updated: true,
         organizationId: paymentRow.organization_id,
@@ -262,6 +278,19 @@ export async function syncOrganizationBillingPaymentFromMercadoPago(params: {
       supabase,
       paymentRow,
       approvedAt: approvedAt ?? new Date().toISOString()
+    });
+
+    await recordAnalyticsEvent({
+      eventName: SERVER_ANALYTICS_EVENTS.paymentApproved,
+      source: "mercadopago",
+      adminId: paymentRow.requested_by_admin_id ?? paymentRow.created_by ?? null,
+      organizationId: paymentRow.organization_id,
+      entityType: "payment",
+      entityId: paymentRow.id,
+      properties: {
+        purpose: normalizedPurpose,
+        status: normalizedStatus
+      }
     });
   }
 

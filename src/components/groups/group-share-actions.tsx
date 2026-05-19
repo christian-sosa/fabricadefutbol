@@ -1,8 +1,7 @@
 "use client";
 
-import { track } from "@vercel/analytics";
-
 import { Button } from "@/components/ui/button";
+import { trackAnalyticsEvent } from "@/lib/analytics/client";
 import { GROWTH_EVENTS } from "@/lib/growth";
 import {
   buildGroupWhatsAppMessage,
@@ -40,7 +39,7 @@ export function GroupShareActions({
       {rankingUrl ? (
         <Button
           onClick={() => {
-            track(GROWTH_EVENTS.rankingShared, { source });
+            trackAnalyticsEvent(GROWTH_EVENTS.rankingShared, { source });
             openWhatsApp(buildRankingWhatsAppMessage({ groupName, rankingUrl }));
           }}
           type="button"
@@ -52,7 +51,7 @@ export function GroupShareActions({
       {groupUrl ? (
         <Button
           onClick={() => {
-            track(GROWTH_EVENTS.groupShared, { source });
+            trackAnalyticsEvent(GROWTH_EVENTS.groupShared, { source });
             openWhatsApp(buildGroupWhatsAppMessage({ groupName, groupUrl }));
           }}
           type="button"

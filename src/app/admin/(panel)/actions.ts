@@ -11,6 +11,8 @@ import {
   checkActionRateLimit,
   formatActionRateLimitMessage
 } from "@/lib/action-rate-limit";
+import { SERVER_ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import {
   assertAdminAction,
   assertCanCreateOrganization,
@@ -309,6 +311,18 @@ export async function createOrganizationAction(formData: FormData) {
         slug
       }
     });
+    await recordAnalyticsEvent({
+      eventName: GROWTH_EVENTS.groupCreated,
+      source: "server_action",
+      adminId: admin.userId,
+      organizationId: organization.id,
+      entityType: "organization",
+      entityId: organization.id,
+      path: withOrgQuery("/admin", slug),
+      properties: {
+        slug
+      }
+    });
 
     revalidatePath("/admin");
     revalidatePath("/");
@@ -455,6 +469,21 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
         )
       );
     }
+    await recordAnalyticsEvent({
+      eventName: SERVER_ANALYTICS_EVENTS.paymentCreated,
+      source: "mercadopago",
+      adminId: admin.userId,
+      organizationId: parsed.data.organizationId,
+      entityType: "payment",
+      entityId: insertedPayment.id,
+      path: withOrgQuery("/admin", organizationQueryKey),
+      properties: {
+        purpose: "organization_creation",
+        amount: ORGANIZATION_MONTHLY_PRICE_ARS,
+        currency: ORGANIZATION_BILLING_CURRENCY,
+        status: "pending"
+      }
+    });
 
     const preference = await createCheckoutProPreference({
       title: `Crear nuevo grupo (${normalizedOrgName})`,
@@ -500,6 +529,20 @@ export async function startOrganizationCreationCheckoutAction(formData: FormData
         )
       );
     }
+
+    await recordAnalyticsEvent({
+      eventName: GROWTH_EVENTS.billingStarted,
+      source: "mercadopago",
+      adminId: admin.userId,
+      organizationId: parsed.data.organizationId,
+      entityType: "payment",
+      entityId: insertedPayment.id,
+      path: withOrgQuery("/admin", organizationQueryKey),
+      properties: {
+        purpose: "organization_creation",
+        checkout: shouldUseMercadoPagoSandboxCheckout() ? "sandbox" : "production"
+      }
+    });
 
     redirect(redirectUrl);
   } catch (error) {
@@ -593,6 +636,21 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
         )
       );
     }
+    await recordAnalyticsEvent({
+      eventName: SERVER_ANALYTICS_EVENTS.paymentCreated,
+      source: "mercadopago",
+      adminId: admin.userId,
+      organizationId: organization.id,
+      entityType: "payment",
+      entityId: insertedPayment.id,
+      path: withOrgQuery("/admin/billing", organizationQueryKey),
+      properties: {
+        purpose: "organization_subscription",
+        amount: ORGANIZATION_MONTHLY_PRICE_ARS,
+        currency: ORGANIZATION_BILLING_CURRENCY,
+        status: "pending"
+      }
+    });
 
     const preference = await createCheckoutProPreference({
       title: `Plan mensual ${organization.name}`,
@@ -637,6 +695,20 @@ export async function startOrganizationCheckoutProAction(formData: FormData) {
         )
       );
     }
+
+    await recordAnalyticsEvent({
+      eventName: GROWTH_EVENTS.billingStarted,
+      source: "mercadopago",
+      adminId: admin.userId,
+      organizationId: organization.id,
+      entityType: "payment",
+      entityId: insertedPayment.id,
+      path: withOrgQuery("/admin/billing", organizationQueryKey),
+      properties: {
+        purpose: "organization_subscription",
+        checkout: shouldUseMercadoPagoSandboxCheckout() ? "sandbox" : "production"
+      }
+    });
 
     redirect(redirectUrl);
   } catch (error) {

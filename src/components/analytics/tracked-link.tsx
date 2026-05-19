@@ -1,9 +1,9 @@
 "use client";
 
-import { track } from "@vercel/analytics";
 import Link from "next/link";
 import type { ComponentProps } from "react";
 
+import { trackAnalyticsEvent } from "@/lib/analytics/client";
 import type { GrowthEventName } from "@/lib/growth";
 
 type TrackedLinkProps = ComponentProps<typeof Link> & {
@@ -21,7 +21,7 @@ export function TrackedLink({
     <Link
       {...props}
       onClick={(event) => {
-        track(eventName, eventProperties);
+        trackAnalyticsEvent(eventName, eventProperties);
         onClick?.(event);
       }}
     />

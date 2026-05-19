@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/lib/auth/admin";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { createDraftMatchWithOptions } from "@/lib/domain/match-workflow";
@@ -267,6 +268,21 @@ export async function createMatchAction(formData: FormData) {
       creationMode === "manual"
         ? withOrgQuery(`/matches/${matchId}`, organizationQueryKey)
         : withOrgQuery(`/admin/matches/${matchId}`, organizationQueryKey);
+    await recordAnalyticsEvent({
+      eventName: GROWTH_EVENTS.matchCreated,
+      source: "server_action",
+      adminId: admin.userId,
+      organizationId: parsed.data.organizationId,
+      entityType: "match",
+      entityId: matchId,
+      path: nextPath,
+      properties: {
+        modality: parsed.data.modality,
+        creationMode,
+        playerCount: parsed.data.playerIds.length,
+        guestCount: invitedGuests.length
+      }
+    });
     redirect(withGrowthEvent(nextPath, GROWTH_EVENTS.matchCreated));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;

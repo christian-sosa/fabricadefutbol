@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { SERVER_ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { resolveSafeNextPath } from "@/lib/auth/redirects";
 import { toUserMessage } from "@/lib/errors";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -137,6 +139,15 @@ export async function loginAdminAction(_: LoginState, formData: FormData): Promi
     };
   }
 
+  await recordAnalyticsEvent({
+    eventName: SERVER_ANALYTICS_EVENTS.adminLoginSucceeded,
+    source: "auth_password",
+    adminId: authData.user.id,
+    entityType: "admin",
+    entityId: authData.user.id,
+    path: nextPath
+  });
+
   redirect(nextPath);
 }
 
@@ -205,6 +216,20 @@ export async function registerAdminAction(_: RegisterState, formData: FormData):
       error: toUserMessage(error, "No se pudo completar el registro. Intenta nuevamente."),
       success: null
     };
+  }
+
+  if (data.user?.id) {
+    await recordAnalyticsEvent({
+      eventName: SERVER_ANALYTICS_EVENTS.adminRegisterSucceeded,
+      source: "auth_password",
+      adminId: data.user.id,
+      entityType: "admin",
+      entityId: data.user.id,
+      path: nextPath,
+      properties: {
+        hasSession: Boolean(data.session)
+      }
+    });
   }
 
   if (data.session) {

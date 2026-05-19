@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { SERVER_ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { toCsv, type CsvCellValue } from "@/lib/csv";
 import { maskEmail, maskUserId } from "@/lib/log-pii";
@@ -32,6 +34,18 @@ export async function GET() {
   });
 
   const metrics = await getSuperAdminDashboardMetrics();
+  await recordAnalyticsEvent({
+    eventName: SERVER_ANALYTICS_EVENTS.superMetricsExported,
+    source: "super_admin",
+    adminId: admin.userId,
+    entityType: "export",
+    path: "/api/admin/super-metrics/export",
+    properties: {
+      organizations: metrics.totals.organizations,
+      players: metrics.totals.players,
+      matches: metrics.totals.matches
+    }
+  });
   const dateStamp = new Date().toISOString().slice(0, 10);
 
   const summaryRows: CsvCellValue[][] = [

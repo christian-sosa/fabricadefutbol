@@ -1,3 +1,5 @@
+import { SERVER_ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { resolveNextLeagueBillingPeriod } from "@/lib/domain/billing";
 import { getMercadoPagoPaymentById } from "@/lib/payments/mercadopago";
 import { slugifyTournamentName } from "@/lib/org";
@@ -290,6 +292,18 @@ export async function approveTournamentBillingPaymentForDebug(params: {
     approvedAt,
     targetLeagueId: createdLeagueId
   });
+  await recordAnalyticsEvent({
+    eventName: SERVER_ANALYTICS_EVENTS.paymentApproved,
+    source: "debug_skip_checkout",
+    adminId: paymentRow.admin_id,
+    leagueId: createdLeagueId,
+    entityType: "payment",
+    entityId: paymentRow.id,
+    properties: {
+      purpose: normalizePaymentPurpose(paymentRow.purpose),
+      status: "approved"
+    }
+  });
 
   return {
     updated: true,
@@ -375,6 +389,18 @@ export async function syncTournamentBillingPaymentFromMercadoPago(params: {
       paymentRow,
       approvedAt: approvedAt ?? new Date().toISOString(),
       targetLeagueId: createdLeagueId
+    });
+    await recordAnalyticsEvent({
+      eventName: SERVER_ANALYTICS_EVENTS.paymentApproved,
+      source: "mercadopago",
+      adminId: paymentRow.admin_id,
+      leagueId: createdLeagueId,
+      entityType: "payment",
+      entityId: paymentRow.id,
+      properties: {
+        purpose: normalizedPurpose,
+        status: normalizedStatus
+      }
     });
   }
 

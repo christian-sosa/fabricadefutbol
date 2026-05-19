@@ -1,9 +1,9 @@
 "use client";
 
-import { track } from "@vercel/analytics";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 
+import { trackAnalyticsEvent } from "@/lib/analytics/client";
 import {
   GROWTH_EVENT_QUERY_PARAM,
   GROWTH_EVENT_SOURCE_QUERY_PARAM,
@@ -25,7 +25,7 @@ export function GrowthEventTracker() {
     handledEventRef.current = eventKey;
 
     const source = searchParams.get(GROWTH_EVENT_SOURCE_QUERY_PARAM) ?? "query";
-    track(eventName, { source });
+    trackAnalyticsEvent(eventName, { source }, { path: `${pathname}?${searchParams.toString()}` });
 
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.delete(GROWTH_EVENT_QUERY_PARAM);

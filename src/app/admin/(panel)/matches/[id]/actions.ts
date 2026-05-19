@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { SERVER_ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/lib/auth/admin";
 import {
   confirmTeamOption,
@@ -245,6 +247,20 @@ export async function saveResultAction(matchId: string, organizationId: string, 
         notes: parsed.data.notes,
         mvpParticipantId: parsed.data.mvpParticipantId?.trim() || null,
         lineup: parsedLineup
+      }
+    });
+
+    await recordAnalyticsEvent({
+      eventName: SERVER_ANALYTICS_EVENTS.matchFinished,
+      source: "server_action",
+      adminId: admin.userId,
+      organizationId,
+      entityType: "match",
+      entityId: matchId,
+      path: buildPath(matchId, organizationQueryKey),
+      properties: {
+        scoreA: parsed.data.scoreA,
+        scoreB: parsed.data.scoreB
       }
     });
 

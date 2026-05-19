@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { track } from "@vercel/analytics";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { trackAnalyticsEvent } from "@/lib/analytics/client";
 import { GROWTH_EVENTS } from "@/lib/growth";
 import { buildWhatsAppShareUrl, getWhatsAppShareTarget } from "@/lib/share";
 import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL, normalizeTeamLabel, TEAM_LABEL_MAX_LENGTH } from "@/lib/team-labels";
@@ -37,7 +37,7 @@ export function MatchTeamLabelsShareForm({
 
   const handleShare = () => {
     const target = getWhatsAppShareTarget(window.navigator.userAgent);
-    track(GROWTH_EVENTS.matchShared, { source: "admin_match_detail" });
+    trackAnalyticsEvent(GROWTH_EVENTS.matchShared, { source: "admin_match_detail" });
 
     window.open(
       buildWhatsAppShareUrl(

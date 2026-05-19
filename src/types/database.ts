@@ -21,6 +21,51 @@ export type Database = {
         };
         Relationships: [];
       };
+      analytics_events: {
+        Row: {
+          admin_id: string | null;
+          club_id: string | null;
+          created_at: string;
+          entity_id: string | null;
+          entity_type: string | null;
+          event_name: string;
+          id: string;
+          league_id: string | null;
+          organization_id: string | null;
+          path: string | null;
+          properties: Json;
+          source: string;
+        };
+        Insert: {
+          admin_id?: string | null;
+          club_id?: string | null;
+          created_at?: string;
+          entity_id?: string | null;
+          entity_type?: string | null;
+          event_name: string;
+          id?: string;
+          league_id?: string | null;
+          organization_id?: string | null;
+          path?: string | null;
+          properties?: Json;
+          source?: string;
+        };
+        Update: {
+          admin_id?: string | null;
+          club_id?: string | null;
+          created_at?: string;
+          entity_id?: string | null;
+          entity_type?: string | null;
+          event_name?: string;
+          id?: string;
+          league_id?: string | null;
+          organization_id?: string | null;
+          path?: string | null;
+          properties?: Json;
+          source?: string;
+        };
+        Relationships: [];
+      };
       organizations: {
         Row: {
           created_at: string;

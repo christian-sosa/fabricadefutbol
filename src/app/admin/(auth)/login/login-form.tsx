@@ -1,6 +1,5 @@
 "use client";
 
-import { track } from "@vercel/analytics";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -14,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { trackAnalyticsEvent } from "@/lib/analytics/client";
 import { GROWTH_EVENTS } from "@/lib/growth";
 
 const initialLoginState: LoginState = { error: null };
@@ -73,7 +73,7 @@ function RegisterSubmitButton() {
     <Button
       className="w-full"
       disabled={pending}
-      onClick={() => track(GROWTH_EVENTS.signupStarted, { source: "login_form" })}
+      onClick={() => trackAnalyticsEvent(GROWTH_EVENTS.signupStarted, { source: "login_form" })}
       type="submit"
       variant="secondary"
     >
