@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { sendFeedbackEmail, type FeedbackModule } from "@/lib/feedback-email";
-import { getCurrentUserIsSuperAdmin } from "@/lib/auth/super-admin";
+import { getCurrentUserCanAccessTournamentsProduct } from "@/lib/auth/super-admin";
 import type { PublicModuleContext } from "@/lib/org";
 import { normalizeEmail, withPublicQuery } from "@/lib/org";
 import { checkRateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
@@ -103,7 +103,7 @@ export async function submitFeedbackAction(
   defaultIntent: "club" | null,
   formData: FormData
 ) {
-  const canAccessTournaments = await getCurrentUserIsSuperAdmin();
+  const canAccessTournaments = await getCurrentUserCanAccessTournamentsProduct();
   const submittedModule = normalizeFeedbackModule(formData.get("module"), defaultModule);
   const safeSubmittedModule =
     submittedModule === "tournaments" && !canAccessTournaments ? "organizations" : submittedModule;

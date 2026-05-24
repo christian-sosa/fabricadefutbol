@@ -6,6 +6,7 @@ import {
   toShortDate,
   type LeagueSubscriptionSnapshot
 } from "@/lib/domain/billing";
+import { canAccessTournamentsProduct } from "@/lib/features";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   CompetitionCoverageMode,
@@ -179,7 +180,7 @@ async function assertLeagueMembership(leagueId: string) {
   void leagueId;
   const admin = await assertAdminAction();
 
-  if (admin.isSuperAdmin) {
+  if (canAccessTournamentsProduct({ isSuperAdmin: admin.isSuperAdmin })) {
     return admin;
   }
 
@@ -191,7 +192,7 @@ export async function assertLeagueMembershipAction(leagueId: string) {
 }
 
 export async function getLeagueCreationAccess(admin: AdminSession): Promise<LeagueCreationAccess> {
-  if (admin.isSuperAdmin) {
+  if (canAccessTournamentsProduct({ isSuperAdmin: admin.isSuperAdmin })) {
     return {
       canCreateLeague: true,
       reason: null
@@ -215,7 +216,7 @@ export async function getLeagueWriteAccess(
   admin: AdminSession,
   leagueId: string
 ): Promise<LeagueWriteAccess> {
-  if (admin.isSuperAdmin) {
+  if (canAccessTournamentsProduct({ isSuperAdmin: admin.isSuperAdmin })) {
     return {
       canWrite: true,
       reason: null,

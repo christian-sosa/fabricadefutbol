@@ -16,7 +16,7 @@ const sharedCoverage = {
     "src/lib/org.ts",
     "src/lib/errors.ts",
     "src/lib/queries/public.ts",
-    "src/lib/domain/billing-workflow.ts",
+    "src/lib/domain/tournament-billing-workflow.ts",
     "src/lib/domain/match-workflow.ts",
     "src/app/api/payments/mercadopago/webhook/route.ts",
     "src/components/admin/new-match-form.tsx",
@@ -45,7 +45,7 @@ const sharedCoverage = {
       branches: 70,
       statements: 80
     },
-    "src/lib/domain/billing-workflow.ts": {
+    "src/lib/domain/tournament-billing-workflow.ts": {
       lines: 80,
       functions: 80,
       branches: 70,

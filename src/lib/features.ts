@@ -1,6 +1,8 @@
 const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
 const FALSE_VALUES = new Set(["0", "false", "no", "off"]);
 
+export const TOURNAMENTS_PRODUCT_STAGE = "future-internal" as const;
+
 function parseBooleanFlag(value: string | undefined) {
   const normalized = value?.trim().toLowerCase();
   if (!normalized) return null;
@@ -14,4 +16,8 @@ export function shouldSkipTournamentCheckoutForDebug() {
   const override = parseBooleanFlag(process.env.SKIP_TOURNAMENT_CHECKOUT);
   if (override !== null) return override;
   return process.env.NODE_ENV === "development";
+}
+
+export function canAccessTournamentsProduct(params: { isSuperAdmin: boolean }) {
+  return TOURNAMENTS_PRODUCT_STAGE === "future-internal" && params.isSuperAdmin;
 }

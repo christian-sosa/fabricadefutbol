@@ -18,7 +18,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { getCaptainContext } from "@/lib/auth/captains";
-import { getCurrentUserIsSuperAdmin } from "@/lib/auth/super-admin";
+import { getCurrentUserCanAccessTournamentsProduct } from "@/lib/auth/super-admin";
 import { isCompetitionRosterFrozen } from "@/lib/auth/tournaments";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import { formatMatchDateTime } from "@/lib/match-datetime";
@@ -58,7 +58,7 @@ export default async function CaptainPage({
   }>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const canAccessTournaments = await getCurrentUserIsSuperAdmin();
+  const canAccessTournaments = await getCurrentUserCanAccessTournamentsProduct();
   if (!canAccessTournaments) notFound();
 
   const context = await getCaptainContext({

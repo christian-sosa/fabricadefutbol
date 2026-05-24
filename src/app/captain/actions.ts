@@ -9,7 +9,7 @@ import {
   assertCompetitionRosterEditableAction,
   getCompetitionPublicPathById
 } from "@/lib/auth/tournaments";
-import { getCurrentUserIsSuperAdmin } from "@/lib/auth/super-admin";
+import { getCurrentUserCanAccessTournamentsProduct } from "@/lib/auth/super-admin";
 import { MAX_TOURNAMENT_PLAYERS_PER_TEAM } from "@/lib/constants";
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { toUserMessage } from "@/lib/errors";
@@ -97,7 +97,7 @@ async function assertCaptainTeamPlayerCapacity(teamId: string) {
 }
 
 async function assertCanUseCaptainTournamentActions() {
-  const canAccessTournaments = await getCurrentUserIsSuperAdmin();
+  const canAccessTournaments = await getCurrentUserCanAccessTournamentsProduct();
   if (!canAccessTournaments) {
     throw new Error("Torneos esta disponible solo para el super admin por ahora.");
   }

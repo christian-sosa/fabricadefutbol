@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { getCurrentUserIsSuperAdmin } from "@/lib/auth/super-admin";
+import { getCurrentUserCanAccessTournamentsProduct } from "@/lib/auth/super-admin";
 
 export const metadata = {
   robots: {
@@ -10,7 +10,7 @@ export const metadata = {
 };
 
 export default async function TournamentsLayout({ children }: { children: React.ReactNode }) {
-  const canAccessTournaments = await getCurrentUserIsSuperAdmin();
+  const canAccessTournaments = await getCurrentUserCanAccessTournamentsProduct();
   if (!canAccessTournaments) notFound();
 
   return children;

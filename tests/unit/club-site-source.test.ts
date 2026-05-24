@@ -52,34 +52,35 @@ describe("club site productizado", () => {
 
   it("agrega una pestaña Sitio al admin de club para identidad, secciones y productos", () => {
     const adminPageSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "page.tsx");
+    const siteTabSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "site-tab.tsx");
 
-    expect(adminPageSource).toContain("updateClubSiteSettingsAction");
-    expect(adminPageSource).toContain("addClubProductAction");
-    expect(adminPageSource).toContain("updateClubProductAction");
-    expect(adminPageSource).toContain("deleteClubProductAction");
-    expect(adminPageSource).toContain('function SiteTab');
+    expect(siteTabSource).toContain("updateClubSiteSettingsAction");
+    expect(siteTabSource).toContain("addClubProductAction");
+    expect(siteTabSource).toContain("updateClubProductAction");
+    expect(siteTabSource).toContain("deleteClubProductAction");
+    expect(siteTabSource).toContain("export function SiteTab");
     expect(adminPageSource).toContain('{ key: "site", label: "Sitio" }');
-    expect(adminPageSource).toContain("details.siteSettings");
-    expect(adminPageSource).toContain("details.products");
-    expect(adminPageSource).toContain('name={`section:${key}`}');
-    expect(adminPageSource).toContain("Cargar nuevo producto");
-    expect(adminPageSource).toContain("Ver productos actuales");
-    expect(adminPageSource).toContain('name="productSearch"');
-    expect(adminPageSource).toContain('name="productStatus"');
-    expect(adminPageSource).toContain("Eliminar");
-    expect(adminPageSource).toContain("Sin stock");
+    expect(adminPageSource).toContain("<SiteTab");
+    expect(siteTabSource).toContain("details.siteSettings");
+    expect(siteTabSource).toContain("details.products");
+    expect(siteTabSource).toContain('name={`section:${key}`}');
+    expect(siteTabSource).toContain("Cargar nuevo producto");
+    expect(siteTabSource).toContain("Ver productos actuales");
+    expect(siteTabSource).toContain('name="productSearch"');
+    expect(siteTabSource).toContain('name="productStatus"');
+    expect(siteTabSource).toContain("Eliminar");
+    expect(siteTabSource).toContain("Sin stock");
   });
 
   it("mantiene Productos cargados oculto hasta abrir Ver productos actuales", () => {
-    const adminPageSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "page.tsx");
+    const siteTabSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "site-tab.tsx");
     const normalizePanelSource = sourceSlice(
-      adminPageSource,
-      "function normalizeSiteProductPanel",
-      "function normalizeSiteProductStatusFilter"
+      siteTabSource,
+      "export function normalizeSiteProductPanel",
+      "export function normalizeSiteProductStatusFilter"
     );
-    const siteTabSource = sourceSlice(adminPageSource, "function SiteTab", "function AdminsTab");
 
-    expect(adminPageSource).toContain('type SiteProductPanel = "products" | "new" | null');
+    expect(siteTabSource).toContain('type SiteProductPanel = "products" | "new" | null');
     expect(normalizePanelSource).toContain('panel === "products"');
     expect(normalizePanelSource).toContain('panel === "new"');
     expect(normalizePanelSource).toContain("return null");
@@ -88,19 +89,19 @@ describe("club site productizado", () => {
   });
 
   it("explica limites y campos comerciales del sitio en el admin", () => {
-    const adminPageSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "page.tsx");
+    const siteTabSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "site-tab.tsx");
     const actionsSource = readSource("src", "app", "admin", "(panel)", "clubs", "[clubId]", "actions.ts");
     const uploadInputSource = expectFile("src", "components", "admin", "optimized-club-site-image-input.tsx");
 
-    expect(adminPageSource).toContain("JPG, PNG o WEBP hasta");
-    expect(adminPageSource).toContain("OptimizedClubSiteImageInput");
-    expect(adminPageSource).toContain("MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB");
-    expect(adminPageSource).toContain("MAX_CLUB_PRODUCT_IMAGE_SIZE_MB");
-    expect(adminPageSource).toContain("Tiene que estar habilitado y publicado");
-    expect(adminPageSource).toContain("Orden en catalogo");
-    expect(adminPageSource).toContain("Descripcion publica");
-    expect(adminPageSource).toContain("Mensaje de consulta");
-    expect(adminPageSource).toContain('id="new-product-image"');
+    expect(siteTabSource).toContain("JPG, PNG o WEBP hasta");
+    expect(siteTabSource).toContain("OptimizedClubSiteImageInput");
+    expect(siteTabSource).toContain("MAX_CLUB_SITE_HERO_IMAGE_SIZE_MB");
+    expect(siteTabSource).toContain("MAX_CLUB_PRODUCT_IMAGE_SIZE_MB");
+    expect(siteTabSource).toContain("Tiene que estar habilitado y publicado");
+    expect(siteTabSource).toContain("Orden en catalogo");
+    expect(siteTabSource).toContain("Descripcion publica");
+    expect(siteTabSource).toContain("Mensaje de consulta");
+    expect(siteTabSource).toContain('id="new-product-image"');
     expect(actionsSource).toContain('const productImage = getRequiredFile(formData, "productImage");');
     expect(actionsSource).toContain("La foto principal no puede superar");
     expect(actionsSource).toContain("La imagen del producto no puede superar");
