@@ -2,6 +2,7 @@ import type { MatchStatus } from "@/types/domain";
 
 export function getAdminMatchListActions(status: MatchStatus) {
   return {
-    canLoadResult: status === "confirmed"
+    canLoadResult: status === "confirmed",
+    canCorrectResult: status === "finished"
   };
 }

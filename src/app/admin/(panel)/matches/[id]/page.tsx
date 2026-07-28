@@ -51,7 +51,9 @@ export default async function AdminMatchDetailPage({
   const confirmedOption = details.options.find((option) => option.is_confirmed) ?? null;
   const visibleOptions = confirmedOption ? [confirmedOption] : details.options;
   const publicMatchUrl = buildAbsolutePublicUrl(withOrgQuery(`/matches/${id}`, selectedOrganization.slug));
+  const resultHref = withOrgQuery(`/admin/matches/${id}/result`, selectedOrganization.slug);
   const teamLabels = resolveMatchTeamLabels(details.match);
+  const canManageResult = details.match.status === "confirmed" || details.match.status === "finished";
 
   return (
     <div className="space-y-4">
@@ -86,6 +88,27 @@ export default async function AdminMatchDetailPage({
           </div>
         </form>
       </Card>
+
+      {canManageResult ? (
+        <Card>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>{details.result ? "Resultado cargado" : "Resultado pendiente"}</CardTitle>
+              <CardDescription className="mt-1">
+                {details.result
+                  ? `${teamLabels.teamA} ${details.result.score_a} - ${details.result.score_b} ${teamLabels.teamB}`
+                  : "El partido ya tiene equipos confirmados y esta listo para cargar el resultado."}
+              </CardDescription>
+            </div>
+            <Link
+              className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+              href={resultHref}
+            >
+              {details.result ? "Modificar resultado" : "Cargar resultado"}
+            </Link>
+          </div>
+        </Card>
+      ) : null}
 
       {confirmedOption ? (
         <Card>

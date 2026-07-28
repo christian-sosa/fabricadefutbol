@@ -121,7 +121,7 @@ export default async function AdminMatchesPage({
               matches.map((match) => {
                 const editHref = withOrgQuery(`/admin/matches/${match.id}`, selectedOrganization.slug);
                 const resultHref = withOrgQuery(`/admin/matches/${match.id}/result`, selectedOrganization.slug);
-                const { canLoadResult } = getAdminMatchListActions(match.status);
+                const { canCorrectResult, canLoadResult } = getAdminMatchListActions(match.status);
 
                 return (
                   <div
@@ -147,6 +147,14 @@ export default async function AdminMatchesPage({
                               href={resultHref}
                             >
                               Cargar resultado
+                            </Link>
+                          ) : null}
+                          {canCorrectResult ? (
+                            <Link
+                              className="inline-flex items-center justify-center rounded-md border border-emerald-400/50 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/15"
+                              href={resultHref}
+                            >
+                              Corregir resultado
                             </Link>
                           ) : null}
                           <Link
