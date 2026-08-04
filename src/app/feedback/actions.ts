@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { sendFeedbackEmail, type FeedbackModule } from "@/lib/feedback-email";
 import { getCurrentUserCanAccessTournamentsProduct } from "@/lib/auth/super-admin";
+import { canAccessClubsProduct } from "@/lib/features";
 import type { PublicModuleContext } from "@/lib/org";
 import { normalizeEmail, withPublicQuery } from "@/lib/org";
 import { checkRateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
@@ -103,10 +104,15 @@ export async function submitFeedbackAction(
   defaultIntent: "club" | null,
   formData: FormData
 ) {
+  const clubsProductEnabled = canAccessClubsProduct();
+  const safeDefaultIntent = clubsProductEnabled ? defaultIntent : null;
   const canAccessTournaments = await getCurrentUserCanAccessTournamentsProduct();
   const submittedModule = normalizeFeedbackModule(formData.get("module"), defaultModule);
   const safeSubmittedModule =
-    submittedModule === "tournaments" && !canAccessTournaments ? "organizations" : submittedModule;
+    (submittedModule === "tournaments" && !canAccessTournaments) ||
+    (submittedModule === "clubs" && !clubsProductEnabled)
+      ? "organizations"
+      : submittedModule;
   const pageModule = toPageModule(safeSubmittedModule, defaultModule);
 
   const parsed = feedbackSchema.safeParse({
@@ -124,7 +130,7 @@ export async function submitFeedbackAction(
       buildFeedbackPath({
         organizationKey,
         module: pageModule,
-        intent: defaultIntent,
+        intent: safeDefaultIntent,
         error: parsed.error.issues[0]?.message ?? "No se pudo enviar tu mensaje."
       })
     );
@@ -135,7 +141,7 @@ export async function submitFeedbackAction(
       buildFeedbackPath({
         organizationKey,
         module: pageModule,
-        intent: defaultIntent,
+        intent: safeDefaultIntent,
         sent: true
       })
     );
@@ -155,7 +161,7 @@ export async function submitFeedbackAction(
       buildFeedbackPath({
         organizationKey,
         module: pageModule,
-        intent: defaultIntent,
+        intent: safeDefaultIntent,
         error: `Enviaste demasiados mensajes seguidos. Proba de nuevo en ${retryMinutes} minuto(s).`
       })
     );
@@ -166,7 +172,11 @@ export async function submitFeedbackAction(
       fullName: parsed.data.fullName,
       email: normalizeEmail(parsed.data.email),
       category: parsed.data.category,
-      module: parsed.data.module === "tournaments" && !canAccessTournaments ? "organizations" : parsed.data.module,
+      module:
+        (parsed.data.module === "tournaments" && !canAccessTournaments) ||
+        (parsed.data.module === "clubs" && !clubsProductEnabled)
+          ? "organizations"
+          : parsed.data.module,
       organization: parsed.data.organization?.trim() || null,
       message: parsed.data.message,
       submittedAtIso: new Date().toISOString(),
@@ -179,7 +189,7 @@ export async function submitFeedbackAction(
       buildFeedbackPath({
         organizationKey,
         module: pageModule,
-        intent: defaultIntent,
+        intent: safeDefaultIntent,
         error: buildFriendlyFeedbackErrorMessage(error)
       })
     );
@@ -189,7 +199,7 @@ export async function submitFeedbackAction(
     buildFeedbackPath({
       organizationKey,
       module: pageModule,
-      intent: defaultIntent,
+      intent: safeDefaultIntent,
       sent: true
     })
   );

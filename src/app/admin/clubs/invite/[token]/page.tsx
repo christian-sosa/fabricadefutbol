@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { acceptClubAdminInviteAction } from "@/app/admin/clubs/invite/[token]/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { buildAdminLoginPath } from "@/lib/auth/redirects";
+import { canAccessClubsProduct } from "@/lib/features";
 import { normalizeEmail } from "@/lib/org";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -24,6 +25,8 @@ export default async function ClubAdminInvitePage({
   params: Promise<{ token: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
+  if (!canAccessClubsProduct()) notFound();
+
   const { token } = await params;
   const resolvedSearchParams = await searchParams;
   const loginHref = buildAdminLoginPath(`/admin/clubs/invite/${token}`);

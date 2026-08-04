@@ -1,6 +1,6 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 
 import {
@@ -10,6 +10,7 @@ import {
 } from "@/lib/action-rate-limit";
 import { deriveDisplayName } from "@/lib/auth/profile";
 import { buildAdminLoginPath } from "@/lib/auth/redirects";
+import { canAccessClubsProduct } from "@/lib/features";
 import { normalizeEmail } from "@/lib/org";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -42,6 +43,8 @@ function buildClubAdminPanelHref(clubId: string) {
 }
 
 export async function acceptClubAdminInviteAction(formData: FormData) {
+  if (!canAccessClubsProduct()) notFound();
+
   const parsed = acceptClubAdminInviteSchema.safeParse({
     token: formData.get("token")
   });

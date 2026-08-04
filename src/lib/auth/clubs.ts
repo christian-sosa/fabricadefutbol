@@ -1,6 +1,7 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { assertAdminAction, requireAdminSession, type AdminSession } from "@/lib/auth/admin";
+import { assertCanAccessClubsProduct, canAccessClubsProduct } from "@/lib/features";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ClubStatus } from "@/lib/domain/clubs";
 
@@ -38,6 +39,8 @@ async function loadClubById(clubId: string) {
 }
 
 export async function getAdminClubs(admin: AdminSession): Promise<AdminClub[]> {
+  if (!canAccessClubsProduct()) return [];
+
   const supabase = await createSupabaseServerClient();
 
   if (admin.isSuperAdmin) {
@@ -79,6 +82,8 @@ export async function getAdminClubs(admin: AdminSession): Promise<AdminClub[]> {
 }
 
 async function assertClubMembership(clubId: string) {
+  assertCanAccessClubsProduct();
+
   const admin = await assertAdminAction();
 
   if (admin.isSuperAdmin) {
@@ -135,6 +140,8 @@ export async function getAdminClubContext(preferredClubKey?: string | null) {
 }
 
 export async function requireAdminClub(clubId: string) {
+  if (!canAccessClubsProduct()) notFound();
+
   await assertClubMembershipAction(clubId);
 
   const [admin, club] = await Promise.all([requireAdminSession(), loadClubById(clubId)]);

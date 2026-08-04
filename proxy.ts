@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { ACTIVE_ORG_COOKIE, ACTIVE_ORG_COOKIE_MAX_AGE } from "@/lib/active-org";
+import { canAccessClubsProduct } from "@/lib/features";
 import { getPublicAppUrl } from "@/lib/public-url";
 import { createSupabaseMiddlewareClient } from "@/lib/supabase/middleware";
 
@@ -57,6 +58,12 @@ function mapCustomDomainPathToClubPath(pathname: string, slug: string) {
   return null;
 }
 
+function isClubProductPath(pathname: string) {
+  return ["/clubs", "/admin/clubs", "/catalogo", "/equipo", "/historia"].some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
 async function resolveClubSiteRewrite(request: NextRequest, response: NextResponse) {
   const host = normalizeRequestHost(request);
   if (hostBelongsToMainApp(host)) return null;
@@ -96,12 +103,26 @@ async function resolveClubSiteRewrite(request: NextRequest, response: NextRespon
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAdminArea = pathname.startsWith("/admin");
+  const clubsProductEnabled = canAccessClubsProduct();
+
+  if (!clubsProductEnabled) {
+    const isDisabledCustomDomainPath =
+      !hostBelongsToMainApp(normalizeRequestHost(request)) &&
+      Boolean(mapCustomDomainPathToClubPath(pathname, "__disabled__"));
+
+    if (isClubProductPath(pathname) || isDisabledCustomDomainPath) {
+      return new NextResponse(null, { status: 404 });
+    }
+  }
+
   const response = NextResponse.next({ request });
   persistActiveOrgCookieIfPresent(request, response);
 
   if (!isAdminArea) {
-    const clubSiteRewrite = await resolveClubSiteRewrite(request, response);
-    if (clubSiteRewrite) return clubSiteRewrite;
+    if (clubsProductEnabled) {
+      const clubSiteRewrite = await resolveClubSiteRewrite(request, response);
+      if (clubSiteRewrite) return clubSiteRewrite;
+    }
     return response;
   }
 

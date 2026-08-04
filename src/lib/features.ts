@@ -2,6 +2,7 @@ const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
 const FALSE_VALUES = new Set(["0", "false", "no", "off"]);
 
 export const TOURNAMENTS_PRODUCT_STAGE = "future-internal" as const;
+export const CLUBS_PRODUCT_STAGE = "development-only" as const;
 
 function parseBooleanFlag(value: string | undefined) {
   const normalized = value?.trim().toLowerCase();
@@ -20,4 +21,14 @@ export function shouldSkipTournamentCheckoutForDebug() {
 
 export function canAccessTournamentsProduct(params: { isSuperAdmin: boolean }) {
   return TOURNAMENTS_PRODUCT_STAGE === "future-internal" && params.isSuperAdmin;
+}
+
+export function canAccessClubsProduct(environment = process.env.NODE_ENV) {
+  return CLUBS_PRODUCT_STAGE === "development-only" && environment !== "production";
+}
+
+export function assertCanAccessClubsProduct(environment = process.env.NODE_ENV) {
+  if (!canAccessClubsProduct(environment)) {
+    throw new Error("La gestion de clubes no esta disponible.");
+  }
 }

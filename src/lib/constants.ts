@@ -1,6 +1,6 @@
 ﻿import type { MatchModality, MatchStatus } from "@/types/domain";
 
-import { shouldSkipTournamentCheckoutForDebug } from "@/lib/features";
+import { canAccessClubsProduct, shouldSkipTournamentCheckoutForDebug } from "@/lib/features";
 
 export const MATCH_MODALITIES: MatchModality[] = ["5v5", "6v6", "7v7", "9v9", "11v11"];
 export const MATCH_STATUSES: MatchStatus[] = ["draft", "confirmed", "finished", "cancelled"];
@@ -102,7 +102,7 @@ export function formatMatchModality(modality: MatchModality) {
 export const PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
   { href: "/groups", label: "Grupos" },
-  { href: "/clubs", label: "Clubes" },
+  ...(canAccessClubsProduct() ? [{ href: "/clubs", label: "Clubes" }] : []),
   { href: "/ranking", label: "Ranking" },
   { href: "/matches", label: "Historial" },
   { href: "/upcoming", label: "Proximos" },
@@ -114,7 +114,7 @@ export const PUBLIC_NAV_ITEMS = [
 export const PRIMARY_PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
   { href: "/groups", label: "Grupos" },
-  { href: "/clubs", label: "Clubes" },
+  ...(canAccessClubsProduct() ? [{ href: "/clubs", label: "Clubes" }] : []),
   { href: "/guides", label: "Guías" },
   { href: "/feedback", label: "Contacto" },
   { href: "/help", label: "Ayuda" }

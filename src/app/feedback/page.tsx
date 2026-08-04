@@ -6,6 +6,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { canAccessClubsProduct } from "@/lib/features";
 import { withPublicQuery } from "@/lib/org";
 
 type FeedbackPageProps = {
@@ -21,7 +22,8 @@ type FeedbackPageProps = {
 export default async function FeedbackPage({ searchParams }: FeedbackPageProps) {
   const resolvedSearchParams = await searchParams;
   const organizationKey = resolvedSearchParams.org ?? null;
-  const isClubInquiry = resolvedSearchParams.intent === "club";
+  const clubsProductEnabled = canAccessClubsProduct();
+  const isClubInquiry = clubsProductEnabled && resolvedSearchParams.intent === "club";
   const currentModule = "organizations";
   const currentFeedbackModule = isClubInquiry ? "clubs" : currentModule;
   const submitAction = submitFeedbackAction.bind(
@@ -136,7 +138,7 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
               </label>
               <Select defaultValue={currentFeedbackModule} id="module" name="module">
                 <option value="organizations">Grupos</option>
-                <option value="clubs">Clubes / equipos</option>
+                {clubsProductEnabled ? <option value="clubs">Clubes / equipos</option> : null}
                 <option value="both">General</option>
               </Select>
             </div>

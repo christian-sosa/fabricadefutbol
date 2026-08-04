@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getTeamLogosBucket } from "@/lib/env";
+import { canAccessClubsProduct } from "@/lib/features";
 import { buildLeagueLogoPlaceholderSvg, LEAGUE_LOGO_PLACEHOLDER_CACHE_CONTROL } from "@/lib/league-logos";
 import {
   createSignedStorageRedirect,
@@ -24,6 +25,10 @@ export async function GET(
     params: Promise<{ id: string }>;
   }
 ) {
+  if (!canAccessClubsProduct()) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   const { id: clubId } = await context.params;
   const supabase = await createSupabaseServerClient();
   const { data: club, error } = await supabase

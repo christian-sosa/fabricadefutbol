@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { CLUB_PRODUCT_IMAGE_CACHE_CONTROL } from "@/lib/club-site-media";
 import { getClubSiteMediaBucket } from "@/lib/env";
+import { canAccessClubsProduct } from "@/lib/features";
 import {
   createSignedStorageRedirect,
   createStorageObjectStreamResponse
@@ -35,6 +36,10 @@ export async function GET(
     params: Promise<{ productId: string }>;
   }
 ) {
+  if (!canAccessClubsProduct()) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   const { productId } = await context.params;
   const supabase = await createSupabaseServerClient();
   const { data: product, error } = await supabase

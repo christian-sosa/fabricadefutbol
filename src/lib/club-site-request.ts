@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 
+import { canAccessClubsProduct } from "@/lib/features";
 import { getPublicAppUrl } from "@/lib/public-url";
 import {
   getPublicClubSiteByDomain,
@@ -31,6 +32,8 @@ export function hostBelongsToMainApp(host: string) {
 }
 
 export function isClubSiteStandaloneHost(host: string | null | undefined) {
+  if (!canAccessClubsProduct()) return false;
+
   const normalizedHost = normalizeRequestHost(host);
   return Boolean(normalizedHost && !hostBelongsToMainApp(normalizedHost));
 }
@@ -41,6 +44,10 @@ export async function resolveClubSiteFromRequestHost(): Promise<ClubSiteRequestR
   const isMainAppHost = hostBelongsToMainApp(host);
 
   if (isMainAppHost) {
+    return { host, isMainAppHost, data: null };
+  }
+
+  if (!canAccessClubsProduct()) {
     return { host, isMainAppHost, data: null };
   }
 

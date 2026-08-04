@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getTeamLogosBucket } from "@/lib/env";
+import { canAccessClubsProduct } from "@/lib/features";
 import {
   createSignedStorageRedirect,
   createStorageObjectStreamResponse
@@ -14,6 +15,10 @@ export async function GET(
     params: Promise<{ id: string }>;
   }
 ) {
+  if (!canAccessClubsProduct()) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   const { id: clubTeamId } = await context.params;
   const supabase = await createSupabaseServerClient();
   const { data: team, error } = await supabase

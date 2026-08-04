@@ -4,6 +4,7 @@ import { access, readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
 
 import { getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
+import { canAccessClubsProduct } from "@/lib/features";
 import {
   CONTENT_TYPE_BY_EXTENSION,
   getClubPlayerPhotoObjectPath,
@@ -125,26 +126,28 @@ export async function GET(
     }
   }
 
-  const { data: clubPlayer, error: clubPlayerError } = await supabase
-    .from("club_players")
-    .select("club_id, photo_path")
-    .eq("id", playerId)
-    .maybeSingle();
+  if (canAccessClubsProduct()) {
+    const { data: clubPlayer, error: clubPlayerError } = await supabase
+      .from("club_players")
+      .select("club_id, photo_path")
+      .eq("id", playerId)
+      .maybeSingle();
 
-  if (!clubPlayerError && clubPlayer?.club_id) {
-    const objectPaths = [
-      String(clubPlayer.photo_path ?? ""),
-      getClubPlayerPhotoObjectPath(schemaName, String(clubPlayer.club_id), playerId)
-    ].filter(Boolean);
+    if (!clubPlayerError && clubPlayer?.club_id) {
+      const objectPaths = [
+        String(clubPlayer.photo_path ?? ""),
+        getClubPlayerPhotoObjectPath(schemaName, String(clubPlayer.club_id), playerId)
+      ].filter(Boolean);
 
-    for (const objectPath of objectPaths) {
-      const photoResponse = await getStoragePhotoResponse({
-        supabase,
-        bucketName,
-        objectPath
-      });
+      for (const objectPath of objectPaths) {
+        const photoResponse = await getStoragePhotoResponse({
+          supabase,
+          bucketName,
+          objectPath
+        });
 
-      if (photoResponse) return photoResponse;
+        if (photoResponse) return photoResponse;
+      }
     }
   }
 

@@ -39,6 +39,7 @@ import {
   type ClubSiteSettingsRow
 } from "@/lib/domain/club-sites";
 import { isMissingSupabaseConfigurationError } from "@/lib/env";
+import { canAccessClubsProduct } from "@/lib/features";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -640,6 +641,8 @@ async function resolveAdminEmailsById(adminIds: string[]) {
 }
 
 export async function getAdminClubList() {
+  if (!canAccessClubsProduct()) return [];
+
   const admin = await requireAdminSession();
   return getAdminClubs(admin);
 }
@@ -762,6 +765,8 @@ async function loadClubPrivateData(clubId: string) {
 }
 
 export async function refreshClubPublicSnapshot(clubId: string) {
+  if (!canAccessClubsProduct()) return null;
+
   const privateData = await loadClubPrivateData(clubId);
   if (!privateData) return null;
 
@@ -792,6 +797,8 @@ export async function refreshClubPublicSnapshot(clubId: string) {
 }
 
 export async function getAdminClubDetails(clubId: string): Promise<AdminClubDetails | null> {
+  if (!canAccessClubsProduct()) return null;
+
   noStore();
   const privateData = await loadClubPrivateData(clubId);
   if (!privateData) return null;
@@ -871,6 +878,8 @@ export async function getAdminClubDetails(clubId: string): Promise<AdminClubDeta
 }
 
 export async function getPublicClubBySlug(slug: string) {
+  if (!canAccessClubsProduct()) return null;
+
   noStore();
   const supabase = await createSupabaseServerClient();
   const { data: club, error: clubError } = await supabase
@@ -897,6 +906,8 @@ export async function getPublicClubBySlug(slug: string) {
 }
 
 export async function getPublicClubSites(): Promise<PublicClubSiteListItem[]> {
+  if (!canAccessClubsProduct()) return [];
+
   noStore();
   let supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   try {
@@ -969,6 +980,8 @@ export async function getPublicClubSites(): Promise<PublicClubSiteListItem[]> {
 }
 
 export async function getPublicClubSiteBySlug(slug: string): Promise<PublicClubSiteDetails | null> {
+  if (!canAccessClubsProduct()) return null;
+
   noStore();
   let data: Awaited<ReturnType<typeof getPublicClubBySlug>>;
   try {
@@ -1005,6 +1018,8 @@ export async function getPublicClubSiteBySlug(slug: string): Promise<PublicClubS
 }
 
 export async function getPublicClubSiteByDomain(host: string): Promise<PublicClubSiteDetails | null> {
+  if (!canAccessClubsProduct()) return null;
+
   noStore();
   const normalizedHost = host.toLowerCase().replace(/^www\./, "").split(":")[0] ?? "";
   if (!normalizedHost) return null;
