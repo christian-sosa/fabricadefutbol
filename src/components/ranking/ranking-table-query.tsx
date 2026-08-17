@@ -6,14 +6,31 @@ import { Card } from "@/components/ui/card";
 import { PlayerPhotoModalTrigger } from "@/components/ui/player-photo-modal-trigger";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { useOrganizationStandingsQuery } from "@/lib/query/hooks";
-import { cn, formatPercent, formatRendimiento } from "@/lib/utils";
-import type { PlayerComputedStats } from "@/types/domain";
+import { cn, formatRendimiento } from "@/lib/utils";
+import type { PlayerComputedStats, PlayerRecentResult } from "@/types/domain";
 
 const PODIUM_RANK_STYLES: Record<number, string> = {
   1: "border-amber-300/70 bg-amber-400/20 text-amber-200",
   2: "border-slate-300/70 bg-slate-300/20 text-slate-100",
   3: "border-orange-300/70 bg-orange-400/20 text-orange-200"
 };
+
+const RECENT_RESULT_STYLES: Record<PlayerRecentResult, { label: string; className: string }> = {
+  V: {
+    label: "Victoria",
+    className: "border-emerald-300/80 bg-emerald-400 text-emerald-950"
+  },
+  E: {
+    label: "Empate",
+    className: "border-amber-200/80 bg-amber-300 text-amber-950"
+  },
+  D: {
+    label: "Derrota",
+    className: "border-rose-300/80 bg-rose-500 text-white"
+  }
+};
+
+const RECENT_RESULTS_LIMIT = 5;
 
 const STAT_CARDS = [
   {
@@ -45,16 +62,10 @@ const STAT_CARDS = [
     label: "MVP",
     value: (player: PlayerComputedStats) => player.mvpCount ?? 0,
     className: "text-amber-200"
-  },
-  {
-    key: "winRate",
-    label: "Efectividad",
-    value: (player: PlayerComputedStats) => formatPercent(player.winRate),
-    className: "text-emerald-300"
   }
 ] as const;
 
-type SortKey = "rank" | "player" | "rating" | "pj" | "pg" | "pe" | "pp" | "winRate" | "mvp";
+type SortKey = "rank" | "player" | "rating" | "pj" | "pg" | "pe" | "pp" | "mvp";
 type SortDirection = "asc" | "desc";
 
 const SORTABLE_COLUMNS: Array<{ key: SortKey; label: string }> = [
@@ -65,8 +76,7 @@ const SORTABLE_COLUMNS: Array<{ key: SortKey; label: string }> = [
   { key: "pg", label: "PG" },
   { key: "pe", label: "PE" },
   { key: "pp", label: "PP" },
-  { key: "mvp", label: "MVP" },
-  { key: "winRate", label: "Efectividad" }
+  { key: "mvp", label: "MVP" }
 ];
 
 type RankingTableQueryProps = {
@@ -95,8 +105,6 @@ function readSortableValue(player: PlayerComputedStats, sortKey: SortKey) {
       return player.draws;
     case "pp":
       return player.losses;
-    case "winRate":
-      return player.winRate;
     case "mvp":
       return player.mvpCount ?? 0;
   }
@@ -140,6 +148,48 @@ function SortLabel({
   );
 }
 
+function RecentResults({ results, className }: { results?: PlayerRecentResult[]; className?: string }) {
+  const recentResults = results?.slice(-RECENT_RESULTS_LIMIT) ?? [];
+  const emptySlots = RECENT_RESULTS_LIMIT - recentResults.length;
+  const readableResults = recentResults.length
+    ? recentResults.map((result) => RECENT_RESULT_STYLES[result].label.toLowerCase()).join(", ")
+    : "sin partidos jugados";
+
+  return (
+    <div
+      aria-label={`Últimos ${RECENT_RESULTS_LIMIT} partidos: ${readableResults}. El más reciente está a la derecha.`}
+      className={cn("flex items-center justify-end gap-1 sm:gap-1.5", className)}
+      role="img"
+    >
+      {Array.from({ length: emptySlots }, (_, index) => (
+        <span
+          aria-hidden="true"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-800/65 text-xs font-black text-slate-600"
+          key={`empty-${index}`}
+        >
+          –
+        </span>
+      ))}
+      {recentResults.map((result, index) => {
+        const resultStyle = RECENT_RESULT_STYLES[result];
+        return (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-xs font-black shadow-sm",
+              resultStyle.className
+            )}
+            key={`${result}-${index}`}
+            title={resultStyle.label}
+          >
+            {result}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 export function RankingTableQuery({ organizationId, initialPlayers, season = "current" }: RankingTableQueryProps) {
   const { data, isFetching } = useOrganizationStandingsQuery({
     organizationId,
@@ -174,7 +224,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
         </p>
       ) : null}
 
-      <div className="space-y-3 p-3 md:hidden">
+      <div className="space-y-3 p-3 lg:hidden">
         <div className="scrollbar-none flex gap-2 overflow-x-auto pb-1">
           {SORTABLE_COLUMNS.map((column) => {
             const isActive = sortKey === column.key;
@@ -197,65 +247,78 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
           })}
         </div>
 
-        {sortedPlayers.map((player) => {
-          const rank = player.currentRank;
-          return (
-            <article className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4" key={player.playerId}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-3">
-                  <span
-                    className={cn(
-                      "inline-flex min-w-[4.25rem] justify-center rounded-full border px-3 py-1.5 text-sm font-black",
-                      PODIUM_RANK_STYLES[rank] ?? "border-slate-700 bg-slate-800 text-slate-200"
-                    )}
-                  >
-                    #{rank}
-                  </span>
-                  <PlayerPhotoModalTrigger avatarSize="md" playerId={player.playerId} playerName={player.playerName} />
-                </div>
-                <div className="text-right">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Rendimiento</p>
-                  <p className="text-2xl font-black text-emerald-300">{formatRendimiento(player.currentRating)}</p>
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                {STAT_CARDS.map((item) => (
-                  <div
-                    className={cn(
-                      "rounded-xl border border-slate-800 bg-slate-900 px-3 py-2",
-                      item.key === "winRate" ? "col-span-2" : ""
-                    )}
-                    key={item.key}
-                  >
-                    <p className="text-[11px] uppercase tracking-wide text-slate-500">{item.label}</p>
-                    <p className={cn("mt-1 font-semibold", item.className)}>{item.value(player)}</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {sortedPlayers.map((player) => {
+            const rank = player.currentRank;
+            return (
+              <article className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5" key={player.playerId}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <span
+                      className={cn(
+                        "inline-flex min-w-[4.25rem] justify-center rounded-full border px-3 py-1.5 text-sm font-black",
+                        PODIUM_RANK_STYLES[rank] ?? "border-slate-700 bg-slate-800 text-slate-200"
+                      )}
+                    >
+                      #{rank}
+                    </span>
+                    <PlayerPhotoModalTrigger
+                      avatarSize="md"
+                      nameClassName="min-w-0 break-words leading-tight"
+                      playerId={player.playerId}
+                      playerName={player.playerName}
+                      triggerClassName="min-w-0 max-w-full"
+                    />
                   </div>
-                ))}
-              </div>
-            </article>
-          );
-        })}
+                  <div className="shrink-0 text-right">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Rendimiento</p>
+                    <p className="text-2xl font-black text-emerald-300">{formatRendimiento(player.currentRating)}</p>
+                  </div>
+                </div>
 
-        {!sortedPlayers.length ? (
-          <p className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-6 text-sm text-slate-400">
-            {isFetching ? "Cargando ranking..." : "No hay jugadores para este grupo."}
-          </p>
-        ) : null}
+                <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-300">Últimos 5</p>
+                    <p className="text-[10px] text-slate-500">Reciente a la derecha</p>
+                  </div>
+                  <RecentResults className="mt-2 justify-end" results={player.recentResults} />
+                </div>
+
+                <div className="mt-3 grid grid-cols-5 gap-1.5 text-center text-sm">
+                  {STAT_CARDS.map((item) => (
+                    <div
+                      className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 px-1.5 py-2"
+                      key={item.key}
+                    >
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500">{item.label}</p>
+                      <p className={cn("mt-1 font-semibold", item.className)}>{item.value(player)}</p>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            );
+          })}
+
+          {!sortedPlayers.length ? (
+            <p className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-6 text-sm text-slate-400 sm:col-span-2">
+              {isFetching ? "Cargando ranking..." : "No hay jugadores para este grupo."}
+            </p>
+          ) : null}
+        </div>
       </div>
 
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
         <Table className="table-fixed text-sm text-slate-100">
           <colgroup>
-            <col className="w-[8%]" />
-            <col className="w-[26%]" />
-            <col className="w-[14%]" />
             <col className="w-[7%]" />
+            <col className="w-[25%]" />
+            <col className="w-[13%]" />
+            <col className="w-[6%]" />
+            <col className="w-[6%]" />
+            <col className="w-[6%]" />
+            <col className="w-[6%]" />
             <col className="w-[7%]" />
-            <col className="w-[7%]" />
-            <col className="w-[7%]" />
-            <col className="w-[8%]" />
-            <col className="w-[16%]" />
+            <col className="w-[24%]" />
           </colgroup>
           <THead className="bg-slate-800/90 text-slate-300">
             <tr>
@@ -280,6 +343,9 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
                   </TH>
                 );
               })}
+              <TH className="px-2.5 py-3 text-center text-[11px] font-bold uppercase text-slate-400 lg:px-3">
+                Últimos 5
+              </TH>
             </tr>
           </THead>
           <TBody className="divide-slate-800">
@@ -308,8 +374,8 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
                   <TD className="px-2.5 py-4 text-base font-medium text-slate-300 lg:px-3">{player.draws}</TD>
                   <TD className="px-2.5 py-4 text-base font-medium text-slate-300 lg:px-3">{player.losses}</TD>
                   <TD className="px-2.5 py-4 text-base font-semibold text-amber-200 lg:px-3">{player.mvpCount ?? 0}</TD>
-                  <TD className="px-2.5 py-4 text-base font-semibold text-emerald-300 lg:px-3">
-                    {formatPercent(player.winRate)}
+                  <TD className="px-2.5 py-4 lg:px-3">
+                    <RecentResults className="justify-center" results={player.recentResults} />
                   </TD>
                 </tr>
               );

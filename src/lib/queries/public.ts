@@ -65,6 +65,17 @@ function normalizeSeasonFilter(value: SeasonFilterInput) {
   return normalized.length ? normalized : "current";
 }
 
+function hasRecentResultsData(standings: PlayerComputedStats[]) {
+  return standings.every((player) => {
+    const recentResults = (player as Partial<PlayerComputedStats>).recentResults;
+    return (
+      Array.isArray(recentResults) &&
+      recentResults.length <= 5 &&
+      recentResults.every((result) => result === "V" || result === "E" || result === "D")
+    );
+  });
+}
+
 function normalizeSeasonOption(row: Database["public"]["Tables"]["organization_seasons"]["Row"]): OrganizationSeasonOption {
   return {
     id: row.id,
@@ -594,7 +605,7 @@ export async function getPlayersWithStats(
   if (normalizeSeasonFilter(options?.season) === "all") {
     const supabase = await createSupabaseServerClient();
     const standings = await readOrganizationPublicStandingsSnapshot(supabase, organizationId);
-    if (standings) return standings;
+    if (standings && hasRecentResultsData(standings)) return standings;
   }
 
   return getPlayersWithStatsLive(organizationId, options);

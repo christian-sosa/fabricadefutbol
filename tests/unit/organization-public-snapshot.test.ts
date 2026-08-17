@@ -75,6 +75,7 @@ const payload: OrganizationPublicSnapshotPayload = {
       losses: 0,
       winRate: 100,
       streak: "2G",
+      recentResults: ["V", "V"],
       goals: 3,
       assists: 1
     }

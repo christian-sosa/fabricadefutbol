@@ -339,6 +339,7 @@ describe("resolvePublicOrganization", () => {
               losses: 0,
               winRate: 100,
               streak: "W1",
+              recentResults: ["V"],
               goals: 0,
               assists: 0
             },
@@ -354,6 +355,7 @@ describe("resolvePublicOrganization", () => {
               losses: 0,
               winRate: 0,
               streak: "-",
+              recentResults: [],
               goals: 0,
               assists: 0
             }
@@ -369,6 +371,78 @@ describe("resolvePublicOrganization", () => {
     const summary = await getHomeSummary(ORG_ID);
 
     expect(summary.topPlayers.map((player) => player.id)).toEqual(["player-lucas", "player-gonza"]);
+  });
+
+  it("recalcula el acumulado cuando el snapshot todavia no tiene la forma reciente", async () => {
+    const fake = createFakeSupabase({
+      organization_public_snapshots: [
+        {
+          organization_id: ORG_ID,
+          standings: [
+            {
+              playerId: "player-1",
+              playerName: "Arquero",
+              currentRating: 1200,
+              initialRank: 1,
+              currentRank: 1,
+              matchesPlayed: 99,
+              wins: 99,
+              draws: 0,
+              losses: 0,
+              winRate: 100,
+              streak: "W99",
+              goals: 0,
+              assists: 0
+            }
+          ]
+        }
+      ],
+      players: buildPlayers(),
+      matches: [
+        {
+          id: "match-live",
+          organization_id: ORG_ID,
+          scheduled_at: "2026-04-18T21:00:00.000Z",
+          modality: "5v5",
+          status: "finished"
+        }
+      ],
+      team_options: [
+        {
+          id: "option-live",
+          match_id: "match-live",
+          option_number: 1,
+          is_confirmed: true,
+          rating_sum_a: 20,
+          rating_sum_b: 20,
+          rating_diff: 0,
+          created_by: "admin-1"
+        }
+      ],
+      team_option_players: [
+        { team_option_id: "option-live", player_id: "player-1", team: "A" },
+        { team_option_id: "option-live", player_id: "player-2", team: "B" }
+      ],
+      match_result: [
+        {
+          match_id: "match-live",
+          score_a: 2,
+          score_b: 1,
+          winner_team: "A",
+          created_by: "admin-1"
+        }
+      ]
+    });
+
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    cookiesMock.mockResolvedValue({ get: () => undefined });
+
+    const standings = await getPlayersWithStats(ORG_ID, { season: "all" });
+
+    expect(standings.find((player) => player.playerId === "player-1")).toEqual(
+      expect.objectContaining({ matchesPlayed: 1, recentResults: ["V"] })
+    );
+    expect(standings.find((player) => player.playerId === "player-2")?.recentResults).toEqual(["D"]);
   });
 
   it("excluye confirmados vencidos usando la hora de cancha, no UTC del servidor", async () => {
@@ -656,9 +730,17 @@ describe("resolvePublicOrganization", () => {
     const history = await getMatchHistoryCardsPage(ORG_ID, { page: 1, pageSize: 10, season: "season-current" });
     const allHistory = await getMatchHistoryCardsPage(ORG_ID, { page: 1, pageSize: 10, season: "all" });
 
-    expect(standings.map((player) => [player.playerId, player.currentRating, player.matchesPlayed, player.mvpCount])).toEqual([
-      ["player-2", 1015, 1, 1],
-      ["player-1", 1000, 0, 1]
+    expect(
+      standings.map((player) => [
+        player.playerId,
+        player.currentRating,
+        player.matchesPlayed,
+        player.mvpCount,
+        player.recentResults
+      ])
+    ).toEqual([
+      ["player-2", 1015, 1, 1, ["V"]],
+      ["player-1", 1000, 0, 1, []]
     ]);
     expect(history.matches.map((match) => match.id)).toEqual(["match-current"]);
     expect(allHistory.matches.map((match) => match.id)).toEqual(["match-current", "match-old"]);

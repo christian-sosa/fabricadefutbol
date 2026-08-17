@@ -1,10 +1,11 @@
 import type { Database } from "@/types/database";
-import type { PlayerComputedStats, TeamSide } from "@/types/domain";
+import type { PlayerComputedStats, PlayerRecentResult, TeamSide } from "@/types/domain";
 
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
 type MatchResultRow = Database["public"]["Tables"]["match_result"]["Row"];
 type MatchPlayerStatsRow = Database["public"]["Tables"]["match_player_stats"]["Row"];
+type MatchOutcome = "W" | "D" | "L";
 
 export type MatchWithTeams = {
   match: MatchRow;
@@ -24,25 +25,25 @@ type InternalStats = {
   wins: number;
   draws: number;
   losses: number;
-  outcomes: ("W" | "D" | "L")[];
+  outcomes: MatchOutcome[];
   goals: number;
   assists: number;
   mvpCount: number;
 };
 
-function pushOutcome(stats: InternalStats, outcome: "W" | "D" | "L") {
+function pushOutcome(stats: InternalStats, outcome: MatchOutcome) {
   stats.outcomes.push(outcome);
   if (outcome === "W") stats.wins += 1;
   if (outcome === "D") stats.draws += 1;
   if (outcome === "L") stats.losses += 1;
 }
 
-function outcomeByTeam(winner: MatchResultRow["winner_team"], team: TeamSide): "W" | "D" | "L" {
+function outcomeByTeam(winner: MatchResultRow["winner_team"], team: TeamSide): MatchOutcome {
   if (winner === "DRAW") return "D";
   return winner === team ? "W" : "L";
 }
 
-function buildStreak(outcomes: ("W" | "D" | "L")[]) {
+function buildStreak(outcomes: MatchOutcome[]) {
   if (!outcomes.length) return "-";
   const last = outcomes[outcomes.length - 1];
   let count = 0;
@@ -51,6 +52,14 @@ function buildStreak(outcomes: ("W" | "D" | "L")[]) {
     count += 1;
   }
   return `${last}${count}`;
+}
+
+function buildRecentResults(outcomes: MatchOutcome[]): PlayerRecentResult[] {
+  return outcomes.slice(-5).map((outcome) => {
+    if (outcome === "W") return "V";
+    if (outcome === "D") return "E";
+    return "D";
+  });
 }
 
 export function calculatePlayerStats(params: {
@@ -150,6 +159,7 @@ export function calculatePlayerStats(params: {
         losses: stats.losses,
         winRate: Number(winRate.toFixed(2)),
         streak: buildStreak(stats.outcomes),
+        recentResults: buildRecentResults(stats.outcomes),
         goals: stats.goals,
         assists: stats.assists,
         mvpCount: stats.mvpCount

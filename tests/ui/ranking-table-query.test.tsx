@@ -25,6 +25,7 @@ const players: PlayerComputedStats[] = [
     losses: 2,
     winRate: 66.67,
     streak: "W1",
+    recentResults: ["V", "D", "V", "E", "V"],
     goals: 0,
     assists: 0,
     mvpCount: 1
@@ -41,6 +42,7 @@ const players: PlayerComputedStats[] = [
     losses: 0,
     winRate: 90,
     streak: "W1",
+    recentResults: ["V", "V", "E", "V"],
     goals: 0,
     assists: 0,
     mvpCount: 4
@@ -57,6 +59,7 @@ const players: PlayerComputedStats[] = [
     losses: 1,
     winRate: 85.71,
     streak: "W3",
+    recentResults: [],
     goals: 0,
     assists: 0,
     mvpCount: 2
@@ -87,11 +90,6 @@ describe("RankingTableQuery", () => {
     expect(getBodyRows()[0]).toHaveTextContent("#3");
     expect(getBodyRows()[0]).toHaveTextContent("Gabi Lamine");
 
-    await user.click(within(screen.getByRole("table")).getByRole("button", { name: /Efectividad/ }));
-
-    expect(getBodyRows()[0]).toHaveTextContent("#2");
-    expect(getBodyRows()[0]).toHaveTextContent("GonzaMastro");
-
     await user.click(within(screen.getByRole("table")).getByRole("button", { name: /MVP/ }));
 
     expect(getBodyRows()[0]).toHaveTextContent("#2");
@@ -99,6 +97,28 @@ describe("RankingTableQuery", () => {
     const firstRowCells = within(getBodyRows()[0]).getAllByRole("cell");
     expect(firstRowCells).toHaveLength(9);
     expect(firstRowCells.at(-2)).toHaveTextContent("4");
-    expect(firstRowCells.at(-1)).toHaveTextContent("90.0%");
+    expect(within(firstRowCells.at(-1) as HTMLElement).getByRole("img")).toHaveAccessibleName(
+      "Últimos 5 partidos: victoria, victoria, empate, victoria. El más reciente está a la derecha."
+    );
+  });
+
+  it("muestra la forma reciente con letras y colores sin depender de Efectividad", () => {
+    render(<RankingTableQuery initialPlayers={players} organizationId="org-1" />);
+
+    const firstRowCells = within(getBodyRows()[0]).getAllByRole("cell");
+    const formCell = firstRowCells.at(-1) as HTMLElement;
+    const resultBadges = within(formCell).getAllByTitle(/Victoria|Empate|Derrota/);
+
+    expect(resultBadges.map((badge) => badge.textContent)).toEqual(["V", "D", "V", "E", "V"]);
+    expect(within(formCell).getAllByTitle("Victoria")[0]).toHaveClass("bg-emerald-400");
+    expect(within(formCell).getByTitle("Empate")).toHaveClass("bg-amber-300");
+    expect(within(formCell).getByTitle("Derrota")).toHaveClass("bg-rose-500");
+    expect(screen.queryByRole("button", { name: /Efectividad/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Efectividad")).not.toBeInTheDocument();
+
+    const mobilePlayerName = screen.getAllByText("Gabi Lamine")[0];
+    const mobileCard = mobilePlayerName.closest("article");
+    expect(mobileCard).not.toBeNull();
+    expect(within(mobileCard as HTMLElement).getByRole("img", { name: /sin partidos jugados/ })).toBeInTheDocument();
   });
 });

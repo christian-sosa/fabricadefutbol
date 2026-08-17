@@ -3,6 +3,7 @@ export type MatchModality = "5v5" | "6v6" | "7v7" | "9v9" | "11v11";
 export type TeamSide = "A" | "B";
 export type WinnerTeam = TeamSide | "DRAW";
 export type ResultAssignmentTeam = TeamSide | "OUT";
+export type PlayerRecentResult = "V" | "E" | "D";
 export type TournamentStatus = "draft" | "active" | "finished" | "archived";
 export type TournamentMatchStatus = "draft" | "scheduled" | "played" | "cancelled";
 export type LeagueStatus = TournamentStatus;
@@ -46,6 +47,7 @@ export type PlayerComputedStats = {
   losses: number;
   winRate: number;
   streak: string;
+  recentResults: PlayerRecentResult[];
   goals: number;
   assists: number;
   mvpCount?: number;
