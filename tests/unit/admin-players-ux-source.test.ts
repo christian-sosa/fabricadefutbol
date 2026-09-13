@@ -12,7 +12,7 @@ describe("admin players UX source", () => {
     const source = readFileSync(playersPagePath, "utf8");
 
     expect(source).toContain('resolvedSearchParams.view === "new"');
-    expect(source).toContain('resolvedSearchParams.view === "edit"');
+    expect(source).toContain("const showEditRoster = !showCreateForm");
     expect(source).toContain('withOrgQuery("/admin/players?view=new"');
     expect(source).toContain('withOrgQuery("/admin/players?view=edit"');
     expect(source).toContain("Gestion de jugadores");

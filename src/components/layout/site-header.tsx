@@ -7,13 +7,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { PRIMARY_PUBLIC_NAV_ITEMS } from "@/lib/constants";
-import { parsePublicModule, withPublicQuery } from "@/lib/org";
+import { withPublicQuery } from "@/lib/org";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type SiteHeaderProps = {
   initialIsAuthenticated?: boolean;
-  initialCanAccessTournaments?: boolean;
 };
 
 const ORGANIZATION_SECTION_PATHS = ["/groups", "/organizations", "/ranking", "/matches", "/upcoming"] as const;
@@ -71,9 +70,6 @@ function MenuToggleIcon({ open }: { open: boolean }) {
   );
 }
 
-function filterTournamentNavItems<T extends { href: string }>(items: readonly T[], canAccessTournaments: boolean) {
-  return canAccessTournaments ? items : items.filter((item) => item.href !== "/tournaments");
-}
 
 function tryCreateSupabaseBrowserClient() {
   try {
@@ -84,7 +80,6 @@ function tryCreateSupabaseBrowserClient() {
 }
 
 export function SiteHeader({
-  initialCanAccessTournaments = false,
   initialIsAuthenticated = false
 }: SiteHeaderProps) {
   const pathname = usePathname();
@@ -92,15 +87,13 @@ export function SiteHeader({
   const router = useRouter();
   const searchParams = useSearchParams();
   const organizationKey = searchParams.get("org");
-  const requestedPublicModule = parsePublicModule(searchParams.get("module"));
   const searchKey = searchParams.toString();
   const [mounted, setMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(initialIsAuthenticated);
-  const [canAccessTournaments, setCanAccessTournaments] = useState(initialCanAccessTournaments);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentOrganizationName, setCurrentOrganizationName] = useState<string | null>(null);
 
-  const publicModule = canAccessTournaments ? requestedPublicModule : "organizations";
+  const publicModule = "organizations";
   const isOrganizationSection = isOrganizationSectionPath(safePathname);
   const shouldShowOrganizationSubnav = mounted && isOrganizationSection;
   const shouldShowMobileOrganizationSubnav = shouldShowOrganizationSubnav && !isActivePath(safePathname, "/groups");
@@ -109,7 +102,7 @@ export function SiteHeader({
     module: publicModule
   });
   const currentOrganizationLabel = currentOrganizationName ?? humanizeOrganizationKey(organizationKey);
-  const primaryNavItems = filterTournamentNavItems(PRIMARY_PUBLIC_NAV_ITEMS, canAccessTournaments);
+  const primaryNavItems = PRIMARY_PUBLIC_NAV_ITEMS;
 
   useEffect(() => {
     setMounted(true);
@@ -119,15 +112,11 @@ export function SiteHeader({
     setIsAuthenticated(initialIsAuthenticated);
   }, [initialIsAuthenticated]);
 
-  useEffect(() => {
-    setCanAccessTournaments(initialCanAccessTournaments);
-  }, [initialCanAccessTournaments]);
 
   useEffect(() => {
     const supabase = tryCreateSupabaseBrowserClient();
     if (!supabase) {
       setIsAuthenticated(false);
-      setCanAccessTournaments(false);
       return;
     }
 
@@ -137,19 +126,16 @@ export function SiteHeader({
       .then(({ data }) => {
         if (!active) return;
         setIsAuthenticated(Boolean(data.session?.user));
-        if (!data.session?.user) setCanAccessTournaments(false);
       })
       .catch(() => {
         if (!active) return;
         setIsAuthenticated(false);
-        setCanAccessTournaments(false);
       });
 
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(Boolean(session?.user));
-      if (!session?.user) setCanAccessTournaments(false);
     });
 
     return () => {
@@ -221,7 +207,6 @@ export function SiteHeader({
       await supabase.auth.signOut();
     }
     setIsAuthenticated(false);
-    setCanAccessTournaments(false);
     router.refresh();
   };
 

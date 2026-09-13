@@ -1,5 +1,4 @@
 import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
-import { canAccessTournamentsProduct } from "@/lib/features";
 import { normalizeEmail } from "@/lib/org";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -15,10 +14,4 @@ export async function getCurrentUserIsSuperAdmin() {
   } = await supabase.auth.getUser();
 
   return isSuperAdminEmail(user?.email);
-}
-
-export async function getCurrentUserCanAccessTournamentsProduct() {
-  return canAccessTournamentsProduct({
-    isSuperAdmin: await getCurrentUserIsSuperAdmin()
-  });
 }

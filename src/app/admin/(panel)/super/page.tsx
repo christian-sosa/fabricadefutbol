@@ -73,6 +73,20 @@ export default async function SuperAdminDashboardPage() {
         </Card>
       </section>
 
+      <Card>
+        <CardTitle>Activación y hábito de los grupos</CardTitle>
+        <CardDescription className="mt-2">Calculado desde partidos finalizados. Los porcentajes excluyen grupos que todavía no tuvieron tiempo de completar la ventana.</CardDescription>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div><p className="text-sm text-slate-400">Primer resultado en 7 días</p><p className="mt-1 text-2xl font-bold">{metrics.activation.activation7dPercent === null ? "—" : `${metrics.activation.activation7dPercent}%`}</p><p className="text-xs text-slate-400">{metrics.activation.activatedWithin7d} de {metrics.activation.eligibleForActivation7d} grupos con al menos 7 días</p></div>
+          <div><p className="text-sm text-slate-400">Segundo resultado en 14 días</p><p className="mt-1 text-2xl font-bold">{metrics.activation.repeat14dPercent === null ? "—" : `${metrics.activation.repeat14dPercent}%`}</p><p className="text-xs text-slate-400">{metrics.activation.repeatedWithin14d} de {metrics.activation.eligibleForRepeat14d} grupos elegibles desde su primer resultado</p></div>
+          <div><p className="text-sm text-slate-400">Volvieron a cargar un resultado</p><p className="mt-1 text-2xl font-bold">{metrics.activation.weeklyReturnPercent === null ? "—" : `${metrics.activation.weeklyReturnPercent}%`}</p><p className="text-xs text-slate-400">{metrics.activation.returnedGroups7d} de {metrics.activation.activeGroupsPrevious7d} grupos activos en los 7 días anteriores</p></div>
+          <div><p className="text-sm text-slate-400">Tiempo al primer resultado (mediana)</p><p className="mt-1 text-2xl font-bold">{metrics.activation.medianHoursToFirstResult === null ? "—" : `${metrics.activation.medianHoursToFirstResult} h`}</p></div>
+          <div><p className="text-sm text-slate-400">Grupos con resultados esta semana</p><p className="mt-1 text-2xl font-bold">{metrics.activation.activeGroupsLast7d}</p></div>
+          <div><p className="text-sm text-slate-400">Alcanzaron uno / dos resultados</p><p className="mt-1 text-2xl font-bold">{metrics.activation.groupsWithFirstResult} / {metrics.activation.groupsWithSecondResult}</p></div>
+        </div>
+        <p className="mt-4 text-xs text-slate-400">Retorno: últimos 7 días frente a los 7 días inmediatamente anteriores, como ventanas móviles. Se cuenta actividad de carga de resultados; cargar historial antiguo no demuestra que se haya jugado esa semana. Un guion indica que no hay grupos elegibles.</p>
+      </Card>
+
       <section className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardTitle>Metricas clave</CardTitle>
@@ -97,6 +111,17 @@ export default async function SuperAdminDashboardPage() {
           </div>
         </Card>
       </section>
+
+      <Card>
+        <CardTitle>WhatsApp → nuevos organizadores · últimos 30 días</CardTitle>
+        {metrics.referrals ? <>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <div><p className="text-sm text-slate-400">Sesiones referidas observadas</p><p className="mt-1 text-2xl font-bold">{metrics.referrals.referredSessions}</p></div>
+            <div><p className="text-sm text-slate-400">Registros con email atribuidos</p><p className="mt-1 text-2xl font-bold">{metrics.referrals.referredRegistrations}</p></div>
+            <div><p className="text-sm text-slate-400">Grupos creados atribuidos</p><p className="mt-1 text-2xl font-bold">{metrics.referrals.referredGroups}</p></div>
+          </div><p className="mt-4 text-xs text-slate-400">Última visita identificada con parámetros de WhatsApp, durante 30 días y en el mismo navegador. Una sesión no equivale a una persona. Los clics de compartir no prueban que el mensaje se haya enviado. Bloqueadores y cookies borradas reducen la medición; el alta de grupo también permite seguir usuarios que ingresan con Google.</p>
+        </> : <CardDescription className="mt-2">La medición de referencias no está disponible. Los datos de actividad de grupos siguen calculándose desde partidos.</CardDescription>}
+      </Card>
 
       <Card>
         <CardTitle>Top grupos (por cantidad de jugadores)</CardTitle>

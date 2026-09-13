@@ -5,7 +5,6 @@ import {
   parsePublicModule,
   resolvePublicModule,
   slugifyOrganizationName,
-  slugifyTournamentName,
   withOrgQuery,
   withPublicQuery
 } from "@/lib/org";
@@ -14,22 +13,22 @@ describe("org helpers", () => {
   it("agrega org al query string sin romper params existentes", () => {
     expect(withOrgQuery("/ranking", "liga-a")).toBe("/ranking?org=liga-a");
     expect(withOrgQuery("/matches?page=2", "liga a")).toBe("/matches?page=2&org=liga%20a");
-    expect(withOrgQuery("/tournaments", null)).toBe("/tournaments");
+    expect(withOrgQuery("/groups", null)).toBe("/groups");
   });
 
   it("reconoce y resuelve el contexto publico del modulo", () => {
     expect(parsePublicModule("organizations")).toBe("organizations");
     expect(parsePublicModule("groups")).toBe("organizations");
-    expect(parsePublicModule("tournaments")).toBe("tournaments");
+    expect(parsePublicModule("tournaments")).toBeNull();
     expect(parsePublicModule("otra-cosa")).toBeNull();
     expect(parsePublicModule(undefined)).toBeNull();
-    expect(resolvePublicModule("tournaments")).toBe("tournaments");
+    expect(resolvePublicModule("tournaments")).toBe("organizations");
     expect(resolvePublicModule(null)).toBe("organizations");
   });
 
   it("combina org y modulo en un query string publico", () => {
-    expect(withPublicQuery("/help", { organizationKey: "liga a", module: "tournaments" })).toBe(
-      "/help?org=liga%20a&module=tournaments"
+    expect(withPublicQuery("/help", { organizationKey: "liga a", module: "organizations" })).toBe(
+      "/help?org=liga%20a&module=groups"
     );
     expect(withPublicQuery("/pricing?from=home", { module: "organizations" })).toBe(
       "/pricing?from=home&module=groups"
@@ -46,9 +45,5 @@ describe("org helpers", () => {
     expect(slugifyOrganizationName("Club Atletico San Martin y Compania Limitada")).toBe(
       "club-atletico-san-martin-y-compania-limitada"
     );
-  });
-
-  it("slugifica torneos reutilizando la misma regla base", () => {
-    expect(slugifyTournamentName("Torneo Apertura 2026 / Zona Norte")).toBe("torneo-apertura-2026-zona-norte");
   });
 });

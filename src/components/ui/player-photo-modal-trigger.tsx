@@ -9,6 +9,8 @@ import { getPlayerPhotoSrc, PlayerAvatar } from "@/components/ui/player-avatar";
 
 type PlayerPhotoModalTriggerProps = {
   playerId?: string;
+  hasPhoto?: boolean;
+  photoUpdatedAt?: string | null;
   playerName: string;
   triggerClassName?: string;
   nameClassName?: string;
@@ -17,6 +19,8 @@ type PlayerPhotoModalTriggerProps = {
 
 export function PlayerPhotoModalTrigger({
   playerId,
+  hasPhoto,
+  photoUpdatedAt,
   playerName,
   triggerClassName,
   nameClassName,
@@ -24,7 +28,7 @@ export function PlayerPhotoModalTrigger({
 }: PlayerPhotoModalTriggerProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const imageSrc = getPlayerPhotoSrc(playerId);
+  const imageSrc = getPlayerPhotoSrc(playerId, hasPhoto, photoUpdatedAt);
 
   useEffect(() => {
     setMounted(true);
@@ -87,7 +91,7 @@ export function PlayerPhotoModalTrigger({
         onClick={() => setOpen(true)}
         type="button"
       >
-        <PlayerAvatar name={playerName} playerId={playerId} size={avatarSize} />
+        <PlayerAvatar hasPhoto={hasPhoto} name={playerName} photoUpdatedAt={photoUpdatedAt} playerId={playerId} size={avatarSize} />
         <span className={cn("font-semibold text-emerald-300 transition hover:text-emerald-200 hover:underline", nameClassName)}>
           {playerName}
         </span>

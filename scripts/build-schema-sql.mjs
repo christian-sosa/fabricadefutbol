@@ -16,10 +16,14 @@ if (!/^[a-z_][a-z0-9_]*$/i.test(schemaName)) {
 const root = process.cwd();
 const schemaSqlPath = path.join(root, "supabase", "schema.sql");
 const policiesSqlPath = path.join(root, "supabase", "policies.sql");
+const matchWorkflowSqlPath = path.join(root, "supabase", "group-match-workflow.sql");
 const outputDir = path.join(root, "supabase", "generated");
 
 function replacePublicSchema(sql, targetSchema) {
   return sql
+    .replace(/\bpublic_private\b/g, `${targetSchema}_private`)
+    .replace(/\bcreate schema if not exists public\b/gi, `create schema if not exists ${targetSchema}`)
+    .replace(/'public\//g, `'${targetSchema}/`)
     .replace(/set search_path = public\b/g, `set search_path = ${targetSchema}, public`)
     .replace(/\bgrant usage on schema public\b/g, `grant usage on schema ${targetSchema}`)
     .replace(/\bpublic\./g, `${targetSchema}.`)
@@ -27,7 +31,7 @@ function replacePublicSchema(sql, targetSchema) {
 }
 
 function splitStoragePolicies(sql) {
-  const marker = "create or replace function public.can_manage_player_photo_object";
+  const marker = "-- STORAGE POLICIES (GLOBAL)";
   const markerIndex = sql.indexOf(marker);
   if (markerIndex < 0) {
     return { core: sql, storage: "" };
@@ -39,13 +43,14 @@ function splitStoragePolicies(sql) {
 }
 
 async function main() {
-  const [schemaSqlRaw, policiesSqlRaw] = await Promise.all([
+  const [schemaSqlRaw, policiesSqlRaw, matchWorkflowSqlRaw] = await Promise.all([
     readFile(schemaSqlPath, "utf8"),
-    readFile(policiesSqlPath, "utf8")
+    readFile(policiesSqlPath, "utf8"),
+    readFile(matchWorkflowSqlPath, "utf8")
   ]);
 
   const { core: policiesCoreRaw, storage: storagePoliciesRaw } = splitStoragePolicies(policiesSqlRaw);
-  const transformedSchema = replacePublicSchema(schemaSqlRaw, schemaName);
+  const transformedSchema = replacePublicSchema(`${schemaSqlRaw}\n${matchWorkflowSqlRaw}`, schemaName);
   const transformedPolicies = replacePublicSchema(policiesCoreRaw, schemaName);
 
   await mkdir(outputDir, { recursive: true });

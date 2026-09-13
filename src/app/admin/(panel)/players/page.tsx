@@ -19,6 +19,7 @@ import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth
 import { DEFAULT_SKILL_LEVEL, formatSkillLevelLabel, SKILL_LEVEL_OPTIONS } from "@/lib/domain/skill-level";
 import { getAdminPlayers } from "@/lib/queries/admin";
 import { withOrgQuery } from "@/lib/org";
+import { BulkCreatePlayersForm } from "./bulk-create-form";
 
 const primaryActionLinkClass =
   "inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110";
@@ -47,8 +48,8 @@ export default async function AdminPlayersPage({
   const success = resolvedSearchParams.success;
   const formRenderKey = `${selectedOrganization.id}:${resolvedSearchParams.refresh ?? "base"}`;
   const bulkFormId = `bulk-players-form-${selectedOrganization.id}`;
-  const showCreateForm = resolvedSearchParams.view === "new";
-  const showEditRoster = resolvedSearchParams.view === "edit";
+  const showCreateForm = resolvedSearchParams.view === "new" || players.length === 0;
+  const showEditRoster = !showCreateForm;
   const createHref = withOrgQuery("/admin/players?view=new", selectedOrganization.slug);
   const editHref = withOrgQuery("/admin/players?view=edit", selectedOrganization.slug);
 
@@ -80,13 +81,21 @@ export default async function AdminPlayersPage({
 
       {showCreateForm ? (
         <Card>
+          <CardTitle>Cargá el plantel de una vez</CardTitle>
+          <CardDescription className="mt-2">Pegá la lista que ya usás para organizar el partido.</CardDescription>
+          <BulkCreatePlayersForm organizationId={selectedOrganization.id} />
+        </Card>
+      ) : null}
+
+      {showCreateForm ? (
+        <Card>
           <CardTitle>Alta de jugador</CardTitle>
           <CardDescription>
             Carga jugadores nuevos para el grupo seleccionado. El nivel manual se usa como base para ordenar la planilla.
           </CardDescription>
           <form action={createPlayerAction} className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_220px_1.2fr_auto] lg:items-start">
             <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-            <Input name="fullName" placeholder="Nombre completo" required />
+            <Input aria-label="Nombre completo del jugador" name="fullName" placeholder="Nombre completo" required />
             <Select aria-label="Nivel de habilidad" defaultValue={String(DEFAULT_SKILL_LEVEL)} name="skillLevel" required>
               {SKILL_LEVEL_OPTIONS.map((level) => (
                 <option key={level} value={level}>
@@ -132,8 +141,8 @@ export default async function AdminPlayersPage({
                 <input form={bulkFormId} name="playerId" type="hidden" value={player.id} />
                 <div className="min-w-0 space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
-                    <Input className="min-w-0" defaultValue={player.full_name} form={bulkFormId} name="fullName" required />
+                    <PlayerAvatar hasPhoto={Boolean(player.photo_path)} name={player.full_name} photoUpdatedAt={player.photo_updated_at} playerId={player.id} size="sm" />
+                    <Input aria-label={`Nombre de ${player.full_name}`} className="min-w-0" defaultValue={player.full_name} form={bulkFormId} name="fullName" required />
                   </div>
                   <p className="text-xs text-slate-400">
                     Creado {new Date(player.created_at).toLocaleDateString("es-AR")}

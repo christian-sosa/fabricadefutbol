@@ -2,16 +2,15 @@ export const GROWTH_EVENT_QUERY_PARAM = "ff_event";
 export const GROWTH_EVENT_SOURCE_QUERY_PARAM = "ff_source";
 
 export const GROWTH_EVENTS = {
-  billingStarted: "billing_started",
   ctaClicked: "cta_clicked",
   groupCreated: "group_created",
   groupShared: "group_shared",
   matchCreated: "match_created",
   matchShared: "match_shared",
-  paymentReturned: "payment_returned",
   playersPageOpened: "players_page_opened",
   rankingShared: "ranking_shared",
-  signupStarted: "signup_started"
+  signupStarted: "signup_started",
+  referralVisit: "referral_visit"
 } as const;
 
 export type GrowthEventName = (typeof GROWTH_EVENTS)[keyof typeof GROWTH_EVENTS];

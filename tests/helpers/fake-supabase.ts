@@ -7,40 +7,7 @@ type TableName =
   | "organization_audit_events"
   | "organization_seasons"
   | "organization_season_player_ratings"
-  | "leagues"
-  | "league_admins"
-  | "league_admin_invites"
-  | "league_billing_subscriptions"
-  | "league_billing_payments"
-  | "league_teams"
-  | "competitions"
-  | "competition_teams"
-  | "competition_team_captains"
-  | "competition_captain_invites"
-  | "competition_team_players"
   | "player_photo_upload_events"
-  | "competition_rounds"
-  | "competition_byes"
-  | "competition_matches"
-  | "competition_match_results"
-  | "competition_match_player_stats"
-  | "clubs"
-  | "club_admins"
-  | "club_admin_invites"
-  | "club_competitions"
-  | "club_players"
-  | "club_teams"
-  | "club_team_players"
-  | "club_callups"
-  | "club_callup_players"
-  | "club_callup_guests"
-  | "club_matches"
-  | "club_match_lineups"
-  | "club_match_payments"
-  | "club_match_player_stats"
-  | "club_public_snapshots"
-  | "club_site_settings"
-  | "club_products"
   | "players"
   | "matches"
   | "match_players"
@@ -91,40 +58,7 @@ function createEmptyDatabase(): FakeDatabase {
     organization_audit_events: [],
     organization_seasons: [],
     organization_season_player_ratings: [],
-    leagues: [],
-    league_admins: [],
-    league_admin_invites: [],
-    league_billing_subscriptions: [],
-    league_billing_payments: [],
-    league_teams: [],
-    competitions: [],
-    competition_teams: [],
-    competition_team_captains: [],
-    competition_captain_invites: [],
-    competition_team_players: [],
     player_photo_upload_events: [],
-    competition_rounds: [],
-    competition_byes: [],
-    competition_matches: [],
-    competition_match_results: [],
-    competition_match_player_stats: [],
-    clubs: [],
-    club_admins: [],
-    club_admin_invites: [],
-    club_competitions: [],
-    club_players: [],
-    club_teams: [],
-    club_team_players: [],
-    club_callups: [],
-    club_callup_players: [],
-    club_callup_guests: [],
-    club_matches: [],
-    club_match_lineups: [],
-    club_match_payments: [],
-    club_match_player_stats: [],
-    club_public_snapshots: [],
-    club_site_settings: [],
-    club_products: [],
     players: [],
     matches: [],
     match_players: [],
@@ -168,8 +102,6 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!normalized.source) normalized.source = "server";
       if (!("admin_id" in normalized)) normalized.admin_id = null;
       if (!("organization_id" in normalized)) normalized.organization_id = null;
-      if (!("club_id" in normalized)) normalized.club_id = null;
-      if (!("league_id" in normalized)) normalized.league_id = null;
       if (!("entity_type" in normalized)) normalized.entity_type = null;
       if (!("entity_id" in normalized)) normalized.entity_id = null;
       if (!("path" in normalized)) normalized.path = null;
@@ -195,261 +127,7 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!("current_rating" in normalized)) normalized.current_rating = 1000;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
-    case "club_site_settings":
-      if (!("enabled" in normalized)) normalized.enabled = false;
-      if (!("published" in normalized)) normalized.published = false;
-      if (!("domain" in normalized)) normalized.domain = null;
-      if (!("hero_image_path" in normalized)) normalized.hero_image_path = null;
-      if (!("primary_color" in normalized)) normalized.primary_color = "#ff9900";
-      if (!("secondary_color" in normalized)) normalized.secondary_color = "#0a0908";
-      if (!("accent_color" in normalized)) normalized.accent_color = "#25D366";
-      if (!("font_family" in normalized)) normalized.font_family = "system";
-      if (!("whatsapp_url_or_phone" in normalized)) normalized.whatsapp_url_or_phone = null;
-      if (!("instagram_url" in normalized)) normalized.instagram_url = null;
-      if (!("section_visibility" in normalized)) normalized.section_visibility = {};
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "club_products":
-      if (!("description" in normalized)) normalized.description = null;
-      if (!("category" in normalized)) normalized.category = null;
-      if (!("image_path" in normalized)) normalized.image_path = null;
-      if (!("price_label" in normalized)) normalized.price_label = null;
-      if (!("status" in normalized)) normalized.status = "available";
-      if (!("visible" in normalized)) normalized.visible = true;
-      if (!("sort_order" in normalized)) normalized.sort_order = 0;
-      if (!("contact_channel" in normalized)) normalized.contact_channel = "whatsapp";
-      if (!("contact_url" in normalized)) normalized.contact_url = null;
-      if (!("contact_message" in normalized)) normalized.contact_message = null;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "leagues":
-      if (!("description" in normalized)) normalized.description = null;
-      if (!("logo_path" in normalized)) normalized.logo_path = null;
-      if (!("photo_path" in normalized)) normalized.photo_path = null;
-      if (!("venue_name" in normalized)) normalized.venue_name = null;
-      if (!("location_notes" in normalized)) normalized.location_notes = null;
-      if (!("is_public" in normalized)) normalized.is_public = true;
-      if (!normalized.status) normalized.status = "draft";
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "league_admins":
-      if (!normalized.role) normalized.role = "editor";
-      if (!("created_by" in normalized)) normalized.created_by = null;
-      break;
-    case "league_admin_invites":
-      if (!normalized.invite_token) normalized.invite_token = nextId();
-      if (!normalized.status) normalized.status = "pending";
-      if (!("accepted_by" in normalized)) normalized.accepted_by = null;
-      if (!("accepted_at" in normalized)) normalized.accepted_at = null;
-      if (!normalized.expires_at) {
-        normalized.expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
-      }
-      break;
-    case "league_billing_subscriptions":
-      if (!normalized.status) normalized.status = "active";
-      if (!("current_period_start" in normalized)) normalized.current_period_start = null;
-      if (!("current_period_end" in normalized)) normalized.current_period_end = null;
-      if (!("last_payment_at" in normalized)) normalized.last_payment_at = null;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "league_billing_payments":
-      if (!normalized.status) normalized.status = "pending";
-      if (!normalized.purpose) normalized.purpose = "league_creation";
-      if (!("approved_at" in normalized)) normalized.approved_at = null;
-      if (!("period_start" in normalized)) normalized.period_start = null;
-      if (!("period_end" in normalized)) normalized.period_end = null;
-      if (!("subscription_applied_at" in normalized)) normalized.subscription_applied_at = null;
-      if (!("created_league_id" in normalized)) normalized.created_league_id = null;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "league_teams":
-      if (!("short_name" in normalized)) normalized.short_name = null;
-      if (!("logo_path" in normalized)) normalized.logo_path = null;
-      if (!("notes" in normalized)) normalized.notes = null;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "competitions":
-      if (!("description" in normalized)) normalized.description = null;
-      if (!("venue_override" in normalized)) normalized.venue_override = null;
-      if (!("type" in normalized)) normalized.type = "league";
-      if (!("coverage_mode" in normalized)) normalized.coverage_mode = "full_stats";
-      if (!("playoff_size" in normalized)) normalized.playoff_size = null;
-      if (!("is_public" in normalized)) normalized.is_public = true;
-      if (!normalized.status) normalized.status = "draft";
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "competition_teams":
-      if (!("short_name" in normalized)) normalized.short_name = null;
-      if (!("logo_path" in normalized)) normalized.logo_path = null;
-      if (!("notes" in normalized)) normalized.notes = null;
-      break;
-    case "competition_team_captains":
-      if (!("created_by" in normalized)) normalized.created_by = null;
-      break;
-    case "competition_captain_invites":
-      if (!normalized.invite_token) normalized.invite_token = nextId();
-      if (!normalized.expires_at) {
-        normalized.expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
-      }
-      break;
-    case "competition_team_players":
-      if (!("shirt_number" in normalized)) normalized.shirt_number = null;
-      if (!("position" in normalized)) normalized.position = null;
-      if (!("active" in normalized)) normalized.active = true;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
     case "player_photo_upload_events":
-      break;
-    case "competition_rounds":
-      if (!("phase" in normalized)) normalized.phase = "league";
-      if (!("stage_label" in normalized)) normalized.stage_label = normalized.name ?? null;
-      if (!("starts_at" in normalized)) normalized.starts_at = null;
-      if (!("ends_at" in normalized)) normalized.ends_at = null;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "competition_byes":
-      if (!("phase" in normalized)) normalized.phase = "league";
-      if (!("kind" in normalized)) normalized.kind = "free_round";
-      if (!("note" in normalized)) normalized.note = null;
-      break;
-    case "competition_matches":
-      if (!("round_id" in normalized)) normalized.round_id = null;
-      if (!("phase" in normalized)) normalized.phase = "league";
-      if (!("stage_label" in normalized)) normalized.stage_label = null;
-      if (!("scheduled_at" in normalized)) normalized.scheduled_at = null;
-      if (!("venue" in normalized)) normalized.venue = null;
-      if (!normalized.status) normalized.status = "draft";
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "competition_match_results":
-      if (!("penalty_home_score" in normalized)) normalized.penalty_home_score = null;
-      if (!("penalty_away_score" in normalized)) normalized.penalty_away_score = null;
-      if (!("winner_team_id" in normalized)) normalized.winner_team_id = null;
-      if (!("mvp_player_id" in normalized)) normalized.mvp_player_id = null;
-      if (!("mvp_player_name" in normalized)) normalized.mvp_player_name = null;
-      if (!("notes" in normalized)) normalized.notes = null;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "competition_match_player_stats":
-      if (!("player_id" in normalized)) normalized.player_id = null;
-      if (!("goals" in normalized)) normalized.goals = 0;
-      if (!("yellow_cards" in normalized)) normalized.yellow_cards = 0;
-      if (!("red_cards" in normalized)) normalized.red_cards = 0;
-      if (!("is_mvp" in normalized)) normalized.is_mvp = false;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "clubs":
-      if (!("description" in normalized)) normalized.description = null;
-      if (!("home_venue" in normalized)) normalized.home_venue = null;
-      if (!("is_public" in normalized)) normalized.is_public = true;
-      if (!normalized.status) normalized.status = "active";
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "club_admins":
-      if (!("created_by" in normalized)) normalized.created_by = null;
-      break;
-    case "club_admin_invites":
-      if (!normalized.invite_token) normalized.invite_token = nextId();
-      if (!normalized.status) normalized.status = "pending";
-      if (!("accepted_by" in normalized)) normalized.accepted_by = null;
-      if (!("accepted_at" in normalized)) normalized.accepted_at = null;
-      if (!normalized.expires_at) {
-        normalized.expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
-      }
-      break;
-    case "club_competitions":
-      if (!("notes" in normalized)) normalized.notes = null;
-      if (!("active" in normalized)) normalized.active = true;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "club_players":
-      if (!("nickname" in normalized)) normalized.nickname = null;
-      if (!("position" in normalized)) normalized.position = null;
-      if (!("shirt_number" in normalized)) normalized.shirt_number = null;
-      if (!("photo_path" in normalized)) normalized.photo_path = null;
-      if (!("notes" in normalized)) normalized.notes = null;
-      if (!("active" in normalized)) normalized.active = true;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "club_teams":
-      if (!("short_name" in normalized)) normalized.short_name = null;
-      if (!("logo_path" in normalized)) normalized.logo_path = null;
-      if (!("modality" in normalized)) normalized.modality = "11v11";
-      if (!("notes" in normalized)) normalized.notes = null;
-      if (!("active" in normalized)) normalized.active = true;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "club_callups":
-      if (!("opponent_name" in normalized)) normalized.opponent_name = null;
-      if (!("venue" in normalized)) normalized.venue = null;
-      if (!("status" in normalized)) normalized.status = "draft";
-      if (!("ideal_player_count" in normalized)) normalized.ideal_player_count = 14;
-      if (!("max_player_count" in normalized)) normalized.max_player_count = 16;
-      if (!("target_payment_count" in normalized)) normalized.target_payment_count = 14;
-      if (!("full_payment_cents" in normalized)) normalized.full_payment_cents = 2500000;
-      if (!("field_cost_cents" in normalized)) normalized.field_cost_cents = 0;
-      if (!("notes" in normalized)) normalized.notes = null;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "club_callup_players":
-      if (!("status" in normalized)) normalized.status = "confirmed";
-      if (!("expected_cents" in normalized)) normalized.expected_cents = null;
-      if (!("notes" in normalized)) normalized.notes = null;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "club_callup_guests":
-      if (!("position" in normalized)) normalized.position = null;
-      if (!("status" in normalized)) normalized.status = "confirmed";
-      if (!("expected_cents" in normalized)) normalized.expected_cents = null;
-      if (!("notes" in normalized)) normalized.notes = null;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "club_matches":
-      if (!("club_competition_id" in normalized)) normalized.club_competition_id = null;
-      if (!("modality" in normalized)) normalized.modality = "11v11";
-      if (!("field_cost_cents" in normalized)) normalized.field_cost_cents = 0;
-      if (!("field_cost_currency" in normalized)) normalized.field_cost_currency = "ARS";
-      if (!("venue" in normalized)) normalized.venue = null;
-      if (!("notes" in normalized)) normalized.notes = null;
-      if (!normalized.status) normalized.status = "played";
-      if (!("goals_for" in normalized)) normalized.goals_for = 0;
-      if (!("goals_against" in normalized)) normalized.goals_against = 0;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "club_match_lineups":
-      if (!("club_player_id" in normalized)) normalized.club_player_id = null;
-      if (!("guest_name" in normalized)) normalized.guest_name = null;
-      if (!normalized.role) normalized.role = "starter";
-      break;
-    case "club_match_payments":
-      if (!("expected_cents" in normalized)) normalized.expected_cents = 0;
-      if (!("paid_cents" in normalized)) normalized.paid_cents = 0;
-      if (!("paid_at" in normalized)) normalized.paid_at = null;
-      if (!("notes" in normalized)) normalized.notes = null;
-      if (!("updated_by" in normalized)) normalized.updated_by = null;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "club_match_player_stats":
-      if (!("goals" in normalized)) normalized.goals = 0;
-      if (!("assists" in normalized)) normalized.assists = 0;
-      if (!("is_mvp" in normalized)) normalized.is_mvp = false;
-      if (!normalized.updated_at) normalized.updated_at = now;
-      break;
-    case "club_public_snapshots":
-      if (!("summary" in normalized)) normalized.summary = {};
-      if (!("activity" in normalized)) normalized.activity = [];
-      if (!("teams" in normalized)) normalized.teams = [];
-      if (!("recent_matches" in normalized)) normalized.recent_matches = [];
-      if (!("player_stats" in normalized)) normalized.player_stats = [];
-      if (!("records" in normalized)) normalized.records = {};
-      if (!("top_scorers" in normalized)) normalized.top_scorers = [];
-      if (!("top_assisters" in normalized)) normalized.top_assisters = [];
-      if (!("top_figures" in normalized)) normalized.top_figures = [];
-      if (!("competition_stats" in normalized)) normalized.competition_stats = [];
-      if (!("available_modalities" in normalized)) normalized.available_modalities = [];
-      if (!("by_modality" in normalized)) normalized.by_modality = {};
-      if (!normalized.refreshed_at) normalized.refreshed_at = now;
-      if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "players":
       if (!("skill_level" in normalized)) normalized.skill_level = 5;
@@ -537,387 +215,15 @@ class FakeSupabaseState {
   }
 
   insertRow(table: TableName, row: Row) {
-    if (table === "league_admins") {
-      const leagueId = String(row.league_id ?? "");
-      const adminId = String(row.admin_id ?? "");
-      const existing = this.db.league_admins.find(
-        (candidate) => String(candidate.league_id) === leagueId && String(candidate.admin_id) === adminId
-      );
-
-      if (existing) {
-        Object.assign(existing, cloneRow(row));
-        return existing;
-      }
-    }
-
-    if (table === "club_admins") {
-      const clubId = String(row.club_id ?? "");
-      const adminId = String(row.admin_id ?? "");
-      const existing = this.db.club_admins.find(
-        (candidate) => String(candidate.club_id) === clubId && String(candidate.admin_id) === adminId
-      );
-
-      if (existing) {
-        Object.assign(existing, cloneRow(row));
-        return existing;
-      }
-    }
-
-    if (table === "competition_team_captains") {
-      const competitionTeamId = String(row.competition_team_id ?? "");
-      const competitionId = String(row.competition_id ?? "");
-      const captainId = String(row.captain_id ?? "");
-      const existing = this.db.competition_team_captains.find(
-        (candidate) =>
-          String(candidate.competition_team_id) === competitionTeamId ||
-          (String(candidate.competition_id) === competitionId && String(candidate.captain_id) === captainId)
-      );
-
-      if (existing) {
-        Object.assign(existing, cloneRow(row));
-        return existing;
-      }
-    }
-
-    if (table === "league_admin_invites") {
-      const leagueId = String(row.league_id ?? "");
-      const email = String(row.email ?? "").toLowerCase();
-      const status = String(row.status ?? "pending").toLowerCase();
-      const existing = this.db.league_admin_invites.find(
-        (candidate) =>
-          String(candidate.league_id) === leagueId &&
-          String(candidate.email ?? "").toLowerCase() === email &&
-          String(candidate.status ?? "pending").toLowerCase() === status
-      );
-
-      if (existing) {
-        Object.assign(existing, cloneRow(row));
-        return existing;
-      }
-    }
-
-    if (table === "club_admin_invites") {
-      const clubId = String(row.club_id ?? "");
-      const email = String(row.email ?? "").toLowerCase();
-      const status = String(row.status ?? "pending").toLowerCase();
-      const existing = this.db.club_admin_invites.find(
-        (candidate) =>
-          String(candidate.club_id) === clubId &&
-          String(candidate.email ?? "").toLowerCase() === email &&
-          String(candidate.status ?? "pending").toLowerCase() === status
-      );
-
-      if (existing) {
-        Object.assign(existing, cloneRow(row));
-        return existing;
-      }
-    }
-
-    if (table === "competition_captain_invites") {
-      const competitionTeamId = String(row.competition_team_id ?? "");
-      const existing = this.db.competition_captain_invites.find(
-        (candidate) => String(candidate.competition_team_id) === competitionTeamId
-      );
-
-      if (existing) {
-        Object.assign(existing, cloneRow(row));
-        return existing;
-      }
-    }
-
-    if (table === "competition_teams") {
-      const competitionId = String(row.competition_id ?? "");
-      const leagueTeamId = String(row.league_team_id ?? "");
-      const existing = this.db.competition_teams.find(
-        (candidate) =>
-          String(candidate.competition_id) === competitionId &&
-          String(candidate.league_team_id) === leagueTeamId
-      );
-
-      if (existing) {
-        Object.assign(existing, cloneRow(row));
-        return existing;
-      }
-    }
-
-    if (table === "club_team_players") {
-      const teamId = String(row.club_team_id ?? "");
-      const playerId = String(row.club_player_id ?? "");
-      const existing = this.db.club_team_players.find(
-        (candidate) =>
-          String(candidate.club_team_id) === teamId &&
-          String(candidate.club_player_id) === playerId
-      );
-
-      if (existing) {
-        Object.assign(existing, cloneRow(row));
-        return existing;
-      }
-    }
 
     const normalized = applyDefaults(table, cloneRow(row), () => this.nextId());
     this.db[table].push(normalized);
-
-    if (table === "leagues" && normalized.created_by) {
-      const ownerLinkExists = this.db.league_admins.some(
-        (candidate) =>
-          String(candidate.league_id) === String(normalized.id) &&
-          String(candidate.admin_id) === String(normalized.created_by)
-      );
-
-      if (!ownerLinkExists) {
-        this.insertRow("league_admins", {
-          league_id: normalized.id,
-          admin_id: normalized.created_by,
-          role: "owner",
-          created_by: normalized.created_by
-        });
-      }
-    }
-
-    if (table === "clubs" && normalized.created_by) {
-      const ownerLinkExists = this.db.club_admins.some(
-        (candidate) =>
-          String(candidate.club_id) === String(normalized.id) &&
-          String(candidate.admin_id) === String(normalized.created_by)
-      );
-
-      if (!ownerLinkExists) {
-        this.insertRow("club_admins", {
-          club_id: normalized.id,
-          admin_id: normalized.created_by,
-          created_by: normalized.created_by
-        });
-      }
-    }
 
     return normalized;
   }
 
   cascadeDelete(table: TableName, deletedRows: Row[]) {
     if (!deletedRows.length) return;
-
-    if (table === "leagues") {
-      const deletedLeagueIds = new Set(deletedRows.map((row) => String(row.id)));
-      const deletedCompetitionIds = new Set(
-        this.db.competitions
-          .filter((row) => deletedLeagueIds.has(String(row.league_id)))
-          .map((row) => String(row.id))
-      );
-      const deletedCompetitionTeamIds = new Set(
-        this.db.competition_teams
-          .filter((row) => deletedCompetitionIds.has(String(row.competition_id)))
-          .map((row) => String(row.id))
-      );
-      const deletedMatchIds = new Set(
-        this.db.competition_matches
-          .filter((row) => deletedCompetitionIds.has(String(row.competition_id)))
-          .map((row) => String(row.id))
-      );
-
-      this.db.league_admins = this.db.league_admins.filter(
-        (row) => !deletedLeagueIds.has(String(row.league_id))
-      );
-      this.db.league_admin_invites = this.db.league_admin_invites.filter(
-        (row) => !deletedLeagueIds.has(String(row.league_id))
-      );
-      this.db.league_billing_subscriptions = this.db.league_billing_subscriptions.filter(
-        (row) => !deletedLeagueIds.has(String(row.league_id))
-      );
-      this.db.league_teams = this.db.league_teams.filter(
-        (row) => !deletedLeagueIds.has(String(row.league_id))
-      );
-      this.db.competition_team_captains = this.db.competition_team_captains.filter(
-        (row) => !deletedCompetitionIds.has(String(row.competition_id))
-      );
-      this.db.competition_captain_invites = this.db.competition_captain_invites.filter(
-        (row) => !deletedCompetitionIds.has(String(row.competition_id))
-      );
-      this.db.competition_team_players = this.db.competition_team_players.filter(
-        (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
-      );
-      this.db.competition_byes = this.db.competition_byes.filter(
-        (row) => !deletedCompetitionIds.has(String(row.competition_id))
-      );
-      this.db.competition_rounds = this.db.competition_rounds.filter(
-        (row) => !deletedCompetitionIds.has(String(row.competition_id))
-      );
-      this.db.competition_match_results = this.db.competition_match_results.filter(
-        (row) => !deletedMatchIds.has(String(row.match_id))
-      );
-      this.db.competition_match_player_stats = this.db.competition_match_player_stats.filter(
-        (row) =>
-          !deletedMatchIds.has(String(row.match_id)) &&
-          !deletedCompetitionTeamIds.has(String(row.team_id))
-      );
-      this.db.competition_matches = this.db.competition_matches.filter(
-        (row) => !deletedCompetitionIds.has(String(row.competition_id))
-      );
-      this.db.competition_teams = this.db.competition_teams.filter(
-        (row) => !deletedCompetitionIds.has(String(row.competition_id))
-      );
-      this.db.competitions = this.db.competitions.filter(
-        (row) => !deletedLeagueIds.has(String(row.league_id))
-      );
-      this.db.league_billing_payments = this.db.league_billing_payments.map((row) =>
-        deletedLeagueIds.has(String(row.created_league_id))
-          ? { ...row, created_league_id: null, updated_at: new Date().toISOString() }
-          : row
-      );
-    }
-
-    if (table === "competitions") {
-      const deletedCompetitionIds = new Set(deletedRows.map((row) => String(row.id)));
-      const deletedCompetitionTeamIds = new Set(
-        this.db.competition_teams
-          .filter((row) => deletedCompetitionIds.has(String(row.competition_id)))
-          .map((row) => String(row.id))
-      );
-      const deletedMatchIds = new Set(
-        this.db.competition_matches
-          .filter((row) => deletedCompetitionIds.has(String(row.competition_id)))
-          .map((row) => String(row.id))
-      );
-
-      this.db.competition_team_captains = this.db.competition_team_captains.filter(
-        (row) => !deletedCompetitionIds.has(String(row.competition_id))
-      );
-      this.db.competition_captain_invites = this.db.competition_captain_invites.filter(
-        (row) => !deletedCompetitionIds.has(String(row.competition_id))
-      );
-      this.db.competition_team_players = this.db.competition_team_players.filter(
-        (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
-      );
-      this.db.competition_byes = this.db.competition_byes.filter(
-        (row) => !deletedCompetitionIds.has(String(row.competition_id))
-      );
-      this.db.competition_rounds = this.db.competition_rounds.filter(
-        (row) => !deletedCompetitionIds.has(String(row.competition_id))
-      );
-      this.db.competition_match_results = this.db.competition_match_results.filter(
-        (row) => !deletedMatchIds.has(String(row.match_id))
-      );
-      this.db.competition_match_player_stats = this.db.competition_match_player_stats.filter(
-        (row) =>
-          !deletedMatchIds.has(String(row.match_id)) &&
-          !deletedCompetitionTeamIds.has(String(row.team_id))
-      );
-      this.db.competition_matches = this.db.competition_matches.filter(
-        (row) => !deletedCompetitionIds.has(String(row.competition_id))
-      );
-      this.db.competition_teams = this.db.competition_teams.filter(
-        (row) => !deletedCompetitionIds.has(String(row.competition_id))
-      );
-    }
-
-    if (table === "clubs") {
-      const deletedClubIds = new Set(deletedRows.map((row) => String(row.id)));
-      const deletedTeamIds = new Set(
-        this.db.club_teams
-          .filter((row) => deletedClubIds.has(String(row.club_id)))
-          .map((row) => String(row.id))
-      );
-      const deletedMatchIds = new Set(
-        this.db.club_matches
-          .filter((row) => deletedClubIds.has(String(row.club_id)))
-          .map((row) => String(row.id))
-      );
-      const deletedCallupIds = new Set(
-        this.db.club_callups
-          .filter((row) => deletedClubIds.has(String(row.club_id)))
-          .map((row) => String(row.id))
-      );
-      const deletedLineupIds = new Set(
-        this.db.club_match_lineups
-          .filter((row) => deletedMatchIds.has(String(row.match_id)))
-          .map((row) => String(row.id))
-      );
-
-      this.db.club_admins = this.db.club_admins.filter((row) => !deletedClubIds.has(String(row.club_id)));
-      this.db.club_admin_invites = this.db.club_admin_invites.filter((row) => !deletedClubIds.has(String(row.club_id)));
-      this.db.club_competitions = this.db.club_competitions.filter((row) => !deletedClubIds.has(String(row.club_id)));
-      this.db.club_players = this.db.club_players.filter((row) => !deletedClubIds.has(String(row.club_id)));
-      this.db.club_teams = this.db.club_teams.filter((row) => !deletedClubIds.has(String(row.club_id)));
-      this.db.club_team_players = this.db.club_team_players.filter((row) => !deletedTeamIds.has(String(row.club_team_id)));
-      this.db.club_callups = this.db.club_callups.filter((row) => !deletedClubIds.has(String(row.club_id)));
-      this.db.club_callup_players = this.db.club_callup_players.filter((row) => !deletedCallupIds.has(String(row.callup_id)));
-      this.db.club_callup_guests = this.db.club_callup_guests.filter((row) => !deletedCallupIds.has(String(row.callup_id)));
-      this.db.club_matches = this.db.club_matches.filter((row) => !deletedClubIds.has(String(row.club_id)));
-      this.db.club_match_lineups = this.db.club_match_lineups.filter((row) => !deletedMatchIds.has(String(row.match_id)));
-      this.db.club_match_payments = this.db.club_match_payments.filter(
-        (row) => !deletedMatchIds.has(String(row.match_id)) && !deletedLineupIds.has(String(row.lineup_id))
-      );
-      this.db.club_match_player_stats = this.db.club_match_player_stats.filter(
-        (row) => !deletedMatchIds.has(String(row.match_id)) && !deletedLineupIds.has(String(row.lineup_id))
-      );
-      this.db.club_public_snapshots = this.db.club_public_snapshots.filter((row) => !deletedClubIds.has(String(row.club_id)));
-      this.db.club_site_settings = this.db.club_site_settings.filter((row) => !deletedClubIds.has(String(row.club_id)));
-      this.db.club_products = this.db.club_products.filter((row) => !deletedClubIds.has(String(row.club_id)));
-    }
-
-    if (table === "competition_matches") {
-      const deletedMatchIds = new Set(deletedRows.map((row) => String(row.id)));
-      this.db.competition_match_results = this.db.competition_match_results.filter(
-        (row) => !deletedMatchIds.has(String(row.match_id))
-      );
-      this.db.competition_match_player_stats = this.db.competition_match_player_stats.filter(
-        (row) => !deletedMatchIds.has(String(row.match_id))
-      );
-    }
-
-    if (table === "competition_teams") {
-      const deletedCompetitionTeamIds = new Set(deletedRows.map((row) => String(row.id)));
-      this.db.competition_team_players = this.db.competition_team_players.filter(
-        (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
-      );
-      this.db.competition_team_captains = this.db.competition_team_captains.filter(
-        (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
-      );
-      this.db.competition_captain_invites = this.db.competition_captain_invites.filter(
-        (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
-      );
-      this.db.competition_match_player_stats = this.db.competition_match_player_stats.filter(
-        (row) => !deletedCompetitionTeamIds.has(String(row.team_id))
-      );
-      this.db.competition_byes = this.db.competition_byes.filter(
-        (row) => !deletedCompetitionTeamIds.has(String(row.competition_team_id))
-      );
-    }
-
-    if (table === "club_matches") {
-      const deletedMatchIds = new Set(deletedRows.map((row) => String(row.id)));
-      const deletedLineupIds = new Set(
-        this.db.club_match_lineups
-          .filter((row) => deletedMatchIds.has(String(row.match_id)))
-          .map((row) => String(row.id))
-      );
-      this.db.club_match_lineups = this.db.club_match_lineups.filter(
-        (row) => !deletedMatchIds.has(String(row.match_id))
-      );
-      this.db.club_match_payments = this.db.club_match_payments.filter(
-        (row) => !deletedMatchIds.has(String(row.match_id)) && !deletedLineupIds.has(String(row.lineup_id))
-      );
-      this.db.club_match_player_stats = this.db.club_match_player_stats.filter(
-        (row) => !deletedMatchIds.has(String(row.match_id)) && !deletedLineupIds.has(String(row.lineup_id))
-      );
-    }
-
-    if (table === "club_teams") {
-      const deletedTeamIds = new Set(deletedRows.map((row) => String(row.id)));
-      this.db.club_team_players = this.db.club_team_players.filter(
-        (row) => !deletedTeamIds.has(String(row.club_team_id))
-      );
-    }
-
-    if (table === "club_callups") {
-      const deletedCallupIds = new Set(deletedRows.map((row) => String(row.id)));
-      this.db.club_callup_players = this.db.club_callup_players.filter(
-        (row) => !deletedCallupIds.has(String(row.callup_id))
-      );
-      this.db.club_callup_guests = this.db.club_callup_guests.filter(
-        (row) => !deletedCallupIds.has(String(row.callup_id))
-      );
-    }
 
     if (table === "team_options") {
       const deletedOptionIds = new Set(deletedRows.map((row) => String(row.id)));
@@ -931,6 +237,32 @@ class FakeSupabaseState {
   }
 
   async runRpc(name: string, args: Record<string, unknown>) {
+    if (name === "replace_group_match_options") {
+      const match = this.db.matches.find((row) => row.id === args.p_match_id && row.organization_id === args.p_organization_id);
+      if (!match || match.status !== "draft") return { data: null, error: { message: "Solo se pueden regenerar opciones en borrador." } };
+      const removed = this.db.team_options.filter((row) => row.match_id === args.p_match_id);
+      this.cascadeDelete("team_options", removed);
+      this.db.team_options = this.db.team_options.filter((row) => row.match_id !== args.p_match_id);
+      const options = args.p_options as Array<{ teamA: Array<{ id: string }>; teamB: Array<{ id: string }>; ratingSumA: number; ratingSumB: number; ratingDiff: number }>;
+      options.forEach((value, index) => {
+        const option = this.insertRow("team_options", { match_id: args.p_match_id, option_number: index + 1, rating_sum_a: value.ratingSumA, rating_sum_b: value.ratingSumB, rating_diff: value.ratingDiff });
+        for (const team of ["A", "B"] as const) for (const member of value[team === "A" ? "teamA" : "teamB"]) {
+          const [source, id] = member.id.split(":");
+          this.insertRow(source === "player" ? "team_option_players" : "team_option_guests", { team_option_id: option.id, [source === "player" ? "player_id" : "guest_id"]: id, team });
+        }
+      });
+      match.result_version = Number(match.result_version ?? 0) + 1;
+      return { data: { result_version: match.result_version }, error: null };
+    }
+    if (name === "confirm_group_match_option") {
+      const match = this.db.matches.find((row) => row.id === args.p_match_id && row.organization_id === args.p_organization_id);
+      const option = this.db.team_options.find((row) => row.id === args.p_option_id && row.match_id === args.p_match_id);
+      if (!match || !option || match.status !== "draft") return { data: null, error: { message: "Solo puedes confirmar una opcion del partido en borrador." } };
+      this.db.team_options.filter((row) => row.match_id === args.p_match_id).forEach((row) => { row.is_confirmed = row.id === args.p_option_id; });
+      Object.assign(match, { status: "confirmed", confirmed_option_id: args.p_option_id, team_a_label: args.p_team_a_label, team_b_label: args.p_team_b_label,
+        result_version: Number(match.result_version ?? 0) + 1 });
+      return { data: { result_version: match.result_version }, error: null };
+    }
     return {
       data: args,
       error: { message: `RPC no soportada en fake: ${name}` }
@@ -1175,7 +507,8 @@ class FakeQuery {
 
     rows.forEach((row) => {
       Object.assign(row, updates);
-      if ("updated_at" in row) {
+      const clearsPhotoOnly = this.table === "players" && updates.photo_path === null && Object.keys(updates).length === 1;
+      if ("updated_at" in row && !clearsPhotoOnly) {
         row.updated_at = now;
       }
     });

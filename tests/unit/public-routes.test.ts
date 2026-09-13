@@ -17,13 +17,7 @@ describe("public routes for crawlers", () => {
         disallow: [
           "/admin",
           "/api",
-          "/captain",
           "/invite",
-          "/tournaments",
-          "/clubs",
-          "/catalogo",
-          "/equipo",
-          "/historia"
         ]
       }
     });

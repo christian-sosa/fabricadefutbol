@@ -2,7 +2,7 @@
 
 import { track } from "@vercel/analytics";
 
-import { type AnalyticsEventName, type AnalyticsProperties } from "@/lib/analytics/events";
+import { isClientAnalyticsEventName, sanitizeAnalyticsPath, sanitizeAnalyticsProperties, type ClientAnalyticsEventName, type AnalyticsProperties } from "@/lib/analytics/events";
 
 type TrackAnalyticsOptions = {
   path?: string;
@@ -14,20 +14,24 @@ function getEventSource(properties: AnalyticsProperties | undefined) {
 }
 
 export function trackAnalyticsEvent(
-  eventName: AnalyticsEventName,
+  eventName: ClientAnalyticsEventName,
   properties?: AnalyticsProperties,
   options?: TrackAnalyticsOptions
 ) {
-  track(eventName, properties);
+  if (!isClientAnalyticsEventName(eventName)) return;
+  const safeProperties = sanitizeAnalyticsProperties(properties);
+  track(eventName, safeProperties);
 
   if (typeof window === "undefined") return;
 
-  const path = options?.path ?? `${window.location.pathname}${window.location.search}`;
+  const path = sanitizeAnalyticsPath(options?.path ?? window.location.pathname);
+  const sessionId = getAnalyticsSessionId();
   const payload = {
     eventName,
+    sessionId,
     source: getEventSource(properties),
     path,
-    properties: properties ?? {}
+    properties: safeProperties
   };
 
   window
@@ -42,4 +46,14 @@ export function trackAnalyticsEvent(
     .catch(() => {
       // Analytics must never interrupt the user flow.
     });
+}
+
+export function getAnalyticsSessionId() {
+  try {
+    const stored = window.sessionStorage.getItem("fdf_analytics_session");
+    if (stored && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(stored)) return stored;
+    const value = window.crypto.randomUUID();
+    window.sessionStorage.setItem("fdf_analytics_session", value);
+    return value;
+  } catch { return undefined; }
 }

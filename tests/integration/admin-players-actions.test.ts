@@ -45,10 +45,31 @@ vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: createSupabaseServerClientMock
 }));
 
-import { bulkUpdatePlayersAction } from "@/app/admin/(panel)/players/actions";
+import { bulkCreatePlayersAction, bulkUpdatePlayersAction } from "@/app/admin/(panel)/players/actions";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 describe("admin players actions", () => {
+  it("carga una lista sin duplicar jugadores existentes ni cambiar su nivel", async () => {
+    const organizationId = "00000000-0000-4000-8000-000000000001";
+    const fake = createFakeSupabase({ players: [{ id: "existing", organization_id: organizationId, full_name: "Juan Pérez", initial_rank: 3, display_order: 4, skill_level: 2 }] });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    const form = new FormData();
+    form.set("organizationId", organizationId);
+    form.set("names", "juan pérez\nNico López\nNico López\nDiego Ruiz");
+    await expect(bulkCreatePlayersAction({ error: null }, form)).rejects.toMatchObject({ digest: expect.stringContaining("view=edit") });
+    expect(fake.table("players")).toHaveLength(3);
+    expect(fake.find("players", (row) => row.id === "existing")?.skill_level).toBe(2);
+    expect(fake.find("players", (row) => row.full_name === "Nico López")).toMatchObject({ organization_id: organizationId, initial_rank: 4, display_order: 5, skill_level: 5 });
+  });
+  it("rechaza toda la lista inválida antes de escribir", async () => {
+    const fake = createFakeSupabase({ players: [] });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    const form = new FormData();
+    form.set("organizationId", "00000000-0000-4000-8000-000000000001");
+    form.set("names", "Juan Pérez\nX");
+    expect((await bulkCreatePlayersAction({ error: null }, form)).error).toBeTruthy();
+    expect(fake.table("players")).toHaveLength(0);
+  });
   it("permite guardar la planilla sin editar rendimiento", async () => {
     const organizationId = "00000000-0000-4000-8000-000000000001";
     const playerId = "00000000-0000-4000-8000-000000000002";

@@ -22,6 +22,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Restore private SQL validation artifact
+        env:
+          GROUPS_SQL_BUNDLE_GZIP_BASE64: ${{ secrets.GROUPS_SQL_BUNDLE_GZIP_BASE64 }}
+        run: |
+          node scripts/restore-ci-sql.mjs
+          npm run sql:build-schema -- app_dev
+          npm run sql:build-schema -- app_prod
+
+      - name: Guardrails
+        run: npm run guardrails
+
       - name: Lint
         run: npm run lint
 

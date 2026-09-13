@@ -1,13 +1,8 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 
 import { TrackedLink } from "@/components/analytics/tracked-link";
-import { ClubSiteHome } from "@/components/clubs/club-site";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { resolveClubSiteFromRequestHost } from "@/lib/club-site-request";
-import { buildClubSitePublicHref } from "@/lib/domain/club-sites";
 import { GROWTH_EVENTS } from "@/lib/growth";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery, withPublicQuery } from "@/lib/org";
@@ -64,31 +59,11 @@ const exampleRankingPreview = [
   { name: "Diego", rendimiento: 960, matchesPlayed: 54 }
 ] as const;
 
-export async function generateMetadata(): Promise<Metadata> {
-  const { data } = await resolveClubSiteFromRequestHost();
-
-  if (!data) return {};
-
-  return {
-    title: { absolute: data.club.name },
-    description: data.club.description ?? `Sitio oficial de ${data.club.name}.`,
-    alternates: { canonical: buildClubSitePublicHref(data.club, data.settings) },
-    robots: {
-      index: true,
-      follow: true
-    }
-  };
-}
-
 export default async function HomePage({
   searchParams
 }: {
   searchParams: Promise<{ org?: string }>;
 }) {
-  const clubSiteResolution = await resolveClubSiteFromRequestHost();
-  if (clubSiteResolution.data) return <ClubSiteHome data={clubSiteResolution.data} />;
-  if (!clubSiteResolution.isMainAppHost) notFound();
-
   const resolvedSearchParams = await searchParams;
   const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
     resolvePublicOrganization(resolvedSearchParams.org, { defaultContext: "home" }),
@@ -121,17 +96,17 @@ export default async function HomePage({
                 className="rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_-18px_rgba(16,185,129,0.95)] transition hover:brightness-110"
                 eventName={GROWTH_EVENTS.ctaClicked}
                 eventProperties={{ cta: "create_group", source: "home_hero" }}
-                href="/admin/login"
+                href="/admin/login?mode=register"
               >
                 Crear mi grupo gratis
               </TrackedLink>
               <TrackedLink
                 className="rounded-xl border border-slate-700 bg-slate-950/70 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
                 eventName={GROWTH_EVENTS.ctaClicked}
-                eventProperties={{ cta: "guides", source: "home_hero" }}
-                href={withPublicQuery("/guides", { organizationKey: selectedOrganizationSlug })}
+                eventProperties={{ cta: "demo", source: "home_hero" }}
+                href="/demo"
               >
-                Ver guías
+                Probar un grupo de ejemplo
               </TrackedLink>
             </div>
 
@@ -150,6 +125,7 @@ export default async function HomePage({
           <Card className="border-emerald-400/20 bg-slate-950/70 p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
+                <p className="mb-2 text-xs text-amber-200">Ejemplo ficticio · datos ilustrativos</p>
                 <CardTitle className="text-2xl">Rendimiento del grupo</CardTitle>
                 <CardDescription className="mt-2">
                   Cargás resultados y el ranking se actualiza solo. El nivel sirve como base; el rendimiento muestra quién viene jugando mejor.
@@ -334,7 +310,7 @@ export default async function HomePage({
         </Card>
 
         <Card>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Ejemplo</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Ejemplo ficticio</p>
           <CardTitle className="mt-2">Tabla de rendimiento</CardTitle>
           <div className="mt-4 space-y-2">
             <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 px-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -396,7 +372,7 @@ export default async function HomePage({
             className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-95"
             eventName={GROWTH_EVENTS.ctaClicked}
             eventProperties={{ cta: "create_group", source: "home_bottom" }}
-            href="/admin/login"
+            href="/admin/login?mode=register"
           >
             Crear mi grupo gratis
           </TrackedLink>

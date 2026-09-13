@@ -1,3 +1,4 @@
+import { readAllRows } from "@/lib/queries/read-all-rows";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Helpers defensivos para leer invitaciones pendientes filtrando por `expires_at`
@@ -72,10 +73,10 @@ export async function countPendingInvitesByOrganization(
   const selectLegacy = "organization_id";
 
   if (expiresAtColumnSupported !== false) {
-    const { data, error } = await supabase
+    const { data, error } = await readAllRows((from, to) => supabase
       .from("organization_invites")
-      .select(selectWithExpires)
-      .eq("status", "pending");
+      .select(selectWithExpires, { count: "exact" })
+      .eq("status", "pending").order("id").range(from, to));
 
     if (!error) {
       expiresAtColumnSupported = true;
@@ -96,10 +97,10 @@ export async function countPendingInvitesByOrganization(
     }
   }
 
-  const { data: legacyData, error: legacyError } = await supabase
+  const { data: legacyData, error: legacyError } = await readAllRows((from, to) => supabase
     .from("organization_invites")
-    .select(selectLegacy)
-    .eq("status", "pending");
+    .select(selectLegacy, { count: "exact" })
+    .eq("status", "pending").order("id").range(from, to));
 
   if (legacyError) throw new Error(legacyError.message);
   return (legacyData ?? []) as Array<{ organization_id: string }>;

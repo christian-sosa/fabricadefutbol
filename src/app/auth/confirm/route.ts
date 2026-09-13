@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
   const type = requestUrl.searchParams.get("type") as EmailOtpType | null;
   const code = requestUrl.searchParams.get("code");
 
-  const successRedirect = buildRedirectUrl(request, nextPath, { confirmed: "1" });
+  const successRedirect = new URL(type === "recovery" ? "/admin/reset-password" : nextPath, request.nextUrl.origin);
+  if (type !== "recovery") successRedirect.searchParams.set("confirmed", "1");
   const failureRedirect = buildRedirectUrl(request, "/admin/login", {
     error: "No pudimos confirmar tu email. Intenta abrir de nuevo el enlace o vuelve a registrarte."
   });
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createSupabaseServerClient();
 
-  if (tokenHash && type) {
+  if (tokenHash && type && ["signup", "invite", "magiclink", "recovery", "email_change", "email"].includes(type)) {
     const { error } = await supabase.auth.verifyOtp({
       token_hash: tokenHash,
       type

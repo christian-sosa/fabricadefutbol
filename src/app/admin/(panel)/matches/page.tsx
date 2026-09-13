@@ -52,6 +52,11 @@ export default async function AdminMatchesPage({
               >
                 Crear partido
               </Link>
+              {matches.some((match) => match.status === "confirmed" || match.status === "finished") ? (
+                <Link className="inline-flex items-center justify-center rounded-md border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-100" href={withOrgQuery("/admin/matches/new?repeat=last", selectedOrganization.slug)}>
+                  Repetir ultimo partido
+                </Link>
+              ) : null}
               {pendingResultHref && pendingResultMatch ? (
                 <Link
                   className="inline-flex items-center justify-center rounded-md border border-emerald-400/50 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/15"

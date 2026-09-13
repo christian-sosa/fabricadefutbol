@@ -19,7 +19,7 @@ describe("AdminNav", () => {
     navigationState.searchParams = new URLSearchParams();
   });
 
-  it("oculta Torneos a admins comunes", () => {
+  it("muestra la navegacion de Grupos a admins comunes", () => {
     navigationState.searchParams = new URLSearchParams({ org: "grupo-a" });
 
     render(<AdminNav isSuperAdmin={false} />);
@@ -31,12 +31,10 @@ describe("AdminNav", () => {
     expect(screen.queryByRole("link", { name: "Torneos" })).not.toBeInTheDocument();
   });
 
-  it("muestra Torneos solo al super admin", () => {
+  it("muestra Grupos y metricas al super admin", () => {
     render(<AdminNav isSuperAdmin />);
 
-    expect(screen.getByRole("link", { name: "Torneos" })).toHaveAttribute(
-      "href",
-      "/admin/tournaments"
-    );
+    expect(screen.getByRole("link", { name: "Super Admin" })).toHaveAttribute("href", "/admin/super");
+    expect(screen.queryByRole("link", { name: "Torneos" })).not.toBeInTheDocument();
   });
 });

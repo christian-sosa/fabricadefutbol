@@ -9,11 +9,11 @@ export default async function PricingPage() {
     title: "Grupos",
     eyebrow: "Para partidos recurrentes",
     price: "Gratis",
-    badge: "Sin checkout",
+    badge: "Sin vencimiento comercial",
     description:
       "Para amigos, equipos y grupos que juegan seguido y quieren ordenar convocatorias, equipos, rendimiento e historial.",
     cta: "Crear mi grupo",
-    href: "/admin/login",
+    href: "/admin/login?mode=register",
     items: [
       "Jugadores con nivel de habilidad simple",
       "Armado automatico de equipos parejos",
@@ -45,7 +45,7 @@ export default async function PricingPage() {
             className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
             eventName={GROWTH_EVENTS.ctaClicked}
             eventProperties={{ cta: "start_now", source: "pricing_hero" }}
-            href="/admin/login"
+            href="/admin/login?mode=register"
           >
             Empezar ahora
           </TrackedLink>
@@ -125,13 +125,14 @@ export default async function PricingPage() {
           <div className="mt-4">
             <Link
               className="inline-flex rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
-              href="/feedback"
+              href="/feedback?intent=multiple_groups"
             >
-              Contactar
+              Consultar por varios grupos
             </Link>
           </div>
         </Card>
       </section>
+      <Card><CardTitle>Ayuda para empezar</CardTitle><CardDescription className="mt-3">Si tenés jugadores o historial en otra herramienta y necesitás asistencia para cargarlos, contanos el alcance. Primero lo revisamos con vos.</CardDescription><Link className="mt-4 inline-block text-sm font-semibold text-emerald-300 underline" href="/feedback?intent=setup_help">Consultar por carga inicial</Link></Card>
     </div>
   );
 }

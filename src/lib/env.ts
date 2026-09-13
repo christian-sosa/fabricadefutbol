@@ -1,6 +1,7 @@
 type SupabaseTargetEnv = "development" | "production";
 
 const NEXT_PUBLIC_ENV = {
+  NEXT_PUBLIC_SUPABASE_TARGET_ENV: process.env.NEXT_PUBLIC_SUPABASE_TARGET_ENV,
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_URL_DEV: process.env.NEXT_PUBLIC_SUPABASE_URL_DEV,
   NEXT_PUBLIC_SUPABASE_URL_PROD: process.env.NEXT_PUBLIC_SUPABASE_URL_PROD,
@@ -33,24 +34,6 @@ const NEXT_PUBLIC_ENV = {
     process.env.NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_DEV,
   NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD:
     process.env.NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD,
-  NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET:
-    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET,
-  NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_DEV:
-    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_DEV,
-  NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_PROD:
-    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_PROD,
-  NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET:
-    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET,
-  NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_DEV:
-    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_DEV,
-  NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_PROD:
-    process.env.NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_PROD,
-  NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET:
-    process.env.NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET,
-  NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_DEV:
-    process.env.NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_DEV,
-  NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_PROD:
-    process.env.NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_PROD,
   NEXT_PUBLIC_ENABLE_ADS: process.env.NEXT_PUBLIC_ENABLE_ADS,
   NEXT_PUBLIC_ADSENSE_CLIENT_ID: process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID,
   NEXT_PUBLIC_SPEED_INSIGHTS_ENABLED:
@@ -114,11 +97,11 @@ export function shouldRenderSpeedInsights() {
   return parseBooleanEnv(getEnv("NEXT_PUBLIC_SPEED_INSIGHTS_ENABLED"), false);
 }
 
-function getSupabaseTargetEnv(): SupabaseTargetEnv {
-  const configured = (getServerEnv("SUPABASE_TARGET_ENV") ?? "").toLowerCase();
-  if (configured === "dev" || configured === "development") return "development";
-  if (configured === "prod" || configured === "production") return "production";
-  return process.env.NODE_ENV === "development" ? "development" : "production";
+export function getSupabaseTargetEnv(): SupabaseTargetEnv {
+  const configured = getEnv("NEXT_PUBLIC_SUPABASE_TARGET_ENV");
+  if (configured === "development" || configured === "production") return configured;
+  if (configured) throw new Error("NEXT_PUBLIC_SUPABASE_TARGET_ENV debe ser development o production.");
+  return process.env.NODE_ENV === "production" ? "production" : "development";
 }
 
 function isPlaceholderServiceRoleKey(value: string) {
@@ -136,27 +119,12 @@ export function getSupabaseUrl() {
   const targetEnv = getSupabaseTargetEnv();
   const selected =
     targetEnv === "development"
-      ? firstDefined([
-          "NEXT_PUBLIC_SUPABASE_URL_DEV",
-          "SUPABASE_URL_DEV",
-          "NEXT_PUBLIC_SUPABASE_URL",
-          "SUPABASE_URL"
-        ])
+      ? firstDefined(["NEXT_PUBLIC_SUPABASE_URL_DEV"])
       : firstDefined([
           "NEXT_PUBLIC_SUPABASE_URL",
-          "SUPABASE_URL",
           "NEXT_PUBLIC_SUPABASE_URL_PROD",
-          "SUPABASE_URL_PROD"
         ]);
-  const fallback = firstDefined([
-    "NEXT_PUBLIC_SUPABASE_URL",
-    "SUPABASE_URL",
-    "NEXT_PUBLIC_SUPABASE_URL_DEV",
-    "SUPABASE_URL_DEV",
-    "NEXT_PUBLIC_SUPABASE_URL_PROD",
-    "SUPABASE_URL_PROD"
-  ]);
-  const value = selected ?? fallback;
+  const value = selected;
 
   if (!value) {
     throw new Error(
@@ -170,14 +138,7 @@ export function getSupabaseAnonKey() {
   const targetEnv = getSupabaseTargetEnv();
   const selected =
     targetEnv === "development"
-      ? firstDefined([
-          "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV",
-          "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_DEV",
-          "NEXT_PUBLIC_SUPABASE_ANON_KEY_DEV",
-          "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY",
-          "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-          "NEXT_PUBLIC_SUPABASE_ANON_KEY"
-        ])
+      ? firstDefined(["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_DEV", "NEXT_PUBLIC_SUPABASE_ANON_KEY_DEV"])
       : firstDefined([
           "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY",
           "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
@@ -186,18 +147,7 @@ export function getSupabaseAnonKey() {
           "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_PROD",
           "NEXT_PUBLIC_SUPABASE_ANON_KEY_PROD"
         ]);
-  const fallback = firstDefined([
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_DEV",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY_DEV",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_PROD",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_PROD",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY_PROD"
-  ]);
-  const value = selected ?? fallback;
+  const value = selected;
 
   if (!value) {
     throw new Error(
@@ -222,7 +172,7 @@ export function getSupabaseServiceRoleKey() {
   const targetEnv = getSupabaseTargetEnv();
   const rawValue =
     targetEnv === "development"
-      ? firstDefined(["SUPABASE_SERVICE_ROLE_KEY_DEV", "SUPABASE_SERVICE_ROLE_KEY"])
+      ? firstDefined(["SUPABASE_SERVICE_ROLE_KEY_DEV"])
       : firstDefined(["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERVICE_ROLE_KEY_PROD"]);
 
   if (!rawValue || isPlaceholderServiceRoleKey(rawValue)) return null;
@@ -233,342 +183,83 @@ export function getSupabaseDbSchema() {
   const targetEnv = getSupabaseTargetEnv();
   const selected =
     targetEnv === "development"
-      ? firstDefined([
-          "NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV",
-          "SUPABASE_DB_SCHEMA_DEV",
-          "NEXT_PUBLIC_SUPABASE_DB_SCHEMA",
-          "SUPABASE_DB_SCHEMA"
-        ])
+      ? firstDefined(["NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV"])
       : firstDefined([
           "NEXT_PUBLIC_SUPABASE_DB_SCHEMA",
-          "SUPABASE_DB_SCHEMA",
           "NEXT_PUBLIC_SUPABASE_DB_SCHEMA_PROD",
-          "SUPABASE_DB_SCHEMA_PROD"
         ]);
-  const fallback = firstDefined([
-    "NEXT_PUBLIC_SUPABASE_DB_SCHEMA",
-    "SUPABASE_DB_SCHEMA",
-    "NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV",
-    "SUPABASE_DB_SCHEMA_DEV",
-    "NEXT_PUBLIC_SUPABASE_DB_SCHEMA_PROD",
-    "SUPABASE_DB_SCHEMA_PROD"
-  ]);
-  const value = selected ?? fallback;
+  const value = selected;
 
-  return value ?? "public";
+  const expected = targetEnv === "development" ? "app_dev" : "app_prod";
+  if (value && value !== expected) throw new Error(`El schema de Supabase debe ser ${expected} para este entorno.`);
+  return value ?? expected;
 }
 
 export function getPlayerPhotosBucket() {
   const targetEnv = getSupabaseTargetEnv();
   const selected =
     targetEnv === "development"
-      ? firstDefined([
-          "SUPABASE_PLAYER_PHOTOS_BUCKET_DEV",
-          "NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET_DEV",
-          "SUPABASE_PLAYER_PHOTOS_BUCKET",
-          "NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET"
-        ])
+      ? firstDefined(["SUPABASE_PLAYER_PHOTOS_BUCKET_DEV", "NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET_DEV"])
       : firstDefined([
           "SUPABASE_PLAYER_PHOTOS_BUCKET",
           "NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET",
           "SUPABASE_PLAYER_PHOTOS_BUCKET_PROD",
           "NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET_PROD"
         ]);
-  const fallback = firstDefined([
-    "SUPABASE_PLAYER_PHOTOS_BUCKET",
-    "NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET",
-    "SUPABASE_PLAYER_PHOTOS_BUCKET_DEV",
-    "NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET_DEV",
-    "SUPABASE_PLAYER_PHOTOS_BUCKET_PROD",
-    "NEXT_PUBLIC_SUPABASE_PLAYER_PHOTOS_BUCKET_PROD"
-  ]);
-  const value = selected ?? fallback;
+  const value = selected;
 
-  return value ?? "player-photos";
+  return value ?? (targetEnv === "development" ? "player-photos-dev" : "player-photos");
 }
 
 export function getOrganizationImagesBucket() {
   const targetEnv = getSupabaseTargetEnv();
   const selected =
     targetEnv === "development"
-      ? firstDefined([
-          "SUPABASE_ORGANIZATION_IMAGES_BUCKET_DEV",
-          "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_DEV",
-          "SUPABASE_ORGANIZATION_IMAGES_BUCKET",
-          "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET"
-        ])
+      ? firstDefined(["SUPABASE_ORGANIZATION_IMAGES_BUCKET_DEV", "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_DEV"])
       : firstDefined([
           "SUPABASE_ORGANIZATION_IMAGES_BUCKET",
           "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET",
           "SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD",
           "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD"
         ]);
-  const fallback = firstDefined([
-    "SUPABASE_ORGANIZATION_IMAGES_BUCKET",
-    "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET",
-    "SUPABASE_ORGANIZATION_IMAGES_BUCKET_DEV",
-    "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_DEV",
-    "SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD",
-    "NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD"
-  ]);
-  const value = selected ?? fallback;
+  const value = selected;
 
-  return value ?? "organization-images";
-}
-
-export function getLeagueLogosBucket() {
-  const targetEnv = getSupabaseTargetEnv();
-  const selected =
-    targetEnv === "development"
-      ? firstDefined([
-          "SUPABASE_LEAGUE_LOGOS_BUCKET_DEV",
-          "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_DEV",
-          "SUPABASE_LEAGUE_LOGOS_BUCKET",
-          "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET"
-        ])
-      : firstDefined([
-          "SUPABASE_LEAGUE_LOGOS_BUCKET",
-          "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET",
-          "SUPABASE_LEAGUE_LOGOS_BUCKET_PROD",
-          "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_PROD"
-        ]);
-  const fallback = firstDefined([
-    "SUPABASE_LEAGUE_LOGOS_BUCKET",
-    "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET",
-    "SUPABASE_LEAGUE_LOGOS_BUCKET_DEV",
-    "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_DEV",
-    "SUPABASE_LEAGUE_LOGOS_BUCKET_PROD",
-    "NEXT_PUBLIC_SUPABASE_LEAGUE_LOGOS_BUCKET_PROD"
-  ]);
-  const value = selected ?? fallback;
-
-  return value ?? "league-logos";
-}
-
-export function getLeaguePhotosBucket() {
-  const targetEnv = getSupabaseTargetEnv();
-  const selected =
-    targetEnv === "development"
-      ? firstDefined([
-          "SUPABASE_LEAGUE_PHOTOS_BUCKET_DEV",
-          "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_DEV",
-          "SUPABASE_LEAGUE_PHOTOS_BUCKET",
-          "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET"
-        ])
-      : firstDefined([
-          "SUPABASE_LEAGUE_PHOTOS_BUCKET",
-          "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET",
-          "SUPABASE_LEAGUE_PHOTOS_BUCKET_PROD",
-          "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_PROD"
-        ]);
-  const fallback = firstDefined([
-    "SUPABASE_LEAGUE_PHOTOS_BUCKET",
-    "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET",
-    "SUPABASE_LEAGUE_PHOTOS_BUCKET_DEV",
-    "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_DEV",
-    "SUPABASE_LEAGUE_PHOTOS_BUCKET_PROD",
-    "NEXT_PUBLIC_SUPABASE_LEAGUE_PHOTOS_BUCKET_PROD"
-  ]);
-  const value = selected ?? fallback;
-
-  return value ?? "league-photos";
-}
-
-export function getTeamLogosBucket() {
-  const targetEnv = getSupabaseTargetEnv();
-  const selected =
-    targetEnv === "development"
-      ? firstDefined([
-          "SUPABASE_TEAM_LOGOS_BUCKET_DEV",
-          "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_DEV",
-          "SUPABASE_TEAM_LOGOS_BUCKET",
-          "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET"
-        ])
-      : firstDefined([
-          "SUPABASE_TEAM_LOGOS_BUCKET",
-          "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET",
-          "SUPABASE_TEAM_LOGOS_BUCKET_PROD",
-          "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_PROD"
-        ]);
-  const fallback = firstDefined([
-    "SUPABASE_TEAM_LOGOS_BUCKET",
-    "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET",
-    "SUPABASE_TEAM_LOGOS_BUCKET_DEV",
-    "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_DEV",
-    "SUPABASE_TEAM_LOGOS_BUCKET_PROD",
-    "NEXT_PUBLIC_SUPABASE_TEAM_LOGOS_BUCKET_PROD"
-  ]);
-  const value = selected ?? fallback;
-
-  return value ?? "team-logos";
-}
-
-export function getClubSiteMediaBucket() {
-  const targetEnv = getSupabaseTargetEnv();
-  const selected =
-    targetEnv === "development"
-      ? firstDefined([
-          "SUPABASE_CLUB_SITE_MEDIA_BUCKET_DEV",
-          "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET_DEV",
-          "SUPABASE_CLUB_SITE_MEDIA_BUCKET",
-          "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET"
-        ])
-      : firstDefined([
-          "SUPABASE_CLUB_SITE_MEDIA_BUCKET",
-          "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET",
-          "SUPABASE_CLUB_SITE_MEDIA_BUCKET_PROD",
-          "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET_PROD"
-        ]);
-  const fallback = firstDefined([
-    "SUPABASE_CLUB_SITE_MEDIA_BUCKET",
-    "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET",
-    "SUPABASE_CLUB_SITE_MEDIA_BUCKET_DEV",
-    "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET_DEV",
-    "SUPABASE_CLUB_SITE_MEDIA_BUCKET_PROD",
-    "NEXT_PUBLIC_SUPABASE_CLUB_SITE_MEDIA_BUCKET_PROD"
-  ]);
-  const value = selected ?? fallback;
-
-  return value ?? "club-site-media";
-}
-
-export function getMercadoPagoAccessToken() {
-  const targetEnv = getSupabaseTargetEnv();
-  const selected =
-    targetEnv === "development"
-      ? firstServerDefined(["MERCADOPAGO_ACCESS_TOKEN_DEV", "MERCADOPAGO_ACCESS_TOKEN"])
-      : firstServerDefined(["MERCADOPAGO_ACCESS_TOKEN", "MERCADOPAGO_ACCESS_TOKEN_PROD"]);
-  const fallback = firstServerDefined([
-    "MERCADOPAGO_ACCESS_TOKEN",
-    "MERCADOPAGO_ACCESS_TOKEN_DEV",
-    "MERCADOPAGO_ACCESS_TOKEN_PROD"
-  ]);
-  const token = selected ?? fallback;
-
-  if (!token) {
-    throw new Error(
-      "Falta token de Mercado Pago. Configura MERCADOPAGO_ACCESS_TOKEN_DEV (local) y/o MERCADOPAGO_ACCESS_TOKEN (prod)."
-    );
-  }
-  return token;
-}
-
-export function getMercadoPagoWebhookSecret() {
-  const targetEnv = getSupabaseTargetEnv();
-  const selected =
-    targetEnv === "development"
-      ? firstServerDefined(["MERCADOPAGO_WEBHOOK_SECRET_DEV", "MERCADOPAGO_WEBHOOK_SECRET"])
-      : firstServerDefined(["MERCADOPAGO_WEBHOOK_SECRET", "MERCADOPAGO_WEBHOOK_SECRET_PROD"]);
-  const fallback = firstServerDefined([
-    "MERCADOPAGO_WEBHOOK_SECRET",
-    "MERCADOPAGO_WEBHOOK_SECRET_DEV",
-    "MERCADOPAGO_WEBHOOK_SECRET_PROD"
-  ]);
-  return selected ?? fallback;
-}
-
-export function getMercadoPagoWebhookBaseUrl() {
-  const targetEnv = getSupabaseTargetEnv();
-  const selected =
-    targetEnv === "development"
-      ? firstServerDefined([
-          "MERCADOPAGO_WEBHOOK_BASE_URL_DEV",
-          "MERCADOPAGO_WEBHOOK_BASE_URL",
-          "APP_URL_DEV",
-          "APP_URL",
-          "NEXT_PUBLIC_APP_URL_DEV",
-          "NEXT_PUBLIC_APP_URL"
-        ])
-      : firstServerDefined([
-          "MERCADOPAGO_WEBHOOK_BASE_URL",
-          "MERCADOPAGO_WEBHOOK_BASE_URL_PROD",
-          "APP_URL",
-          "APP_URL_PROD",
-          "NEXT_PUBLIC_APP_URL",
-          "NEXT_PUBLIC_APP_URL_PROD"
-        ]);
-  const fallback = firstServerDefined([
-    "MERCADOPAGO_WEBHOOK_BASE_URL",
-    "MERCADOPAGO_WEBHOOK_BASE_URL_DEV",
-    "MERCADOPAGO_WEBHOOK_BASE_URL_PROD",
-    "APP_URL",
-    "APP_URL_DEV",
-    "APP_URL_PROD",
-    "NEXT_PUBLIC_APP_URL",
-    "NEXT_PUBLIC_APP_URL_DEV",
-    "NEXT_PUBLIC_APP_URL_PROD"
-  ]);
-
-  return selected ?? fallback;
+  return value ?? (targetEnv === "development" ? "organization-images-dev" : "organization-images");
 }
 
 export function getResendApiKey() {
   const targetEnv = getSupabaseTargetEnv();
   const selected =
     targetEnv === "development"
-      ? firstServerDefined(["RESEND_API_KEY_DEV", "RESEND_API_KEY"])
+      ? firstServerDefined(["RESEND_API_KEY_DEV"])
       : firstServerDefined(["RESEND_API_KEY", "RESEND_API_KEY_PROD"]);
-  const fallback = firstServerDefined(["RESEND_API_KEY", "RESEND_API_KEY_DEV", "RESEND_API_KEY_PROD"]);
-  return selected ?? fallback;
+  return selected;
 }
 
 export function getFeedbackInboxEmail() {
   const targetEnv = getSupabaseTargetEnv();
   const selected =
     targetEnv === "development"
-      ? firstServerDefined(["FEEDBACK_TO_EMAIL_DEV", "FEEDBACK_TO_EMAIL"])
+      ? firstServerDefined(["FEEDBACK_TO_EMAIL_DEV"])
       : firstServerDefined(["FEEDBACK_TO_EMAIL", "FEEDBACK_TO_EMAIL_PROD"]);
-  const fallback = firstServerDefined([
-    "FEEDBACK_TO_EMAIL",
-    "FEEDBACK_TO_EMAIL_DEV",
-    "FEEDBACK_TO_EMAIL_PROD"
-  ]);
-  return selected ?? fallback ?? "info@fabricadefutbol.com.ar";
+  return selected ?? "info@fabricadefutbol.com.ar";
 }
 
 export function getFeedbackFromEmail() {
   const targetEnv = getSupabaseTargetEnv();
   const selected =
     targetEnv === "development"
-      ? firstServerDefined(["FEEDBACK_FROM_EMAIL_DEV", "FEEDBACK_FROM_EMAIL"])
+      ? firstServerDefined(["FEEDBACK_FROM_EMAIL_DEV"])
       : firstServerDefined(["FEEDBACK_FROM_EMAIL", "FEEDBACK_FROM_EMAIL_PROD"]);
-  const fallback = firstServerDefined([
-    "FEEDBACK_FROM_EMAIL",
-    "FEEDBACK_FROM_EMAIL_DEV",
-    "FEEDBACK_FROM_EMAIL_PROD"
-  ]);
-  return selected ?? fallback ?? "Fabrica de Futbol <no-reply@fabricadefutbol.com.ar>";
-}
-
-export function shouldUseMercadoPagoSandboxCheckout() {
-  const targetEnv = getSupabaseTargetEnv();
-  const selected =
-    targetEnv === "development"
-      ? firstServerDefined(["MERCADOPAGO_USE_SANDBOX_DEV", "MERCADOPAGO_USE_SANDBOX"])
-      : firstServerDefined(["MERCADOPAGO_USE_SANDBOX", "MERCADOPAGO_USE_SANDBOX_PROD"]);
-  const fallback = firstServerDefined([
-    "MERCADOPAGO_USE_SANDBOX",
-    "MERCADOPAGO_USE_SANDBOX_DEV",
-    "MERCADOPAGO_USE_SANDBOX_PROD"
-  ]);
-
-  return parseBooleanEnv(selected ?? fallback, targetEnv === "development");
+  return selected ?? "Fabrica de Futbol <no-reply@fabricadefutbol.com.ar>";
 }
 
 export function getInternalCronSecret() {
   const targetEnv = getSupabaseTargetEnv();
   const selected =
     targetEnv === "development"
-      ? firstServerDefined(["INTERNAL_CRON_SECRET_DEV", "CRON_SECRET_DEV", "INTERNAL_CRON_SECRET", "CRON_SECRET"])
+      ? firstServerDefined(["INTERNAL_CRON_SECRET_DEV", "CRON_SECRET_DEV"])
       : firstServerDefined(["INTERNAL_CRON_SECRET", "CRON_SECRET", "INTERNAL_CRON_SECRET_PROD", "CRON_SECRET_PROD"]);
-  const fallback = firstServerDefined([
-    "INTERNAL_CRON_SECRET",
-    "CRON_SECRET",
-    "INTERNAL_CRON_SECRET_DEV",
-    "CRON_SECRET_DEV",
-    "INTERNAL_CRON_SECRET_PROD",
-    "CRON_SECRET_PROD"
-  ]);
 
-  return selected ?? fallback;
+  return selected;
 }

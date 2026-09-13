@@ -5,6 +5,7 @@ import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-ca
 import { MatchResultEditorQuery } from "@/components/admin/match-result-editor-query";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
+import { readMatchLineupSnapshot } from "@/lib/domain/match-sheet";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminMatchDetails, getSelectablePlayers } from "@/lib/queries/admin";
 import { resolveMatchTeamLabels } from "@/lib/team-labels";
@@ -38,7 +39,7 @@ export default async function AdminMatchResultPage({
   const canManageResult = details.match.status === "confirmed" || details.match.status === "finished";
   const confirmedOption = details.options.find((option) => option.is_confirmed) ?? null;
   const teamLabels = resolveMatchTeamLabels(details.match);
-  const editableParticipants = confirmedOption
+  const confirmedParticipants = confirmedOption
     ? [
         ...confirmedOption.teamA.map((member: OptionMember) => ({
           participantId: `${member.is_guest ? "guest" : "player"}:${member.id}`,
@@ -62,6 +63,14 @@ export default async function AdminMatchResultPage({
     fullName: player.full_name,
     rating: Number(player.current_rating)
   }));
+  const snapshot = readMatchLineupSnapshot(details.match.lineup_snapshot);
+  const participantRatings = new Map(confirmedParticipants.map((participant) => [participant.participantId, participant.rating]));
+  const playerRatings = new Map(selectablePlayers.map((player) => [`player:${player.id}`, Number(player.current_rating)]));
+  const editableParticipants = snapshot.length
+    ? snapshot.map((participant) => ({ ...participant, initialTeam: participant.team,
+        rating: participantRatings.get(participant.participantId) ?? playerRatings.get(participant.participantId) ?? 1000 }))
+    : confirmedParticipants;
+  const defaultAbsencePenaltyParticipantIds = snapshot.filter((participant) => participant.penalized).map((participant) => participant.participantId);
   const defaultMvpParticipantId = details.result?.mvp_player_id
     ? `player:${details.result.mvp_player_id}`
     : details.result?.mvp_guest_id
@@ -89,6 +98,9 @@ export default async function AdminMatchResultPage({
         {canManageResult && editableParticipants.length ? (
           <MatchResultEditorQuery
             availablePlayers={availableReplacementPlayers}
+            expectedVersion={details.match.result_version ?? 0}
+            defaultAbsencePenaltyParticipantIds={defaultAbsencePenaltyParticipantIds}
+            defaultHandicapTeam={details.result?.handicap_team ?? null}
             defaultNotes={details.result?.notes ?? ""}
             defaultMvpParticipantId={defaultMvpParticipantId}
             defaultScoreA={details.result?.score_a ?? 0}

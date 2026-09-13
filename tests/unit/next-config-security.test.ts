@@ -15,8 +15,6 @@ describe("next config security", () => {
 
   it("no permite origins de desarrollo para Server Actions en produccion", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("MERCADOPAGO_WEBHOOK_BASE_URL", "https://fabricadefutbol.com.ar");
-    vi.stubEnv("MERCADOPAGO_WEBHOOK_BASE_URL_DEV", "https://dev-tunnel.ngrok-free.app");
     vi.stubEnv("NGROK_URL", "https://local-tunnel.ngrok-free.app");
 
     const config = await loadNextConfig("production-origins");
@@ -27,13 +25,11 @@ describe("next config security", () => {
 
   it("mantiene origins de desarrollo fuera de produccion", async () => {
     vi.stubEnv("NODE_ENV", "development");
-    vi.stubEnv("MERCADOPAGO_WEBHOOK_BASE_URL_DEV", "https://dev-tunnel.ngrok-free.app/hook");
     vi.stubEnv("NGROK_URL", "https://local-tunnel.ngrok-free.app");
 
     const config = await loadNextConfig("development-origins");
 
     expect(config.allowedDevOrigins).toEqual([
-      "dev-tunnel.ngrok-free.app",
       "local-tunnel.ngrok-free.app"
     ]);
     expect(config.experimental?.serverActions?.allowedOrigins).toEqual(config.allowedDevOrigins);

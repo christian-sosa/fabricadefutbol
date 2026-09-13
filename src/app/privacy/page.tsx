@@ -158,6 +158,12 @@ export default async function PrivacyPage({
 
         <PrivacySection title="9. Cookies, sesiones y analitica">
           <p>
+            Para medir visitas que llegan desde enlaces compartidos por WhatsApp usamos un identificador aleatorio
+            de sesión y una cookie propia de atribución durante hasta 30 días. Relacionamos esas visitas con altas
+            de cuentas o grupos para entender qué funciones ayudan a empezar. Estos eventos no incluyen emails,
+            contraseñas ni enlaces de invitación o recuperación. Borrar cookies o bloquear la analítica limita esta medición.
+          </p>
+          <p>
             El sitio puede usar cookies o tecnologias similares para mantener sesiones, recordar preferencias tecnicas,
             proteger accesos y medir uso agregado del producto. Tambien puede usar analitica de Vercel u otra herramienta
             equivalente para entender rendimiento, errores y navegacion general.

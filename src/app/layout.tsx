@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import Script from "next/script";
 import { Suspense } from "react";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import { PrivateTelemetry } from "@/components/analytics/private-telemetry";
 
 import "@/app/globals.css";
 import { GrowthEventTracker } from "@/components/analytics/growth-event-tracker";
@@ -11,7 +9,6 @@ import { BetaNotice } from "@/components/layout/beta-notice";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ReactQueryProvider } from "@/components/providers/react-query-provider";
-import { isClubSiteStandaloneHost } from "@/lib/club-site-request";
 import { getAdsenseClientId, shouldRenderAds, shouldRenderSpeedInsights } from "@/lib/env";
 import { getPublicAppUrl } from "@/lib/public-url";
 
@@ -69,16 +66,14 @@ export const metadata: Metadata = {
   }
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const requestHeaders = await headers();
-  const standaloneClubSite = isClubSiteStandaloneHost(requestHeaders.get("host"));
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   const adsenseClientId = getAdsenseClientId();
-  const adsEnabled = !standaloneClubSite && shouldRenderAds() && Boolean(adsenseClientId);
+  const adsEnabled = shouldRenderAds() && Boolean(adsenseClientId);
   const speedInsightsEnabled = shouldRenderSpeedInsights();
 
   return (
     <html lang="es">
-      <body className={standaloneClubSite ? "club-site-standalone" : undefined}>
+      <body>
         <ReactQueryProvider>
           {adsEnabled && adsenseClientId ? (
             <Script
@@ -92,15 +87,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <a className="skip-link" href="#contenido-principal">
             Saltar al contenido
           </a>
-          {standaloneClubSite ? (
-            <main className="w-full" id="contenido-principal">
-              {children}
-            </main>
-          ) : (
-            <>
               <Suspense fallback={<div className="sticky top-0 z-30 h-[57px] border-b border-slate-800 bg-slate-950/85" />}>
                 <SiteHeader
-                  initialCanAccessTournaments={false}
                   initialIsAuthenticated={false}
                 />
               </Suspense>
@@ -109,16 +97,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {children}
               </main>
               <Suspense fallback={<div className="h-[280px] border-t border-slate-800 bg-slate-950/80" />}>
-                <SiteFooter canAccessTournaments={false} />
+                <SiteFooter />
               </Suspense>
-            </>
-          )}
         </ReactQueryProvider>
         <Suspense fallback={null}>
           <GrowthEventTracker />
         </Suspense>
-        <Analytics />
-        {speedInsightsEnabled ? <SpeedInsights /> : null}
+        <PrivateTelemetry speedInsightsEnabled={speedInsightsEnabled} />
       </body>
     </html>
   );

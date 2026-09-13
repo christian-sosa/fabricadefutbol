@@ -89,6 +89,8 @@ export default async function AdminMatchDetailPage({
         </form>
       </Card>
 
+      {confirmedOption ? <Link className="inline-flex rounded-md border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-100" href={withOrgQuery(`/admin/matches/new?repeat=${id}`, selectedOrganization.slug)}>Repetir este partido</Link> : null}
+
       {canManageResult ? (
         <Card>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

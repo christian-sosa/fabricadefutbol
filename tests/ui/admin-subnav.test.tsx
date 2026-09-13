@@ -76,27 +76,4 @@ describe("AdminSubnav", () => {
     expect(screen.getByRole("link", { name: "Partidos" }).className).toContain("border-emerald");
     expect(screen.queryByRole("link", { name: "Nuevo partido" })).not.toBeInTheDocument();
   });
-
-  it("muestra navegacion de liga dentro de una liga seleccionada", () => {
-    navigationState.pathname = "/admin/tournaments/league-1";
-
-    render(<AdminSubnav />);
-
-    expect(screen.queryByText("Liga actual")).not.toBeInTheDocument();
-    expect(screen.queryByText("Estas trabajando dentro de una liga. Las competencias, equipos y resultados quedan separados de Grupos.")).not.toBeInTheDocument();
-    expect(screen.queryByText("Contexto torneos")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Competencias" })).toHaveAttribute(
-      "href",
-      "/admin/tournaments/league-1?tab=competitions"
-    );
-  });
-
-  it("usa Cambiar espacio para volver al hub desde torneos", () => {
-    navigationState.pathname = "/admin/tournaments";
-
-    render(<AdminSubnav />);
-
-    expect(screen.getByRole("link", { name: "Cambiar espacio" })).toHaveAttribute("href", "/admin");
-    expect(screen.queryByRole("link", { name: "Menu admin" })).not.toBeInTheDocument();
-  });
 });

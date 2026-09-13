@@ -1,7 +1,6 @@
 import type { MetadataRoute } from "next";
 
 import { GUIDES } from "@/lib/guides";
-import { canAccessClubsProduct } from "@/lib/features";
 import { getPublicAppUrl } from "@/lib/public-url";
 
 const STATIC_PUBLIC_PATHS = [
@@ -22,7 +21,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const appUrl = getPublicAppUrl();
   const routes = [
     ...STATIC_PUBLIC_PATHS,
-    ...(canAccessClubsProduct() ? ["/clubs"] : []),
     ...GUIDES.map((guide) => `/guides/${guide.slug}`)
   ];
 

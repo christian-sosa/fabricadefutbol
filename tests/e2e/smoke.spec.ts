@@ -12,40 +12,45 @@ function publicNavLink(page: Page, label: string) {
   return page.getByRole("link", { name: label, exact: true }).first();
 }
 
+async function expectGroupPath(page: Page, pathname: string) {
+  await expect(page).toHaveURL((url) =>
+    url.pathname === pathname && url.searchParams.get("org") === ORG_SLUG
+  );
+}
+
 test("mantiene la organizacion al navegar por la parte publica", async ({ page }) => {
   await page.goto(`/?org=${ORG_SLUG}`);
 
-  await expect(page).toHaveURL(new RegExp(`\\?org=${ORG_SLUG}$`));
+  await expectGroupPath(page, "/");
   await publicNavLink(page, "Grupos").click();
-  await expect(page).toHaveURL(new RegExp(`/groups\\?org=${ORG_SLUG}$`));
+  await expectGroupPath(page, "/groups");
 
   await publicNavLink(page, "Ranking").click();
-  await expect(page).toHaveURL(new RegExp(`/ranking\\?org=${ORG_SLUG}$`));
+  await expectGroupPath(page, "/ranking");
 
   await page.goto(`/players?org=${ORG_SLUG}`);
-  await expect(page).toHaveURL(new RegExp(`/ranking\\?org=${ORG_SLUG}$`));
+  await expectGroupPath(page, "/ranking");
 
   await publicNavLink(page, "Historial").click();
-  await expect(page).toHaveURL(new RegExp(`/matches\\?org=${ORG_SLUG}$`));
+  await expectGroupPath(page, "/matches");
 });
 
 test("login admin, crea partido, carga resultado y lo ve en publico", async ({ page }) => {
-  await page.goto("/admin/login");
+  await page.goto(`/admin/login?next=${encodeURIComponent(`/admin?org=${ORG_SLUG}`)}`);
 
   const loginForm = page.locator("form").filter({
-    has: page.getByRole("button", { name: "Ingresar", exact: true })
+    has: page.getByRole("button", { name: "Ingresar con email", exact: true })
   });
 
   await loginForm.getByLabel("Email", { exact: true }).fill(ADMIN_EMAIL);
-  await loginForm.getByLabel("Contrasena", { exact: true }).fill(ADMIN_PASSWORD);
-  await loginForm.getByRole("button", { name: "Ingresar", exact: true }).click();
-  await page.waitForURL("**/admin");
-  await expect(page.getByRole("heading", { name: "Que queres administrar?" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Entrar al grupo" }).first()).toBeVisible();
+  await loginForm.getByLabel("Contraseña", { exact: true }).fill(ADMIN_PASSWORD);
+  await loginForm.getByRole("button", { name: "Ingresar con email", exact: true }).click();
+  await expectGroupPath(page, "/admin");
+  await expect(page.getByRole("heading", { name: "Dejá tu grupo listo para jugar" })).toBeVisible();
 
   await page.goto(`/admin/matches/new?org=${ORG_SLUG}`);
 
-  await page.locator('input[name="scheduledDate"]').fill("2026-04-30");
+  await page.locator('input[name="scheduledDate"]').fill(new Date().toISOString().slice(0, 10));
   await page.locator('input[name="scheduledTime"]').fill("20:00");
   await page.locator('select[name="modality"]').selectOption("5v5");
 
@@ -57,14 +62,14 @@ test("login admin, crea partido, carga resultado y lo ve en publico", async ({ p
   await page.locator(`input[name="goalkeeperPlayerIds"][value="${E2E_PLAYER_IDS[5]}"]`).check();
 
   await page.getByRole("button", { name: "Crear partido y generar equipos" }).click();
-  await page.waitForURL("**/admin/matches/**");
+  await expect(page).toHaveURL((url) => /^\/admin\/matches\/[0-9a-f-]{36}$/.test(url.pathname));
   await expect(page.getByText("Opciones de equipos")).toBeVisible();
 
   const matchId = page.url().match(/\/admin\/matches\/([^?]+)/)?.[1];
   expect(matchId).toBeTruthy();
 
   await page.getByRole("button", { name: "Confirmar esta opcion" }).first().click();
-  await page.waitForURL(`**/matches/${matchId}**`);
+  await expectGroupPath(page, `/matches/${matchId}`);
   await expect(page.getByText("Resultado pendiente.")).toBeVisible();
 
   await page.goto(`/admin/matches/${matchId}/result?org=${ORG_SLUG}`);

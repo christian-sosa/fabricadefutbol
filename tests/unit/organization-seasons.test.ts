@@ -7,6 +7,14 @@ import {
 } from "@/lib/domain/organization-seasons";
 
 describe("organization season dates", () => {
+  it("cambia de temporada a medianoche de Buenos Aires", () => {
+    const before = buildOrganizationSeasonInsert({ organizationId: "org-1", startsAt: new Date("2027-01-01T02:59:59Z") });
+    const after = buildOrganizationSeasonInsert({ organizationId: "org-1", startsAt: new Date("2027-01-01T03:00:00Z") });
+    expect(before.label).toBe("Temporada 2026");
+    expect(before.ends_at).toBe("2026-12-31");
+    expect(after.label).toBe("Temporada 2027");
+  });
+
   it("usa inicio de año como apertura anual fija de una temporada", () => {
     expect(getAnnualOrganizationSeasonStartDate(new Date("2026-05-03T12:00:00.000Z"))).toBe("2026-01-01");
   });

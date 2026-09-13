@@ -129,7 +129,7 @@ describe("admin new match actions", () => {
     const redirectUrl = new URL(String(redirectedTo), "http://localhost");
     expect(redirectUrl.pathname).toBe(`/matches/${match.id}`);
     expect(redirectUrl.searchParams.get("org")).toBe("la-banda");
-    expect(redirectUrl.searchParams.get("ff_event")).toBe("match_created");
+    expect(redirectUrl.searchParams.has("ff_event")).toBe(false);
     expect(String(redirectedTo)).not.toContain("/admin/matches");
     expect(refreshOrganizationPublicSnapshotSafeMock).toHaveBeenCalledWith(ORGANIZATION_ID);
   });

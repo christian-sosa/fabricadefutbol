@@ -128,7 +128,7 @@ export default async function GroupsPage({
                       key={player.id}
                     >
                       <div className="flex items-center gap-3">
-                        <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
+                        <PlayerAvatar hasPhoto={player.photo_path === undefined ? undefined : Boolean(player.photo_path)} name={player.full_name} photoUpdatedAt={player.photo_updated_at} playerId={player.id} size="sm" />
                         <span>
                           #{index + 1} {player.full_name}
                         </span>

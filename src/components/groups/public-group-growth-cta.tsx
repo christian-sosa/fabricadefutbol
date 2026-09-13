@@ -25,7 +25,7 @@ export function PublicGroupGrowthCta({ source }: PublicGroupGrowthCtaProps) {
             className="inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
             eventName={GROWTH_EVENTS.ctaClicked}
             eventProperties={{ cta: "create_group", source }}
-            href="/admin/login?next=/admin"
+            href="/admin/login?mode=register&next=/admin"
           >
             Crear mi grupo gratis
           </TrackedLink>

@@ -2,8 +2,6 @@ function collectAllowedDevOrigins() {
   if (process.env.NODE_ENV === "production") return [];
 
   const rawValues = [
-    process.env.MERCADOPAGO_WEBHOOK_BASE_URL_DEV,
-    process.env.MERCADOPAGO_WEBHOOK_BASE_URL,
     process.env.NGROK_URL
   ].filter(Boolean);
 
@@ -58,16 +56,12 @@ function buildSecurityHeaders() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  ...(allowedDevOrigins.length ? { allowedDevOrigins } : {}),
-  async redirects() {
-    return [
-      {
-        source: "/pricing",
-        destination: "/help",
-        permanent: true
-      }
-    ];
+  env: {
+    NEXT_PUBLIC_SUPABASE_TARGET_ENV:
+      process.env.NEXT_PUBLIC_SUPABASE_TARGET_ENV || process.env.SUPABASE_TARGET_ENV ||
+      (process.env.NODE_ENV === "production" ? "production" : "development")
   },
+  ...(allowedDevOrigins.length ? { allowedDevOrigins } : {}),
   async headers() {
     return [
       {

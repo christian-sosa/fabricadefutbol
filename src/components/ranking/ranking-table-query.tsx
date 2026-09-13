@@ -264,6 +264,8 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
                     </span>
                     <PlayerPhotoModalTrigger
                       avatarSize="md"
+                      hasPhoto={player.photoPath === undefined ? undefined : Boolean(player.photoPath)}
+                      photoUpdatedAt={player.photoUpdatedAt}
                       nameClassName="min-w-0 break-words leading-tight"
                       playerId={player.playerId}
                       playerName={player.playerName}
@@ -364,7 +366,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
                     </span>
                   </TD>
                   <TD className="px-2.5 py-4 lg:px-3">
-                    <PlayerPhotoModalTrigger avatarSize="md" playerId={player.playerId} playerName={player.playerName} />
+                    <PlayerPhotoModalTrigger avatarSize="md" hasPhoto={player.photoPath === undefined ? undefined : Boolean(player.photoPath)} photoUpdatedAt={player.photoUpdatedAt} playerId={player.playerId} playerName={player.playerName} />
                   </TD>
                   <TD className="px-2.5 py-4 text-base font-semibold text-emerald-300 lg:px-3">
                     {formatRendimiento(player.currentRating)}

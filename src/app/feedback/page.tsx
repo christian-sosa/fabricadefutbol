@@ -1,198 +1,39 @@
 import Link from "next/link";
-
-import { submitFeedbackAction } from "@/app/feedback/actions";
+import { submitFeedbackAction } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { canAccessClubsProduct } from "@/lib/features";
-import { withPublicQuery } from "@/lib/org";
 
-type FeedbackPageProps = {
-  searchParams: Promise<{
-    org?: string;
-    module?: string;
-    intent?: string;
-    sent?: string;
-    error?: string;
-  }>;
-};
-
-export default async function FeedbackPage({ searchParams }: FeedbackPageProps) {
-  const resolvedSearchParams = await searchParams;
-  const organizationKey = resolvedSearchParams.org ?? null;
-  const clubsProductEnabled = canAccessClubsProduct();
-  const isClubInquiry = clubsProductEnabled && resolvedSearchParams.intent === "club";
-  const currentModule = "organizations";
-  const currentFeedbackModule = isClubInquiry ? "clubs" : currentModule;
-  const submitAction = submitFeedbackAction.bind(
-    null,
-    organizationKey,
-    currentModule,
-    isClubInquiry ? "club" : null
-  );
-  const homePath = withPublicQuery("/", {
-    organizationKey,
-    module: currentModule
-  });
-  const helpPath = withPublicQuery("/help", {
-    organizationKey,
-    module: currentModule
-  });
-  const moduleDescription = isClubInquiry
-    ? "Si queres traer un club o equipo, contanos nombre, redes, dominio si ya lo tenes y que secciones necesitarias."
-    : "Si tu consulta es por grupos, ranking o partidos equilibrados, la recibimos por aqui.";
-
-  return (
-    <div className="space-y-4">
-      <Card className="rounded-[2rem] p-5 md:p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Contacto</p>
-        <CardTitle className="mt-2 text-3xl">
-          {isClubInquiry ? "Traer un club o equipo" : "Necesitas ayuda?"}
-        </CardTitle>
-        <CardDescription className="mt-3 text-base">
-          {isClubInquiry
-            ? "Te ayudamos a publicar una presencia independiente para tu club dentro de Fabrica de Futbol."
-            : "Estamos para ayudarte a configurar tu grupo, resolver dudas y ordenar tu flujo sin romper nada."}
-        </CardDescription>
-        <p className="mt-3 text-sm text-slate-300">{moduleDescription}</p>
-
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Mail</p>
-            <a
-              className="mt-2 block text-sm font-semibold text-emerald-300 transition hover:underline"
-              href="mailto:info@fabricadefutbol.com.ar"
-            >
-              info@fabricadefutbol.com.ar
-            </a>
-            <p className="mt-2 text-sm text-slate-400">Canal principal de soporte y consultas comerciales.</p>
-          </div>
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              {isClubInquiry ? "Clubes" : "Sugerencias"}
-            </p>
-            <p className="mt-2 text-sm text-slate-300">
-              {isClubInquiry
-                ? "Podemos preparar URL propia, catalogo consultivo, identidad visual y datos deportivos publicos."
-                : "Si tienes una idea para mejorar Fabrica de Futbol, tambien puedes escribirnos. Las sugerencias son bienvenidas."}
-            </p>
-          </div>
-        </div>
-      </Card>
-
-      {resolvedSearchParams.sent ? (
-        <Card className="border-emerald-500/40 bg-emerald-500/10">
-          <CardTitle>Mensaje enviado</CardTitle>
-          <CardDescription className="mt-1">
-            Gracias por escribirnos. Recibimos tu mensaje correctamente.
-          </CardDescription>
-        </Card>
-      ) : null}
-
-      {resolvedSearchParams.error ? (
-        <Card className="border-danger/40 bg-danger/10">
-          <CardTitle>No se pudo enviar</CardTitle>
-          <CardDescription className="mt-1">{resolvedSearchParams.error}</CardDescription>
-        </Card>
-      ) : null}
-
-      <Card>
-        <CardTitle>Formulario</CardTitle>
-        <form action={submitAction} className="mt-4 space-y-3">
-          <input autoComplete="off" className="hidden" name="website" tabIndex={-1} type="text" />
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="fullName">
-                Nombre
-              </label>
-              <Input id="fullName" name="fullName" placeholder="Tu nombre" required />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="email">
-                Email
-              </label>
-              <Input id="email" name="email" placeholder="tu@email.com" required type="email" />
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="category">
-                Tipo
-              </label>
-              <Select defaultValue="sugerencia" id="category" name="category">
-                <option value="sugerencia">Sugerencia</option>
-                <option value="queja">Queja</option>
-                <option value="error">Reporte de error</option>
-                <option value="otro">Otro</option>
-              </Select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="module">
-                Tema
-              </label>
-              <Select defaultValue={currentFeedbackModule} id="module" name="module">
-                <option value="organizations">Grupos</option>
-                {clubsProductEnabled ? <option value="clubs">Clubes / equipos</option> : null}
-                <option value="both">General</option>
-              </Select>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="organization">
-              {isClubInquiry ? "Club o equipo (opcional)" : "Grupo (opcional)"}
-            </label>
-            <Input
-              id="organization"
-              name="organization"
-              placeholder={isClubInquiry ? "Ej: La Quinta FC" : "Ej: La Cantera de LQ"}
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="message">
-              Mensaje
-            </label>
-            <Textarea
-              id="message"
-              maxLength={2500}
-              minLength={10}
-              name="message"
-              placeholder={
-                isClubInquiry
-                  ? "Contanos que club queres traer, si ya tiene dominio, redes, catalogo o fotos propias."
-                  : "Cuentanos que paso o que te gustaria mejorar."
-              }
-              required
-              rows={7}
-            />
-            <p className="mt-1 text-xs text-slate-500">Minimo 10 caracteres.</p>
-          </div>
-
-          <Button type="submit">Enviar mensaje</Button>
-        </form>
-      </Card>
-
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <Link
-          className="rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
-          href={homePath}
-        >
-          Volver al inicio
-        </Link>
-        <Link
-          className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
-          href={helpPath}
-        >
-          Ir a ayuda
-        </Link>
-      </div>
-    </div>
-  );
+export default async function FeedbackPage({ searchParams }: { searchParams: Promise<{ org?: string; intent?: string; sent?: string; error?: string }> }) {
+  const params = await searchParams;
+  const intent = params.intent === "multiple_groups" || params.intent === "setup_help" ? params.intent : null;
+  const title = intent === "multiple_groups" ? "Necesito administrar varios grupos" : intent === "setup_help" ? "Ayuda para la carga inicial" : "Contacto";
+  const description = intent === "multiple_groups"
+    ? "Contanos cuántos grupos organizás y qué necesitás. Revisamos tu solicitud antes de habilitar otro grupo."
+    : intent === "setup_help" ? "Contanos dónde tenés los jugadores o el historial y qué te gustaría cargar. Evaluamos el alcance con vos antes de hacer cambios."
+    : "Escribinos si necesitás ayuda, encontraste un error o tenés una sugerencia.";
+  return <div className="mx-auto max-w-3xl space-y-4">
+    <Card><CardTitle className="text-3xl">{title}</CardTitle><CardDescription className="mt-3">{description}</CardDescription>
+      <a className="mt-4 inline-block text-sm font-semibold text-emerald-300 underline" href="mailto:info@fabricadefutbol.com.ar">info@fabricadefutbol.com.ar</a>
+    </Card>
+    {params.sent ? <Card><p role="status" className="text-emerald-300">Recibimos tu mensaje. Gracias por escribirnos.</p></Card> : null}
+    {params.error ? <Card><p role="alert" className="text-danger">{params.error}</p></Card> : null}
+    <Card><form action={submitFeedbackAction.bind(null, params.org ?? null, "organizations", intent)} className="space-y-4">
+      <input autoComplete="off" className="hidden" name="website" tabIndex={-1} type="text" />
+      <input name="module" type="hidden" value="organizations" />
+      <div className="grid gap-4 sm:grid-cols-2"><div><label className="mb-1 block text-sm font-semibold" htmlFor="fullName">Nombre</label><Input autoComplete="name" id="fullName" maxLength={80} name="fullName" required /></div>
+        <div><label className="mb-1 block text-sm font-semibold" htmlFor="email">Email</label><Input autoComplete="email" id="email" name="email" required type="email" /></div></div>
+      <div><label className="mb-1 block text-sm font-semibold" htmlFor="category">Motivo</label><Select defaultValue={intent ?? "sugerencia"} id="category" name="category">
+        <option value="multiple_groups">Administrar varios grupos</option><option value="setup_help">Ayuda para la carga inicial</option>
+        <option value="sugerencia">Sugerencia</option><option value="queja">Queja</option><option value="error">Reporte de error</option><option value="otro">Otra consulta</option>
+      </Select></div>
+      <div><label className="mb-1 block text-sm font-semibold" htmlFor="organization">Grupo (opcional)</label><Input defaultValue={params.org ?? ""} id="organization" maxLength={80} name="organization" /></div>
+      <div><label className="mb-1 block text-sm font-semibold" htmlFor="message">Mensaje</label><Textarea id="message" maxLength={2500} minLength={10} name="message" placeholder={intent === "multiple_groups" ? "Cuántos grupos son, cuántas veces juegan y qué necesitás organizar…" : intent === "setup_help" ? "Cantidad aproximada de jugadores y partidos, formato actual y ayuda que necesitás…" : "Contanos en qué podemos ayudarte…"} required rows={7} /></div>
+      <p className="text-xs text-slate-400">No adjuntes contraseñas ni datos sensibles. La solicitud no genera cobros ni habilita grupos automáticamente.</p>
+      <Button type="submit">Enviar mensaje</Button>
+    </form></Card>
+    <Link className="inline-block text-sm text-emerald-300 underline" href="/help">Consultar ayuda</Link>
+  </div>;
 }

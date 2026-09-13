@@ -14,7 +14,7 @@ import {
   saveMatchResult
 } from "@/lib/domain/match-workflow";
 import { parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
-import { matchDateAndTimeToIso } from "@/lib/match-datetime";
+import { matchDateAndTimeToIso, matchIsoToDateInput } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
 import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
@@ -28,6 +28,7 @@ const confirmSchema = z.object({
 });
 
 const resultSchema = z.object({
+  expectedVersion: z.coerce.number().int().nonnegative(),
   scoreA: z.coerce.number().int().nonnegative(),
   scoreB: z.coerce.number().int().nonnegative(),
   notes: z.string().optional(),
@@ -36,6 +37,7 @@ const resultSchema = z.object({
 });
 
 const lineupAdjustmentPayloadSchema = z.object({
+  expectedVersion: z.coerce.number().int().nonnegative(),
   lineupPayload: z.string().min(1, "La formacion final enviada es invalida.")
 });
 
@@ -203,6 +205,7 @@ export async function saveResultAction(matchId: string, organizationId: string, 
   try {
     const admin = await assertOrganizationAdminAction(organizationId);
     const parsed = resultSchema.safeParse({
+      expectedVersion: formData.get("expectedVersion"),
       scoreA: formData.get("scoreA"),
       scoreB: formData.get("scoreB"),
       notes: formData.get("notes"),
@@ -236,12 +239,13 @@ export async function saveResultAction(matchId: string, organizationId: string, 
     }
 
     const supabase = await createSupabaseServerClient();
-    await saveMatchResult({
+    const outcome = await saveMatchResult({
       supabase,
       adminId: admin.userId,
       matchId,
       organizationId,
       resultInput: {
+        expectedVersion: parsed.data.expectedVersion,
         scoreA: parsed.data.scoreA,
         scoreB: parsed.data.scoreB,
         notes: parsed.data.notes,
@@ -250,7 +254,7 @@ export async function saveResultAction(matchId: string, organizationId: string, 
       }
     });
 
-    await recordAnalyticsEvent({
+    if (outcome.firstFinished) await recordAnalyticsEvent({
       eventName: SERVER_ANALYTICS_EVENTS.matchFinished,
       source: "server_action",
       adminId: admin.userId,
@@ -283,6 +287,7 @@ export async function saveLineupBeforeResultAction(
   try {
     await assertOrganizationAdminAction(organizationId);
     const parsedPayload = lineupAdjustmentPayloadSchema.safeParse({
+      expectedVersion: formData.get("expectedVersion"),
       lineupPayload: formData.get("lineupPayload")
     });
     if (!parsedPayload.success) {
@@ -318,6 +323,7 @@ export async function saveLineupBeforeResultAction(
       supabase,
       matchId,
       organizationId,
+      expectedVersion: parsedPayload.data.expectedVersion,
       lineupInput: parsedLineup.data
     });
 
@@ -345,22 +351,52 @@ export async function updateMatchAction(matchId: string, organizationId: string,
     }
 
     const supabase = await createSupabaseServerClient();
+    const { data: match, error: matchError } = await supabase
+      .from("matches")
+      .select("id, status, season_id, scheduled_at, result_version")
+      .eq("id", matchId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (matchError) throw new Error(matchError.message);
+    if (!match) throw new Error("No se encontro el partido para el grupo seleccionado.");
+
+    const previousDate = matchIsoToDateInput(match.scheduled_at);
     const payload: {
       scheduled_at: string;
       location: string | null;
     } = {
-      scheduled_at: matchDateAndTimeToIso(parsed.data.scheduledDate, parsed.data.scheduledTime),
+      scheduled_at: matchDateAndTimeToIso(parsed.data.scheduledDate, parsed.data.scheduledTime, previousDate),
       location: parsed.data.location || null
     };
 
-    const { error } = await supabase
+    if (match.status === "finished") {
+      const { data: season, error: seasonError } = match.season_id
+        ? await supabase.from("organization_seasons").select("starts_at, ends_at")
+            .eq("id", match.season_id).eq("organization_id", organizationId).maybeSingle()
+        : { data: null, error: null };
+      if (seasonError) throw new Error(seasonError.message);
+      if (match.season_id && !season) throw new Error("No se encontro la temporada de este partido.");
+      const nextDate = matchIsoToDateInput(payload.scheduled_at);
+      const startsAt = season?.starts_at ?? `${previousDate.slice(0, 4)}-01-01`;
+      const endsAt = season?.ends_at ?? `${previousDate.slice(0, 4)}-12-31`;
+      if (nextDate !== previousDate && (nextDate < startsAt || nextDate > endsAt)) {
+        throw new Error("La fecha de un partido finalizado debe quedar en la misma temporada.");
+      }
+    }
+
+    const { data: updated, error } = await supabase
       .from("matches")
       .update(payload)
       .eq("id", matchId)
-      .eq("organization_id", organizationId);
+      .eq("organization_id", organizationId)
+      .eq("status", match.status)
+      .eq("result_version", match.result_version)
+      .select("id")
+      .maybeSingle();
     if (error) {
       redirect(buildPath(matchId, organizationQueryKey, error.message));
     }
+    if (!updated) throw new Error("El partido cambio mientras lo editabas. Recarga para revisar la ultima version.");
 
     await refreshOrganizationPublicSnapshotSafe(organizationId);
     revalidateMatchPaths(matchId);
@@ -467,14 +503,19 @@ export async function deleteMatchAction(matchId: string, organizationId: string)
       }
     }
 
-    const { error: deleteError } = await supabase
+    const { data: deletedMatch, error: deleteError } = await supabase
       .from("matches")
       .delete()
       .eq("id", matchId)
-      .eq("organization_id", organizationId);
+      .eq("organization_id", organizationId)
+      .in("status", ["draft", "confirmed"])
+      .select("id")
+      .maybeSingle();
     if (deleteError) {
       redirect(buildPath(matchId, organizationQueryKey, deleteError.message));
     }
+
+    if (!deletedMatch) redirect(buildPath(matchId, organizationQueryKey, "El partido cambio mientras lo editabas. Recarga antes de continuar."));
 
     await refreshOrganizationPublicSnapshotSafe(organizationId);
     revalidatePath("/admin");

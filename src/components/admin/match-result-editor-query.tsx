@@ -12,7 +12,7 @@ type ExistingParticipant = {
   fullName: string;
   rating: number;
   source: "player" | "guest";
-  initialTeam: TeamSide;
+  initialTeam: TeamSide | "OUT";
 };
 
 type ReplacementPlayerOption = {
@@ -26,6 +26,9 @@ type MatchResultEditorQueryProps = {
   matchId: string;
   existingParticipants: ExistingParticipant[];
   availablePlayers?: ReplacementPlayerOption[];
+  expectedVersion?: number;
+  defaultAbsencePenaltyParticipantIds?: string[];
+  defaultHandicapTeam?: TeamSide | null;
   defaultScoreA: number;
   defaultScoreB: number;
   defaultMvpParticipantId?: string | null;

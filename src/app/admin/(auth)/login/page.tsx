@@ -7,6 +7,8 @@ type AdminLoginPageProps = {
     confirmed?: string;
     error?: string;
     next?: string;
+    mode?: string;
+    reset?: string;
   }>;
 };
 
@@ -27,6 +29,7 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
           </CardDescription>
         </Card>
       ) : null}
+      {resolvedSearchParams.reset ? <p role="status" className="text-sm text-emerald-300">Contraseña actualizada. Ingresá con tu nueva contraseña.</p> : null}
 
       {resolvedSearchParams.error ? (
         <Card className="rounded-lg border-danger/40 bg-danger/10">
@@ -35,7 +38,7 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
         </Card>
       ) : null}
 
-      <LoginForm nextPath={nextPath} />
+      <LoginForm initialMode={resolvedSearchParams.mode === "register" ? "register" : "login"} nextPath={nextPath} />
     </div>
   );
 }

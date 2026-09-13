@@ -4,10 +4,10 @@ import type { ComponentProps } from "react";
 
 import { Button } from "@/components/ui/button";
 import { trackAnalyticsEvent } from "@/lib/analytics/client";
-import type { GrowthEventName } from "@/lib/growth";
+import type { ClientAnalyticsEventName } from "@/lib/analytics/events";
 
 type TrackedButtonProps = ComponentProps<typeof Button> & {
-  eventName: GrowthEventName;
+  eventName: ClientAnalyticsEventName;
   eventProperties?: Record<string, string | number | boolean>;
 };
 

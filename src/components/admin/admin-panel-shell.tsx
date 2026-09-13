@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { AdminSubnav } from "@/components/admin/admin-subnav";
 import type { AdminSession } from "@/lib/auth/admin";
 
 type AdminPanelShellProps = {
@@ -19,17 +18,8 @@ export function AdminPanelShell({ admin, children }: AdminPanelShellProps) {
   const isGroupContext =
     hasOrganizationContext &&
     pathname.startsWith("/admin") &&
-    !pathname.startsWith("/admin/tournaments") &&
-    !pathname.startsWith("/admin/clubs") &&
     !pathname.startsWith("/admin/super");
-  const isClubDetailContext = /^\/admin\/clubs\/[^/]+/.test(pathname);
-  const isTournamentStandalonePage =
-    pathname === "/admin/tournaments/billing" ||
-    pathname === "/admin/tournaments/new" ||
-    pathname.startsWith("/admin/tournaments/invite/");
-  const isLeagueDetailContext = /^\/admin\/tournaments\/[^/]+/.test(pathname) && !isTournamentStandalonePage;
-  const isLeagueRootContext = isLeagueDetailContext && /^\/admin\/tournaments\/[^/]+$/.test(pathname);
-  const isFocusedAdminContext = isGroupContext || isClubDetailContext || isLeagueDetailContext;
+  const isFocusedAdminContext = isGroupContext;
 
   return (
     <div className="space-y-4">
@@ -56,7 +46,6 @@ export function AdminPanelShell({ admin, children }: AdminPanelShellProps) {
         </section>
       ) : null}
 
-      {!isLeagueRootContext ? <AdminSubnav scope="tournaments" /> : null}
 
       {children}
     </div>

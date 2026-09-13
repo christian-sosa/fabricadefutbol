@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   SERVER_ANALYTICS_EVENTS,
+  isClientAnalyticsEventName,
   isAnalyticsEventName,
+  sanitizeAnalyticsPath,
   sanitizeAnalyticsProperties
 } from "@/lib/analytics/events";
 import { buildAnalyticsEventInsert, insertAnalyticsEvent } from "@/lib/analytics/server";
@@ -29,9 +31,30 @@ describe("analytics events", () => {
       })
     ).toEqual({
       cta: "home",
-      nested: "[redacted]",
+      nested: '{"owner":"[redacted]"}',
       count: 2
     });
+  });
+
+  it("reserva altas, resultados y autenticación para el servidor", () => {
+    for (const event of ["group_created", "match_created", "match_finished", "admin_register_succeeded", "admin_login_succeeded", "payment_approved"]) expect(isClientAnalyticsEventName(event)).toBe(false);
+    expect(isClientAnalyticsEventName("referral_visit")).toBe(true);
+  });
+
+  it("elimina secretos anidados y parámetros de URLs", () => {
+    const properties = sanitizeAnalyticsProperties({ details: { password: "secret-value", items: [{ token: "secret-token", count: 2 }] }, link: "https://fdf.example/invite/private-token?email=a@example.com" });
+    expect(JSON.stringify(properties)).not.toContain("secret-value");
+    expect(JSON.stringify(properties)).not.toContain("secret-token");
+    expect(properties.details).toBe('{"items":[{"count":2}]}');
+    expect(sanitizeAnalyticsPath("/invite/private-token?email=a@example.com")).toBe("/invite/:token");
+    expect(sanitizeAnalyticsPath("/admin?org=private&token=secret")).toBe("/admin");
+  });
+
+  it("usa una clave estable por hecho de negocio y absorbe reintentos", async () => {
+    const input = { eventName: "match_finished", entityId: "00000000-0000-4000-8000-000000000001" };
+    expect(buildAnalyticsEventInsert(input)?.event_key).toBe(`match_finished:${input.entityId}`);
+    const db = { from: () => ({ insert: () => ({ select: () => ({ single: async () => ({ data: null, error: { code: "23505", message: "duplicate" } }) }) }) }) };
+    await expect(insertAnalyticsEvent(db, input)).resolves.toMatchObject({ recorded: false, reason: "duplicate" });
   });
 
   it("inserta eventos permitidos con propiedades sanitizadas", async () => {

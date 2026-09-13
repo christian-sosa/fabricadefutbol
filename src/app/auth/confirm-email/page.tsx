@@ -39,7 +39,7 @@ export default async function ConfirmEmailPage({ searchParams }: ConfirmEmailPag
   return (
     <div className="py-6">
       <Card>
-        <CardTitle>Confirmar cuenta</CardTitle>
+        <CardTitle>{type === "recovery" ? "Recuperar contraseña" : "Confirmar cuenta"}</CardTitle>
         <CardDescription className="mt-2">
           Para evitar que algunos proveedores de correo consuman el enlace antes de tiempo, confirma tu cuenta desde este boton.
         </CardDescription>

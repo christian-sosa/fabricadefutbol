@@ -40,6 +40,15 @@ function getLineupPayload(container: HTMLElement) {
 }
 
 describe("MatchResultEditor", () => {
+  it("rehidrata acta, sanciones, desventaja y version al corregir", () => {
+    const participants = [...existingParticipants, { participantId: "player:absent", fullName: "Ausente", rating: 980, source: "player" as const, initialTeam: "OUT" as const }];
+    const { container } = render(<MatchResultEditor existingParticipants={participants} expectedVersion={7}
+      defaultScoreA={2} defaultScoreB={1} defaultAbsencePenaltyParticipantIds={["player:absent"]} defaultHandicapTeam="B" submitLabel="Corregir" />);
+    expect(getLineupPayload(container).absencePenaltyParticipantIds).toEqual(["player:absent"]);
+    expect(getLineupPayload(container).handicapTeam).toBe("B");
+    expect(container.querySelector<HTMLInputElement>('input[name="expectedVersion"]')?.value).toBe("7");
+  });
+
   it("identifica los inputs del resultado con el nombre de cada equipo", () => {
     render(
       <MatchResultEditor
@@ -184,6 +193,7 @@ describe("MatchResultEditor", () => {
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith({
+        expectedVersion: 0,
         scoreA: 1,
         scoreB: 0,
         notes: "Nota base editada",

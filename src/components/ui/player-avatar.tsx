@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 
 type PlayerAvatarProps = {
   playerId?: string;
+  hasPhoto?: boolean;
+  photoUpdatedAt?: string | null;
   name: string;
   size?: "sm" | "md" | "lg";
   className?: string;
@@ -29,13 +31,13 @@ function getInitials(name: string) {
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 }
 
-export function getPlayerPhotoSrc(playerId?: string) {
-  if (!playerId) return "/avatar-placeholder.svg";
-  return `/api/player-photo/${encodeURIComponent(playerId)}?v=${PLAYER_PHOTO_SRC_VERSION}`;
+export function getPlayerPhotoSrc(playerId?: string, hasPhoto?: boolean, photoUpdatedAt?: string | null) {
+  if (!playerId || hasPhoto === false) return "/avatar-placeholder.svg";
+  return `/api/player-photo/${encodeURIComponent(playerId)}?v=${encodeURIComponent(photoUpdatedAt ?? PLAYER_PHOTO_SRC_VERSION)}`;
 }
 
-export function PlayerAvatar({ playerId, name, size = "md", className }: PlayerAvatarProps) {
-  const src = getPlayerPhotoSrc(playerId);
+export function PlayerAvatar({ playerId, hasPhoto, photoUpdatedAt, name, size = "md", className }: PlayerAvatarProps) {
+  const src = getPlayerPhotoSrc(playerId, hasPhoto, photoUpdatedAt);
   const pixelSize = sizePixels[size];
   return (
     <div
@@ -59,7 +61,7 @@ export function PlayerAvatar({ playerId, name, size = "md", className }: PlayerA
         unoptimized
         width={pixelSize}
       />
-      {!playerId ? (
+      {!playerId || hasPhoto === false ? (
         <span className="absolute inset-0 flex items-center justify-center text-xs font-bold tracking-wide text-slate-100">
           {getInitials(name)}
         </span>

@@ -62,7 +62,8 @@ vi.mock("@/lib/domain/match-workflow", () => ({
   saveMatchResult: saveMatchResultMock
 }));
 
-import { confirmOptionAction, saveResultAction } from "@/app/admin/(panel)/matches/[id]/actions";
+import { confirmOptionAction, saveResultAction, updateMatchAction } from "@/app/admin/(panel)/matches/[id]/actions";
+import { createFakeSupabase } from "../helpers/fake-supabase";
 
 describe("admin match result actions", () => {
   beforeEach(() => {
@@ -73,7 +74,7 @@ describe("admin match result actions", () => {
     confirmTeamOptionMock.mockClear();
     confirmTeamOptionMock.mockResolvedValue(undefined);
     saveMatchResultMock.mockClear();
-    saveMatchResultMock.mockResolvedValue(undefined);
+    saveMatchResultMock.mockResolvedValue({ firstFinished: true, resultVersion: 1, seasonId: "season-1" });
   });
 
   it("redirige al partido publico despues de confirmar una opcion", async () => {
@@ -132,5 +133,66 @@ describe("admin match result actions", () => {
     );
     expect(refreshOrganizationPublicSnapshotSafeMock).toHaveBeenCalledWith("org-1");
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin/matches");
+  });
+
+  function matchDateFixture(status = "finished", seasonId: string | null = "season-1") {
+    const fake = createFakeSupabase({
+      matches: [{ id: "match-1", organization_id: "org-1", status, season_id: seasonId,
+        scheduled_at: "2026-09-13T22:00:00.000Z", location: "Cancha vieja", result_version: 1 }],
+      organization_seasons: [{ id: "season-1", organization_id: "org-1", starts_at: "2026-07-01", ends_at: "2027-06-30" }]
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    return fake;
+  }
+
+  async function changeMatchDate(date: string) {
+    const formData = new FormData();
+    formData.set("scheduledDate", date);
+    formData.set("scheduledTime", "01:30");
+    formData.set("location", "Cancha nueva");
+    await expect(updateMatchAction("match-1", "org-1", formData)).rejects.toMatchObject({
+      digest: expect.stringContaining("NEXT_REDIRECT")
+    });
+    return new URL(String(redirectMock.mock.calls.at(-1)?.[0]), "http://localhost");
+  }
+
+  it.each(["2026-06-30", "2027-07-01"])("no mueve un finalizado fuera de su temporada: %s", async (date) => {
+    const fake = matchDateFixture();
+    const url = await changeMatchDate(date);
+    expect(url.searchParams.get("error")).toBe("La fecha de un partido finalizado debe quedar en la misma temporada.");
+    expect(fake.table("matches")[0]).toMatchObject({scheduled_at: "2026-09-13T22:00:00.000Z", location: "Cancha vieja"});
+    expect(refreshOrganizationPublicSnapshotSafeMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["2026-07-01", "2027-01-01", "2027-06-30"])("permite cambiar fecha y hora dentro del intervalo inclusivo: %s", async (date) => {
+    const fake = matchDateFixture();
+    const url = await changeMatchDate(date);
+    expect(url.searchParams.has("error")).toBe(false);
+    expect(fake.table("matches")[0]).toMatchObject({scheduled_at: `${date}T01:30:00.000Z`, location: "Cancha nueva", season_id: "season-1"});
+  });
+
+  it("conserva la fecha al cambiar solo la hora y protege el año de partidos antiguos sin temporada", async () => {
+    const fake = matchDateFixture("finished", null);
+    expect((await changeMatchDate("")).searchParams.has("error")).toBe(false);
+    expect(fake.table("matches")[0]).toMatchObject({scheduled_at: "2026-09-13T01:30:00.000Z"});
+    expect((await changeMatchDate("2027-01-01")).searchParams.get("error")).toBe("La fecha de un partido finalizado debe quedar en la misma temporada.");
+  });
+
+  it("no mueve la fecha si otra pestaña termina el partido entre la lectura y la actualización", async () => {
+    const fake = matchDateFixture("confirmed", null);
+    let matchReads = 0;
+    createSupabaseServerClientMock.mockResolvedValue({
+      ...fake.client,
+      from(table: Parameters<typeof fake.client.from>[0]) {
+        if (table === "matches" && ++matchReads === 2) {
+          void fake.client.from("matches").update({status: "finished", result_version: 2}).eq("id", "match-1").select("id").maybeSingle();
+        }
+        return fake.client.from(table);
+      }
+    });
+    const url = await changeMatchDate("2027-01-01");
+    expect(url.searchParams.get("error")).toContain("El partido cambio mientras lo editabas");
+    expect(fake.table("matches")[0]).toMatchObject({status: "finished", scheduled_at: "2026-09-13T22:00:00.000Z"});
+    expect(refreshOrganizationPublicSnapshotSafeMock).not.toHaveBeenCalled();
   });
 });

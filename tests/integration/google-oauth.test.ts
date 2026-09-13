@@ -44,7 +44,7 @@ describe("google oauth login", () => {
     });
 
     const formData = new FormData();
-    formData.set("next", "/admin/clubs");
+    formData.set("next", "/admin/players");
 
     await expect(loginWithGoogleAction(formData)).rejects.toMatchObject({
       digest: expect.stringContaining("NEXT_REDIRECT")
@@ -53,7 +53,7 @@ describe("google oauth login", () => {
     expect(signInWithOAuth).toHaveBeenCalledWith({
       provider: "google",
       options: {
-        redirectTo: "https://fabricadefutbol.com.ar/auth/callback?next=%2Fadmin%2Fclubs"
+        redirectTo: "https://fabricadefutbol.com.ar/auth/callback?next=%2Fadmin%2Fplayers"
       }
     });
     expect(redirectMock).toHaveBeenLastCalledWith(
@@ -98,12 +98,12 @@ describe("google oauth login", () => {
     });
 
     const response = await googleOAuthCallback(
-      new NextRequest("https://fabricadefutbol.com.ar/auth/callback?code=oauth-code&next=%2Fadmin%2Fclubs")
+      new NextRequest("https://fabricadefutbol.com.ar/auth/callback?code=oauth-code&next=%2Fadmin%2Fplayers")
     );
 
     expect(exchangeCodeForSession).toHaveBeenCalledWith("oauth-code");
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("https://fabricadefutbol.com.ar/admin/clubs");
+    expect(response.headers.get("location")).toBe("https://fabricadefutbol.com.ar/admin/players");
   });
 
   it("preserves query params in safe OAuth next paths", async () => {
@@ -126,7 +126,7 @@ describe("google oauth login", () => {
 
   it("rejects callback requests without a code", async () => {
     const response = await googleOAuthCallback(
-      new NextRequest("https://fabricadefutbol.com.ar/auth/callback?next=%2Fadmin%2Fclubs")
+      new NextRequest("https://fabricadefutbol.com.ar/auth/callback?next=%2Fadmin%2Fplayers")
     );
 
     expect(response.status).toBe(307);

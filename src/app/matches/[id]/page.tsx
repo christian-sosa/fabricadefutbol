@@ -87,7 +87,7 @@ export default async function MatchDetailPage({
               {details.teamAPlayers.map((player) => (
                 <li className="flex items-center justify-between gap-3" key={player.id}>
                   <span className="flex items-center gap-2">
-                    <PlayerAvatar name={player.full_name} playerId={player.is_guest ? undefined : player.id} size="sm" />
+                    <PlayerAvatar hasPhoto={Boolean(player.photo_path)} name={player.full_name} photoUpdatedAt={player.photo_updated_at} playerId={player.is_guest ? undefined : player.id} size="sm" />
                     {player.full_name}
                     {player.is_guest ? (
                       <span className="rounded-full border border-cyan-400/50 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
@@ -106,7 +106,7 @@ export default async function MatchDetailPage({
               {details.teamBPlayers.map((player) => (
                 <li className="flex items-center justify-between gap-3" key={player.id}>
                   <span className="flex items-center gap-2">
-                    <PlayerAvatar name={player.full_name} playerId={player.is_guest ? undefined : player.id} size="sm" />
+                    <PlayerAvatar hasPhoto={Boolean(player.photo_path)} name={player.full_name} photoUpdatedAt={player.photo_updated_at} playerId={player.is_guest ? undefined : player.id} size="sm" />
                     {player.full_name}
                     {player.is_guest ? (
                       <span className="rounded-full border border-cyan-400/50 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">

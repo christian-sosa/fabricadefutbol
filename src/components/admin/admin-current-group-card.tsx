@@ -48,7 +48,7 @@ export function AdminCurrentGroupCard({ admin, organization }: AdminCurrentGroup
           </div>
         </div>
       </Card>
-      <AdminSubnav scope="organizations" />
+      <AdminSubnav />
     </div>
   );
 }

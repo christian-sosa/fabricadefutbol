@@ -16,7 +16,7 @@ export function AdminNav({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const [mounted, setMounted] = useState(false);
   const navItems = isSuperAdmin
     ? [...ADMIN_NAV_ITEMS, { href: "/admin/super", label: "Super Admin" }]
-    : ADMIN_NAV_ITEMS.filter((item) => item.href !== "/admin/tournaments");
+    : ADMIN_NAV_ITEMS;
 
   useEffect(() => {
     setMounted(true);
@@ -26,7 +26,7 @@ export function AdminNav({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     if (!mounted) return false;
 
     if (itemHref === "/admin") {
-      return safePathname.startsWith("/admin") && !safePathname.startsWith("/admin/tournaments") && !safePathname.startsWith("/admin/super");
+      return safePathname.startsWith("/admin") && !safePathname.startsWith("/admin/super");
     }
 
     return safePathname === itemHref || safePathname.startsWith(`${itemHref}/`);

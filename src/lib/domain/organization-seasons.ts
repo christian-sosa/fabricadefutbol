@@ -10,12 +10,16 @@ export function toDateOnly(value: Date) {
   return value.toISOString().slice(0, 10);
 }
 
+function getOrganizationSeasonYear(date: Date) {
+  return new Intl.DateTimeFormat("en", { timeZone: "America/Argentina/Buenos_Aires", year: "numeric" }).format(date);
+}
+
 export function getAnnualOrganizationSeasonEndDate(now = new Date()) {
-  return `${now.getUTCFullYear()}-12-31`;
+  return `${getOrganizationSeasonYear(now)}-12-31`;
 }
 
 export function getAnnualOrganizationSeasonStartDate(now = new Date()) {
-  return `${now.getUTCFullYear()}-01-01`;
+  return `${getOrganizationSeasonYear(now)}-01-01`;
 }
 
 function parseDateOnly(value: string) {

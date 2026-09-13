@@ -119,32 +119,9 @@ async function getAdminFreeTrialStatus(userId: string): Promise<FreeTrialStatus>
   };
 }
 
-async function hasAdminMembershipInAnyOrganization(userId: string) {
-  const supabase = await createSupabaseServerClient();
-  const { count, error } = await supabase
-    .from("organization_admins")
-    .select("id", { count: "exact", head: true })
-    .eq("admin_id", userId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return (count ?? 0) > 0;
-}
-
 export async function getAdminOrganizationCreationAccess(admin: AdminSession) {
   const freeTrialStatus = await getAdminFreeTrialStatus(admin.userId);
   if (!freeTrialStatus.hasCreatedOrganization) {
-    const hasMembership = await hasAdminMembershipInAnyOrganization(admin.userId);
-    if (hasMembership) {
-      return {
-        canCreateOrganization: false,
-        reason:
-          "Ya administrás un grupo. Si querés sumar otro, escribinos y lo habilitamos manualmente."
-      };
-    }
-
     return {
       canCreateOrganization: true,
       reason: null as string | null

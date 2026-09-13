@@ -10,15 +10,11 @@ const sharedCoverage = {
   include: [
     "src/lib/domain/team-generator.ts",
     "src/lib/domain/rating.ts",
-    "src/lib/domain/billing.ts",
     "src/lib/rate-limit.ts",
-    "src/lib/payments/mercadopago.ts",
     "src/lib/org.ts",
     "src/lib/errors.ts",
     "src/lib/queries/public.ts",
-    "src/lib/domain/tournament-billing-workflow.ts",
     "src/lib/domain/match-workflow.ts",
-    "src/app/api/payments/mercadopago/webhook/route.ts",
     "src/components/admin/new-match-form.tsx",
     "src/components/admin/match-result-editor.tsx"
   ],
@@ -39,18 +35,6 @@ const sharedCoverage = {
       branches: 70,
       statements: 80
     },
-    "src/lib/domain/billing.ts": {
-      lines: 80,
-      functions: 80,
-      branches: 70,
-      statements: 80
-    },
-    "src/lib/domain/tournament-billing-workflow.ts": {
-      lines: 80,
-      functions: 80,
-      branches: 70,
-      statements: 80
-    },
     "src/lib/rate-limit.ts": {
       lines: 80,
       functions: 80,
@@ -58,18 +42,6 @@ const sharedCoverage = {
       statements: 80
     },
     "src/lib/org.ts": {
-      lines: 80,
-      functions: 80,
-      branches: 70,
-      statements: 80
-    },
-    "src/lib/payments/mercadopago.ts": {
-      lines: 80,
-      functions: 80,
-      branches: 70,
-      statements: 80
-    },
-    "src/app/api/payments/mercadopago/webhook/route.ts": {
       lines: 80,
       functions: 80,
       branches: 70,

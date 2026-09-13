@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   createOrganizationAction,
   deleteOrganizationAction,
@@ -8,7 +9,6 @@ import { TrackedLink } from "@/components/analytics/tracked-link";
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { GroupActivityValueCard } from "@/components/admin/group-activity-value-card";
 import { OrganizationImage } from "@/components/groups/organization-image";
-import { TournamentStatusBadge } from "@/components/tournaments/tournament-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
@@ -18,14 +18,13 @@ import {
   getAdminOrganizationCreationAccess,
   getOrganizationWriteAccess
 } from "@/lib/auth/admin";
-import { getAdminClubs } from "@/lib/auth/clubs";
-import { getLeagueCreationAccess } from "@/lib/auth/tournaments";
+import { MATCH_MODALITIES, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { GROWTH_EVENTS } from "@/lib/growth";
 import { getOrganizationImageUrl } from "@/lib/organization-images";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminDashboardData } from "@/lib/queries/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getOrganizationSeasons } from "@/lib/queries/public";
-import { getAdminLeagueList } from "@/lib/queries/tournaments";
 
 type OrganizationEntry = {
   id: string;
@@ -35,24 +34,8 @@ type OrganizationEntry = {
   created_at: string;
 };
 
-type LeagueEntry = Awaited<ReturnType<typeof getAdminLeagueList>>[number];
-type ClubEntry = Awaited<ReturnType<typeof getAdminClubs>>[number];
 type OrganizationSeasonEntry = Awaited<ReturnType<typeof getOrganizationSeasons>>[number];
-
-const leagueActionLinkClass =
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-sky-400/45 bg-sky-500/10 px-3.5 py-2 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/15";
-
-const clubActionLinkClass =
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-indigo-400/45 bg-indigo-500/10 px-3.5 py-2 text-sm font-semibold text-indigo-200 transition hover:bg-indigo-500/15";
-
-const enterGroupLinkClass =
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-accent px-3.5 py-2 text-sm font-semibold text-white transition hover:brightness-110";
-
-const enterLeagueLinkClass =
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-sky-500 px-3.5 py-2 text-sm font-semibold text-white transition hover:brightness-110";
-
-const enterClubLinkClass =
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-indigo-500 px-3.5 py-2 text-sm font-semibold text-white transition hover:brightness-110";
+const enterGroupLinkClass = "inline-flex items-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white";
 
 function findOrganizationByKey(organizations: OrganizationEntry[], organizationKey?: string | null) {
   if (!organizationKey) return null;
@@ -109,28 +92,32 @@ function AdminFeedback({
 function AdminOnboardingCard({
   canWrite,
   dashboardData,
-  organizationSlug
+  organizationSlug,
+  modality
 }: {
   canWrite: boolean;
   dashboardData: Awaited<ReturnType<typeof getAdminDashboardData>>;
   organizationSlug: string;
+  modality?: string;
 }) {
+  const selectedModality = MATCH_MODALITIES.find((value) => value === modality) ?? "6v6";
+  const requiredPlayers = TEAM_SIZE_BY_MODALITY[selectedModality] * 2;
   const totalMatches =
     dashboardData.draftsCount + dashboardData.confirmedCount + dashboardData.finishedCount;
   const steps = [
     {
       title: "Cargá jugadores",
-      description: "Definí niveles y dejá listo el plantel base del grupo.",
-      done: dashboardData.playersCount > 0,
-      href: withOrgQuery("/admin/players", organizationSlug),
+      description: `${dashboardData.playersCount} de ${requiredPlayers} jugadores para ${selectedModality}. Podés ajustar los niveles después.`,
+      done: dashboardData.playersCount >= requiredPlayers,
+      href: withOrgQuery("/admin/players?view=new", organizationSlug),
       cta: "Ir a jugadores"
     },
     {
       title: "Armá el primer partido",
       description: "Elegí modalidad, convocados, invitados y arqueros.",
       done: totalMatches > 0,
-      href: withOrgQuery("/admin/matches", organizationSlug),
-      cta: "Ir a partidos"
+      href: withOrgQuery(`/admin/matches/new?modality=${selectedModality}`, organizationSlug),
+      cta: "Armar partido"
     },
     {
       title: "Cargá el resultado",
@@ -162,6 +149,13 @@ function AdminOnboardingCard({
         ) : null}
       </div>
 
+      <form className="mt-4 flex flex-wrap items-center gap-2" action="/admin">
+        <input name="org" type="hidden" value={organizationSlug} />
+        <label className="text-sm" htmlFor="onboarding-modality">¿Cuántos juegan?</label>
+        <select className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm" defaultValue={selectedModality} id="onboarding-modality" name="modality">
+          {MATCH_MODALITIES.map((value) => <option key={value} value={value}>{value.replace("v", " vs ")}</option>)}
+        </select><Button type="submit" variant="secondary">Actualizar pasos</Button>
+      </form>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         {steps.map((step, index) => (
           <div
@@ -198,258 +192,42 @@ function AdminOnboardingCard({
   );
 }
 
-function AdminHomeHub({
-  creationAccess,
-  clubs,
-  checkout,
-  error,
-  leagueCreationAccess,
-  leagues,
-  organizations,
-  showTournaments,
-  success
-}: {
-  creationAccess: Awaited<ReturnType<typeof getAdminOrganizationCreationAccess>>;
-  clubs: ClubEntry[];
-  checkout?: string;
-  error?: string;
-  leagueCreationAccess: Awaited<ReturnType<typeof getLeagueCreationAccess>>;
-  leagues: LeagueEntry[];
-  organizations: OrganizationEntry[];
-  showTournaments: boolean;
-  success?: string;
-}) {
-  const hasOrganizations = organizations.length > 0;
-  const hasClubs = clubs.length > 0;
-  const hasLeagues = leagues.length > 0;
-  const visibleHubCards = 1 + (hasClubs ? 1 : 0) + (showTournaments ? 1 : 0);
-  const hubGridClass = visibleHubCards >= 3 ? "lg:grid-cols-2 xl:grid-cols-3" : visibleHubCards === 2 ? "lg:grid-cols-2" : "";
-
-  return (
-    <div className="space-y-4">
-      <AdminFeedback checkout={checkout} error={error} success={success} />
-
-      <Card className="p-5 sm:p-6">
-        <CardTitle className="text-3xl">Que queres administrar?</CardTitle>
-        <CardDescription className="mt-3 max-w-3xl text-base">
-          {showTournaments || hasClubs
-            ? "Elegi un espacio antes de cargar datos. Asi cada flujo mantiene jugadores, partidos, competencias y permisos en el lugar correcto."
-            : "Elegi un grupo antes de cargar datos. Asi jugadores, partidos, rendimiento y configuracion quedan en el lugar correcto."}
-        </CardDescription>
-      </Card>
-
-      <section className={`grid gap-4 ${hubGridClass}`}>
-        <Card>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <CardTitle>Tus grupos</CardTitle>
-              <CardDescription className="mt-2">
-                Para partidos recurrentes, niveles de habilidad, rendimiento, historial y proximas fechas.
-              </CardDescription>
-            </div>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {hasOrganizations ? (
-              organizations.map((organization) => (
-                <div
-                  className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 sm:flex-row sm:items-center sm:justify-between"
-                  key={organization.id}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-slate-100">{organization.name}</p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      {organization.is_public ? "Publico" : "Privado"} - /{organization.slug}
-                    </p>
-                  </div>
-                  <Link
-                    className={enterGroupLinkClass}
-                    href={withOrgQuery("/admin", organization.slug)}
-                  >
-                    Entrar al grupo
-                  </Link>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                <p className="text-sm font-semibold text-slate-100">Todavía no administrás grupos.</p>
-                <p className="mt-1 text-sm text-slate-400">
-                  Creá el primero para empezar a cargar jugadores y partidos semanales.
-                </p>
-                <form
-                  action={createOrganizationAction}
-                  className="mt-4 flex flex-col gap-3 md:flex-row"
-                >
-                  <Input name="name" placeholder="Nombre del grupo" required />
-                  <Button disabled={!creationAccess.canCreateOrganization} type="submit">
-                    Crear grupo
-                  </Button>
-                </form>
-                {!creationAccess.canCreateOrganization ? (
-                  <p className="mt-2 text-xs font-semibold text-amber-300">
-                    {creationAccess.reason ??
-                      "Si querés sumar otro grupo, escribinos y lo habilitamos manualmente."}
-                  </p>
-                ) : null}
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {hasClubs ? (
-          <Card>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <CardTitle>Tus clubes</CardTitle>
-                <CardDescription className="mt-2">
-                  Para planteles, equipos del club, partidos segun modalidad, torneos internos y estadisticas privadas.
-                </CardDescription>
-              </div>
-              <Link
-                className={clubActionLinkClass}
-                href="/admin/clubs"
-              >
-                Ver clubes
-              </Link>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {clubs.map((club) => (
-                <div
-                  className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 sm:flex-row sm:items-center sm:justify-between"
-                  key={club.id}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-slate-100">{club.name}</p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      {club.status === "active" ? "Activo" : "Oculto"} - /clubs/{club.slug}
-                    </p>
-                  </div>
-                  <Link
-                    className={enterClubLinkClass}
-                    href={`/admin/clubs/${club.id}`}
-                  >
-                    Entrar al club
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </Card>
-        ) : null}
-
-        {showTournaments ? (
-          <Card>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <CardTitle>Tus ligas</CardTitle>
-                <CardDescription className="mt-2">
-                  Para torneos con equipos maestros, competencias, fixture, tabla y resultados publicos.
-                </CardDescription>
-              </div>
-              {leagueCreationAccess.canCreateLeague ? (
-                <Link
-                  className={leagueActionLinkClass}
-                  href="/admin/tournaments/new"
-                >
-                  Nueva liga
-                </Link>
-              ) : null}
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {hasLeagues ? (
-                leagues.map((league) => (
-                  <div
-                    className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 sm:flex-row sm:items-center sm:justify-between"
-                    key={league.id}
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate font-semibold text-slate-100">{league.name}</p>
-                        <TournamentStatusBadge status={league.status} />
-                      </div>
-                      <p className="mt-1 text-xs text-slate-400">
-                        {league.teamCount} equipos - {league.competitionCount} competencias
-                      </p>
-                    </div>
-                    <Link
-                      className={enterLeagueLinkClass}
-                      href={`/admin/tournaments/${league.id}`}
-                    >
-                      Entrar a la liga
-                    </Link>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                  <p className="text-sm font-semibold text-slate-100">Todavia no administras ligas.</p>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {leagueCreationAccess.canCreateLeague
-                      ? "Crea una liga cuando necesites competencias, equipos inscriptos y tabla publica."
-                      : (leagueCreationAccess.reason ?? "Por ahora las altas de ligas estan habilitadas manualmente.")}
-                  </p>
-                  {leagueCreationAccess.canCreateLeague ? (
-                    <Link
-                      className={`${enterLeagueLinkClass} mt-4`}
-                      href="/admin/tournaments/new"
-                    >
-                      Crear liga
-                    </Link>
-                  ) : null}
-                </div>
-              )}
-            </div>
-          </Card>
-        ) : null}
-      </section>
-    </div>
-  );
-}
-
 export default async function AdminDashboardPage({
   searchParams
 }: {
-  searchParams: Promise<{ org?: string; error?: string; checkout?: string; success?: string }>;
+  searchParams: Promise<{ org?: string; error?: string; checkout?: string; success?: string; modality?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const { admin, organizations } = await getAdminOrganizationContext(resolvedSearchParams.org);
 
   const creationAccess = await getAdminOrganizationCreationAccess(admin);
+  if (!resolvedSearchParams.org && organizations.length === 1) {
+    redirect(withOrgQuery("/admin", organizations[0].slug));
+  }
   const selectedOrganization = resolvedSearchParams.org
     ? findOrganizationByKey(organizations, resolvedSearchParams.org)
-    : null;
-  const showTournaments = admin.isSuperAdmin;
-  const leagueCreationAccess = showTournaments
-    ? await getLeagueCreationAccess(admin)
-    : {
-        canCreateLeague: false,
-        reason: null
-      };
-
+    : organizations.length === 1 ? organizations[0] : null;
   if (!selectedOrganization) {
-    const [clubs, leagues] = await Promise.all([
-      getAdminClubs(admin),
-      showTournaments ? getAdminLeagueList() : Promise.resolve([])
-    ]);
-
-    return (
-      <AdminHomeHub
-        clubs={clubs}
-        checkout={resolvedSearchParams.checkout}
-        creationAccess={creationAccess}
-        error={resolvedSearchParams.error}
-        leagueCreationAccess={leagueCreationAccess}
-        leagues={leagues}
-        organizations={organizations}
-        showTournaments={showTournaments}
-        success={resolvedSearchParams.success}
-      />
-    );
+    return <div className="space-y-4">
+      <AdminFeedback error={resolvedSearchParams.error} success={resolvedSearchParams.success} />
+      <Card><CardTitle>{organizations.length ? "Tus grupos" : "Creá tu primer grupo"}</CardTitle>
+        <CardDescription className="mt-2">Empezá por el nombre. Después podés pegar la lista de jugadores y armar el primer partido.</CardDescription>
+        {organizations.length ? <div className="mt-4 space-y-3">{organizations.map((organization) => <Link className={enterGroupLinkClass} href={withOrgQuery("/admin", organization.slug)} key={organization.id}>{organization.name}</Link>)}</div> :
+          <form action={createOrganizationAction} className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <Input aria-label="Nombre del grupo" name="name" placeholder="Nombre del grupo" required />
+            <Button disabled={!creationAccess.canCreateOrganization} type="submit">Crear grupo gratis</Button>
+          </form>}
+        {!creationAccess.canCreateOrganization ? <Link className="mt-4 block text-sm text-emerald-300 underline" href="/feedback?intent=multiple_groups">Necesito administrar otro grupo</Link> : null}
+      </Card>
+    </div>;
   }
 
   const dashboardData = await getAdminDashboardData(selectedOrganization.id);
   const organizationWriteAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   const canWriteSelectedOrganization = organizationWriteAccess?.canWrite ?? false;
+  const supabase = await createSupabaseServerClient();
+  const { error: seasonError } = await supabase.rpc("ensure_group_current_season", { p_organization_id: selectedOrganization.id });
+  if (seasonError) throw new Error("No se pudo preparar la temporada actual.");
   const organizationSeasons = await getOrganizationSeasons(selectedOrganization.id);
   const activeSeason = organizationSeasons.find((season) => season.status === "active") ?? null;
   const organizationImageSrc = getOrganizationImageUrl(selectedOrganization.id);
@@ -464,6 +242,13 @@ export default async function AdminDashboardPage({
 
       <AdminCurrentGroupCard admin={admin} organization={selectedOrganization} />
 
+      <AdminOnboardingCard
+        canWrite={canWriteSelectedOrganization}
+        dashboardData={dashboardData}
+        organizationSlug={selectedOrganization.slug}
+        modality={resolvedSearchParams.modality ?? dashboardData.latestMatches[0]?.modality}
+      />
+
       <GroupActivityValueCard
         finishedCount={dashboardData.finishedCount}
         playersCount={dashboardData.playersCount}
@@ -472,8 +257,9 @@ export default async function AdminDashboardPage({
         totalMatches={dashboardData.draftsCount + dashboardData.confirmedCount + dashboardData.finishedCount}
       />
 
-      <Card>
-        <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+      <details className="rounded-2xl border border-slate-800 p-4">
+        <summary className="cursor-pointer font-semibold">Personalizar foto de portada</summary>
+        <div className="mt-4 grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <OrganizationImage
             alt={`Imagen de ${selectedOrganization.name}`}
             className="aspect-[16/9] min-h-[220px]"
@@ -506,7 +292,7 @@ export default async function AdminDashboardPage({
             </details>
           </div>
         </div>
-      </Card>
+      </details>
 
       {admin.isSuperAdmin ? (
         <Card className="border-danger/40 bg-danger/10">
@@ -526,11 +312,7 @@ export default async function AdminDashboardPage({
         </Card>
       ) : null}
 
-      <AdminOnboardingCard
-        canWrite={canWriteSelectedOrganization}
-        dashboardData={dashboardData}
-        organizationSlug={selectedOrganization.slug}
-      />
+
     </div>
   );
 }

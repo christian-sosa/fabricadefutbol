@@ -34,6 +34,22 @@ function getCheckbox(container: HTMLElement, name: string, value: string) {
 }
 
 describe("NewMatchForm", () => {
+  it("precarga el partido anterior y permite revisar la nueva fecha", () => {
+    const players = buildPlayers(10);
+    const { container } = render(<NewMatchForm defaultScheduledDate="2026-09-20" organizationId="org-1" players={players}
+      initialValues={{ modality: "5v5", location: "Cancha del barrio", scheduledTime: "21:30", playerIds: players.map((p) => p.id), goalkeeperPlayerIds: ["player-1", "player-10"], guests: [] }} />);
+    expect(screen.getByLabelText("Modalidad")).toHaveValue("5v5");
+    expect(screen.getByLabelText("Ubicacion")).toHaveValue("Cancha del barrio");
+    expect(screen.getByLabelText("Hora")).toHaveValue("21:30");
+    expect(screen.getByLabelText("Fecha")).toHaveValue("2026-09-20");
+    expect(getCheckbox(container, "playerIds", "player-10")).toBeChecked();
+    expect(getCheckbox(container, "goalkeeperPlayerIds", "player-1")).toBeChecked();
+  });
+  it("respeta la modalidad elegida durante el alta", () => {
+    render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} defaultModality="7v7" organizationId="org-1" players={buildPlayers(14)} />);
+    expect(screen.getByLabelText("Modalidad")).toHaveValue("7v7");
+  });
+
   it("muestra nombres de equipos solo cuando se arma el partido manual", async () => {
     const user = userEvent.setup();
     render(

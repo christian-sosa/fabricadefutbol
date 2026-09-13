@@ -15,6 +15,7 @@ function requireEnv(name: string) {
 }
 
 function createServiceClient() {
+  if (getSupabaseDbSchema() !== "app_dev") throw new Error("E2E solo puede preparar app_dev.");
   const serviceRoleKey = getSupabaseServiceRoleKey();
   if (!serviceRoleKey) {
     throw new Error("SUPABASE_SERVICE_ROLE_KEY_DEV es obligatoria para preparar el entorno E2E.");
@@ -74,16 +75,18 @@ async function ensureAdminUser(client: ReturnType<typeof createServiceClient>) {
 async function ensureOrganization(client: ReturnType<typeof createServiceClient>, adminId: string) {
   const slug = requireEnv("E2E_ORG_SLUG");
   const name = process.env.E2E_ORG_NAME?.trim() || "Organizacion E2E";
-  const now = new Date().toISOString();
 
   const { data: existing, error: existingError } = await client
     .from("organizations")
-    .select("id")
+    .select("id, created_by")
     .eq("slug", slug)
     .maybeSingle();
   if (existingError) throw existingError;
 
   const organizationId = existing?.id ?? E2E_ORGANIZATION_ID;
+  if (existing && (existing.id !== E2E_ORGANIZATION_ID || existing.created_by !== adminId)) {
+    throw new Error("El grupo E2E existente no pertenece al fixture autorizado.");
+  }
 
   const { error: orgError } = await client.from("organizations").upsert(
     {
@@ -91,9 +94,7 @@ async function ensureOrganization(client: ReturnType<typeof createServiceClient>
       name,
       slug,
       is_public: true,
-      created_by: adminId,
-      created_at: now,
-      updated_at: now
+      created_by: adminId
     },
     { onConflict: "id" }
   );

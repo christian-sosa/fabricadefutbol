@@ -14,7 +14,8 @@ import {
   assertPlayerPhotoUploadAllowed,
   registerPlayerPhotoUploadEvent
 } from "@/lib/player-photo-upload-limits";
-import { MAX_SKILL_LEVEL, MIN_SKILL_LEVEL, normalizeSkillLevel } from "@/lib/domain/skill-level";
+import { DEFAULT_SKILL_LEVEL, MAX_SKILL_LEVEL, MIN_SKILL_LEVEL, normalizeSkillLevel } from "@/lib/domain/skill-level";
+import { parsePlayerNameList } from "@/lib/domain/player-name-list";
 import {
   getOrganizationPlayerPhotoObjectPath,
   inferPlayerPhotoExtension,
@@ -104,11 +105,12 @@ async function savePlayerPhotoForAdmin({
   validatePlayer?: boolean;
 }) {
   validatePlayerPhotoFile(file, organizationQueryKey);
+  let previousPhotoPath: string | null = null;
 
   if (validatePlayer) {
     const { data: player, error: playerError } = await supabase
       .from("players")
-      .select("id")
+      .select("id, photo_path")
       .eq("id", playerId)
       .eq("organization_id", organizationId)
       .maybeSingle();
@@ -116,6 +118,7 @@ async function savePlayerPhotoForAdmin({
     if (playerError || !player) {
       redirect(withMessage(organizationQueryKey, "No se encontro el jugador en el grupo seleccionado."));
     }
+    previousPhotoPath = player.photo_path ?? null;
   }
 
   await assertPlayerPhotoUploadAllowed({
@@ -127,7 +130,7 @@ async function savePlayerPhotoForAdmin({
   });
 
   const optimizedBuffer = await optimizePlayerAvatarImage(file);
-  const objectPath = getOrganizationPlayerPhotoObjectPath(getSupabaseDbSchema(), organizationId, playerId);
+  const objectPath = getOrganizationPlayerPhotoObjectPath(getSupabaseDbSchema(), organizationId, playerId, crypto.randomUUID());
   const bucketName = getPlayerPhotosBucket();
   const { error: uploadError } = await supabase.storage
     .from(bucketName)
@@ -144,6 +147,23 @@ async function savePlayerPhotoForAdmin({
     });
     redirect(withMessage(organizationQueryKey, "No se pudo guardar la foto en Storage. Intenta nuevamente."));
   }
+
+  const metadataUpdate = supabase.from("players")
+    .update({ photo_path: objectPath, photo_updated_at: new Date().toISOString() })
+    .eq("id", playerId).eq("organization_id", organizationId);
+  const { data: updatedPlayers, error: photoMetadataError } = await (previousPhotoPath
+    ? metadataUpdate.eq("photo_path", previousPhotoPath)
+    : metadataUpdate.is("photo_path", null)).select("id");
+  if (photoMetadataError || !updatedPlayers?.length) {
+    await supabase.storage.from(bucketName).remove([objectPath]);
+    redirect(withMessage(organizationQueryKey, "No se pudo asociar la foto o el jugador cambió mientras subías. Recargá e intentá nuevamente."));
+  }
+  if (previousPhotoPath && previousPhotoPath !== objectPath) {
+    const { error: cleanupError } = await supabase.storage.from(bucketName).remove([previousPhotoPath]);
+    if (cleanupError) logError("players.photo.previous_cleanup.failed", cleanupError, { organizationId, playerId });
+  }
+  const { error: snapshotError } = await supabase.from("organization_public_snapshots").delete().eq("organization_id", organizationId);
+  if (snapshotError) logError("players.photo.snapshot_invalidation.failed", snapshotError, { organizationId, playerId });
 
   await registerPlayerPhotoUploadEvent({
     supabase: supabase as never,
@@ -238,6 +258,39 @@ export async function createPlayerAction(formData: FormData) {
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(withMessage(String(formData.get("organizationId") ?? ""), toUserMessage(error, "Error inesperado al crear jugador.")));
+  }
+}
+
+export async function bulkCreatePlayersAction(_: { error: string | null }, formData: FormData): Promise<{ error: string | null }> {
+  const parsedId = z.string().uuid().safeParse(formData.get("organizationId"));
+  if (!parsedId.success) return { error: "Falta un grupo válido." };
+  try {
+    const names = parsePlayerNameList(String(formData.get("names") ?? ""));
+    await assertOrganizationAdminAction(parsedId.data);
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.from("players").select("full_name, initial_rank, display_order").eq("organization_id", parsedId.data);
+    if (error) return { error: "No se pudo consultar el plantel. Intentá de nuevo." };
+    const existing = data ?? [];
+    const existingNames = new Set(existing.map((player) => player.full_name.trim().toLocaleLowerCase("es")));
+    const newNames = names.filter((name) => !existingNames.has(name.toLocaleLowerCase("es")));
+    if (!newNames.length) return { error: "Todos esos jugadores ya están en el grupo." };
+    const initialRank = Math.max(0, ...existing.map((player) => Number(player.initial_rank) || 0));
+    const displayOrder = Math.max(0, ...existing.map((player) => Number(player.display_order ?? player.initial_rank) || 0));
+    const { error: insertError } = await supabase.from("players").insert(newNames.map((name, index) => ({
+      organization_id: parsedId.data, full_name: name, skill_level: DEFAULT_SKILL_LEVEL,
+      initial_rank: initialRank + index + 1, display_order: displayOrder + index + 1
+    })));
+    if (insertError) return { error: "No se pudo guardar la lista. Si otro admin cargó jugadores, recargá y volvé a intentar." };
+    await refreshOrganizationPublicSnapshotSafe(parsedId.data);
+    revalidatePath("/admin");
+    revalidatePath("/admin/players");
+    revalidatePath("/players");
+    revalidatePath("/ranking");
+    const organizationKey = await getOrganizationQueryKeyById(parsedId.data);
+    redirect(`${withSuccess(organizationKey, `${newNames.length} jugadores cargados. Podés ajustar niveles cuando quieras.`)}&view=edit`);
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    return { error: toUserMessage(error, "No se pudo cargar la lista.") };
   }
 }
 

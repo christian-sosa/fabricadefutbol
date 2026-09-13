@@ -51,7 +51,7 @@ export default async function PlayerDetailPage({
 
       <Card>
         <div className="flex flex-wrap items-center gap-4">
-          <PlayerAvatar className="h-16 w-16" name={details.player.full_name} playerId={details.player.id} size="lg" />
+          <PlayerAvatar className="h-16 w-16" hasPhoto={Boolean(details.player.photo_path)} name={details.player.full_name} photoUpdatedAt={details.player.photo_updated_at} playerId={details.player.id} size="lg" />
           <div>
             <CardTitle>{details.player.full_name}</CardTitle>
             <CardDescription>Rendimiento actual {formatRendimiento(details.player.current_rating)}</CardDescription>

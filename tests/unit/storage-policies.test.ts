@@ -16,12 +16,6 @@ const privateBuckets = [
   "player-photos-dev",
   "organization-images",
   "organization-images-dev",
-  "league-logos",
-  "league-logos-dev",
-  "league-photos",
-  "league-photos-dev",
-  "team-logos",
-  "team-logos-dev"
 ] as const;
 
 describeSupabaseSql("storage privacy policies", () => {
@@ -38,18 +32,10 @@ describeSupabaseSql("storage privacy policies", () => {
     expect(policiesSql).not.toContain(
       "using (bucket_id in ('organization-images', 'organization-images-dev'));"
     );
-    expect(policiesSql).not.toContain("using (bucket_id in ('league-logos', 'league-logos-dev'));");
-    expect(policiesSql).not.toContain("using (bucket_id in ('league-photos', 'league-photos-dev'));");
-    expect(policiesSql).not.toContain("using (bucket_id in ('team-logos', 'team-logos-dev'));");
   });
 
   it("ata la lectura de objetos a las reglas de negocio", () => {
     expect(policiesSql).toContain("public.can_read_player_photo_object(name)");
     expect(policiesSql).toContain("public.can_read_organization_image_object(name)");
-    expect(policiesSql).toContain("public.can_read_league_logo_object(name)");
-    expect(policiesSql).toContain("public.can_read_league_photo_object(name)");
-    expect(policiesSql).toContain("public.can_read_team_logo_object(name)");
-    expect(policiesSql).toContain("scope_name = 'clubs'");
-    expect(policiesSql).toContain("scope_name = 'club-teams'");
   });
 });

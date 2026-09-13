@@ -67,7 +67,7 @@ export default async function NewOrganizationPage({
           {selectedOrganization ? (
             <input name="organizationId" type="hidden" value={selectedOrganization.id} />
           ) : null}
-          <Input name="name" placeholder="Nombre del grupo" required />
+          <Input aria-label="Nombre del nuevo grupo" name="name" placeholder="Nombre del grupo" required />
           <TrackedButton
             disabled={!creationAccess.canCreateOrganization}
             eventName={GROWTH_EVENTS.ctaClicked}
@@ -82,10 +82,10 @@ export default async function NewOrganizationPage({
         </form>
 
         {!creationAccess.canCreateOrganization ? (
-          <p className="mt-2 text-xs font-semibold text-amber-300">
+          <div><p className="mt-2 text-xs font-semibold text-amber-300">
             {creationAccess.reason ??
               "Si querés sumar otro grupo, escribinos y lo habilitamos manualmente."}
-          </p>
+          </p><Link className="mt-3 inline-block text-sm font-semibold text-emerald-300 underline" href="/feedback?intent=multiple_groups">Solicitar otro grupo</Link></div>
         ) : null}
         {resolvedSearchParams.error ? (
           <p className="mt-3 text-sm font-semibold text-danger">{resolvedSearchParams.error}</p>

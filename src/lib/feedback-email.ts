@@ -1,8 +1,8 @@
 import { getFeedbackFromEmail, getFeedbackInboxEmail, getResendApiKey } from "@/lib/env";
 import { normalizeEmail } from "@/lib/org";
 
-export type FeedbackCategory = "sugerencia" | "queja" | "error" | "otro";
-export type FeedbackModule = "organizations" | "tournaments" | "clubs" | "both";
+export type FeedbackCategory = "sugerencia" | "queja" | "error" | "otro" | "multiple_groups" | "setup_help";
+export type FeedbackModule = "organizations" | "both";
 
 type SendFeedbackEmailInput = {
   fullName: string;
@@ -18,6 +18,10 @@ type SendFeedbackEmailInput = {
 
 function categoryLabel(category: FeedbackCategory) {
   switch (category) {
+    case "multiple_groups":
+      return "Administrar varios grupos";
+    case "setup_help":
+      return "Ayuda para la carga inicial";
     case "sugerencia":
       return "Sugerencia";
     case "queja":
@@ -33,10 +37,6 @@ function moduleLabel(module: FeedbackModule) {
   switch (module) {
     case "organizations":
       return "Grupos";
-    case "clubs":
-      return "Clubes";
-    case "tournaments":
-      return "Torneos";
     default:
       return "General";
   }
@@ -65,7 +65,7 @@ export async function sendFeedbackEmail(input: SendFeedbackEmailInput) {
     `Tema: ${moduleName}`,
     `Nombre: ${input.fullName}`,
     `Email: ${normalizedSenderEmail}`,
-    `Grupo / club / torneo: ${input.organization ?? "No informado"}`,
+    `Grupo: ${input.organization ?? "No informado"}`,
     `Enviado: ${input.submittedAtIso}`,
     `User-Agent: ${input.userAgent ?? "No informado"}`,
     `Referer: ${input.referer ?? "No informado"}`,

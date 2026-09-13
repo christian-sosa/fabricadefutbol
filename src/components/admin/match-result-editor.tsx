@@ -14,14 +14,14 @@ import {
 } from "@/lib/domain/skill-level";
 import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL } from "@/lib/team-labels";
 import { formatRendimiento } from "@/lib/utils";
-import type { TeamSide } from "@/types/domain";
+import type { MatchResultInput, TeamSide } from "@/types/domain";
 
 type ExistingParticipant = {
   participantId: string;
   fullName: string;
   rating: number;
   source: "player" | "guest";
-  initialTeam: TeamSide;
+  initialTeam: TeamSide | "OUT";
 };
 
 type ReplacementPlayerOption = {
@@ -44,32 +44,12 @@ type GuestDraft = {
 
 type MatchResultEditorProps = {
   action?: (formData: FormData) => void | Promise<void>;
-  onSubmit?: (payload: {
-    scoreA: number;
-    scoreB: number;
-      notes?: string;
-      mvpParticipantId?: string | null;
-      lineup?: {
-        assignments: Array<{
-          participantId: string;
-          team: "A" | "B" | "OUT";
-        }>;
-        absencePenaltyParticipantIds?: string[];
-        newGuests?: Array<{
-          clientId?: string;
-          name: string;
-        rating: number;
-        team: "A" | "B";
-      }>;
-      newPlayers?: Array<{
-        playerId: string;
-        team: "A" | "B";
-      }>;
-      handicapTeam?: TeamSide | null;
-    };
-  }) => Promise<void>;
+  onSubmit?: (payload: MatchResultInput) => Promise<void>;
   existingParticipants: ExistingParticipant[];
   availablePlayers?: ReplacementPlayerOption[];
+  expectedVersion?: number;
+  defaultAbsencePenaltyParticipantIds?: string[];
+  defaultHandicapTeam?: TeamSide | null;
   defaultScoreA: number;
   defaultScoreB: number;
   defaultMvpParticipantId?: string | null;
@@ -88,6 +68,9 @@ export function MatchResultEditor({
   onSubmit,
   existingParticipants,
   availablePlayers = [],
+  expectedVersion = 0,
+  defaultAbsencePenaltyParticipantIds = [],
+  defaultHandicapTeam = null,
   defaultScoreA,
   defaultScoreB,
   defaultMvpParticipantId = null,
@@ -106,11 +89,11 @@ export function MatchResultEditor({
   const [guestSequence, setGuestSequence] = useState(1);
   const [newGuests, setNewGuests] = useState<GuestDraft[]>([]);
   const [replacementPlayers, setReplacementPlayers] = useState<ReplacementPlayerDraft[]>([]);
-  const [absencePenalties, setAbsencePenalties] = useState<Set<string>>(() => new Set());
+  const [absencePenalties, setAbsencePenalties] = useState<Set<string>>(() => new Set(defaultAbsencePenaltyParticipantIds));
   const [selectedReplacementPlayerId, setSelectedReplacementPlayerId] = useState("");
   const [selectedReplacementTeam, setSelectedReplacementTeam] = useState<TeamSide>("A");
-  const [handicapEnabled, setHandicapEnabled] = useState(false);
-  const [handicapTeam, setHandicapTeam] = useState<TeamSide>("A");
+  const [handicapEnabled, setHandicapEnabled] = useState(Boolean(defaultHandicapTeam));
+  const [handicapTeam, setHandicapTeam] = useState<TeamSide>(defaultHandicapTeam ?? "A");
   const [selectedMvpParticipantId, setSelectedMvpParticipantId] = useState(defaultMvpParticipantId ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -281,6 +264,7 @@ export function MatchResultEditor({
       }
 
       await onSubmit({
+        expectedVersion,
         scoreA,
         scoreB,
         notes,
@@ -314,6 +298,7 @@ export function MatchResultEditor({
 
   return (
     <form action={onSubmit ? undefined : action} className="mt-4 space-y-4" onSubmit={onSubmit ? handleSubmit : undefined}>
+      <input name="expectedVersion" type="hidden" value={expectedVersion} />
       <input name="lineupPayload" type="hidden" value={lineupPayload} />
       <input name="mvpParticipantId" type="hidden" value={selectedMvpParticipantId} />
 

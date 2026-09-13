@@ -4,10 +4,10 @@ import Link from "next/link";
 import type { ComponentProps } from "react";
 
 import { trackAnalyticsEvent } from "@/lib/analytics/client";
-import type { GrowthEventName } from "@/lib/growth";
+import type { ClientAnalyticsEventName } from "@/lib/analytics/events";
 
 type TrackedLinkProps = ComponentProps<typeof Link> & {
-  eventName: GrowthEventName;
+  eventName: ClientAnalyticsEventName;
   eventProperties?: Record<string, string | number | boolean>;
 };
 

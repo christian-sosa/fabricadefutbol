@@ -20,7 +20,7 @@ type ExistingParticipant = {
   fullName: string;
   rating: number;
   source: "player" | "guest";
-  initialTeam: TeamSide;
+  initialTeam: TeamSide | "OUT";
 };
 
 type ReplacementPlayerOption = {
@@ -45,6 +45,7 @@ type MatchLineupEditorProps = {
   action: (formData: FormData) => void | Promise<void>;
   existingParticipants: ExistingParticipant[];
   availablePlayers: ReplacementPlayerOption[];
+  expectedVersion?: number;
   submitLabel?: string;
   teamALabel?: string;
   teamBLabel?: string;
@@ -58,6 +59,7 @@ export function MatchLineupEditor({
   action,
   existingParticipants,
   availablePlayers,
+  expectedVersion = 0,
   submitLabel = "Guardar formacion final",
   teamALabel = DEFAULT_TEAM_A_LABEL,
   teamBLabel = DEFAULT_TEAM_B_LABEL
@@ -153,6 +155,7 @@ export function MatchLineupEditor({
 
   return (
     <form action={action} className="mt-4 space-y-4">
+      <input name="expectedVersion" type="hidden" value={expectedVersion} />
       <input name="lineupPayload" type="hidden" value={lineupPayload} />
 
       <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">

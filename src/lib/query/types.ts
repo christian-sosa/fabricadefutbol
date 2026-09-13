@@ -42,6 +42,7 @@ export type OrganizationMatchesResponse = {
 };
 
 export type UpdateMatchResultPayload = {
+  expectedVersion?: number;
   scoreA: number;
   scoreB: number;
   notes?: string;
@@ -67,6 +68,8 @@ export type UpdateMatchResultPayload = {
 };
 
 export type UpdateMatchResultResponse = {
+  firstFinished?: boolean;
+  resultVersion?: number;
   success: true;
   organizationId: string;
   matchId: string;

@@ -36,6 +36,8 @@ export function OrganizationSwitcher({
   label?: string;
 }) {
   const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const selectedOrganization = organizations.find((organization) => organization.slug === currentOrganizationSlug);
 
   const safeQuickOrganizations = useMemo(() => {
     if (!quickOrganizations.length) return [];
@@ -70,7 +72,13 @@ export function OrganizationSwitcher({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
+          {selectedOrganization ? <p className="truncate font-semibold text-slate-100 md:hidden">{selectedOrganization.name}</p> : null}
+        </div>
+        {selectedOrganization ? <button aria-expanded={expanded} className="shrink-0 rounded-md border border-slate-700 px-3 py-2 text-sm md:hidden" onClick={() => setExpanded((value) => !value)} type="button">{expanded ? "Cerrar" : "Cambiar grupo"}</button> : null}
+      </div>
+      <div className={cn("space-y-3", selectedOrganization && !expanded ? "hidden md:block" : "block")}>
 
       {safeQuickOrganizations.length ? (
         <div className="space-y-2">
@@ -87,6 +95,7 @@ export function OrganizationSwitcher({
                       : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
                   )}
                   href={withOrgQuery(basePath, organization.slug)}
+                  aria-current={active ? "page" : undefined}
                   key={organization.id}
                 >
                   {organization.name}
@@ -99,6 +108,7 @@ export function OrganizationSwitcher({
 
       <div className="space-y-2">
         <input
+          aria-label="Buscar grupo por nombre"
           className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/30"
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Buscar grupo por nombre..."
@@ -118,6 +128,7 @@ export function OrganizationSwitcher({
                     : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
                 )}
                 href={withOrgQuery(basePath, organization.slug)}
+                aria-current={active ? "page" : undefined}
                 key={organization.id}
               >
                 {organization.name}
@@ -132,6 +143,7 @@ export function OrganizationSwitcher({
         {!query.trim() && safeQuickOrganizations.length > 0 && !visibleOrganizations.length ? (
           <p className="text-sm text-slate-400">No hay otros grupos publicos por ahora.</p>
         ) : null}
+      </div>
       </div>
     </div>
   );

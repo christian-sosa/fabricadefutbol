@@ -1,3 +1,5 @@
+import { SERVER_ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -17,6 +19,7 @@ const guestSkillLevelSchema = z
   );
 
 const requestSchema = z.object({
+  expectedVersion: z.number().int().nonnegative(),
   scoreA: z.number().int().nonnegative(),
   scoreB: z.number().int().nonnegative(),
   notes: z.string().optional(),
@@ -93,7 +96,7 @@ export async function PATCH(
     }
 
     const supabase = await createSupabaseServerClient();
-    await saveMatchResult({
+    const outcome = await saveMatchResult({
       supabase,
       adminId: admin.userId,
       matchId,
@@ -101,6 +104,14 @@ export async function PATCH(
       resultInput: parsed.data
     });
 
+    if (outcome.firstFinished) await recordAnalyticsEvent({
+      eventName: SERVER_ANALYTICS_EVENTS.matchFinished,
+      eventKey: `match_finished:${matchId}`,
+      source: "result_api", adminId: admin.userId, organizationId,
+      entityType: "match", entityId: matchId,
+      path: `/admin/matches/${matchId}/result`,
+      properties: { result_version: outcome.resultVersion, season_id: outcome.seasonId }
+    });
     await refreshOrganizationPublicSnapshotSafe(organizationId);
     logInfo("matches.result.succeeded", {
       organizationId,
@@ -111,7 +122,9 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       organizationId,
-      matchId
+      matchId,
+      firstFinished: outcome.firstFinished,
+      resultVersion: outcome.resultVersion
     });
   } catch (error) {
     const rawMessage = error instanceof Error ? error.message : "No se pudo guardar resultado.";
@@ -122,6 +135,9 @@ export async function PATCH(
         durationMs: Date.now() - startedAt
       });
       return NextResponse.json({ error: rawMessage }, { status: 403 });
+    }
+    if (/cambio mientras lo editabas/i.test(rawMessage)) {
+      return NextResponse.json({ error: rawMessage }, { status: 409 });
     }
     logError("matches.result.failed", error, {
       organizationId,

@@ -9,6 +9,8 @@ import { cn, formatPercent, formatRendimiento } from "@/lib/utils";
 type PlayerStatsRow = {
   playerId: string;
   playerName: string;
+  photoPath?: string | null;
+  photoUpdatedAt?: string | null;
   currentRating: number;
   matchesPlayed: number;
   wins: number;
@@ -102,7 +104,7 @@ export function PlayersStatsTable({ players }: { players: PlayerStatsRow[] }) {
         {sortedPlayers.map((player) => (
           <article className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4" key={player.playerId}>
             <div className="flex items-start justify-between gap-3">
-              <PlayerPhotoModalTrigger playerId={player.playerId} playerName={player.playerName} />
+              <PlayerPhotoModalTrigger hasPhoto={player.photoPath === undefined ? undefined : Boolean(player.photoPath)} photoUpdatedAt={player.photoUpdatedAt} playerId={player.playerId} playerName={player.playerName} />
               <div className="text-right">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Rendimiento</p>
                 <p className="text-xl font-black text-emerald-300">{formatRendimiento(player.currentRating)}</p>
@@ -170,7 +172,7 @@ export function PlayersStatsTable({ players }: { players: PlayerStatsRow[] }) {
             {sortedPlayers.map((player) => (
               <tr className="transition-colors hover:bg-slate-800/70" key={player.playerId}>
                 <TD>
-                  <PlayerPhotoModalTrigger playerId={player.playerId} playerName={player.playerName} />
+                  <PlayerPhotoModalTrigger hasPhoto={player.photoPath === undefined ? undefined : Boolean(player.photoPath)} photoUpdatedAt={player.photoUpdatedAt} playerId={player.playerId} playerName={player.playerName} />
                 </TD>
                 <TD className="font-semibold text-slate-100">{formatRendimiento(player.currentRating)}</TD>
                 <TD>{player.matchesPlayed}</TD>

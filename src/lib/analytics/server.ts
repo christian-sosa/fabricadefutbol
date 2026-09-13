@@ -1,4 +1,5 @@
-import { isAnalyticsEventName, sanitizeAnalyticsProperties, type AnalyticsEventName } from "@/lib/analytics/events";
+import { getAnalyticsAttribution } from "@/lib/analytics/attribution";
+import { isAnalyticsEventName, sanitizeAnalyticsPath, sanitizeAnalyticsProperties, type AnalyticsEventName } from "@/lib/analytics/events";
 import { logWarn } from "@/lib/observability/log";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -8,7 +9,7 @@ type AnalyticsDbClient = {
       select(columns: string): {
         single(): PromiseLike<{
           data: unknown;
-          error: { message: string } | null;
+          error: { message: string; code?: string } | null;
         }>;
       };
     };
@@ -19,9 +20,6 @@ export type AnalyticsEntityType =
   | "admin"
   | "organization"
   | "match"
-  | "payment"
-  | "club"
-  | "league"
   | "export";
 
 export type AnalyticsEventInput = {
@@ -29,8 +27,7 @@ export type AnalyticsEventInput = {
   source?: string | null;
   adminId?: string | null;
   organizationId?: string | null;
-  clubId?: string | null;
-  leagueId?: string | null;
+  eventKey?: string | null;
   entityType?: AnalyticsEntityType | string | null;
   entityId?: string | null;
   path?: string | null;
@@ -38,7 +35,6 @@ export type AnalyticsEventInput = {
 };
 
 const MAX_SOURCE_LENGTH = 80;
-const MAX_PATH_LENGTH = 500;
 const MISSING_ANALYTICS_TABLE_PATTERN =
   /analytics_events|schema cache|does not exist|relation .*analytics_events/i;
 
@@ -57,11 +53,10 @@ export function buildAnalyticsEventInsert(input: AnalyticsEventInput) {
     source: normalizeText(input.source, MAX_SOURCE_LENGTH) ?? "server",
     admin_id: input.adminId ?? null,
     organization_id: input.organizationId ?? null,
-    club_id: input.clubId ?? null,
-    league_id: input.leagueId ?? null,
+    event_key: normalizeText(input.eventKey ?? (["group_created", "match_created", "match_finished", "admin_register_succeeded"].includes(input.eventName) && input.entityId ? `${input.eventName}:${input.entityId}` : null), 160),
     entity_type: normalizeText(input.entityType, 40),
     entity_id: input.entityId ?? null,
-    path: normalizeText(input.path, MAX_PATH_LENGTH),
+    path: sanitizeAnalyticsPath(input.path),
     properties: sanitizeAnalyticsProperties(input.properties)
   };
 }
@@ -77,6 +72,7 @@ export async function insertAnalyticsEvent(supabase: AnalyticsDbClient, input: A
 
   const { data, error } = await supabase.from("analytics_events").insert(payload).select("id").single();
   if (error) {
+    if (error.code === "23505" && payload.event_key) return { recorded: false, reason: "duplicate" };
     throw new Error(error.message);
   }
 
@@ -90,26 +86,25 @@ export async function insertAnalyticsEvent(supabase: AnalyticsDbClient, input: A
 }
 
 export async function recordAnalyticsEvent(input: AnalyticsEventInput) {
-  const supabaseAdmin = createSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    logWarn("analytics.event.skipped", {
-      reason: "missing_service_role",
-      eventName: input.eventName
-    });
-    return {
-      recorded: false,
-      reason: "missing_service_role"
-    };
-  }
-
   try {
-    return await insertAnalyticsEvent(supabaseAdmin, input);
+    const supabaseAdmin = createSupabaseAdminClient();
+    if (!supabaseAdmin) {
+      logWarn("analytics.event.skipped", {
+        reason: "missing_service_role",
+        eventName: input.eventName
+      });
+      return {
+        recorded: false,
+        reason: "missing_service_role"
+      };
+    }
+
+    return await insertAnalyticsEvent(supabaseAdmin, { ...input, properties: { ...await getAnalyticsAttribution(), ...input.properties } });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logWarn("analytics.event.skipped", {
       reason: MISSING_ANALYTICS_TABLE_PATTERN.test(message) ? "analytics_table_missing" : "insert_failed",
-      eventName: input.eventName,
-      message
+      eventName: input.eventName
     });
     return {
       recorded: false,

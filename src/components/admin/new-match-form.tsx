@@ -30,6 +30,8 @@ type SelectablePlayer = {
   initial_rank: number;
   skill_level: number;
   display_order?: number;
+  photo_path?: string | null;
+  photo_updated_at?: string | null;
 };
 
 type GuestRow = {
@@ -52,21 +54,34 @@ const EXPECTED_PLAYERS: Record<MatchModality, number> = Object.fromEntries(
   Object.entries(TEAM_SIZE_BY_MODALITY).map(([modality, teamSize]) => [modality, teamSize * 2])
 ) as Record<MatchModality, number>;
 
+export type NewMatchDefaults = {
+  modality: MatchModality;
+  location?: string;
+  scheduledTime?: string;
+  playerIds: string[];
+  goalkeeperPlayerIds: string[];
+  guests: Array<{ name: string; rating: number }>;
+};
+
 export function NewMatchForm({
   defaultScheduledDate,
   organizationId,
   players,
+  initialValues,
+  defaultModality = "6v6",
   error
 }: {
   defaultScheduledDate: string;
   organizationId: string;
   players: SelectablePlayer[];
+  defaultModality?: MatchModality;
+  initialValues?: NewMatchDefaults;
   error?: string;
 }) {
-  const [modality, setModality] = useState<MatchModality>("6v6");
-  const [selectedPlayers, setSelectedPlayers] = useState<Record<string, boolean>>({});
-  const [goalkeeperPlayers, setGoalkeeperPlayers] = useState<Record<string, boolean>>({});
-  const [guestRows, setGuestRows] = useState<GuestRow[]>([]);
+  const [modality, setModality] = useState<MatchModality>(initialValues?.modality ?? defaultModality);
+  const [selectedPlayers, setSelectedPlayers] = useState<Record<string, boolean>>(() => Object.fromEntries((initialValues?.playerIds ?? []).map((id) => [id, true])));
+  const [goalkeeperPlayers, setGoalkeeperPlayers] = useState<Record<string, boolean>>(() => Object.fromEntries((initialValues?.goalkeeperPlayerIds ?? []).map((id) => [id, true])));
+  const [guestRows, setGuestRows] = useState<GuestRow[]>(() => (initialValues?.guests ?? []).map((guest, index) => ({ key: index + 1, name: guest.name, rating: String(guest.rating) })));
   const [showManualBuilder, setShowManualBuilder] = useState(false);
   const [manualAssignments, setManualAssignments] = useState<Record<string, TeamSide>>({});
 
@@ -259,6 +274,7 @@ export function NewMatchForm({
         <MatchDateTimeFields
           dateName="scheduledDate"
           defaultDate={defaultScheduledDate}
+          defaultTime={initialValues?.scheduledTime}
           requiredTime
           timeName="scheduledTime"
         />
@@ -278,7 +294,7 @@ export function NewMatchForm({
           <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="location">
             Ubicacion
           </label>
-          <Input id="location" name="location" placeholder="Cancha / barrio" />
+          <Input defaultValue={initialValues?.location} id="location" name="location" placeholder="Cancha / barrio" />
         </div>
       </div>
 
@@ -311,7 +327,7 @@ export function NewMatchForm({
                 key={player.id}
               >
                 <span className="flex min-w-0 items-center gap-3">
-                  <PlayerAvatar name={player.full_name} playerId={player.id} size="sm" />
+                  <PlayerAvatar name={player.full_name} playerId={player.id} hasPhoto={Boolean(player.photo_path)} photoUpdatedAt={player.photo_updated_at} size="sm" />
                   <span className="min-w-0">
                     <span className="block truncate font-semibold text-slate-100">{player.full_name}</span>
                     <span className="mt-1 flex flex-wrap gap-1.5">
@@ -384,7 +400,7 @@ export function NewMatchForm({
           <div>
             <p className="text-sm font-semibold text-slate-100">Invitados (temporales)</p>
             <p className="text-xs text-slate-400">
-              No se guardan como jugadores del club, pero si quedan en el historial del partido.
+              No se guardan como jugadores del grupo, pero si quedan en el historial del partido.
               {` ${GUEST_SKILL_LEVEL_HELP_TEXT}`}
             </p>
           </div>

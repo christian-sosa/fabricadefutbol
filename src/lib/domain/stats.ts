@@ -17,6 +17,8 @@ export type MatchWithTeams = {
 type InternalStats = {
   playerId: string;
   playerName: string;
+  photoPath: string | null;
+  photoUpdatedAt: string | null;
   currentRating: number;
   initialRank: number;
   skillLevel: number;
@@ -75,6 +77,8 @@ export function calculatePlayerStats(params: {
       {
         playerId: player.id,
         playerName: player.full_name,
+        photoPath: player.photo_path ?? null,
+        photoUpdatedAt: player.photo_updated_at ?? null,
         currentRating: Number(player.current_rating),
         initialRank: player.initial_rank,
         skillLevel: player.skill_level,
@@ -150,6 +154,8 @@ export function calculatePlayerStats(params: {
       return {
         playerId: stats.playerId,
         playerName: stats.playerName,
+        photoPath: stats.photoPath,
+        photoUpdatedAt: stats.photoUpdatedAt,
         currentRating: Math.round(stats.currentRating),
         initialRank: stats.initialRank,
         currentRank,

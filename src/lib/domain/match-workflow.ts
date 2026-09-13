@@ -1,17 +1,13 @@
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
-import { calculateMatchRatingAdjustments, deriveWinnerTeam } from "@/lib/domain/rating";
-import { buildOrganizationSeasonInsert } from "@/lib/domain/organization-seasons";
 import {
   calculateEffectiveSkillScore,
-  calculateGuestDisplayRating,
   calculateGuestSkillScore,
-  mapInitialRankToSkillLevel,
-  parseGuestSkillLevelValue
+  mapInitialRankToSkillLevel
 } from "@/lib/domain/skill-level";
 import { generateBalancedTeamOptions } from "@/lib/domain/team-generator";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizeTeamLabel } from "@/lib/team-labels";
-import type { MatchModality, MatchResultInput, ResultAssignmentTeam, TeamSide } from "@/types/domain";
+import type { MatchModality, MatchResultInput, TeamSide } from "@/types/domain";
 
 type DbClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
@@ -36,49 +32,9 @@ type SelectedPlayerForBalance = {
   active: boolean;
 };
 
-type ConfirmedParticipant = {
-  id: string;
-  source: "player" | "guest";
-  entityId: string;
-  full_name: string;
-  current_rating: number;
-};
-
 type ManualTeamAssignmentInput = {
   participantId: string;
   team: TeamSide;
-};
-
-type LineupAssignmentInput = {
-  participantId: string;
-  team: ResultAssignmentTeam;
-};
-
-type NewGuestLineupInput = {
-  clientId?: string;
-  name: string;
-  rating: number;
-  team: TeamSide;
-};
-
-type NewPlayerLineupInput = {
-  playerId: string;
-  team: TeamSide;
-};
-
-type MatchLineupAdjustmentInput = {
-  assignments: LineupAssignmentInput[];
-  newPlayers?: NewPlayerLineupInput[];
-  newGuests?: NewGuestLineupInput[];
-};
-
-type ResolvedMatchLineup = {
-  optionId: string;
-  teamA: ConfirmedParticipant[];
-  teamB: ConfirmedParticipant[];
-  absencePenaltyParticipants: ConfirmedParticipant[];
-  handicapTeam: TeamSide | null;
-  participantAliases: Map<string, string>;
 };
 
 type CreateDraftInput = {
@@ -99,26 +55,6 @@ type CreateDraftInput = {
 
 const PLAYER_PREFIX = "player:";
 const GUEST_PREFIX = "guest:";
-const SEASON_STARTING_RATING = 1000;
-const MVP_BONUS_POINTS = 5;
-const ABSENCE_PENALTY_POINTS = -20;
-
-type OrganizationSeasonRow = {
-  id: string;
-  organization_id: string;
-  label: string;
-  duration_months: number;
-  starts_at: string;
-  ends_at: string;
-  status: "active" | "closed";
-};
-
-type SeasonRatingState = {
-  ratingBefore: number;
-  ratingAfter: number;
-  delta: number;
-};
-
 function isGuestSchemaMissing(message: string) {
   const normalized = message.toLowerCase();
   const mentionsGuestTables =
@@ -186,141 +122,6 @@ function parseParticipantId(participantId: string): { source: "player" | "guest"
     };
   }
   throw new Error("Participante invalido dentro de la opcion de equipos.");
-}
-
-async function getActiveOrganizationSeason(supabase: DbClient, organizationId: string) {
-  const { data, error } = await supabase
-    .from("organization_seasons")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .eq("status", "active")
-    .order("starts_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) throw new Error(`No se pudo leer la temporada activa: ${error.message}`);
-  return data as OrganizationSeasonRow | null;
-}
-
-async function getOrganizationSeasonById(supabase: DbClient, organizationId: string, seasonId: string) {
-  const { data, error } = await supabase
-    .from("organization_seasons")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .eq("id", seasonId)
-    .maybeSingle();
-
-  if (error) throw new Error(`No se pudo leer la temporada del partido: ${error.message}`);
-  return data as OrganizationSeasonRow | null;
-}
-
-async function ensureActiveOrganizationSeason(params: {
-  supabase: DbClient;
-  organizationId: string;
-  adminId?: string;
-  startsAt?: Date;
-}) {
-  const { supabase, organizationId, adminId } = params;
-  const current = await getActiveOrganizationSeason(supabase, organizationId);
-  if (current) return current;
-
-  const startDate = params.startsAt ?? new Date();
-  const { data, error } = await supabase
-    .from("organization_seasons")
-    .insert(
-      buildOrganizationSeasonInsert({
-        organizationId,
-        createdBy: adminId ?? null,
-        startsAt: startDate
-      })
-    )
-    .select("*")
-    .single();
-
-  if (error || !data) {
-    throw new Error(`No se pudo crear la temporada activa: ${error?.message ?? "sin detalle"}`);
-  }
-  return data as OrganizationSeasonRow;
-}
-
-async function resolveSeasonForResult(params: {
-  supabase: DbClient;
-  organizationId: string;
-  adminId: string;
-  matchSeasonId?: string | null;
-  matchScheduledAt?: string | null;
-}) {
-  const { supabase, organizationId, adminId, matchSeasonId } = params;
-  if (matchSeasonId) {
-    const existing = await getOrganizationSeasonById(supabase, organizationId, matchSeasonId);
-    if (existing) return existing;
-  }
-
-  const scheduledAt = params.matchScheduledAt ? new Date(params.matchScheduledAt) : new Date();
-  const startsAt = Number.isFinite(scheduledAt.getTime()) ? scheduledAt : new Date();
-  return ensureActiveOrganizationSeason({
-    supabase,
-    organizationId,
-    adminId,
-    startsAt
-  });
-}
-
-async function getOrCreateSeasonPlayerRating(params: {
-  supabase: DbClient;
-  organizationId: string;
-  seasonId: string;
-  playerId: string;
-}) {
-  const { supabase, organizationId, seasonId, playerId } = params;
-  const { data: existing, error: readError } = await supabase
-    .from("organization_season_player_ratings")
-    .select("current_rating")
-    .eq("season_id", seasonId)
-    .eq("player_id", playerId)
-    .maybeSingle();
-
-  if (readError) {
-    throw new Error(`No se pudo leer el rendimiento de temporada: ${readError.message}`);
-  }
-  if (existing) return Number(existing.current_rating);
-
-  const { error: insertError } = await supabase.from("organization_season_player_ratings").insert({
-    organization_id: organizationId,
-    season_id: seasonId,
-    player_id: playerId,
-    current_rating: SEASON_STARTING_RATING
-  });
-  if (insertError) {
-    throw new Error(`No se pudo inicializar el rendimiento de temporada: ${insertError.message}`);
-  }
-  return SEASON_STARTING_RATING;
-}
-
-async function applySeasonRatingDelta(params: {
-  supabase: DbClient;
-  organizationId: string;
-  seasonId: string;
-  playerId: string;
-  delta: number;
-}) {
-  const ratingBefore = await getOrCreateSeasonPlayerRating(params);
-  const ratingAfter = Math.round(ratingBefore + params.delta);
-  const { error } = await params.supabase
-    .from("organization_season_player_ratings")
-    .update({ current_rating: ratingAfter })
-    .eq("season_id", params.seasonId)
-    .eq("player_id", params.playerId);
-
-  if (error) {
-    throw new Error(`No se pudo actualizar el rendimiento de temporada: ${error.message}`);
-  }
-
-  return {
-    ratingBefore,
-    ratingAfter,
-    delta: params.delta
-  } satisfies SeasonRatingState;
 }
 
 function resolveManualParticipantId(
@@ -649,7 +450,8 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
       location: location || null,
       team_a_label: normalizeTeamLabel(teamALabel),
       team_b_label: normalizeTeamLabel(teamBLabel),
-      created_by: adminId
+      created_by: adminId,
+      goalkeeper_player_ids: goalkeeperPlayerIds
     })
     .select("id")
     .single();
@@ -699,6 +501,7 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
       supabase,
       matchId: match.id,
       optionId: optionIdToConfirm,
+      organizationId,
       teamALabel,
       teamBLabel
     });
@@ -728,13 +531,13 @@ export async function regenerateDraftTeamOptions(params: {
   matchId: string;
   organizationId?: string;
 }) {
-  const { supabase, adminId, matchId, organizationId } = params;
+  const { supabase, matchId, organizationId } = params;
 
   await assertMatchBelongsToOrganization({ supabase, matchId, organizationId });
 
   const { data: match, error: matchError } = await supabase
     .from("matches")
-    .select("id, modality, status, organization_id")
+    .select("id, modality, status, organization_id, goalkeeper_player_ids, result_version")
     .eq("id", matchId)
     .single();
 
@@ -762,870 +565,85 @@ export async function regenerateDraftTeamOptions(params: {
   const players = await fetchSelectedPlayers(supabase, match.organization_id, playerIds);
   const participants = toBalancePlayers(players, matchGuests ?? []);
 
-  const { data: existingOptions, error: existingOptionsError } = await supabase
-    .from("team_options")
-    .select("id")
-    .eq("match_id", matchId)
-    .eq("is_confirmed", false);
-
-  if (existingOptionsError) {
-    throw new Error(`No se pudieron leer opciones existentes: ${existingOptionsError.message}`);
-  }
-
-  if (existingOptions?.length) {
-    const idsToDelete = existingOptions.map((option) => option.id);
-    const { error: deleteOptionsError } = await supabase.from("team_options").delete().in("id", idsToDelete);
-    if (deleteOptionsError) {
-      throw new Error(`No se pudieron limpiar opciones anteriores: ${deleteOptionsError.message}`);
-    }
-  }
-
   const options = generateBalancedTeamOptions({
     players: participants,
     modality: match.modality,
-    requestedOptions: 3
+    requestedOptions: 3,
+    requiredSeparatedPairs: match.goalkeeper_player_ids?.length === 2
+      ? [[toPlayerParticipantId(match.goalkeeper_player_ids[0]), toPlayerParticipantId(match.goalkeeper_player_ids[1])]]
+      : undefined
   });
 
-  await insertTeamOptions(supabase, adminId, matchId, options);
+  const { error } = await supabase.rpc("replace_group_match_options", {
+    p_match_id: matchId,
+    p_organization_id: match.organization_id,
+    p_expected_version: match.result_version ?? 0,
+    p_options: JSON.parse(JSON.stringify(options))
+  });
+  if (error) throw new Error(error.message);
 }
+
+export type SaveMatchResultOutcome = {
+  firstFinished: boolean;
+  resultVersion: number;
+  seasonId: string | null;
+};
 
 export async function confirmTeamOption(params: {
   supabase: DbClient;
   matchId: string;
   optionId: string;
-  organizationId?: string;
+  organizationId: string;
   teamALabel?: string | null;
   teamBLabel?: string | null;
 }) {
-  const { supabase, matchId, optionId, organizationId, teamALabel, teamBLabel } = params;
-
-  await assertMatchBelongsToOrganization({ supabase, matchId, organizationId });
-
-  const { error: resetError } = await supabase
-    .from("team_options")
-    .update({ is_confirmed: false })
-    .eq("match_id", matchId);
-  if (resetError) throw new Error(`No se pudo resetear confirmacion previa: ${resetError.message}`);
-
-  const { error: confirmError } = await supabase
-    .from("team_options")
-    .update({ is_confirmed: true })
-    .eq("id", optionId)
-    .eq("match_id", matchId);
-  if (confirmError) throw new Error(`No se pudo confirmar opcion: ${confirmError.message}`);
-
-  const { error: updateMatchError } = await supabase
-    .from("matches")
-    .update({
-      status: "confirmed",
-      confirmed_option_id: optionId,
-      team_a_label: normalizeTeamLabel(teamALabel),
-      team_b_label: normalizeTeamLabel(teamBLabel)
-    })
-    .eq("id", matchId);
-  if (updateMatchError) throw new Error(`No se pudo actualizar estado del partido: ${updateMatchError.message}`);
-}
-
-async function rollbackPreviousRatingHistory(supabase: DbClient, matchId: string) {
-  const { data: previousHistory, error: historyError } = await supabase
-    .from("rating_history")
-    .select("id, player_id, delta, season_id, season_delta")
-    .eq("match_id", matchId);
-
-  if (historyError) throw new Error(`No se pudo leer historial de rendimiento: ${historyError.message}`);
-  if (!previousHistory?.length) return;
-
-  for (const row of previousHistory) {
-    const { data: playerRow, error: playerError } = await supabase
-      .from("players")
-      .select("current_rating")
-      .eq("id", row.player_id)
-      .single();
-    if (playerError || !playerRow) {
-      throw new Error("No se pudo restaurar rendimiento anterior.");
-    }
-
-    const reverted = Math.round(Number(playerRow.current_rating) - Number(row.delta));
-    const { error: revertError } = await supabase
-      .from("players")
-      .update({ current_rating: reverted })
-      .eq("id", row.player_id);
-    if (revertError) {
-      throw new Error(`No se pudo revertir rendimiento de jugador: ${revertError.message}`);
-    }
-
-    if (row.season_id && row.season_delta !== null && row.season_delta !== undefined) {
-      const { data: seasonRatingRow, error: seasonRatingError } = await supabase
-        .from("organization_season_player_ratings")
-        .select("current_rating")
-        .eq("season_id", row.season_id)
-        .eq("player_id", row.player_id)
-        .maybeSingle();
-      if (seasonRatingError) {
-        throw new Error(`No se pudo leer rendimiento de temporada anterior: ${seasonRatingError.message}`);
-      }
-
-      if (seasonRatingRow) {
-        const revertedSeasonRating = Math.round(Number(seasonRatingRow.current_rating) - Number(row.season_delta));
-        const { error: revertSeasonError } = await supabase
-          .from("organization_season_player_ratings")
-          .update({ current_rating: revertedSeasonRating })
-          .eq("season_id", row.season_id)
-          .eq("player_id", row.player_id);
-        if (revertSeasonError) {
-          throw new Error(`No se pudo revertir rendimiento de temporada: ${revertSeasonError.message}`);
-        }
-      }
-    }
-  }
-
-  const { error: deleteHistoryError } = await supabase.from("rating_history").delete().eq("match_id", matchId);
-  if (deleteHistoryError) {
-    throw new Error(`No se pudo limpiar historial previo de rendimiento: ${deleteHistoryError.message}`);
-  }
-}
-
-async function loadConfirmedTeams(
-  supabase: DbClient,
-  matchId: string
-): Promise<{ teamA: ConfirmedParticipant[]; teamB: ConfirmedParticipant[]; optionId: string }> {
-  const { data: match, error: matchError } = await supabase
-    .from("matches")
-    .select("confirmed_option_id")
-    .eq("id", matchId)
-    .single();
-
-  if (matchError || !match?.confirmed_option_id) {
-    throw new Error("El partido todavia no tiene equipos confirmados.");
-  }
-
-  const optionId = match.confirmed_option_id;
-  const [{ data: optionPlayers, error: optionPlayersError }, { data: optionGuests, error: optionGuestsError }] =
-    await Promise.all([
-      supabase.from("team_option_players").select("team, player_id").eq("team_option_id", optionId),
-      supabase.from("team_option_guests").select("team, guest_id").eq("team_option_id", optionId)
-    ]);
-
-  if (optionPlayersError) {
-    throw new Error(`No se pudieron leer jugadores de la opcion confirmada: ${optionPlayersError.message}`);
-  }
-  if (optionGuestsError) {
-    if (isGuestSchemaMissing(optionGuestsError.message)) {
-      throw new Error(buildGuestSchemaErrorMessage("No se pudieron leer invitados de la opcion confirmada."));
-    }
-    throw new Error(`No se pudieron leer invitados de la opcion confirmada: ${optionGuestsError.message}`);
-  }
-
-  const playerIds = (optionPlayers ?? []).map((row) => row.player_id);
-  const guestIds = (optionGuests ?? []).map((row) => row.guest_id);
-
-  const [{ data: players, error: playersError }, { data: guests, error: guestsError }] = await Promise.all([
-    playerIds.length
-      ? supabase.from("players").select("id, full_name, current_rating").in("id", playerIds)
-      : Promise.resolve({ data: [], error: null }),
-    guestIds.length
-      ? supabase.from("match_guests").select("id, guest_name, guest_rating").in("id", guestIds)
-      : Promise.resolve({ data: [], error: null })
-  ]);
-
-  if (playersError) {
-    throw new Error(`No se pudieron leer rendimientos de jugadores: ${playersError.message}`);
-  }
-  if (guestsError) {
-    if (isGuestSchemaMissing(guestsError.message)) {
-        throw new Error(buildGuestSchemaErrorMessage("No se pudieron leer rendimientos de invitados."));
-    }
-    throw new Error(`No se pudieron leer rendimientos de invitados: ${guestsError.message}`);
-  }
-
-  const playersById = new Map((players ?? []).map((player) => [player.id, player]));
-  const guestsById = new Map((guests ?? []).map((guest) => [guest.id, guest]));
-  const teamA: ConfirmedParticipant[] = [];
-  const teamB: ConfirmedParticipant[] = [];
-
-  for (const row of optionPlayers ?? []) {
-    const player = playersById.get(row.player_id);
-    if (!player) continue;
-    const normalized: ConfirmedParticipant = {
-      id: toPlayerParticipantId(player.id),
-      source: "player",
-      entityId: player.id,
-      full_name: player.full_name,
-      current_rating: Number(player.current_rating)
-    };
-    if (row.team === "A") teamA.push(normalized);
-    if (row.team === "B") teamB.push(normalized);
-  }
-
-  for (const row of optionGuests ?? []) {
-    const guest = guestsById.get(row.guest_id);
-    if (!guest) continue;
-    const normalized: ConfirmedParticipant = {
-      id: toGuestParticipantId(guest.id),
-      source: "guest",
-      entityId: guest.id,
-      full_name: guest.guest_name,
-      current_rating: calculateGuestDisplayRating(guest.guest_rating)
-    };
-    if (row.team === "A") teamA.push(normalized);
-    if (row.team === "B") teamB.push(normalized);
-  }
-
-  return { teamA, teamB, optionId };
-}
-
-function normalizeLineupAssignments(
-  rawAssignments: LineupAssignmentInput[] | undefined,
-  participantsById: Map<string, ConfirmedParticipant>
-) {
-  const assignmentMap = new Map<string, ResultAssignmentTeam>();
-
-  for (const assignment of rawAssignments ?? []) {
-    if (!participantsById.has(assignment.participantId)) {
-      throw new Error("La formacion final incluye un participante inexistente.");
-    }
-    assignmentMap.set(assignment.participantId, assignment.team);
-  }
-
-  return assignmentMap;
-}
-
-function normalizeAbsencePenaltyParticipants(params: {
-  rawParticipantIds: string[] | undefined;
-  assignments: Map<string, ResultAssignmentTeam>;
-  participantsById: Map<string, ConfirmedParticipant>;
-}) {
-  const normalizedIds = Array.from(new Set(params.rawParticipantIds ?? []));
-  return normalizedIds.map((participantId) => {
-    const participant = params.participantsById.get(participantId);
-    if (!participant) {
-      throw new Error("La penalizacion por ausencia incluye un participante inexistente.");
-    }
-    if (participant.source !== "player") {
-      throw new Error("La penalizacion por ausencia solo aplica a jugadores registrados.");
-    }
-    if ((params.assignments.get(participantId) ?? "OUT") !== "OUT") {
-      throw new Error("Solo se puede penalizar por ausencia a jugadores que no quedaron en la formacion final.");
-    }
-    return participant;
+  const { error } = await params.supabase.rpc("confirm_group_match_option", {
+    p_match_id: params.matchId,
+    p_organization_id: params.organizationId,
+    p_option_id: params.optionId,
+    p_team_a_label: normalizeTeamLabel(params.teamALabel),
+    p_team_b_label: normalizeTeamLabel(params.teamBLabel)
   });
-}
-
-function normalizeLineupGuests(rawGuests: NewGuestLineupInput[] | undefined) {
-  return (rawGuests ?? []).map((guest) => {
-    const normalizedName = guest.name.trim();
-    const normalizedRating = Number(guest.rating);
-
-    if (!normalizedName) {
-      throw new Error("Los invitados agregados deben tener nombre.");
-    }
-    const guestSkillLevel = parseGuestSkillLevelValue(normalizedRating);
-    if (guestSkillLevel === null) {
-      throw new Error(`El invitado ${normalizedName} tiene un nivel equivalente invalido.`);
-    }
-
-    return {
-      clientId: guest.clientId?.trim() || null,
-      name: normalizedName,
-      rating: guestSkillLevel,
-      team: guest.team
-    };
-  });
-}
-
-function normalizeLineupPlayers(rawPlayers: NewPlayerLineupInput[] | undefined) {
-  const usedPlayerIds = new Set<string>();
-
-  return (rawPlayers ?? []).map((row) => {
-    const normalizedPlayerId = row.playerId.trim();
-    if (!normalizedPlayerId) {
-      throw new Error("Los jugadores de reemplazo deben tener un ID valido.");
-    }
-    if (usedPlayerIds.has(normalizedPlayerId)) {
-      throw new Error("Hay jugadores de reemplazo duplicados en la formacion final.");
-    }
-    usedPlayerIds.add(normalizedPlayerId);
-
-    return {
-      playerId: normalizedPlayerId,
-      team: row.team
-    };
-  });
-}
-
-async function insertNewLineupGuests(params: {
-  supabase: DbClient;
-  matchId: string;
-  guests: Array<{ clientId: string | null; name: string; rating: number; team: TeamSide }>;
-}) {
-  const { supabase, matchId, guests } = params;
-  if (!guests.length) return [];
-
-  const insertedGuests: ConfirmedParticipant[] = [];
-  for (const guest of guests) {
-    const { data, error } = await supabase
-      .from("match_guests")
-      .insert({
-        match_id: matchId,
-        guest_name: guest.name,
-        guest_rating: guest.rating
-      })
-      .select("id, guest_name, guest_rating")
-      .single();
-
-    if (error || !data) {
-      if (error && isGuestSchemaMissing(error.message)) {
-        throw new Error(buildGuestSchemaErrorMessage("No se pudieron guardar invitados agregados al resultado."));
-      }
-      throw new Error(`No se pudieron guardar invitados agregados al resultado: ${error?.message ?? "sin detalle"}`);
-    }
-
-    insertedGuests.push({
-      id: toGuestParticipantId(data.id),
-      source: "guest",
-      entityId: data.id,
-      full_name: data.guest_name,
-      current_rating: calculateGuestDisplayRating(data.guest_rating)
-    });
-  }
-
-  return insertedGuests;
-}
-
-async function resolveNewLineupPlayers(params: {
-  supabase: DbClient;
-  organizationId: string;
-  players: Array<{ playerId: string; team: TeamSide }>;
-  participantsById: Map<string, ConfirmedParticipant>;
-}) {
-  const { supabase, organizationId, players, participantsById } = params;
-  if (!players.length) return [];
-
-  const playerIds = players.map((player) => player.playerId);
-  const { data: playerRows, error: playersError } = await supabase
-    .from("players")
-    .select("id, full_name, current_rating, organization_id")
-    .in("id", playerIds)
-    .eq("organization_id", organizationId);
-
-  if (playersError) {
-    throw new Error(`No se pudieron leer jugadores de reemplazo: ${playersError.message}`);
-  }
-
-  const playersById = new Map((playerRows ?? []).map((row) => [row.id, row]));
-  if (playersById.size !== playerIds.length) {
-    throw new Error("Al menos un jugador de reemplazo no existe o no pertenece a este grupo.");
-  }
-
-  return players.map((player) => {
-    const participantId = toPlayerParticipantId(player.playerId);
-    if (participantsById.has(participantId)) {
-      throw new Error("No puedes agregar como reemplazo a un jugador que ya estaba en la formacion confirmada.");
-    }
-
-    const playerRow = playersById.get(player.playerId);
-    if (!playerRow) {
-      throw new Error("No se encontro un jugador de reemplazo seleccionado.");
-    }
-
-    return {
-      participant: {
-        id: participantId,
-        source: "player" as const,
-        entityId: playerRow.id,
-        full_name: playerRow.full_name,
-        current_rating: Number(playerRow.current_rating)
-      },
-      team: player.team
-    };
-  });
-}
-
-async function persistConfirmedLineup(params: {
-  supabase: DbClient;
-  optionId: string;
-  teamA: ConfirmedParticipant[];
-  teamB: ConfirmedParticipant[];
-}) {
-  const { supabase, optionId, teamA, teamB } = params;
-  const allMembers = [
-    ...teamA.map((member) => ({ ...member, team: "A" as TeamSide })),
-    ...teamB.map((member) => ({ ...member, team: "B" as TeamSide }))
-  ];
-
-  const { error: deletePlayersError } = await supabase
-    .from("team_option_players")
-    .delete()
-    .eq("team_option_id", optionId);
-  if (deletePlayersError) {
-    throw new Error(`No se pudo actualizar la formacion confirmada: ${deletePlayersError.message}`);
-  }
-
-  const { error: deleteGuestsError } = await supabase
-    .from("team_option_guests")
-    .delete()
-    .eq("team_option_id", optionId);
-  if (deleteGuestsError) {
-    if (isGuestSchemaMissing(deleteGuestsError.message)) {
-      throw new Error(buildGuestSchemaErrorMessage("No se pudo actualizar la formacion confirmada."));
-    }
-    throw new Error(`No se pudo actualizar la formacion confirmada: ${deleteGuestsError.message}`);
-  }
-
-  const playerRows = allMembers
-    .filter((member) => member.source === "player")
-    .map((member) => ({
-      team_option_id: optionId,
-      player_id: member.entityId,
-      team: member.team
-    }));
-  const guestRows = allMembers
-    .filter((member) => member.source === "guest")
-    .map((member) => ({
-      team_option_id: optionId,
-      guest_id: member.entityId,
-      team: member.team
-    }));
-
-  if (playerRows.length) {
-    const { error: insertPlayersError } = await supabase.from("team_option_players").insert(playerRows);
-    if (insertPlayersError) {
-      throw new Error(`No se pudieron guardar jugadores en la formacion confirmada: ${insertPlayersError.message}`);
-    }
-  }
-
-  if (guestRows.length) {
-    const { error: insertGuestsError } = await supabase.from("team_option_guests").insert(guestRows);
-    if (insertGuestsError) {
-      if (isGuestSchemaMissing(insertGuestsError.message)) {
-        throw new Error(buildGuestSchemaErrorMessage("No se pudieron guardar invitados en la formacion confirmada."));
-      }
-      throw new Error(`No se pudieron guardar invitados en la formacion confirmada: ${insertGuestsError.message}`);
-    }
-  }
-}
-
-async function resolveLineupForResult(params: {
-  supabase: DbClient;
-  matchId: string;
-  resultInput: MatchResultInput;
-  organizationId?: string;
-}) {
-  const { supabase, matchId, resultInput, organizationId } = params;
-  const confirmed = await loadConfirmedTeams(supabase, matchId);
-  const participants = [...confirmed.teamA, ...confirmed.teamB];
-  const participantsById = new Map(participants.map((participant) => [participant.id, participant]));
-  const lineupInput = resultInput.lineup;
-
-  if (!lineupInput) {
-    return {
-      optionId: confirmed.optionId,
-      teamA: confirmed.teamA,
-      teamB: confirmed.teamB,
-      absencePenaltyParticipants: [],
-      handicapTeam: null,
-      participantAliases: new Map<string, string>()
-    } satisfies ResolvedMatchLineup;
-  }
-
-  const assignmentMap = normalizeLineupAssignments(lineupInput.assignments, participantsById);
-  const absencePenaltyParticipants = normalizeAbsencePenaltyParticipants({
-    rawParticipantIds: lineupInput.absencePenaltyParticipantIds,
-    assignments: assignmentMap,
-    participantsById
-  });
-  const teamA: ConfirmedParticipant[] = [];
-  const teamB: ConfirmedParticipant[] = [];
-
-  for (const participant of participants) {
-    const team = assignmentMap.get(participant.id) ?? "OUT";
-    if (team === "A") teamA.push(participant);
-    if (team === "B") teamB.push(participant);
-  }
-
-  const normalizedGuests = normalizeLineupGuests(lineupInput.newGuests);
-  const insertedGuests = await insertNewLineupGuests({
-    supabase,
-    matchId,
-    guests: normalizedGuests
-  });
-  const participantAliases = new Map<string, string>();
-
-  insertedGuests.forEach((guest, index) => {
-    const targetTeam = normalizedGuests[index]?.team;
-    const clientId = normalizedGuests[index]?.clientId;
-    if (clientId) participantAliases.set(`newGuest:${clientId}`, guest.id);
-    if (targetTeam === "A") teamA.push(guest);
-    if (targetTeam === "B") teamB.push(guest);
-  });
-
-  const normalizedNewPlayers = normalizeLineupPlayers(lineupInput.newPlayers);
-  if (normalizedNewPlayers.length && !organizationId) {
-    throw new Error("No se pudo validar el grupo de los jugadores de reemplazo.");
-  }
-  const additionalPlayers = await resolveNewLineupPlayers({
-    supabase,
-    organizationId: organizationId ?? "",
-    players: normalizedNewPlayers,
-    participantsById
-  });
-  for (const row of additionalPlayers) {
-    if (row.team === "A") teamA.push(row.participant);
-    if (row.team === "B") teamB.push(row.participant);
-  }
-
-  if (!teamA.length || !teamB.length) {
-    throw new Error("Cada equipo debe tener al menos un participante en la formacion final.");
-  }
-
-  const handicapTeam = lineupInput.handicapTeam ?? null;
-  if (handicapTeam) {
-    const handicapCount = handicapTeam === "A" ? teamA.length : teamB.length;
-    const otherCount = handicapTeam === "A" ? teamB.length : teamA.length;
-    if (handicapCount >= otherCount) {
-      throw new Error("El equipo marcado con desventaja debe tener menos jugadores que el rival.");
-    }
-  }
-
-  await persistConfirmedLineup({
-    supabase,
-    optionId: confirmed.optionId,
-    teamA,
-    teamB
-  });
-
-  return {
-    optionId: confirmed.optionId,
-    teamA,
-    teamB,
-    absencePenaltyParticipants,
-    handicapTeam,
-    participantAliases
-  } satisfies ResolvedMatchLineup;
-}
-
-function resolveMvpParticipant(params: {
-  mvpParticipantId?: string | null;
-  teamA: ConfirmedParticipant[];
-  teamB: ConfirmedParticipant[];
-}) {
-  const requestedId = params.mvpParticipantId?.trim();
-  if (!requestedId) return null;
-
-  const participant = [...params.teamA, ...params.teamB].find((member) => member.id === requestedId);
-  if (!participant) {
-    throw new Error("El MVP elegido no esta dentro de la formacion final.");
-  }
-  return participant;
+  if (error) throw new Error(error.message);
 }
 
 export async function saveMatchResult(params: {
   supabase: DbClient;
   adminId: string;
   matchId: string;
+  organizationId: string;
   resultInput: MatchResultInput;
-  organizationId?: string;
-}) {
-  const { supabase, adminId, matchId, resultInput, organizationId } = params;
-  const { scoreA, scoreB, notes } = resultInput;
-
-  if (scoreA < 0 || scoreB < 0) {
-    throw new Error("El resultado no puede tener goles negativos.");
+}): Promise<SaveMatchResultOutcome> {
+  const { resultInput } = params;
+  if (![resultInput.scoreA, resultInput.scoreB].every((score) => Number.isInteger(score) && score >= 0)) {
+    throw new Error("El resultado debe tener goles enteros no negativos.");
   }
-
-  await assertMatchBelongsToOrganization({ supabase, matchId, organizationId });
-
-  const { data: match, error: matchError } = await supabase
-    .from("matches")
-    .select("id, organization_id, scheduled_at, season_id")
-    .eq("id", matchId)
-    .single();
-  if (matchError || !match) {
-    throw new Error("No se encontro el partido.");
-  }
-
-  const targetOrganizationId = organizationId ?? match.organization_id;
-  const winnerTeam = deriveWinnerTeam(scoreA, scoreB);
-
-  await rollbackPreviousRatingHistory(supabase, matchId);
-  const { teamA, teamB, absencePenaltyParticipants, handicapTeam, participantAliases } = await resolveLineupForResult({
-    supabase,
-    matchId,
-    resultInput,
-    organizationId: targetOrganizationId
+  // No client-side writes or fallback: the entire result is committed by PostgreSQL.
+  const { data, error } = await params.supabase.rpc("save_group_match_result", {
+    p_match_id: params.matchId,
+    p_organization_id: params.organizationId,
+    p_expected_version: resultInput.expectedVersion ?? 0,
+    p_input: JSON.parse(JSON.stringify(resultInput)),
+    p_finish: true
   });
-  const season = await resolveSeasonForResult({
-    supabase,
-    organizationId: targetOrganizationId,
-    adminId,
-    matchSeasonId: match.season_id,
-    matchScheduledAt: match.scheduled_at
-  });
-  const mvpParticipant = resolveMvpParticipant({
-    mvpParticipantId: resultInput.mvpParticipantId
-      ? participantAliases.get(resultInput.mvpParticipantId) ?? resultInput.mvpParticipantId
-      : null,
-    teamA,
-    teamB
-  });
-  const adjustments = calculateMatchRatingAdjustments({
-    teamA: teamA.map((player) => ({ id: player.id, rating: player.current_rating })),
-    teamB: teamB.map((player) => ({ id: player.id, rating: player.current_rating })),
-    winnerTeam,
-    shortHandedTeam: handicapTeam
-  });
-
-  const { error: upsertResultError } = await supabase.from("match_result").upsert(
-    {
-      match_id: matchId,
-      created_by: adminId,
-      score_a: scoreA,
-      score_b: scoreB,
-      winner_team: winnerTeam,
-      mvp_player_id: mvpParticipant?.source === "player" ? mvpParticipant.entityId : null,
-      mvp_guest_id: mvpParticipant?.source === "guest" ? mvpParticipant.entityId : null,
-      mvp_display_name: mvpParticipant?.full_name ?? null,
-      notes: notes ?? null
-    },
-    { onConflict: "match_id" }
-  );
-  if (upsertResultError) {
-    throw new Error(`No se pudo guardar resultado: ${upsertResultError.message}`);
-  }
-
-  const registeredPlayerAdjustments = adjustments
-    .map((adjustment) => {
-      const parsed = parseParticipantId(adjustment.playerId);
-      if (parsed.source !== "player") return null;
-      return {
-        ...adjustment,
-        playerId: parsed.entityId
-      };
-    })
-    .filter((value): value is NonNullable<typeof value> => value !== null);
-
-  const historyRows = [];
-
-  for (const adjustment of registeredPlayerAdjustments) {
-    const { error: updatePlayerError } = await supabase
-      .from("players")
-      .update({ current_rating: adjustment.ratingAfter })
-      .eq("id", adjustment.playerId);
-
-    if (updatePlayerError) {
-      throw new Error(`No se pudo actualizar rendimiento de un jugador: ${updatePlayerError.message}`);
-    }
-
-    const seasonState = await applySeasonRatingDelta({
-      supabase,
-      organizationId: targetOrganizationId,
-      seasonId: season.id,
-      playerId: adjustment.playerId,
-      delta: adjustment.delta
-    });
-
-    historyRows.push({
-      match_id: matchId,
-      player_id: adjustment.playerId,
-      rating_before: adjustment.ratingBefore,
-      rating_after: adjustment.ratingAfter,
-      delta: adjustment.delta,
-      season_id: season.id,
-      season_rating_before: seasonState.ratingBefore,
-      season_rating_after: seasonState.ratingAfter,
-      season_delta: seasonState.delta,
-      reason: "match_result"
-    });
-  }
-
-  if (mvpParticipant?.source === "player") {
-    const { data: playerRow, error: playerError } = await supabase
-      .from("players")
-      .select("current_rating")
-      .eq("id", mvpParticipant.entityId)
-      .single();
-    if (playerError || !playerRow) {
-      throw new Error("No se pudo leer el rendimiento del MVP.");
-    }
-
-    const ratingBefore = Number(playerRow.current_rating);
-    const ratingAfter = Math.round(ratingBefore + MVP_BONUS_POINTS);
-    const { error: updateMvpError } = await supabase
-      .from("players")
-      .update({ current_rating: ratingAfter })
-      .eq("id", mvpParticipant.entityId);
-    if (updateMvpError) {
-      throw new Error(`No se pudo aplicar el bonus de MVP: ${updateMvpError.message}`);
-    }
-
-    const seasonState = await applySeasonRatingDelta({
-      supabase,
-      organizationId: targetOrganizationId,
-      seasonId: season.id,
-      playerId: mvpParticipant.entityId,
-      delta: MVP_BONUS_POINTS
-    });
-
-    historyRows.push({
-      match_id: matchId,
-      player_id: mvpParticipant.entityId,
-      rating_before: ratingBefore,
-      rating_after: ratingAfter,
-      delta: MVP_BONUS_POINTS,
-      season_id: season.id,
-      season_rating_before: seasonState.ratingBefore,
-      season_rating_after: seasonState.ratingAfter,
-      season_delta: seasonState.delta,
-      reason: "mvp_bonus"
-    });
-  }
-
-  for (const participant of absencePenaltyParticipants) {
-    const { data: playerRow, error: playerError } = await supabase
-      .from("players")
-      .select("current_rating")
-      .eq("id", participant.entityId)
-      .single();
-    if (playerError || !playerRow) {
-      throw new Error("No se pudo leer el rendimiento del ausente.");
-    }
-
-    const ratingBefore = Number(playerRow.current_rating);
-    const ratingAfter = Math.max(1, Math.round(ratingBefore + ABSENCE_PENALTY_POINTS));
-    const delta = ratingAfter - ratingBefore;
-    const { error: updateAbsenceError } = await supabase
-      .from("players")
-      .update({ current_rating: ratingAfter })
-      .eq("id", participant.entityId);
-    if (updateAbsenceError) {
-      throw new Error(`No se pudo aplicar la penalizacion por ausencia: ${updateAbsenceError.message}`);
-    }
-
-    const seasonState = await applySeasonRatingDelta({
-      supabase,
-      organizationId: targetOrganizationId,
-      seasonId: season.id,
-      playerId: participant.entityId,
-      delta
-    });
-
-    historyRows.push({
-      match_id: matchId,
-      player_id: participant.entityId,
-      rating_before: ratingBefore,
-      rating_after: ratingAfter,
-      delta,
-      season_id: season.id,
-      season_rating_before: seasonState.ratingBefore,
-      season_rating_after: seasonState.ratingAfter,
-      season_delta: seasonState.delta,
-      reason: "absence_penalty"
-    });
-  }
-
-  if (historyRows.length) {
-    const { error: historyInsertError } = await supabase.from("rating_history").insert(historyRows);
-    if (historyInsertError) {
-      throw new Error(`No se pudo guardar historial de rendimiento: ${historyInsertError.message}`);
-    }
-  }
-
-  const { error: updateMatchError } = await supabase
-    .from("matches")
-    .update({
-      season_id: season.id,
-      status: "finished",
-      finished_at: new Date().toISOString()
-    })
-    .eq("id", matchId);
-
-  if (updateMatchError) {
-    throw new Error(`No se pudo actualizar estado final del partido: ${updateMatchError.message}`);
-  }
+  if (error) throw new Error(error.message);
+  const outcome = data as { first_finished: boolean; result_version: number; season_id: string | null };
+  return { firstFinished: outcome.first_finished, resultVersion: outcome.result_version, seasonId: outcome.season_id };
 }
 
 export async function saveConfirmedMatchLineup(params: {
   supabase: DbClient;
   matchId: string;
   organizationId: string;
-  lineupInput: MatchLineupAdjustmentInput;
+  expectedVersion?: number;
+  lineupInput: NonNullable<MatchResultInput["lineup"]>;
 }) {
-  const { supabase, matchId, organizationId, lineupInput } = params;
-  await assertMatchBelongsToOrganization({ supabase, matchId, organizationId });
-
-  const { data: match, error: matchError } = await supabase
-    .from("matches")
-    .select("id, status")
-    .eq("id", matchId)
-    .eq("organization_id", organizationId)
-    .maybeSingle();
-  if (matchError || !match) {
-    throw new Error("No se encontro el partido para el grupo seleccionado.");
-  }
-
-  if (match.status !== "confirmed") {
-    throw new Error("Solo puedes ajustar la formacion en partidos confirmados.");
-  }
-
-  const { data: existingResult, error: resultError } = await supabase
-    .from("match_result")
-    .select("id")
-    .eq("match_id", matchId)
-    .maybeSingle();
-  if (resultError) {
-    throw new Error(`No se pudo verificar el resultado del partido: ${resultError.message}`);
-  }
-  if (existingResult) {
-    throw new Error("Este partido ya tiene resultado. Solo puedes ajustar formacion antes de cargarlo.");
-  }
-
-  const confirmed = await loadConfirmedTeams(supabase, matchId);
-  const participants = [...confirmed.teamA, ...confirmed.teamB];
-  const participantsById = new Map(participants.map((participant) => [participant.id, participant]));
-
-  const assignmentMap = normalizeLineupAssignments(lineupInput.assignments, participantsById);
-  const teamA: ConfirmedParticipant[] = [];
-  const teamB: ConfirmedParticipant[] = [];
-
-  for (const participant of participants) {
-    const team = assignmentMap.get(participant.id) ?? "OUT";
-    if (team === "A") teamA.push(participant);
-    if (team === "B") teamB.push(participant);
-  }
-
-  const normalizedNewPlayers = normalizeLineupPlayers(lineupInput.newPlayers);
-  const additionalPlayers = await resolveNewLineupPlayers({
-    supabase,
-    organizationId,
-    players: normalizedNewPlayers,
-    participantsById
+  const { error } = await params.supabase.rpc("save_group_match_result", {
+    p_match_id: params.matchId,
+    p_organization_id: params.organizationId,
+    p_expected_version: params.expectedVersion ?? 0,
+    p_input: JSON.parse(JSON.stringify({ lineup: params.lineupInput })),
+    p_finish: false
   });
-  for (const row of additionalPlayers) {
-    if (row.team === "A") teamA.push(row.participant);
-    if (row.team === "B") teamB.push(row.participant);
-  }
-
-  const normalizedGuests = normalizeLineupGuests(lineupInput.newGuests);
-  const insertedGuests = await insertNewLineupGuests({
-    supabase,
-    matchId,
-    guests: normalizedGuests
-  });
-
-  insertedGuests.forEach((guest, index) => {
-    const targetTeam = normalizedGuests[index]?.team;
-    if (targetTeam === "A") teamA.push(guest);
-    if (targetTeam === "B") teamB.push(guest);
-  });
-
-  if (!teamA.length || !teamB.length) {
-    throw new Error("Cada equipo debe tener al menos un participante en la formacion final.");
-  }
-
-  await persistConfirmedLineup({
-    supabase,
-    optionId: confirmed.optionId,
-    teamA,
-    teamB
-  });
+  if (error) throw new Error(error.message);
 }

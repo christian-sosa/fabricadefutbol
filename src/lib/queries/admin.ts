@@ -1,3 +1,6 @@
+import { calculateReferralFunnel } from "@/lib/analytics/referral-funnel";
+import { calculateGroupActivation } from "@/lib/analytics/group-activation";
+import { readAllRows } from "@/lib/queries/read-all-rows";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { calculateGuestDisplayRating, parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
@@ -172,7 +175,7 @@ export async function getSelectablePlayers(organizationId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("players")
-    .select("id, full_name, current_rating, initial_rank, skill_level, display_order")
+    .select("id, full_name, current_rating, initial_rank, skill_level, display_order, photo_path, photo_updated_at")
     .eq("organization_id", organizationId)
     .eq("active", true)
     .order("skill_level", { ascending: true })
@@ -224,7 +227,7 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
   const { data: players, error: playersError } = playerIds.length
     ? await supabase
         .from("players")
-        .select("id, full_name, current_rating, skill_level")
+        .select("id, full_name, current_rating, skill_level, photo_path, photo_updated_at")
         .eq("organization_id", organizationId)
         .in("id", playerIds)
     : { data: [], error: null };
@@ -318,6 +321,8 @@ type OrgMatchesAggregate = {
 };
 
 export type SuperAdminDashboardMetrics = {
+  activation: ReturnType<typeof calculateGroupActivation>;
+  referrals: ReturnType<typeof calculateReferralFunnel> | null;
   generatedAt: string;
   currentMonth: {
     label: string;
@@ -418,15 +423,13 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
     pendingInvites,
     { count: adminsCount, error: adminsCountError },
     { count: resultsCount, error: resultsCountError },
-    { count: guestsCount, error: guestsCountError }
+    { count: guestsCount, error: guestsCountError },
+    referralEvents
   ] = await Promise.all([
-    supabase
-      .from("organizations")
-      .select("id, name, slug, created_at")
-      .order("created_at", { ascending: true }),
-    supabase.from("players").select("id, organization_id, active, created_at"),
-    supabase.from("matches").select("id, organization_id, status, created_at, finished_at"),
-    supabase.from("organization_admins").select("organization_id"),
+    readAllRows((from, to) => supabase.from("organizations").select("id, name, slug, created_at", { count: "exact" }).order("id").range(from, to)),
+    readAllRows((from, to) => supabase.from("players").select("id, organization_id, active, created_at", { count: "exact" }).order("id").range(from, to)),
+    readAllRows((from, to) => supabase.from("matches").select("id, organization_id, status, created_at, finished_at", { count: "exact" }).order("id").range(from, to)),
+    readAllRows((from, to) => supabase.from("organization_admins").select("organization_id", { count: "exact" }).order("id").range(from, to)),
     supabase
       .from("organization_audit_events")
       .select("id, organization_id, event_type, actor_admin_id, actor_email, target_admin_id, target_email, entity_type, entity_id, details, created_at")
@@ -435,7 +438,8 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
     countPendingInvitesByOrganization(supabase),
     supabase.from("admins").select("id", { count: "exact", head: true }),
     supabase.from("match_result").select("id", { count: "exact", head: true }),
-    supabase.from("match_guests").select("id", { count: "exact", head: true })
+    supabase.from("match_guests").select("id", { count: "exact", head: true }),
+    readAllRows((from, to) => supabase.from("analytics_events").select("event_name, source, entity_id, properties", { count: "exact" }).in("event_name", ["referral_visit", "admin_register_succeeded", "group_created"]).gte("created_at", sinceDate.toISOString()).order("id").range(from, to))
   ]);
 
   if (organizationsError) throw new Error(organizationsError.message);
@@ -564,6 +568,8 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
   });
 
   return {
+    activation: calculateGroupActivation(safeOrganizations, safeMatches, Date.parse(generatedAt)),
+    referrals: referralEvents.error ? null : calculateReferralFunnel(referralEvents.data),
     generatedAt,
     currentMonth: {
       label: currentMonthLabel,
@@ -597,7 +603,7 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
         .length,
       playersCreated: safePlayers.filter((player) => isRecentDate(player.created_at, sinceDate)).length,
       matchesCreated: safeMatches.filter((match) => isRecentDate(match.created_at, sinceDate)).length,
-      matchesFinished: safeMatches.filter((match) => isRecentDate(match.finished_at, sinceDate)).length
+      matchesFinished: safeMatches.filter((match) => match.status === "finished" && isRecentDate(match.finished_at, sinceDate)).length
     },
     organizationsBreakdown,
     topOrganizations,

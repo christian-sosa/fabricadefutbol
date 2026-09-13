@@ -39,7 +39,7 @@ import {
   optimizeOrganizationImage
 } from "@/lib/organization-images";
 import { toUserMessage } from "@/lib/errors";
-import { GROWTH_EVENTS, withGrowthEvent } from "@/lib/growth";
+import { GROWTH_EVENTS } from "@/lib/growth";
 import { REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL } from "@/lib/storage-image-responses";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -259,7 +259,7 @@ export async function createOrganizationAction(formData: FormData) {
       adminId: admin.userId,
       durationMs: Date.now() - startedAt
     });
-    redirect(withGrowthEvent(withOrgQuery("/admin", slug), GROWTH_EVENTS.groupCreated));
+    redirect(withOrgQuery("/admin", slug));
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     logError("organizations.create.failed", error, {

@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
+import Link from "next/link";
 
 import {
   loginWithGoogleAction,
@@ -82,8 +83,8 @@ function RegisterSubmitButton() {
   );
 }
 
-export function LoginForm({ nextPath = "/admin" }: { nextPath?: string }) {
-  const [mode, setMode] = useState<AuthMode>("login");
+export function LoginForm({ nextPath = "/admin", initialMode = "login" }: { nextPath?: string; initialMode?: AuthMode }) {
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [loginState, loginAction] = useActionState(loginAdminAction, initialLoginState);
   const [registerState, registerAction] = useActionState(registerAdminAction, initialRegisterState);
   const isRegisterMode = mode === "register";
@@ -171,6 +172,7 @@ export function LoginForm({ nextPath = "/admin" }: { nextPath?: string }) {
 
             {loginState.error ? <p className="text-sm font-semibold text-danger">{loginState.error}</p> : null}
             <LoginSubmitButton />
+            <Link className="block text-center text-sm font-semibold text-emerald-300 underline" href="/admin/forgot-password">Olvidé mi contraseña</Link>
           </form>
         )}
 

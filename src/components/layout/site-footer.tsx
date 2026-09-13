@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { PRIMARY_PUBLIC_NAV_ITEMS } from "@/lib/constants";
-import { parsePublicModule, withPublicQuery } from "@/lib/org";
+import { withPublicQuery } from "@/lib/org";
 import { cn } from "@/lib/utils";
 
 const COMPANY_LINKS = [{ href: "/about", label: "Sobre nosotros" }] as const;
@@ -38,11 +38,10 @@ function FooterSectionTitle({
   );
 }
 
-export function SiteFooter({ canAccessTournaments = false }: { canAccessTournaments?: boolean }) {
+export function SiteFooter() {
   const searchParams = useSearchParams();
   const organizationId = searchParams.get("org");
-  const requestedPublicModule = parsePublicModule(searchParams.get("module"));
-  const publicModule = canAccessTournaments ? requestedPublicModule : "organizations";
+  const publicModule = "organizations";
   const year = new Date().getFullYear();
   const primaryNavItems = PRIMARY_PUBLIC_NAV_ITEMS;
   return (

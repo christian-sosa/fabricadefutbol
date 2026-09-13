@@ -37,6 +37,10 @@ export function checkRateLimit(params: {
   pruneIfNeeded(now);
   const existing = BUCKETS_BY_KEY.get(params.key);
 
+  if (!existing && BUCKETS_BY_KEY.size >= MAX_BUCKETS) {
+    return { allowed: false, remaining: 0, retryAfterMs: params.windowMs };
+  }
+
   if (!existing || existing.resetAt <= now) {
     BUCKETS_BY_KEY.set(params.key, { count: 1, resetAt: now + params.windowMs });
     return { allowed: true, remaining: Math.max(0, params.limit - 1), retryAfterMs: 0 };

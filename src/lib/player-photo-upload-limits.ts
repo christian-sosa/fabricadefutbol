@@ -3,14 +3,12 @@ import { es } from "date-fns/locale";
 
 export const PLAYER_PHOTO_UPLOAD_COOLDOWN_MONTHS = 3;
 export const PLAYER_PHOTO_TARGET_LIMIT = 2;
-export const CAPTAIN_PLAYER_PHOTO_TOTAL_LIMIT = 40;
 
-export type PlayerPhotoUploaderRole = "organization_admin" | "league_admin" | "club_admin" | "captain";
-export type PlayerPhotoTargetType = "organization_player" | "competition_player" | "club_player";
+export type PlayerPhotoUploaderRole = "organization_admin";
+export type PlayerPhotoTargetType = "organization_player";
 
 export type PlayerPhotoUploadPolicy = {
   targetLimit: number;
-  totalLimit: number | null;
   cooldownMonths: number;
 };
 
@@ -33,10 +31,9 @@ type PlayerPhotoUploadSelectChain = {
   order: (column: string, options?: { ascending?: boolean }) => PlayerPhotoUploadSelectResult;
 };
 
-export function getPlayerPhotoUploadPolicy(role: PlayerPhotoUploaderRole): PlayerPhotoUploadPolicy {
+export function getPlayerPhotoUploadPolicy(): PlayerPhotoUploadPolicy {
   return {
     targetLimit: PLAYER_PHOTO_TARGET_LIMIT,
-    totalLimit: role === "captain" ? CAPTAIN_PLAYER_PHOTO_TOTAL_LIMIT : null,
     cooldownMonths: PLAYER_PHOTO_UPLOAD_COOLDOWN_MONTHS
   };
 }
@@ -77,7 +74,7 @@ export async function assertPlayerPhotoUploadAllowed(params: {
   now?: Date;
 }) {
   const now = params.now ?? new Date();
-  const policy = getPlayerPhotoUploadPolicy(params.uploaderRole);
+  const policy = getPlayerPhotoUploadPolicy();
   const windowStart = getPlayerPhotoUploadWindowStart({
     now,
     cooldownMonths: policy.cooldownMonths
@@ -88,6 +85,8 @@ export async function assertPlayerPhotoUploadAllowed(params: {
     .select("created_at, uploader_id, uploader_role, target_type, target_player_id")
     .eq("uploader_id", params.uploaderId)
     .eq("uploader_role", params.uploaderRole)
+    .eq("target_type", params.targetType)
+    .eq("target_player_id", params.targetPlayerId)
     .gte("created_at", windowStart.toISOString())
     .order("created_at", { ascending: true });
 
@@ -95,12 +94,7 @@ export async function assertPlayerPhotoUploadAllowed(params: {
     throw new Error(error.message);
   }
 
-  const uploadRows: PlayerPhotoUploadEventRow[] = rows ?? [];
-  const targetUploads = uploadRows.filter(
-    (row) =>
-      row.target_type === params.targetType &&
-      row.target_player_id === params.targetPlayerId
-  );
+  const targetUploads: PlayerPhotoUploadEventRow[] = rows ?? [];
 
   if (targetUploads.length >= policy.targetLimit) {
     throw new Error(
@@ -108,17 +102,6 @@ export async function assertPlayerPhotoUploadAllowed(params: {
         label: "reemplazos para este jugador",
         limit: policy.targetLimit,
         oldestAt: targetUploads[0].created_at,
-        now
-      })
-    );
-  }
-
-  if (policy.totalLimit !== null && uploadRows.length >= policy.totalLimit) {
-    throw new Error(
-      buildPhotoUploadCooldownMessage({
-        label: "fotos en este periodo",
-        limit: policy.totalLimit,
-        oldestAt: uploadRows[0].created_at,
         now
       })
     );

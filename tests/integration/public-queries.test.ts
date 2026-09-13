@@ -1105,3 +1105,33 @@ describe("resolvePublicOrganization", () => {
     await expect(getPlayerDetails("player-1", "liga-b")).resolves.toBeNull();
   });
 });
+
+
+describe("large group history", () => {
+  it("counts more than 1000 matches and 2000 participants despite the API row cap", async () => {
+    const count = 1205;
+    const matches = Array.from({ length: count }, (_, i) => ({ id: `long-match-${i}`, organization_id: ORG_ID,
+      status: "finished", modality: "5v5", scheduled_at: new Date(Date.UTC(2020, 0, 1 + i)).toISOString(), confirmed_option_id: `long-option-${i}` }));
+    const fake = createFakeSupabase({ organizations: buildOrganizations(), players: buildPlayers().slice(0, 2), matches,
+      team_options: matches.map((m, i) => ({ id: `long-option-${i}`, match_id: m.id, is_confirmed: true, option_number: 1 })),
+      team_option_players: matches.flatMap((_, i) => [
+        { id: `member-a-${i}`, team_option_id: `long-option-${i}`, player_id: "player-1", team: "A" },
+        { id: `member-b-${i}`, team_option_id: `long-option-${i}`, player_id: "player-2", team: "B" }
+      ]),
+      match_result: matches.map((m) => ({ match_id: m.id, score_a: 1, score_b: 0, winner_team: "A", mvp_player_id: "player-1" })),
+      match_player_stats: matches.map((m) => ({ match_id: m.id, player_id: "player-1", goals: 1, assists: 0 }))
+    });
+    const cappedClient = { ...fake.client, from: (table: Parameters<typeof fake.client.from>[0]) => {
+      const query = fake.client.from(table);
+      const originalThen = query.then.bind(query);
+      Object.defineProperty(query, "then", { value: (resolve: (result: unknown) => unknown, reject: (error: unknown) => unknown) =>
+        originalThen((result) => resolve({ ...result, data: Array.isArray(result.data) ? result.data.slice(0, 1000) : result.data }), reject)
+      });
+      return query;
+    } };
+    createSupabaseServerClientMock.mockResolvedValue(cappedClient);
+    const standings = await getPlayersWithStats(ORG_ID, { season: "all" });
+    expect(standings.find((p) => p.playerId === "player-1")).toMatchObject({ matchesPlayed: count, wins: count, goals: count, mvpCount: count });
+    expect(standings.find((p) => p.playerId === "player-2")).toMatchObject({ matchesPlayed: count, losses: count });
+  });
+});

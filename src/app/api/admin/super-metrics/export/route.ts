@@ -75,7 +75,9 @@ export async function GET() {
     ["last_30_days", "organizations_created", metrics.last30Days.organizationsCreated],
     ["last_30_days", "players_created", metrics.last30Days.playersCreated],
     ["last_30_days", "matches_created", metrics.last30Days.matchesCreated],
-    ["last_30_days", "matches_finished", metrics.last30Days.matchesFinished]
+    ["last_30_days", "matches_finished", metrics.last30Days.matchesFinished],
+    ...Object.entries(metrics.activation).map(([key, value]): CsvCellValue[] => ["activation", key, value]),
+    ...Object.entries(metrics.referrals ?? {}).map(([key, value]): CsvCellValue[] => ["referrals_30d", key, value])
   ];
 
   const orgRows: CsvCellValue[][] = [

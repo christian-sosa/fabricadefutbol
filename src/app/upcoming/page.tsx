@@ -66,7 +66,7 @@ export default async function UpcomingPage({
                       {item.teamAPlayers.map((player) => (
                         <li className="flex items-center justify-between gap-3" key={player.id}>
                           <div className="flex items-center gap-2">
-                            <PlayerAvatar name={player.full_name} playerId={player.is_guest ? undefined : player.id} size="sm" />
+                            <PlayerAvatar hasPhoto={Boolean(player.photo_path)} name={player.full_name} photoUpdatedAt={player.photo_updated_at} playerId={player.is_guest ? undefined : player.id} size="sm" />
                             <span className="flex items-center gap-2">
                               {player.full_name}
                               {player.is_guest ? (
@@ -87,7 +87,7 @@ export default async function UpcomingPage({
                       {item.teamBPlayers.map((player) => (
                         <li className="flex items-center justify-between gap-3" key={player.id}>
                           <div className="flex items-center gap-2">
-                            <PlayerAvatar name={player.full_name} playerId={player.is_guest ? undefined : player.id} size="sm" />
+                            <PlayerAvatar hasPhoto={Boolean(player.photo_path)} name={player.full_name} photoUpdatedAt={player.photo_updated_at} playerId={player.is_guest ? undefined : player.id} size="sm" />
                             <span className="flex items-center gap-2">
                               {player.full_name}
                               {player.is_guest ? (

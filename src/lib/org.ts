@@ -1,8 +1,7 @@
-export type PublicModuleContext = "organizations" | "tournaments";
+export type PublicModuleContext = "organizations";
 
 export function parsePublicModule(value: string | null | undefined): PublicModuleContext | null {
   if (value === "organizations" || value === "groups") return "organizations";
-  if (value === "tournaments") return value;
   return null;
 }
 
@@ -24,7 +23,7 @@ export function withPublicQuery(
   }
 
   if (params?.module) {
-    query.set("module", params.module === "organizations" ? "groups" : params.module);
+    query.set("module", "groups");
   }
 
   const queryString = query.toString().replace(/\+/g, "%20");
@@ -56,13 +55,5 @@ function slugifyName(value: string) {
 }
 
 export function slugifyOrganizationName(value: string) {
-  return slugifyName(value);
-}
-
-export function slugifyTournamentName(value: string) {
-  return slugifyName(value);
-}
-
-export function slugifyClubName(value: string) {
   return slugifyName(value);
 }

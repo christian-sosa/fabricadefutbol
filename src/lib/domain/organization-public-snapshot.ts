@@ -13,6 +13,8 @@ export type OrganizationPublicSummary = {
   topPlayers: Array<{
     id: string;
     full_name: string;
+    photo_path?: string | null;
+    photo_updated_at?: string | null;
     current_rating: number;
     initial_rank: number;
     skill_level?: number;

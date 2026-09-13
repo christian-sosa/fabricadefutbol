@@ -1,7 +1,5 @@
 ﻿import type { MatchModality, MatchStatus } from "@/types/domain";
 
-import { canAccessClubsProduct, shouldSkipTournamentCheckoutForDebug } from "@/lib/features";
-
 export const MATCH_MODALITIES: MatchModality[] = ["5v5", "6v6", "7v7", "9v9", "11v11"];
 export const MATCH_STATUSES: MatchStatus[] = ["draft", "confirmed", "finished", "cancelled"];
 
@@ -51,33 +49,6 @@ export function isSuperAdminConfigured() {
 }
 
 export const ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS = 180;
-export const TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS = 100;
-export const MAX_TOURNAMENT_PLAYERS_PER_TEAM = 20;
-export const TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS = 50000;
-export const BILLING_CURRENCY = "ARS";
-
-function resolveTournamentMonthlyPriceArs() {
-  const raw = process.env.TOURNAMENT_MONTHLY_PRICE_ARS?.trim();
-  if (!raw) return TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS;
-
-  const parsed = Number(raw);
-  if (Number.isInteger(parsed) && parsed > 0) return parsed;
-
-  if (process.env.NODE_ENV !== "test") {
-    console.warn(
-      "[constants] TOURNAMENT_MONTHLY_PRICE_ARS invalido. Se usa el precio mensual de referencia."
-    );
-  }
-  return TOURNAMENT_MONTHLY_REFERENCE_PRICE_ARS;
-}
-
-export const TOURNAMENT_MONTHLY_PRICE_ARS = resolveTournamentMonthlyPriceArs();
-// Atajo temporal solo para desarrollo local: mantiene el flujo de torneos
-// testeable sin checkout externo. En produccion Mercado Pago queda activo.
-export const TEMP_SKIP_TOURNAMENT_CHECKOUT = shouldSkipTournamentCheckoutForDebug();
-export const TOURNAMENT_MONTHLY_CHECKOUT_PRICE_ARS = TEMP_SKIP_TOURNAMENT_CHECKOUT
-  ? TOURNAMENT_MONTHLY_DEBUG_PRICE_ARS
-  : TOURNAMENT_MONTHLY_PRICE_ARS;
 
 export const TEAM_SIZE_BY_MODALITY: Record<MatchModality, number> = {
   "5v5": 5,
@@ -102,7 +73,6 @@ export function formatMatchModality(modality: MatchModality) {
 export const PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
   { href: "/groups", label: "Grupos" },
-  ...(canAccessClubsProduct() ? [{ href: "/clubs", label: "Clubes" }] : []),
   { href: "/ranking", label: "Ranking" },
   { href: "/matches", label: "Historial" },
   { href: "/upcoming", label: "Proximos" },
@@ -114,7 +84,6 @@ export const PUBLIC_NAV_ITEMS = [
 export const PRIMARY_PUBLIC_NAV_ITEMS = [
   { href: "/", label: "Inicio" },
   { href: "/groups", label: "Grupos" },
-  ...(canAccessClubsProduct() ? [{ href: "/clubs", label: "Clubes" }] : []),
   { href: "/guides", label: "Guías" },
   { href: "/feedback", label: "Contacto" },
   { href: "/help", label: "Ayuda" }
@@ -128,6 +97,5 @@ export const ORGANIZATION_PUBLIC_NAV_ITEMS = [
 ];
 
 export const ADMIN_NAV_ITEMS = [
-  { href: "/admin", label: "Grupos" },
-  { href: "/admin/tournaments", label: "Torneos" }
+  { href: "/admin", label: "Grupos" }
 ] as const;

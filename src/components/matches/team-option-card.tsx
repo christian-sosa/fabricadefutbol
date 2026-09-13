@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 type OptionPlayer = {
   id: string;
   full_name: string;
+  photo_path?: string | null;
+  photo_updated_at?: string | null;
   current_rating: number;
   skill_level?: number | null;
   is_guest?: boolean;
@@ -120,7 +122,7 @@ function PlayerRow({ player }: { player: OptionPlayer }) {
   return (
     <li className="flex items-start justify-between gap-2">
       <span className="flex min-w-0 items-start gap-2">
-        <PlayerAvatar name={player.full_name} playerId={player.is_guest ? undefined : player.id} size="sm" />
+        <PlayerAvatar hasPhoto={Boolean(player.photo_path)} name={player.full_name} photoUpdatedAt={player.photo_updated_at} playerId={player.is_guest ? undefined : player.id} size="sm" />
         <span className="min-w-0">
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="truncate font-semibold text-slate-100">{player.full_name}</span>

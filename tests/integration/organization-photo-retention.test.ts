@@ -1,218 +1,102 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { purgeExpiredOrganizationPlayerPhotos } from "@/lib/domain/organization-photo-retention";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
-const ORG_ID = "org-1";
-
+const OLD = "2025-01-01T00:00:00.000Z";
+const NOW = "2026-05-20T12:00:00.000Z";
+const VERSION = "10000000-0000-4000-8000-000000000001";
+const PATH = `app_dev/org-1/player-1/${VERSION}.webp`;
+function setup(options: { createdAt?: string; photoAt?: string; path?: string | null; purgedAt?: string | null } = {}) {
+  const fake = createFakeSupabase({
+    organizations: [{ id: "org-1", created_at: options.createdAt ?? OLD, updated_at: OLD, image_path: "cover.webp", player_photos_purge_at: null, player_photos_purged_at: options.purgedAt ?? null }],
+    organization_public_snapshots: [{ organization_id: "org-1", summary: {}, standings: [], match_history: [] }],
+    players: [{ id: "player-1", organization_id: "org-1", created_at: OLD, updated_at: OLD, photo_path: options.path === undefined ? PATH : options.path, photo_updated_at: options.photoAt ?? OLD }],
+    player_photo_upload_events: [{ id: "event-1", uploader_id: "admin-1", uploader_role: "organization_admin", target_type: "organization_player", target_player_id: "player-1", created_at: options.photoAt ?? OLD }]
+  });
+  const remove = vi.fn(async (paths: string[]) => ({ data: paths.map((name) => ({ name })), error: null as { message: string } | null }));
+  const run = () => purgeExpiredOrganizationPlayerPhotos({ supabase: { ...fake.client, storage: { from: () => ({ remove }) } } as never, bucketName: "player-photos-dev", schemaName: "app_dev", now: new Date(NOW) });
+  return { fake, remove, run };
+}
 describe("organization photo retention", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-05-20T12:00:00.000Z"));
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date(NOW)); });
+  afterEach(() => vi.useRealTimers());
+
+  it("programa una sola vez sin alternar fecha y null ni usar updated_at del cron", async () => {
+    const { run, fake, remove } = setup({ createdAt: "2026-03-25T00:00:00.000Z" });
+    expect((await run()).scheduledOrganizations).toBe(1);
+    const before = fake.table("organizations")[0];
+    expect((await run()).scheduledOrganizations).toBe(0);
+    expect((await run()).resetOrganizations).toBe(0);
+    expect(fake.table("organizations")[0]).toEqual(before);
+    expect(before.player_photos_purge_at).toBe("2026-09-21T00:00:00.000Z");
+    expect(remove).not.toHaveBeenCalled();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
+  it("borra sólo fotos registradas vencidas y conserva portada/datos deportivos", async () => {
+    const { run, fake, remove } = setup();
+    expect(await run()).toMatchObject({ purgedOrganizations: 1, deletedPlayerPhotos: 1, clearedUploadEvents: 1 });
+    expect(remove).toHaveBeenCalledExactlyOnceWith([PATH]);
+    expect(fake.table("players")[0]).toMatchObject({ id: "player-1", photo_path: null, photo_updated_at: OLD, updated_at: OLD });
+    expect(fake.table("organizations")[0].image_path).toBe("cover.webp");
+    expect(fake.table("player_photo_upload_events")).toEqual([]);
+    expect(fake.table("organization_public_snapshots")).toEqual([]);
+    expect((await run()).purgedOrganizations).toBe(0);
+    expect(remove).toHaveBeenCalledTimes(1);
   });
 
-  it("programa el purge de fotos a 180 dias desde la ultima actividad", async () => {
-    const fake = createFakeSupabase({
-      organizations: [
-        {
-          id: ORG_ID,
-          name: "La cantera",
-          slug: "la-cantera",
-          created_at: "2026-03-25T00:00:00.000Z",
-          updated_at: "2026-03-25T00:00:00.000Z"
-        }
-      ]
-    });
-    const removedPaths: string[][] = [];
-
-    const summary = await purgeExpiredOrganizationPlayerPhotos({
-      supabase: {
-        ...fake.client,
-        storage: {
-          from: () => ({
-            remove: async (paths: string[]) => {
-              removedPaths.push(paths);
-              return { data: [], error: null };
-            }
-          })
-        }
-      } as never,
-      bucketName: "player-photos-dev",
-      schemaName: "app_dev"
-    });
-
-    expect(summary).toEqual({
-      scannedOrganizations: 1,
-      scheduledOrganizations: 1,
-      purgedOrganizations: 0,
-      deletedPlayerPhotos: 0,
-      clearedUploadEvents: 0,
-      resetOrganizations: 0
-    });
-    expect(removedPaths).toEqual([]);
-    expect(fake.find("organizations", (row) => row.id === ORG_ID)).toEqual(
-      expect.objectContaining({
-        player_photos_purge_at: "2026-09-21T00:00:00.000Z",
-        player_photos_purged_at: null
-      })
-    );
+  it("una foto cargada hoy renueva la actividad aunque el grupo sea antiguo", async () => {
+    const { run, fake, remove } = setup({ photoAt: NOW });
+    expect((await run()).purgedOrganizations).toBe(0);
+    expect(Date.parse(String(fake.table("organizations")[0].player_photos_purge_at))).toBeGreaterThan(Date.parse(NOW));
+    expect(remove).not.toHaveBeenCalled();
   });
 
-  it("borra fotos de jugadores cuando el grupo lleva 180 dias sin actividad y conserva la imagen del grupo", async () => {
-    const fake = createFakeSupabase({
-      organizations: [
-        {
-          id: ORG_ID,
-          name: "La cantera",
-          slug: "la-cantera",
-          image_path: "app_dev/organizations/org-1.webp",
-          created_at: "2025-01-01T00:00:00.000Z",
-          updated_at: "2025-01-01T00:00:00.000Z"
-        }
-      ],
-      players: [
-        {
-          id: "player-1",
-          organization_id: ORG_ID,
-          full_name: "Juan",
-          initial_rank: 1,
-          created_at: "2025-01-01T00:00:00.000Z",
-          updated_at: "2025-01-01T00:00:00.000Z"
-        },
-        {
-          id: "player-2",
-          organization_id: ORG_ID,
-          full_name: "Pedro",
-          initial_rank: 2,
-          created_at: "2025-01-01T00:00:00.000Z",
-          updated_at: "2025-01-01T00:00:00.000Z"
-        }
-      ],
-      player_photo_upload_events: [
-        {
-          uploader_id: "admin-1",
-          uploader_role: "organization_admin",
-          target_type: "organization_player",
-          target_player_id: "player-1"
-        },
-        {
-          uploader_id: "admin-1",
-          uploader_role: "organization_admin",
-          target_type: "organization_player",
-          target_player_id: "player-2"
-        },
-        {
-          uploader_id: "captain-1",
-          uploader_role: "captain",
-          target_type: "competition_player",
-          target_player_id: "comp-player-1"
-        }
-      ]
-    });
-    const removedPaths: string[][] = [];
-
-    const summary = await purgeExpiredOrganizationPlayerPhotos({
-      supabase: {
-        ...fake.client,
-        storage: {
-          from: (bucketName: string) => ({
-            remove: async (paths: string[]) => {
-              expect(bucketName).toBe("player-photos-dev");
-              removedPaths.push(paths);
-              return { data: [], error: null };
-            }
-          })
-        }
-      } as never,
-      bucketName: "player-photos-dev",
-      schemaName: "app_dev"
-    });
-
-    expect(summary).toEqual({
-      scannedOrganizations: 1,
-      scheduledOrganizations: 0,
-      purgedOrganizations: 1,
-      deletedPlayerPhotos: 2,
-      clearedUploadEvents: 2,
-      resetOrganizations: 0
-    });
-    expect(removedPaths).toEqual([
-      ["app_dev/org-1/player-1.webp", "app_dev/org-1/player-2.webp"]
-    ]);
-    expect(fake.find("organizations", (row) => row.id === ORG_ID)).toEqual(
-      expect.objectContaining({
-        image_path: "app_dev/organizations/org-1.webp",
-        player_photos_purge_at: "2025-06-30T00:00:00.000Z",
-        player_photos_purged_at: "2026-05-20T12:00:00.000Z"
-      })
-    );
-    expect(fake.table("player_photo_upload_events")).toEqual([
-      expect.objectContaining({
-        target_type: "competition_player",
-        target_player_id: "comp-player-1"
-      })
-    ]);
+  it("considera la actividad de jugadores posteriores a la primera página", async () => {
+    const { run, fake, remove } = setup();
+    await fake.client.from("players").insert(Array.from({ length: 1001 }, (_, index) => ({
+      id: `z-player-${String(index).padStart(4, "0")}`,
+      organization_id: "org-1",
+      created_at: OLD,
+      updated_at: OLD,
+      photo_path: null,
+      photo_updated_at: index === 1000 ? NOW : OLD
+    })));
+    expect((await run()).purgedOrganizations).toBe(0);
+    expect(remove).not.toHaveBeenCalled();
   });
 
-  it("resetea la retencion si el grupo vuelve a tener actividad reciente", async () => {
-    const fake = createFakeSupabase({
-      organizations: [
-        {
-          id: ORG_ID,
-          name: "La cantera",
-          slug: "la-cantera",
-          created_at: "2026-01-01T00:00:00.000Z",
-          updated_at: "2025-01-01T00:00:00.000Z",
-          player_photos_purge_at: "2026-05-11T00:00:00.000Z",
-          player_photos_purged_at: "2026-05-12T12:00:00.000Z"
-        }
-      ],
-      matches: [
-        {
-          id: "match-1",
-          organization_id: ORG_ID,
-          status: "finished",
-          date: "2026-05-10",
-          updated_at: "2026-05-10T00:00:00.000Z"
-        }
-      ]
-    });
-    const removedPaths: string[][] = [];
+  it("reactiva la retención después de una purga cuando se vuelve a subir", async () => {
+    const { run, fake } = setup({ photoAt: NOW, purgedAt: "2026-04-01T00:00:00Z" });
+    expect((await run()).resetOrganizations).toBe(1);
+    expect(fake.table("organizations")[0].player_photos_purged_at).toBeNull();
+    expect((await run()).resetOrganizations).toBe(0);
+  });
 
-    const summary = await purgeExpiredOrganizationPlayerPhotos({
-      supabase: {
-        ...fake.client,
-        storage: {
-          from: () => ({
-            remove: async (paths: string[]) => {
-              removedPaths.push(paths);
-              return { data: [], error: null };
-            }
-          })
-        }
-      } as never,
-      bucketName: "player-photos-dev",
-      schemaName: "app_dev"
-    });
+  it("no busca objetos en Storage para jugadores sin foto", async () => {
+    const { run, remove } = setup({ path: null });
+    expect((await run()).deletedPlayerPhotos).toBe(0);
+    expect(remove).not.toHaveBeenCalled();
+  });
 
-    expect(summary).toEqual({
-      scannedOrganizations: 1,
-      scheduledOrganizations: 0,
-      purgedOrganizations: 0,
-      deletedPlayerPhotos: 0,
-      clearedUploadEvents: 0,
-      resetOrganizations: 1
+  it("no limpia metadata si Storage falla", async () => {
+    const { run, fake, remove } = setup();
+    remove.mockResolvedValueOnce({ data: [], error: { message: "fallo de storage" } });
+    await expect(run()).rejects.toThrow("fallo de storage");
+    expect(fake.table("players")[0].photo_path).toBe(PATH);
+    expect(fake.table("organizations")[0].player_photos_purged_at).toBeNull();
+  });
+
+  it("preserva una versión nueva subida mientras se elimina la versión vencida", async () => {
+    const { run, fake, remove } = setup();
+    const newPath = "app_dev/org-1/player-1/20000000-0000-4000-8000-000000000002.webp";
+    remove.mockImplementationOnce(async (paths) => {
+      await fake.client.from("players").update({ photo_path: newPath, photo_updated_at: NOW }).eq("id", "player-1");
+      return { data: paths.map((name) => ({ name })), error: null };
     });
-    expect(removedPaths).toEqual([]);
-    expect(fake.find("organizations", (row) => row.id === ORG_ID)).toEqual(
-      expect.objectContaining({
-        player_photos_purge_at: null,
-        player_photos_purged_at: null
-      })
-    );
+    await run();
+    expect(remove).toHaveBeenCalledExactlyOnceWith([PATH]);
+    expect(fake.table("players")[0].photo_path).toBe(newPath);
+    await run();
+    expect(remove).toHaveBeenCalledTimes(1);
   });
 });
