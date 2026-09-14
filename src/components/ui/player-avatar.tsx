@@ -42,7 +42,7 @@ export function PlayerAvatar({ playerId, hasPhoto, photoUpdatedAt, name, size = 
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-full border border-slate-700 bg-slate-800 ring-1 ring-slate-700/60",
+        "relative shrink-0 overflow-hidden rounded-full border border-slate-700 bg-slate-800 ring-1 ring-slate-700/60",
         sizeClasses[size],
         className
       )}

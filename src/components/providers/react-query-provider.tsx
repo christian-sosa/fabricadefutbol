@@ -16,9 +16,9 @@ export function ReactQueryProvider({ children }: ReactQueryProviderProps) {
             staleTime: 60_000,
             gcTime: 10 * 60_000,
             retry: 1,
-            refetchOnMount: false,
+            refetchOnMount: true,
             refetchOnWindowFocus: false,
-            refetchOnReconnect: false,
+            refetchOnReconnect: true,
             refetchInterval: false
           },
           mutations: {

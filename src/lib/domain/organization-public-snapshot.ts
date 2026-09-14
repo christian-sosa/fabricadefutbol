@@ -179,7 +179,7 @@ export function buildSnapshotMatchHistoryPage(params: {
 }): OrganizationMatchesResponse {
   const totalCount = params.matchHistory.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / params.pageSize));
-  const safePage = Math.min(Math.max(1, params.page), totalPages);
+  const safePage = Math.max(1, params.page);
   const from = (safePage - 1) * params.pageSize;
   const to = from + params.pageSize;
 

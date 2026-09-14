@@ -40,6 +40,62 @@ function getLineupPayload(container: HTMLElement) {
 }
 
 describe("MatchResultEditor", () => {
+  it("abre invitados incompletos y enfoca el campo faltante antes de guardar el acta", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<MatchResultEditor defaultScoreA={2} defaultScoreB={1} existingParticipants={existingParticipants}
+      onSubmit={onSubmit} submitLabel="Guardar resultado" />);
+    const summary = screen.getByText("Invitados y reemplazos").closest("summary")!;
+    await user.click(summary);
+    await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
+    await user.type(screen.getByRole("textbox", { name: "Nombre del invitado de reemplazo 1" }), "Refuerzo");
+    await user.click(summary);
+    expect(summary.closest("details")).not.toHaveAttribute("open");
+
+    await user.click(screen.getByRole("button", { name: "Guardar resultado" }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(summary.closest("details")).toHaveAttribute("open");
+    expect(screen.getByRole("alert")).toHaveTextContent("Completá el nombre y el nivel del invitado 1");
+    const level = screen.getByRole("combobox", { name: "Nivel de Refuerzo" });
+    expect(level).toHaveFocus();
+    expect(level).toHaveAttribute("aria-invalid", "true");
+    await user.selectOptions(level, "3");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Guardar resultado" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+    expect(onSubmit.mock.calls[0][0].lineup.newGuests).toEqual([{ clientId: "1", name: "Refuerzo", rating: 3, team: "A" }]);
+  });
+
+  it("rechaza un nivel de invitado sin nombre incluso cuando sólo contiene espacios", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<MatchResultEditor defaultScoreA={2} defaultScoreB={1} existingParticipants={existingParticipants}
+      onSubmit={onSubmit} submitLabel="Guardar resultado" />);
+    await user.click(screen.getByText("Invitados y reemplazos").closest("summary")!);
+    await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
+    const name = screen.getByRole("textbox", { name: "Nombre del invitado de reemplazo 1" });
+    await user.type(name, "   ");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Nivel de invitado" }), "2");
+    await user.click(screen.getByRole("button", { name: "Guardar resultado" }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(name).toHaveFocus();
+    expect(name).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("permite guardar cuando una fila de invitado quedó completamente vacía", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<MatchResultEditor defaultScoreA={2} defaultScoreB={1} existingParticipants={existingParticipants}
+      onSubmit={onSubmit} submitLabel="Guardar resultado" />);
+    await user.click(screen.getByText("Invitados y reemplazos").closest("summary")!);
+    await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
+    await user.click(screen.getByRole("button", { name: "Guardar resultado" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+    expect(onSubmit.mock.calls[0][0].lineup.newGuests).toEqual([]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("rehidrata acta, sanciones, desventaja y version al corregir", () => {
     const participants = [...existingParticipants, { participantId: "player:absent", fullName: "Ausente", rating: 980, source: "player" as const, initialTeam: "OUT" as const }];
     const { container } = render(<MatchResultEditor existingParticipants={participants} expectedVersion={7}

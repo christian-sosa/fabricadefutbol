@@ -651,18 +651,33 @@ async function getMatchHistoryCardsPageLive(
   const seasonFilter = await resolveSeasonFilter(supabase, organizationId, params?.season);
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
-  let matchesQuery = supabase
-    .from("matches")
-    .select("id, scheduled_at, modality, status, season_id", { count: "exact" })
-    .eq("organization_id", organizationId)
-    .in("status", ["finished", "cancelled"])
-    .order("scheduled_at", { ascending: false });
-  if (seasonFilter.mode === "season") {
-    matchesQuery = matchesQuery.eq("season_id", seasonFilter.season.id);
-  }
+  const historyQuery = (head = false) => {
+    let query = supabase
+      .from("matches")
+      .select("id, scheduled_at, modality, status, season_id", { count: "exact", head })
+      .eq("organization_id", organizationId)
+      .in("status", ["finished", "cancelled"]);
+    if (seasonFilter.mode === "season") query = query.eq("season_id", seasonFilter.season.id);
+    return query;
+  };
 
-  const { data: finishedMatches, error, count } = await matchesQuery.range(from, to);
-  if (error) throw new Error(error.message);
+  const response = await historyQuery().order("scheduled_at", { ascending: false }).range(from, to);
+  let finishedMatches = response.data;
+  let count = response.count;
+  if (response.error?.code === "PGRST103") {
+    // PostgREST rejects offsets beyond the filtered rows. Count without a range to distinguish
+    // an empty page from a database failure, keeping the same group and season restrictions.
+    const countResponse = await historyQuery(true);
+    if (countResponse.error) throw new Error(countResponse.error.message || "No se pudo obtener la cantidad de partidos.");
+    const exactCount = countResponse.count;
+    if (exactCount === null || !Number.isSafeInteger(exactCount) || exactCount < 0 || from < exactCount) {
+      throw new Error(response.error.message);
+    }
+    finishedMatches = [];
+    count = exactCount;
+  } else if (response.error) {
+    throw new Error(response.error.message);
+  }
 
   const matches = (finishedMatches ?? []) as MatchRow[];
   const resultsByMatchId = await fetchMatchResultsByIds(matches.map((match) => match.id));

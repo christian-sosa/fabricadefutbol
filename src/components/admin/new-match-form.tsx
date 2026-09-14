@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import { createMatchFormAction } from "@/app/admin/(panel)/form-actions";
 import { ActionForm } from "@/components/ui/action-form";
@@ -85,6 +85,8 @@ export function NewMatchForm({
   const [guestRows, setGuestRows] = useState<GuestRow[]>(() => (initialValues?.guests ?? []).map((guest, index) => ({ key: index + 1, name: guest.name, rating: String(guest.rating) })));
   const [showManualBuilder, setShowManualBuilder] = useState(false);
   const [manualAssignments, setManualAssignments] = useState<Record<string, TeamSide>>({});
+  const [incompleteGuestKey, setIncompleteGuestKey] = useState<number | null>(null);
+  const formId = useId();
 
   const expected = EXPECTED_PLAYERS[modality];
   const teamSize = expected / 2;
@@ -193,6 +195,12 @@ export function NewMatchForm({
   const manualTeamBCount = manualParticipants.length - manualTeamACount;
 
   const goalkeepersReady = selectedGoalkeeperIds.length === 0 || selectedGoalkeeperIds.length === 2;
+  const rosterComplete = totalCurrent === expected;
+  const rosterStatus = totalCurrent < expected
+    ? `${expected - totalCurrent === 1 ? "Falta 1 convocado" : `Faltan ${expected - totalCurrent} convocados`} para completar ${expected}.`
+    : totalCurrent > expected
+      ? `${totalCurrent - expected === 1 ? "Sobra 1 convocado" : `Sobran ${totalCurrent - expected} convocados`}. Quitá jugadores o cambiá la modalidad.`
+      : `Convocatoria completa: ${totalCurrent} de ${expected}.`;
   const goalkeepersSeparatedInManual = useMemo(() => {
     if (selectedGoalkeeperIds.length !== 2) return true;
     const first = manualAssignments[`player:${selectedGoalkeeperIds[0]}`];
@@ -268,7 +276,17 @@ export function NewMatchForm({
   };
 
   return (
-    <ActionForm action={createMatchFormAction} className="mt-4 space-y-4">
+    <ActionForm action={createMatchFormAction} className="mt-4 space-y-4" onSubmit={(event) => {
+      const incompleteGuest = guestRows.find((guest) =>
+        (guest.name.trim() || guest.rating.trim()) &&
+        (!guest.name.trim() || parseGuestSkillLevelValue(guest.rating) === null)
+      );
+      if (!incompleteGuest) return;
+      event.preventDefault();
+      setIncompleteGuestKey(incompleteGuest.key);
+      const field = incompleteGuest.name.trim() ? "rating" : "name";
+      event.currentTarget.querySelector<HTMLElement>(`[data-guest-key="${incompleteGuest.key}"] [data-guest-field="${field}"]`)?.focus();
+    }}>
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="manualAssignmentsPayload" type="hidden" value={manualAssignmentsPayload} />
       <div className="grid gap-3 md:grid-cols-3">
@@ -322,7 +340,7 @@ export function NewMatchForm({
             return (
               <div
                 className={cn(
-                  "flex items-center justify-between rounded-lg border bg-slate-950 px-3 py-2 text-sm transition hover:border-slate-600",
+                  "flex flex-col gap-3 rounded-lg border bg-slate-950 px-3 py-2 text-sm transition hover:border-slate-600 xl:flex-row xl:items-center xl:justify-between",
                   selectedPlayers[player.id] ? "border-emerald-500/50" : "border-slate-800"
                 )}
                 key={player.id}
@@ -330,7 +348,7 @@ export function NewMatchForm({
                 <span className="flex min-w-0 items-center gap-3">
                   <PlayerAvatar name={player.full_name} playerId={player.id} hasPhoto={Boolean(player.photo_path)} photoUpdatedAt={player.photo_updated_at} size="sm" />
                   <span className="min-w-0">
-                    <span className="block truncate font-semibold text-slate-100">{player.full_name}</span>
+                    <span className="block break-words font-semibold text-slate-100">{player.full_name}</span>
                     <span className="mt-1 flex flex-wrap gap-1.5">
                       <span className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-slate-300">
                         {formatSkillLevelLabel(player.skill_level)}
@@ -350,7 +368,7 @@ export function NewMatchForm({
                     </span>
                   </span>
                 </span>
-                <span className="flex items-center gap-2">
+                <span className="flex flex-wrap items-center gap-2 xl:shrink-0">
                   <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-700 px-2 py-1">
                     <span className="text-[11px] font-semibold uppercase text-slate-300">Juega</span>
                     <input
@@ -416,20 +434,33 @@ export function NewMatchForm({
 
         {guestRows.length ? (
           <div className="mt-3 space-y-2">
-            {guestRows.map((guest, index) => (
+            {guestRows.map((guest, index) => {
+              const showGuestError = incompleteGuestKey === guest.key &&
+                Boolean(guest.name.trim() || guest.rating.trim()) &&
+                (!guest.name.trim() || parseGuestSkillLevelValue(guest.rating) === null);
+              const guestErrorId = `${formId}-guest-${guest.key}-error`;
+              return (
               <div
                 className="grid gap-2 rounded-lg border border-slate-800 bg-slate-950 p-3 md:grid-cols-[minmax(180px,1.2fr)_minmax(180px,0.8fr)_auto]"
+                data-guest-key={guest.key}
                 key={guest.key}
               >
                 <input name="guestKeys" type="hidden" value={String(guest.key)} />
                 <Input
+                  aria-describedby={showGuestError ? guestErrorId : undefined}
+                  aria-invalid={showGuestError && !guest.name.trim() || undefined}
+                  aria-label={`Nombre del invitado ${index + 1}`}
+                  data-guest-field="name"
                   name="guestNames"
                   onChange={(event) => updateGuest(guest.key, "name", event.target.value)}
                   placeholder={`Nombre invitado #${index + 1}`}
                   value={guest.name}
                 />
                 <Select
+                  aria-describedby={showGuestError ? guestErrorId : undefined}
+                  aria-invalid={showGuestError && parseGuestSkillLevelValue(guest.rating) === null || undefined}
                   aria-label={`Nivel de ${guest.name.trim() || `invitado ${index + 1}`}`}
+                  data-guest-field="rating"
                   name="guestRatings"
                   onChange={(event) => updateGuest(guest.key, "rating", event.target.value)}
                   value={guest.rating}
@@ -444,8 +475,10 @@ export function NewMatchForm({
                 <Button onClick={() => removeGuest(guest.key)} type="button" variant="danger">
                   Quitar
                 </Button>
+                {showGuestError ? <p className="text-sm text-danger md:col-span-3" id={guestErrorId} role="alert">Completá el nombre y el nivel del invitado {index + 1}, o quitá la fila.</p> : null}
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <p className="mt-3 text-sm text-slate-400">Aun no agregaste invitados.</p>
@@ -572,8 +605,12 @@ export function NewMatchForm({
       ) : null}
 
       {error ? <p className="text-sm font-semibold text-danger" role="alert">{error}</p> : null}
+      <p className="text-sm text-slate-300" id={`${formId}-roster-status`} role="status">
+        {rosterStatus}
+        {!goalkeepersReady ? " Elegiste un arquero: marcá el segundo o desmarcá el actual." : ""}
+      </p>
       <div className="flex flex-wrap items-center gap-2">
-        <FormSubmitButton name="creationMode" pendingLabel="Generando equipos..." value="auto">
+        <FormSubmitButton aria-describedby={`${formId}-roster-status`} className="w-full sm:w-auto" disabled={!rosterComplete || !goalkeepersReady} name="creationMode" pendingLabel="Generando equipos..." value="auto">
           Crear partido y generar equipos
         </FormSubmitButton>
         <Button onClick={() => setShowManualBuilder((current) => !current)} type="button" variant="secondary">

@@ -33,14 +33,15 @@ export function AdminNav({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   }
 
   return (
-    <nav className="flex flex-wrap items-center gap-2">
+    <nav aria-label="Administración" className="flex flex-wrap items-center gap-2">
       {navItems.map((item) => {
         const active = isItemActive(item.href);
         const href = item.href === "/admin" ? withOrgQuery(item.href, organizationId) : item.href;
         return (
           <Link
+            aria-current={active ? "page" : undefined}
             className={cn(
-              "rounded-md border px-3 py-2 text-xs font-semibold transition md:text-sm",
+              "inline-flex min-h-11 items-center justify-center rounded-md border px-3 py-2 text-xs font-semibold transition md:text-sm",
               active
                 ? "border-emerald-400/50 bg-accent text-white shadow-[0_10px_20px_-14px_rgba(16,185,129,1)]"
                 : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"

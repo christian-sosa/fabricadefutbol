@@ -8,6 +8,7 @@ import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { WhatsAppShareButton } from "@/components/matches/whatsapp-share-button";
 import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
 import { formatMatchDateTime } from "@/lib/match-datetime";
+import { buildMatchHistoryHref, parseMatchHistoryPage } from "@/lib/match-history-navigation";
 import { withShareTracking } from "@/lib/growth";
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
@@ -44,7 +45,7 @@ export default async function MatchDetailPage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ org?: string }>;
+  searchParams: Promise<{ org?: string; season?: string; page?: string }>;
 }) {
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   const details = await getMatchDetails(id, resolvedSearchParams.org);
@@ -56,7 +57,11 @@ export default async function MatchDetailPage({
 
   return (
     <div className="space-y-4">
-      <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery("/matches", resolvedSearchParams.org)}>
+      <Link className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-300 hover:underline" href={buildMatchHistoryHref({
+        organizationSlug: resolvedSearchParams.org,
+        season: resolvedSearchParams.season,
+        page: parseMatchHistoryPage(resolvedSearchParams.page)
+      })}>
         Volver al historial
       </Link>
       <Card>

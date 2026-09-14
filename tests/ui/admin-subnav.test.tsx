@@ -60,7 +60,7 @@ describe("AdminSubnav", () => {
       "href",
       "/admin/admins?org=grupo-a"
     );
-    expect(screen.getByRole("link", { name: "Admins" }).className).toContain("border-emerald");
+    expect(screen.getByRole("link", { name: "Admins" })).toHaveAttribute("aria-current", "page");
   });
 
   it("mantiene Partidos activo cuando se crea un partido nuevo", () => {
@@ -73,7 +73,7 @@ describe("AdminSubnav", () => {
       "href",
       "/admin/matches?org=grupo-a"
     );
-    expect(screen.getByRole("link", { name: "Partidos" }).className).toContain("border-emerald");
+    expect(screen.getByRole("link", { name: "Partidos" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("link", { name: "Nuevo partido" })).not.toBeInTheDocument();
   });
 });

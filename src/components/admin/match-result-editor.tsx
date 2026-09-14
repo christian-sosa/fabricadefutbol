@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,6 +97,8 @@ export function MatchResultEditor({
   const [selectedMvpParticipantId, setSelectedMvpParticipantId] = useState(defaultMvpParticipantId ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [incompleteGuestId, setIncompleteGuestId] = useState<number | null>(null);
+  const formId = useId();
 
   const existingPlayerIds = useMemo(() => {
     const ids = new Set<string>();
@@ -247,6 +249,19 @@ export function MatchResultEditor({
   );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    const incompleteGuest = newGuests.find((guest) =>
+      (guest.name.trim() || guest.rating.trim()) && !isValidGuest(guest)
+    );
+    if (incompleteGuest) {
+      event.preventDefault();
+      setIncompleteGuestId(incompleteGuest.id);
+      const row = event.currentTarget.querySelector<HTMLElement>(`[data-guest-id="${incompleteGuest.id}"]`);
+      const details = row?.closest("details");
+      if (details) details.open = true;
+      const field = incompleteGuest.name.trim() ? "rating" : "name";
+      row?.querySelector<HTMLElement>(`[data-guest-field="${field}"]`)?.focus();
+      return;
+    }
     if (!onSubmit) return;
     event.preventDefault();
     setSubmitError(null);
@@ -297,7 +312,7 @@ export function MatchResultEditor({
   }
 
   return (
-    <form action={onSubmit ? undefined : action} aria-busy={isSubmitting} className="mt-4 space-y-4" onSubmit={onSubmit ? handleSubmit : undefined}>
+    <form action={onSubmit ? undefined : action} aria-busy={isSubmitting} className="mt-4 space-y-4" onSubmit={handleSubmit}>
       <input name="expectedVersion" type="hidden" value={expectedVersion} />
       <input name="lineupPayload" type="hidden" value={lineupPayload} />
       <input name="mvpParticipantId" type="hidden" value={selectedMvpParticipantId} />
@@ -343,13 +358,16 @@ export function MatchResultEditor({
           </label>
           <Input defaultValue={defaultScoreB} id="scoreB" min={0} name="scoreB" required type="number" />
         </div>
-        <Textarea
-          className="md:col-span-2"
-          defaultValue={defaultNotes ?? ""}
-          name="notes"
-          placeholder="Notas opcionales"
-          rows={3}
-        />
+        <div className="md:col-span-2">
+          <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`${formId}-notes`}>Notas opcionales</label>
+          <Textarea
+            defaultValue={defaultNotes ?? ""}
+            id={`${formId}-notes`}
+            name="notes"
+            placeholder="Notas opcionales"
+            rows={3}
+          />
+        </div>
       </div>
 
       <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
@@ -389,10 +407,10 @@ export function MatchResultEditor({
         <div className="mt-3 space-y-2">
           {existingParticipants.map((participant) => (
             <div
-              className="grid gap-2 rounded-lg border border-slate-800 bg-slate-900/80 p-2 md:grid-cols-[1fr_180px_minmax(190px,auto)]"
+              className="grid gap-2 rounded-lg border border-slate-800 bg-slate-900/80 p-2 lg:grid-cols-[minmax(0,1fr)_180px_minmax(190px,auto)]"
               key={participant.participantId}
             >
-              <div className="text-sm text-slate-200">
+              <div className="min-w-0 break-words text-sm text-slate-200">
                 {participant.fullName}
                 <span className="ml-2 text-xs text-slate-400">
                   {participant.source === "guest" ? "Invitado" : `Rendimiento ${formatRendimiento(participant.rating)}`}
@@ -577,12 +595,22 @@ export function MatchResultEditor({
           </Button>
         </div>
         <div className="mt-3 space-y-2">
-          {newGuests.map((guest) => (
+          {newGuests.map((guest, index) => {
+            const showGuestError = incompleteGuestId === guest.id &&
+              Boolean(guest.name.trim() || guest.rating.trim()) && !isValidGuest(guest);
+            const guestErrorId = `${formId}-guest-${guest.id}-error`;
+            return (
             <div
-              className="grid gap-2 rounded-lg border border-slate-800 bg-slate-900/80 p-2 md:grid-cols-[1fr_200px_130px_96px]"
+              className="grid gap-2 rounded-lg border border-slate-800 bg-slate-900/80 p-2 lg:grid-cols-[minmax(0,1fr)_200px_130px_96px]"
+              data-guest-id={guest.id}
               key={guest.id}
             >
               <Input
+                aria-describedby={showGuestError ? guestErrorId : undefined}
+                aria-invalid={showGuestError && !guest.name.trim() || undefined}
+                aria-label={`Nombre del invitado de reemplazo ${index + 1}`}
+                className="min-w-0"
+                data-guest-field="name"
                 onChange={(event) =>
                   setNewGuests((current) =>
                     current.map((item) =>
@@ -594,7 +622,10 @@ export function MatchResultEditor({
                 value={guest.name}
               />
               <Select
+                aria-describedby={showGuestError ? guestErrorId : undefined}
+                aria-invalid={showGuestError && parseGuestSkillLevelValue(guest.rating) === null || undefined}
                 aria-label={`Nivel de ${guest.name.trim() || "invitado"}`}
+                data-guest-field="rating"
                 onChange={(event) =>
                   setNewGuests((current) =>
                     current.map((item) =>
@@ -632,8 +663,10 @@ export function MatchResultEditor({
               >
                 Quitar
               </Button>
+              {showGuestError ? <p className="text-sm text-danger lg:col-span-4" id={guestErrorId} role="alert">Completá el nombre y el nivel del invitado {index + 1}, o quitá la fila antes de guardar el resultado.</p> : null}
             </div>
-          ))}
+            );
+          })}
           {!newGuests.length ? <p className="text-xs text-slate-500">No hay invitados nuevos.</p> : null}
         </div>
         </div>
