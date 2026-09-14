@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { randomUUID } from "node:crypto";
 
-import { createOrganizationAction } from "@/app/admin/(panel)/actions";
+import { createOrganizationFormAction } from "@/app/admin/(panel)/form-actions";
+import { ActionForm } from "@/components/ui/action-form";
 import { TrackedButton } from "@/components/analytics/tracked-button";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -22,6 +24,7 @@ export default async function NewOrganizationPage({
     resolvedSearchParams.org
   );
   const creationAccess = await getAdminOrganizationCreationAccess(admin);
+  const organizationId = randomUUID();
 
   return (
     <div className="space-y-4">
@@ -60,13 +63,11 @@ export default async function NewOrganizationPage({
           </div>
         ) : null}
 
-        <form
-          action={createOrganizationAction}
+        <ActionForm
+          action={createOrganizationFormAction}
           className="mt-4 flex flex-col gap-3 md:flex-row"
         >
-          {selectedOrganization ? (
-            <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-          ) : null}
+          <input name="organizationId" type="hidden" value={organizationId} />
           <Input aria-label="Nombre del nuevo grupo" name="name" placeholder="Nombre del grupo" required />
           <TrackedButton
             disabled={!creationAccess.canCreateOrganization}
@@ -76,10 +77,11 @@ export default async function NewOrganizationPage({
               source: "admin_new_group"
             }}
             type="submit"
+            pendingLabel="Creando grupo…"
           >
             Crear grupo
           </TrackedButton>
-        </form>
+        </ActionForm>
 
         {!creationAccess.canCreateOrganization ? (
           <div><p className="mt-2 text-xs font-semibold text-amber-300">

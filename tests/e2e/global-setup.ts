@@ -1,8 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
+import { readFile, writeFile } from "node:fs/promises";
 
 import { getSupabaseDbSchema, getSupabaseServiceRoleKey, getSupabaseUrl } from "../../src/lib/env";
 import { loadEnvFile } from "../helpers/load-env-file";
 import { E2E_ORGANIZATION_ID, E2E_PLAYER_IDS } from "./test-data";
+import { createFixtureClient, resolveFixtureUser } from "../helpers/e2e-fixture-identity";
+import { fixtureLeaseRpc } from "../../scripts/lib/e2e-lease.mjs";
 
 loadEnvFile(".env.test");
 
@@ -21,55 +23,7 @@ function createServiceClient() {
     throw new Error("SUPABASE_SERVICE_ROLE_KEY_DEV es obligatoria para preparar el entorno E2E.");
   }
 
-  return createClient(getSupabaseUrl(), serviceRoleKey, {
-    db: {
-      schema: getSupabaseDbSchema()
-    },
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  });
-}
-
-async function ensureAdminUser(client: ReturnType<typeof createServiceClient>) {
-  const email = requireEnv("E2E_ADMIN_EMAIL").toLowerCase();
-  const password = requireEnv("E2E_ADMIN_PASSWORD");
-
-  const { data: listed, error: listError } = await client.auth.admin.listUsers({
-    page: 1,
-    perPage: 200
-  });
-  if (listError) throw listError;
-
-  const existing = listed.users.find((user) => user.email?.toLowerCase() === email) ?? null;
-  if (!existing) {
-    const { data, error } = await client.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        display_name: "E2E Admin"
-      }
-    });
-    if (error || !data.user) {
-      throw error ?? new Error("No se pudo crear el usuario E2E.");
-    }
-    return data.user;
-  }
-
-  const { data, error } = await client.auth.admin.updateUserById(existing.id, {
-    password,
-    email_confirm: true,
-    user_metadata: {
-      display_name: "E2E Admin"
-    }
-  });
-  if (error || !data.user) {
-    throw error ?? new Error("No se pudo actualizar el usuario E2E.");
-  }
-
-  return data.user;
+  return createFixtureClient(getSupabaseUrl(), serviceRoleKey);
 }
 
 async function ensureOrganization(client: ReturnType<typeof createServiceClient>, adminId: string) {
@@ -117,33 +71,11 @@ async function cleanupOrganizationMatches(
   client: ReturnType<typeof createServiceClient>,
   organizationId: string
 ) {
-  const { data: matches, error: matchesError } = await client
-    .from("matches")
-    .select("id")
-    .eq("organization_id", organizationId);
-  if (matchesError) throw matchesError;
-
-  const matchIds = (matches ?? []).map((row) => String(row.id));
-  if (!matchIds.length) return;
-
-  const { data: options, error: optionsError } = await client
-    .from("team_options")
-    .select("id")
-    .in("match_id", matchIds);
-  if (optionsError) throw optionsError;
-
-  const optionIds = (options ?? []).map((row) => String(row.id));
-
-  await client.from("rating_history").delete().in("match_id", matchIds);
-  await client.from("match_result").delete().in("match_id", matchIds);
-  if (optionIds.length) {
-    await client.from("team_option_players").delete().in("team_option_id", optionIds);
-    await client.from("team_option_guests").delete().in("team_option_id", optionIds);
-  }
-  await client.from("team_options").delete().in("match_id", matchIds);
-  await client.from("match_guests").delete().in("match_id", matchIds);
-  await client.from("match_players").delete().in("match_id", matchIds);
-  await client.from("matches").delete().in("id", matchIds);
+  // Foreign keys cascade all match children in one transaction, without a 1,000-row read cap.
+  await client.from("matches").delete().eq("organization_id", organizationId).throwOnError();
+  const {count} = await client.from("matches").select("id", {count: "exact", head: true})
+    .eq("organization_id", organizationId).throwOnError();
+  if (count !== 0) throw new Error("La limpieza del fixture dejo partidos pendientes.");
 }
 
 async function seedPlayers(client: ReturnType<typeof createServiceClient>, organizationId: string) {
@@ -172,8 +104,14 @@ async function seedPlayers(client: ReturnType<typeof createServiceClient>, organ
 }
 
 export default async function globalSetup() {
+  const token = requireEnv("E2E_RUN_TOKEN");
+  if (!/^[0-9a-f-]{36}$/.test(token)) throw new Error("Ejecuta E2E mediante npm run test:e2e.");
+  const lock = JSON.parse(await readFile(requireEnv("E2E_RUN_LOCK_PATH"), "utf8"));
+  if (lock.token !== token) throw new Error("No existe un bloqueo E2E valido.");
+  if (!await fixtureLeaseRpc("heartbeat", token, process.env)) throw new Error("No existe una reserva compartida del fixture E2E.");
   const client = createServiceClient();
-  const adminUser = await ensureAdminUser(client);
+  const adminUser = await resolveFixtureUser(client, process.env);
+  await writeFile(`tmp/e2e/identity-${token}.json`, JSON.stringify({token, userId: adminUser.id}));
 
   const { error: adminError } = await client.from("admins").upsert(
     {

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { RankingTableQuery } from "@/components/ranking/ranking-table-query";
 import type { PlayerComputedStats } from "@/types/domain";
+import { useOrganizationStandingsQuery } from "@/lib/query/hooks";
 
 vi.mock("@/lib/query/hooks", () => ({
   useOrganizationStandingsQuery: vi.fn(({ initialData }) => ({
@@ -104,7 +105,8 @@ describe("RankingTableQuery", () => {
     );
   });
 
-  it("muestra la forma reciente con letras y colores sin depender de Efectividad", () => {
+  it("muestra la forma reciente con letras y colores sin depender de Efectividad", async () => {
+    const user = userEvent.setup();
     render(<RankingTableQuery initialPlayers={players} organizationId="org-1" />);
 
     const lucasRow = getBodyRows().find((row) => row.textContent?.includes("LucasDias")) as HTMLElement;
@@ -121,6 +123,16 @@ describe("RankingTableQuery", () => {
     const mobilePlayerName = screen.getAllByText("Gabi Lamine")[0];
     const mobileCard = mobilePlayerName.closest("article");
     expect(mobileCard).not.toBeNull();
+    await user.click(within(mobileCard as HTMLElement).getByText("Estadísticas de Gabi Lamine"));
     expect(within(mobileCard as HTMLElement).getByRole("img", { name: /sin partidos jugados/ })).toBeInTheDocument();
+  });
+  it("conserva el ranking disponible y permite reintentar un error de actualización", async () => {
+    const refetch = vi.fn();
+    vi.mocked(useOrganizationStandingsQuery).mockReturnValueOnce({ data: players, isFetching: false, isError: true, refetch } as unknown as ReturnType<typeof useOrganizationStandingsQuery>);
+    render(<RankingTableQuery initialPlayers={players} organizationId="org-1" />);
+    expect(screen.getByRole("alert")).toHaveTextContent("últimos datos disponibles");
+    expect(getBodyRows()[0]).toHaveTextContent("GonzaMastro");
+    await userEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+    expect(refetch).toHaveBeenCalledOnce();
   });
 });

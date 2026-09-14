@@ -9,6 +9,7 @@ import {
   formatActionRateLimitMessage
 } from "@/lib/action-rate-limit";
 import { deriveDisplayName } from "@/lib/auth/profile";
+import { requiresMfaVerification } from "@/lib/auth/mfa";
 import { buildAdminLoginPath } from "@/lib/auth/redirects";
 import { getOrganizationQueryKeyById } from "@/lib/auth/admin";
 import { recordOrganizationAuditEvent } from "@/lib/domain/organization-audit";
@@ -79,6 +80,14 @@ export async function acceptInviteAction(formData: FormData) {
 
   if (!user?.id || !user.email) {
     redirect(loginHref);
+  }
+
+  if (await requiresMfaVerification(supabase, user)) redirect("/admin/security");
+
+  const { data: organization, error: organizationError } = await privilegedSupabase
+    .from("organizations").select("id, archived_at").eq("id", invite.organization_id).maybeSingle();
+  if (organizationError || !organization || organization.archived_at) {
+    redirect(buildInvitePath(token, "Este grupo no está disponible para aceptar invitaciones."));
   }
 
   const userEmail = normalizeEmail(user.email);

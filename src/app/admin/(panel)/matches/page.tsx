@@ -4,6 +4,7 @@ import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-ca
 import { MatchStatusBadge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getAdminMatchListActions } from "@/lib/admin-match-actions";
+import { getPastPendingResultMatch } from "@/lib/admin-pending-match";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
@@ -19,11 +20,11 @@ export default async function AdminMatchesPage({
   const writeAccess = await getOrganizationWriteAccess(admin, selectedOrganization.id);
   const matches = await getAdminMatches(selectedOrganization.id);
   const createHref = withOrgQuery("/admin/matches/new", selectedOrganization.slug);
-  const pendingResultMatch = matches.find((match) => getAdminMatchListActions(match.status).canLoadResult) ?? null;
+  const pendingResultMatch = getPastPendingResultMatch(matches);
   const pendingResultHref = pendingResultMatch
     ? withOrgQuery(`/admin/matches/${pendingResultMatch.id}/result`, selectedOrganization.slug)
     : null;
-  const showLoadedMatches = resolvedSearchParams.view === "edit";
+  const showLoadedMatches = matches.length > 0 || resolvedSearchParams.view === "edit";
   const editExistingHref = withOrgQuery("/admin/matches?view=edit", selectedOrganization.slug);
   const matchStatusCounts = {
     draft: matches.filter((match) => match.status === "draft").length,
@@ -68,7 +69,7 @@ export default async function AdminMatchesPage({
               {matches.length ? (
                 <Link
                   className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
-                  href={editExistingHref}
+                  href={`${editExistingHref}#partidos-cargados`}
                 >
                   Editar existentes
                 </Link>
@@ -89,28 +90,28 @@ export default async function AdminMatchesPage({
         ) : null}
 
         {resolvedSearchParams.success ? (
-          <div className="mt-4 rounded-md border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100">
+          <div className="mt-4 rounded-md border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100" role="status">
             {resolvedSearchParams.success}
           </div>
         ) : null}
       </Card>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
+      <section aria-label="Resumen de partidos" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Card className="p-3">
           <CardDescription>Borradores</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{matchStatusCounts.draft}</CardTitle>
+          <CardTitle className="mt-1 text-xl">{matchStatusCounts.draft}</CardTitle>
         </Card>
-        <Card>
+        <Card className="p-3">
           <CardDescription>Confirmados</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{matchStatusCounts.confirmed}</CardTitle>
+          <CardTitle className="mt-1 text-xl">{matchStatusCounts.confirmed}</CardTitle>
         </Card>
-        <Card>
+        <Card className="p-3">
           <CardDescription>Finalizados</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{matchStatusCounts.finished}</CardTitle>
+          <CardTitle className="mt-1 text-xl">{matchStatusCounts.finished}</CardTitle>
         </Card>
-        <Card>
+        <Card className="p-3">
           <CardDescription>Cancelados</CardDescription>
-          <CardTitle className="mt-1 text-3xl">{matchStatusCounts.cancelled}</CardTitle>
+          <CardTitle className="mt-1 text-xl">{matchStatusCounts.cancelled}</CardTitle>
         </Card>
       </section>
 

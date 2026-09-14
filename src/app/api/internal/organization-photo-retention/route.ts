@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { purgeExpiredOrganizationPlayerPhotos } from "@/lib/domain/organization-photo-retention";
+import { processMediaCleanup } from "@/lib/domain/media-cleanup";
 import { getInternalCronSecret, getPlayerPhotosBucket, getSupabaseDbSchema } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -35,11 +36,13 @@ export async function GET(request: Request) {
       bucketName: getPlayerPhotosBucket(),
       schemaName: getSupabaseDbSchema()
     });
+    const cleanup = await processMediaCleanup(supabase, 100);
 
     return NextResponse.json({
       ok: true,
       executedAt: new Date().toISOString(),
-      summary
+      summary,
+      cleanup
     });
   } catch (error) {
     return NextResponse.json(

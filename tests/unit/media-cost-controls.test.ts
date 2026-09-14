@@ -23,7 +23,7 @@ describe("media cost controls", () => {
   });
 
   it("mantiene limites conservadores para imagenes de grupo", () => {
-    expect(MAX_ORGANIZATION_IMAGE_SIZE_MB).toBe(8);
+    expect(MAX_ORGANIZATION_IMAGE_SIZE_MB).toBe(3);
     expect(ORGANIZATION_IMAGE_WIDTH_PX).toBe(1200);
     expect(ORGANIZATION_IMAGE_HEIGHT_PX).toBe(675);
     expect(ORGANIZATION_IMAGE_QUALITY).toBe(78);

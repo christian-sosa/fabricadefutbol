@@ -1,10 +1,15 @@
 import Link from "next/link";
+import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import {
-  createOrganizationAction,
   deleteOrganizationAction,
-  uploadOrganizationImageAction
+  archiveOrganizationAction,
+  restoreOrganizationAction
 } from "@/app/admin/(panel)/actions";
+import { createOrganizationFormAction, uploadOrganizationImageFormAction } from "@/app/admin/(panel)/form-actions";
+import { OrganizationImageInput } from "@/components/admin/organization-image-input";
+import { ActionForm } from "@/components/ui/action-form";
+import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { TrackedLink } from "@/components/analytics/tracked-link";
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { GroupActivityValueCard } from "@/components/admin/group-activity-value-card";
@@ -16,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import {
   getAdminOrganizationContext,
   getAdminOrganizationCreationAccess,
+  getArchivedAdminOrganizations,
   getOrganizationWriteAccess
 } from "@/lib/auth/admin";
 import { MATCH_MODALITIES, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
@@ -83,10 +89,33 @@ function AdminFeedback({
           Grupo actualizado.
         </p>
       ) : null}
-      {success ? <p className="text-sm font-semibold text-emerald-300">{success}</p> : null}
-      {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
+      {success ? <p className="text-sm font-semibold text-emerald-300" role="status">{success}</p> : null}
+      {error ? <p className="text-sm font-semibold text-danger" role="alert">{error}</p> : null}
     </Card>
   );
+}
+
+function ArchivedGroups({ organizations }: { organizations: Array<OrganizationEntry & { archived_at: string }> }) {
+  if (!organizations.length) return null;
+  return <Card>
+    <CardTitle>Grupos archivados</CardTitle>
+    <CardDescription className="mt-2">Conservan jugadores, fotos e historial. Restaurá un grupo para volver a usarlo y mostrarlo públicamente según su configuración.</CardDescription>
+    <div className="mt-4 space-y-4">{organizations.map((organization) => <div className="rounded-xl border border-slate-700 p-4" key={organization.id}>
+      <p className="font-semibold">{organization.name}</p>
+      <form action={restoreOrganizationAction} className="mt-3">
+        <input name="organizationId" type="hidden" value={organization.id} />
+        <FormSubmitButton pendingLabel="Restaurando…" variant="secondary">Restaurar {organization.name}</FormSubmitButton>
+      </form>
+      <details className="mt-2">
+        <summary className="flex min-h-11 cursor-pointer items-center text-sm text-slate-400">Eliminación definitiva</summary>
+        <p className="mb-3 text-sm text-slate-300">Borra todos los datos y fotos de este grupo. Requiere verificar tu cuenta desde <Link className="underline" href="/admin/security">Seguridad</Link> y no se puede deshacer.</p>
+        <form action={deleteOrganizationAction}>
+          <input name="organizationId" type="hidden" value={organization.id} />
+          <ConfirmSubmitButton confirmMessage={`¿Eliminar definitivamente ${organization.name}, sus jugadores, fotos, partidos e historial? Esta acción no se puede deshacer.`} label={`Eliminar definitivamente ${organization.name}`} variant="danger" />
+        </form>
+      </details>
+    </div>)}</div>
+  </Card>;
 }
 
 function AdminOnboardingCard({
@@ -200,25 +229,31 @@ export default async function AdminDashboardPage({
   const resolvedSearchParams = await searchParams;
   const { admin, organizations } = await getAdminOrganizationContext(resolvedSearchParams.org);
 
-  const creationAccess = await getAdminOrganizationCreationAccess(admin);
-  if (!resolvedSearchParams.org && organizations.length === 1) {
+  const [creationAccess, archivedOrganizations] = await Promise.all([
+    getAdminOrganizationCreationAccess(admin),
+    getArchivedAdminOrganizations(admin)
+  ]);
+  if (!resolvedSearchParams.org && organizations.length === 1 && !archivedOrganizations.length) {
     redirect(withOrgQuery("/admin", organizations[0].slug));
   }
   const selectedOrganization = resolvedSearchParams.org
     ? findOrganizationByKey(organizations, resolvedSearchParams.org)
     : organizations.length === 1 ? organizations[0] : null;
   if (!selectedOrganization) {
+    const newOrganizationId = randomUUID();
     return <div className="space-y-4">
       <AdminFeedback error={resolvedSearchParams.error} success={resolvedSearchParams.success} />
       <Card><CardTitle>{organizations.length ? "Tus grupos" : "Creá tu primer grupo"}</CardTitle>
         <CardDescription className="mt-2">Empezá por el nombre. Después podés pegar la lista de jugadores y armar el primer partido.</CardDescription>
         {organizations.length ? <div className="mt-4 space-y-3">{organizations.map((organization) => <Link className={enterGroupLinkClass} href={withOrgQuery("/admin", organization.slug)} key={organization.id}>{organization.name}</Link>)}</div> :
-          <form action={createOrganizationAction} className="mt-4 flex flex-col gap-3 sm:flex-row">
+          <ActionForm action={createOrganizationFormAction} className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <input name="organizationId" type="hidden" value={newOrganizationId} />
             <Input aria-label="Nombre del grupo" name="name" placeholder="Nombre del grupo" required />
-            <Button disabled={!creationAccess.canCreateOrganization} type="submit">Crear grupo gratis</Button>
-          </form>}
+            <FormSubmitButton disabled={!creationAccess.canCreateOrganization} pendingLabel="Creando grupo…">Crear grupo gratis</FormSubmitButton>
+          </ActionForm>}
         {!creationAccess.canCreateOrganization ? <Link className="mt-4 block text-sm text-emerald-300 underline" href="/feedback?intent=multiple_groups">Necesito administrar otro grupo</Link> : null}
       </Card>
+      <ArchivedGroups organizations={archivedOrganizations} />
     </div>;
   }
 
@@ -258,7 +293,7 @@ export default async function AdminDashboardPage({
       />
 
       <details className="rounded-2xl border border-slate-800 p-4">
-        <summary className="cursor-pointer font-semibold">Personalizar foto de portada</summary>
+        <summary className="flex min-h-11 cursor-pointer items-center font-semibold">Personalizar foto de portada</summary>
         <div className="mt-4 grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <OrganizationImage
             alt={`Imagen de ${selectedOrganization.name}`}
@@ -282,37 +317,35 @@ export default async function AdminDashboardPage({
               <summary className="mt-4 flex w-fit cursor-pointer list-none items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300">
                 Cambiar imagen
               </summary>
-              <form action={uploadOrganizationImageAction} className="mt-4 space-y-3">
+              <ActionForm action={uploadOrganizationImageFormAction} className="mt-4 space-y-3">
                 <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-                <Input accept="image/png,image/jpeg,image/webp" name="image" type="file" />
-                <Button disabled={!canWriteSelectedOrganization} type="submit">
+                <OrganizationImageInput />
+                <FormSubmitButton disabled={!canWriteSelectedOrganization} pendingLabel="Guardando portada…">
                   Guardar imagen
-                </Button>
-              </form>
+                </FormSubmitButton>
+              </ActionForm>
             </details>
           </div>
         </div>
       </details>
 
       {admin.isSuperAdmin ? (
-        <Card className="border-danger/40 bg-danger/10">
-          <CardTitle className="text-danger">Zona super admin</CardTitle>
+        <Card>
+          <CardTitle>Archivar grupo</CardTitle>
           <CardDescription className="mt-1 text-slate-200">
-            Esta accion elimina el grupo seleccionado y todos sus datos asociados, incluyendo fotos,
-            jugadores, partidos, historial, admins e invitaciones.
+            Ocultá el grupo y pausá su administración conservando jugadores, fotos e historial. Podés restaurarlo desde los grupos archivados.
           </CardDescription>
-          <form action={deleteOrganizationAction} className="mt-4">
+          <form action={archiveOrganizationAction} className="mt-4">
             <input name="organizationId" type="hidden" value={selectedOrganization.id} />
             <ConfirmSubmitButton
-              confirmMessage={`Estas seguro de borrar ${selectedOrganization.name}? Se perderan definitivamente todas las fotos, jugadores, partidos, historial, admins, invitaciones y datos asociados. Esta accion no se puede deshacer.`}
-              label="Borrar grupo"
-              variant="danger"
+              confirmMessage={`¿Archivar ${selectedOrganization.name}? Se ocultará y dejará de poder editarse hasta restaurarlo. Sus datos se conservan.`}
+              label="Archivar grupo"
+              variant="secondary"
             />
           </form>
         </Card>
       ) : null}
-
-
+      <ArchivedGroups organizations={archivedOrganizations} />
     </div>
   );
 }

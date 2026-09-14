@@ -12,20 +12,16 @@ import {
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import {
   assertAdminAction,
-  assertCanCreateOrganization,
   assertOrganizationAdminAction,
   getOrganizationQueryKeyById
 } from "@/lib/auth/admin";
 import { recordOrganizationAuditEvent } from "@/lib/domain/organization-audit";
 import {
   deleteOrganizationDeep,
+  setOrganizationArchived,
   revokeOrganizationInvite
 } from "@/lib/domain/organization-workflow";
 import {
-  buildOrganizationSeasonInsert
-} from "@/lib/domain/organization-seasons";
-import {
-  getPlayerPhotosBucket,
   getOrganizationImagesBucket,
   getSupabaseDbSchema
 } from "@/lib/env";
@@ -45,6 +41,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const createOrganizationSchema = z.object({
+  organizationId: z.string().uuid("El formulario venció. Recargá la página e intentá nuevamente."),
   name: z
     .string()
     .min(3, "El nombre del grupo debe tener al menos 3 caracteres.")
@@ -138,21 +135,10 @@ async function resolveAdminEmailById(adminId: string) {
   return data?.user?.email?.toLowerCase() ?? null;
 }
 
-function parseNextSlug(baseSlug: string, existingSlugs: string[]) {
-  if (!existingSlugs.includes(baseSlug)) return baseSlug;
-
-  let suffix = 2;
-  while (existingSlugs.includes(`${baseSlug}-${suffix}`)) {
-    suffix += 1;
-  }
-  return `${baseSlug}-${suffix}`;
-}
-
 export async function createOrganizationAction(formData: FormData) {
   const startedAt = Date.now();
   try {
     const admin = await assertAdminAction();
-    await assertCanCreateOrganization(admin);
     const createRateLimit = await checkActionRateLimit({
       scope: "organizations:create",
       actorId: admin.userId,
@@ -164,6 +150,7 @@ export async function createOrganizationAction(formData: FormData) {
     }
 
     const parsed = createOrganizationSchema.safeParse({
+      organizationId: formData.get("organizationId"),
       name: formData.get("name")
     });
 
@@ -171,70 +158,20 @@ export async function createOrganizationAction(formData: FormData) {
       redirect(buildAdminPath(undefined, parsed.error.issues[0]?.message ?? "Datos invalidos."));
     }
 
-    const now = new Date();
     const supabase = await createSupabaseServerClient();
 
-    const baseSlug = slugifyOrganizationName(parsed.data.name) || `grupo-${Date.now()}`;
-    const { data: existingSlugsRows, error: existingSlugsError } = await supabase
-      .from("organizations")
-      .select("slug")
-      .ilike("slug", `${baseSlug}%`);
-
-    if (existingSlugsError) {
-      redirect(buildAdminPath(undefined, toUserMessage(existingSlugsError, "No se pudo crear el grupo.")));
-    }
-
-    const existingSlugs = (existingSlugsRows ?? []).map((row) => row.slug.toLowerCase());
-    const slug = parseNextSlug(baseSlug, existingSlugs);
-
-    const { data: organization, error: organizationError } = await supabase
-      .from("organizations")
-      .insert({
-        name: parsed.data.name.trim(),
-        slug,
-        created_by: admin.userId,
-        is_public: true
-      })
-      .select("id")
-      .single();
-
-    if (organizationError || !organization) {
+    const baseSlug = slugifyOrganizationName(parsed.data.name) || `grupo-${parsed.data.organizationId}`;
+    const { data: createdGroup, error: organizationError } = await supabase.rpc("create_group_organization", {
+      p_organization_id: parsed.data.organizationId,
+      p_name: parsed.data.name.trim(),
+      p_slug: baseSlug
+    });
+    if (organizationError || !createdGroup) {
       redirect(buildAdminPath(undefined, toUserMessage(organizationError, "No se pudo crear el grupo.")));
     }
-
-    const { error: membershipError } = await supabase.from("organization_admins").insert({
-      organization_id: organization.id,
-      admin_id: admin.userId,
-      created_by: admin.userId
-    });
-
-    if (membershipError && membershipError.code !== "23505") {
-      redirect(buildAdminPath(undefined, toUserMessage(membershipError, "No se pudo asociar el admin al grupo.")));
-    }
-
-    const { error: seasonError } = await supabase.from("organization_seasons").insert(
-      buildOrganizationSeasonInsert({
-        organizationId: organization.id,
-        createdBy: admin.userId,
-        startsAt: now
-      })
-    );
-
-    if (seasonError) {
-      redirect(buildAdminPath(slug, toUserMessage(seasonError, "No se pudo crear la temporada inicial.")));
-    }
-
-    await recordOrganizationAuditEvent({
-      organizationId: organization.id,
-      eventType: "organization.created",
-      actorAdminId: admin.userId,
-      actorEmail: admin.email,
-      entityType: "organization",
-      entityId: organization.id,
-      details: {
-        slug
-      }
-    });
+    const result = createdGroup as { organizationId: string; slug: string; created: boolean };
+    const organization = { id: result.organizationId };
+    const slug = result.slug;
     await recordAnalyticsEvent({
       eventName: GROWTH_EVENTS.groupCreated,
       source: "server_action",
@@ -509,6 +446,30 @@ export async function removeOrganizationAdminAction(formData: FormData) {
   }
 }
 
+async function changeOrganizationArchive(formData: FormData, archived: boolean) {
+  try {
+    const admin = await assertAdminAction();
+    if (!admin.isSuperAdmin) throw new Error("Solo el superadmin puede archivar o restaurar grupos.");
+    const parsed = deleteOrganizationSchema.parse({ organizationId: formData.get("organizationId") });
+    await setOrganizationArchived({
+      supabase: await createSupabaseServerClient(), organizationId: parsed.organizationId, archived
+    });
+    for (const path of ["/admin", "/groups", "/", "/ranking", "/players", "/matches", "/upcoming"]) revalidatePath(path);
+    redirect("/admin");
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildAdminPath(undefined, toUserMessage(error, "No se pudo cambiar el archivo del grupo.")));
+  }
+}
+
+export async function archiveOrganizationAction(formData: FormData) {
+  return changeOrganizationArchive(formData, true);
+}
+
+export async function restoreOrganizationAction(formData: FormData) {
+  return changeOrganizationArchive(formData, false);
+}
+
 export async function deleteOrganizationAction(formData: FormData) {
   try {
     const admin = await assertAdminAction();
@@ -524,10 +485,7 @@ export async function deleteOrganizationAction(formData: FormData) {
       redirect(buildAdminPath(undefined, parsed.error.issues[0]?.message ?? "Datos invalidos."));
     }
 
-    const supabase = createSupabaseAdminClient();
-    if (!supabase) {
-      redirect(buildAdminPath(undefined, "Falta configurar el cliente admin para borrar grupos."));
-    }
+    const supabase = await createSupabaseServerClient();
 
     const { data: organization, error: organizationError } = await supabase
       .from("organizations")
@@ -545,9 +503,7 @@ export async function deleteOrganizationAction(formData: FormData) {
 
     await deleteOrganizationDeep({
       supabase,
-      organizationId: parsed.data.organizationId,
-      playerPhotosBucket: getPlayerPhotosBucket(),
-      schemaName: getSupabaseDbSchema()
+      organizationId: parsed.data.organizationId
     });
 
     revalidatePath("/admin");

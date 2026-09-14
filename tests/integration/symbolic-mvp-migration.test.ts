@@ -1,11 +1,12 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
+import { executePrivateSql, privateSqlAvailable } from "../helpers/private-sql";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const source = "supabase/schema.sql";
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
-describe.skipIf(!existsSync(source))("symbolic MVP historical migration (PostgreSQL)", () => {
+describe.skipIf(!privateSqlAvailable(source))("symbolic MVP historical migration (PostgreSQL)", () => {
   let db: PGlite;
   let migration: string;
   beforeAll(async () => {
@@ -53,7 +54,7 @@ describe.skipIf(!existsSync(source))("symbolic MVP historical migration (Postgre
 
   it("removes actual bonuses across groups and seasons, preserving awards and non-MVP contributions", async () => {
     const awards = (await db.query("select * from public.match_result order by match_id")).rows;
-    await db.exec(migration);
+    await executePrivateSql(db, migration, "symbolic-mvp-migration");
     expect((await db.query("select current_rating from public.players order by id")).rows).toEqual([{ current_rating: "1200" }, { current_rating: "990" }, { current_rating: "1010" }]);
     expect((await db.query("select current_rating from public.organization_season_player_ratings order by season_id")).rows).toEqual([{ current_rating: "1010" }, { current_rating: "890" }, { current_rating: "990" }]);
     expect((await db.query("select * from public.match_result order by match_id")).rows).toEqual(awards);
@@ -64,7 +65,7 @@ describe.skipIf(!existsSync(source))("symbolic MVP historical migration (Postgre
   it("rebuilds global and seasonal balances without assuming an opening rating of 1000", async () => {
     // A corrected old match can leave stale before/after values in the ledger.
     await db.exec(`update public.rating_history set rating_before=9999,rating_after=9989 where id='${id(43)}'`);
-    await db.exec(migration);
+    await executePrivateSql(db, migration, "symbolic-mvp-migration");
     expect((await db.query(`select rating_before,rating_after,season_rating_before,season_rating_after from public.rating_history where player_id='${id(11)}' order by created_at,match_id,id`)).rows).toEqual([
       { rating_before: "1200", rating_after: "1210", season_rating_before: "1000", season_rating_after: "1010" },
       { rating_before: "1210", rating_after: "1200", season_rating_before: "900", season_rating_after: "890" }
@@ -73,9 +74,9 @@ describe.skipIf(!existsSync(source))("symbolic MVP historical migration (Postgre
   });
 
   it("is idempotent and rejects any future MVP bonus write", async () => {
-    await db.exec(migration);
+    await executePrivateSql(db, migration, "symbolic-mvp-migration");
     const once = await state();
-    await db.exec(migration);
+    await executePrivateSql(db, migration, "symbolic-mvp-migration");
     expect(await state()).toEqual(once);
     await expect(db.exec(`update public.rating_history set reason='mvp_bonus' where id='${id(41)}'`)).rejects.toThrow(/rating_history_no_mvp_bonus_check/);
   });
@@ -83,14 +84,14 @@ describe.skipIf(!existsSync(source))("symbolic MVP historical migration (Postgre
   it("rolls back completely if removing a bonus would violate the positive rating invariant", async () => {
     await db.exec(`update public.players set current_rating=5 where id='${id(13)}'`);
     const before = await state();
-    await expect(db.exec(migration)).rejects.toThrow(/current_rating_check/);
+    await expect(executePrivateSql(db, migration, "symbolic-mvp-migration")).rejects.toThrow(/current_rating_check/);
     expect(await state()).toEqual(before);
   });
 
   it("rolls back global changes when a later seasonal update violates its balance invariant", async () => {
     await db.exec(`update public.organization_season_player_ratings set current_rating=5 where season_id='${id(21)}'`);
     const before = await state();
-    await expect(db.exec(migration)).rejects.toThrow(/current_rating_check/);
+    await expect(executePrivateSql(db, migration, "symbolic-mvp-migration")).rejects.toThrow(/current_rating_check/);
     expect(await state()).toEqual(before);
     expect((await db.query("select count(*)::int count from pg_constraint where conname='rating_history_no_mvp_bonus_check'")).rows).toEqual([{ count: 0 }]);
   });
@@ -98,10 +99,10 @@ describe.skipIf(!existsSync(source))("symbolic MVP historical migration (Postgre
   it("can retry safely after detecting a missing seasonal account", async () => {
     await db.exec(`delete from public.organization_season_player_ratings where season_id='${id(21)}'`);
     const before = await state();
-    await expect(db.exec(migration)).rejects.toThrow(/Falta la cuenta de temporada/);
+    await expect(executePrivateSql(db, migration, "symbolic-mvp-migration")).rejects.toThrow(/Falta la cuenta de temporada/);
     expect(await state()).toEqual(before);
     await db.exec(`insert into public.organization_season_player_ratings values ('${id(11)}','${id(21)}',1015)`);
-    await db.exec(migration);
+    await executePrivateSql(db, migration, "symbolic-mvp-migration");
     expect((await db.query(`select current_rating from public.players where id='${id(11)}'`)).rows).toEqual([{ current_rating: "1200" }]);
     expect((await db.query("select count(*)::int count from public.rating_history where reason='mvp_bonus'")).rows).toEqual([{ count: 0 }]);
   });
@@ -109,7 +110,7 @@ describe.skipIf(!existsSync(source))("symbolic MVP historical migration (Postgre
   it("uses the match order to rebuild a stable chain when timestamps tie and row IDs disagree", async () => {
     await db.exec(`update public.rating_history set created_at='2026-01-02' where player_id='${id(11)}';
       update public.rating_history set id='${id(40)}' where id='${id(43)}'`);
-    await db.exec(migration);
+    await executePrivateSql(db, migration, "symbolic-mvp-migration");
     expect((await db.query(`select rating_before,rating_after from public.rating_history where player_id='${id(11)}' order by match_id`)).rows).toEqual([
       { rating_before: "1200", rating_after: "1210" },
       { rating_before: "1210", rating_after: "1200" }
@@ -119,7 +120,7 @@ describe.skipIf(!existsSync(source))("symbolic MVP historical migration (Postgre
   it("aborts before changing data if a bonus references another group", async () => {
     await db.exec(`update public.rating_history set match_id='${id(33)}' where id='${id(42)}'`);
     const before = await state();
-    await expect(db.exec(migration)).rejects.toThrow(/referencias ajenas/);
+    await expect(executePrivateSql(db, migration, "symbolic-mvp-migration")).rejects.toThrow(/referencias ajenas/);
     expect(await state()).toEqual(before);
   });
 });

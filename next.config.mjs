@@ -39,6 +39,22 @@ function buildSecurityHeaders() {
       value: "frame-ancestors 'none'"
     },
     {
+      key: "Content-Security-Policy-Report-Only",
+      value: [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://vercel.live",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob: https://*.supabase.co",
+        "font-src 'self'",
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://vitals.vercel-insights.com https://va.vercel-scripts.com https://vercel.live",
+        "frame-src https://vercel.live",
+        "form-action 'self' https://*.supabase.co",
+        "report-uri /api/security/csp-report"
+      ].join("; ")
+    },
+    {
       key: "Permissions-Policy",
       value: "camera=(), microphone=(), geolocation=()"
     }
@@ -72,7 +88,7 @@ const nextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: "30mb",
+      bodySizeLimit: "4mb",
       ...(allowedDevOrigins.length ? { allowedOrigins: allowedDevOrigins } : {})
     }
   }

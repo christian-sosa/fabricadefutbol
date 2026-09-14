@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { isSuperAdminEmail } from "@/lib/auth/super-admin";
+import { getSessionIsSuperAdmin } from "@/lib/auth/super-admin";
+import { requiresMfaVerification } from "@/lib/auth/mfa";
 import { deriveDisplayName } from "@/lib/auth/profile";
 import { maskEmail, maskUserId } from "@/lib/log-pii";
 import { normalizeEmail } from "@/lib/org";
@@ -12,6 +13,7 @@ export type AdminSession = {
   email: string;
   displayName: string;
   isSuperAdmin: boolean;
+  requiresMfa?: boolean;
 };
 
 export type AdminOrganization = {
@@ -20,10 +22,6 @@ export type AdminOrganization = {
   slug: string;
   is_public: boolean;
   created_at: string;
-};
-
-type FreeTrialStatus = {
-  hasCreatedOrganization: boolean;
 };
 
 export type OrganizationWriteAccess = {
@@ -94,34 +92,13 @@ async function ensureAdminProfile(params: {
   return inserted;
 }
 
-async function getAdminFreeTrialStatus(userId: string): Promise<FreeTrialStatus> {
-  const supabase = await createSupabaseServerClient();
-  const { data: firstCreatedOrganization, error } = await supabase
-    .from("organizations")
-    .select("id")
-    .eq("created_by", userId)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!firstCreatedOrganization?.id) {
-    return {
-      hasCreatedOrganization: false
-    };
-  }
-
-  return {
-    hasCreatedOrganization: true
-  };
-}
-
 export async function getAdminOrganizationCreationAccess(admin: AdminSession) {
-  const freeTrialStatus = await getAdminFreeTrialStatus(admin.userId);
-  if (!freeTrialStatus.hasCreatedOrganization) {
+  if (!admin.userId) throw new Error("Iniciá sesión antes de crear un grupo.");
+  const supabase = await createSupabaseServerClient();
+  // SQL includes archived groups that ordinary administrators cannot list through RLS.
+  const { data, error } = await supabase.rpc("can_create_organization");
+  if (error || typeof data !== "boolean") throw new Error("No se pudo verificar si podés crear un grupo.");
+  if (data) {
     return {
       canCreateOrganization: true,
       reason: null as string | null
@@ -145,20 +122,13 @@ export async function assertCanCreateOrganization(admin: AdminSession) {
 }
 
 export async function getOrganizationWriteAccess(
-  admin: AdminSession,
+  _admin: AdminSession,
   organizationId: string
 ): Promise<OrganizationWriteAccess> {
-  if (admin.isSuperAdmin) {
-    return {
-      canWrite: true,
-      reason: null
-    };
-  }
-
   const supabase = await createSupabaseServerClient();
   const { data: organization, error: organizationError } = await supabase
     .from("organizations")
-    .select("id")
+    .select("id, archived_at")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -168,6 +138,9 @@ export async function getOrganizationWriteAccess(
 
   if (!organization?.id) {
     throw new Error("El grupo no existe.");
+  }
+  if (organization.archived_at) {
+    return { canWrite: false, reason: "El grupo está archivado. Restauralo antes de modificarlo." };
   }
 
   return {
@@ -201,7 +174,8 @@ export async function getAdminSession(): Promise<AdminSession | null> {
     userId: user.id,
     email,
     displayName: profile.display_name,
-    isSuperAdmin: isSuperAdminEmail(email)
+    isSuperAdmin: await getSessionIsSuperAdmin(supabase),
+    requiresMfa: await requiresMfaVerification(supabase, user)
   };
 }
 
@@ -210,6 +184,7 @@ export async function requireAdminSession() {
   if (!adminSession) {
     redirect("/admin/login");
   }
+  if (adminSession.requiresMfa) redirect("/admin/security");
   return adminSession;
 }
 
@@ -217,6 +192,9 @@ export async function assertAdminAction() {
   const adminSession = await getAdminSession();
   if (!adminSession) {
     throw new Error("No autorizado: debes iniciar sesion.");
+  }
+  if (adminSession.requiresMfa) {
+    throw new Error("Verificá tu segundo factor desde Seguridad de la cuenta antes de continuar.");
   }
   return adminSession;
 }
@@ -228,6 +206,7 @@ export async function getAdminOrganizations(admin: AdminSession): Promise<AdminO
     const { data, error } = await supabase
       .from("organizations")
       .select("id, name, slug, is_public, created_at")
+      .is("archived_at", null)
       .order("name", { ascending: true });
 
     if (error) throw new Error(error.message);
@@ -238,10 +217,11 @@ export async function getAdminOrganizations(admin: AdminSession): Promise<AdminO
     supabase
       .from("organizations")
       .select("id, name, slug, is_public, created_at")
+      .is("archived_at", null)
       .eq("created_by", admin.userId),
     supabase
       .from("organization_admins")
-      .select("organizations(id, name, slug, is_public, created_at)")
+      .select("organizations(id, name, slug, is_public, created_at, archived_at)")
       .eq("admin_id", admin.userId)
   ]);
 
@@ -256,7 +236,7 @@ export async function getAdminOrganizations(admin: AdminSession): Promise<AdminO
   for (const row of data ?? []) {
     const relation = row.organizations;
     const value = Array.isArray(relation) ? relation[0] ?? null : relation ?? null;
-    if (value && typeof value.id === "string" && typeof value.name === "string") {
+    if (value && !value.archived_at && typeof value.id === "string" && typeof value.name === "string") {
       organizationsById.set(value.id, value as AdminOrganization);
     }
   }
@@ -274,6 +254,16 @@ export async function getOrganizationQueryKeyById(organizationId: string) {
 
   if (error || !data?.slug) return organizationId;
   return data.slug;
+}
+
+export async function getArchivedAdminOrganizations(admin: AdminSession): Promise<Array<AdminOrganization & { archived_at: string }>> {
+  if (!admin.isSuperAdmin) return [];
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.from("organizations")
+    .select("id, name, slug, is_public, created_at, archived_at")
+    .not("archived_at", "is", null).order("archived_at", { ascending: false });
+  if (error) throw new Error("No se pudieron leer los grupos archivados.");
+  return data ?? [];
 }
 
 export async function getAdminOrganizationContext(preferredOrganizationKey?: string | null) {

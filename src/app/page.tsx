@@ -81,14 +81,11 @@ export default async function HomePage({
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
               Fútbol amateur, ordenado de verdad
             </p>
-            <h1 className="mt-3 max-w-4xl text-4xl font-black leading-tight text-white md:text-5xl lg:text-6xl">
-              Armá equipos parejos sin discusiones y llevá el historial de tu grupo
+            <h1 className="mt-3 max-w-xl text-4xl font-black leading-tight text-white md:text-5xl">
+              Armá el partido. Disfrutá el fútbol.
             </h1>
             <p className="mt-4 max-w-2xl text-base text-slate-300 md:text-lg">
-              Con Fábrica de Fútbol cargás jugadores, organizás partidos, medís rendimiento y publicás ranking, historial y próximas fechas para todos.
-            </p>
-            <p className="mt-4 max-w-2xl rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100">
-              Gratis para crear y administrar tu grupo. Si más adelante administrás varios grupos, escribinos y lo vemos.
+              Equipos parejos, convocatoria por WhatsApp y un historial que se actualiza con cada resultado.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -106,11 +103,12 @@ export default async function HomePage({
                 eventProperties={{ cta: "demo", source: "home_hero" }}
                 href="/demo"
               >
-                Probar un grupo de ejemplo
+                Probar demo
               </TrackedLink>
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-2">
+            <p className="mt-3 text-sm text-slate-400">Gratis para tu grupo. Los jugadores no necesitan registrarse.</p>
+            <div className="mt-4 flex flex-wrap gap-2">
               {heroHighlights.map((item) => (
                 <span
                   className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-xs font-semibold text-slate-200"

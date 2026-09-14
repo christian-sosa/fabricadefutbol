@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { sendFeedbackEmail } from "@/lib/feedback-email";
 import { normalizeEmail, withOrgQuery } from "@/lib/org";
-import { checkRateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
+import { getClientIpFromHeaders } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/shared-rate-limit";
 
 const feedbackSchema = z.object({
   fullName: z.string().trim().min(2, "Escribí tu nombre.").max(80),
@@ -29,7 +30,7 @@ export async function submitFeedbackAction(organizationKey: string | null, _defa
   if (!parsed.success) redirect(path("error", parsed.error.issues[0]?.message ?? "Revisá los datos."));
   if (parsed.data.website?.trim()) redirect(path("sent", "1"));
   const headerStore = await headers();
-  const limit = checkRateLimit({ key: `feedback:${getClientIpFromHeaders(headerStore)}`, limit: 3, windowMs: 5 * 60_000 });
+  const limit = await checkSharedRateLimit({ key: `feedback:${getClientIpFromHeaders(headerStore)}`, limit: 3, windowMs: 5 * 60_000 });
   if (!limit.allowed) redirect(path("error", "Enviaste varios mensajes seguidos. Esperá unos minutos."));
   try {
     await sendFeedbackEmail({ fullName: parsed.data.fullName, email: normalizeEmail(parsed.data.email), category: parsed.data.category, module: "organizations", organization: parsed.data.organization || null, message: parsed.data.message, submittedAtIso: new Date().toISOString(), userAgent: headerStore.get("user-agent"), referer: null });

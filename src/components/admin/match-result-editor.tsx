@@ -297,7 +297,7 @@ export function MatchResultEditor({
   }
 
   return (
-    <form action={onSubmit ? undefined : action} className="mt-4 space-y-4" onSubmit={onSubmit ? handleSubmit : undefined}>
+    <form action={onSubmit ? undefined : action} aria-busy={isSubmitting} className="mt-4 space-y-4" onSubmit={onSubmit ? handleSubmit : undefined}>
       <input name="expectedVersion" type="hidden" value={expectedVersion} />
       <input name="lineupPayload" type="hidden" value={lineupPayload} />
       <input name="mvpParticipantId" type="hidden" value={selectedMvpParticipantId} />
@@ -673,7 +673,7 @@ export function MatchResultEditor({
         <Button disabled={isSubmitting} type="submit">
           {isSubmitting ? "Guardando..." : submitLabel}
         </Button>
-        {submitError ? <p className="mt-2 text-sm font-semibold text-danger">{submitError}</p> : null}
+        {submitError ? <p className="mt-2 text-sm font-semibold text-danger" role="alert">{submitError}</p> : null}
       </div>
     </form>
   );

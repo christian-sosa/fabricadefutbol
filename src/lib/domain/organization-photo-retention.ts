@@ -18,7 +18,6 @@ export type OrganizationPhotoRetentionSummary = {
   scheduledOrganizations: number;
   purgedOrganizations: number;
   deletedPlayerPhotos: number;
-  clearedUploadEvents: number;
   resetOrganizations: number;
 };
 
@@ -54,12 +53,13 @@ export async function purgeExpiredOrganizationPlayerPhotos(params: {
   const now = params.now ?? new Date();
   const summary: OrganizationPhotoRetentionSummary = {
     scannedOrganizations: 0, scheduledOrganizations: 0, purgedOrganizations: 0,
-    deletedPlayerPhotos: 0, clearedUploadEvents: 0, resetOrganizations: 0
+    deletedPlayerPhotos: 0, resetOrganizations: 0
   };
   const pageSize = 200;
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await params.supabase.from("organizations")
       .select("id, created_at, player_photos_purge_at, player_photos_purged_at")
+      .is("archived_at", null)
       .order("id", { ascending: true }).range(offset, offset + pageSize - 1);
     if (error) throw new Error(error.message);
     const organizations = (data ?? []) as OrganizationRetentionRow[];
@@ -80,24 +80,22 @@ export async function purgeExpiredOrganizationPlayerPhotos(params: {
 
       const photoPlayers = activity.players.filter((player) => player.photo_path);
       if (organization.player_photos_purged_at && !photoPlayers.length) continue;
+      let allPhotosRetired = true;
       for (const player of photoPlayers) {
         const objectPath = player.photo_path!;
         // Only recorded objects owned by this group can be removed.
         if (!isOrganizationPlayerPhotoObjectPath(objectPath, params.schemaName, organization.id, player.id)) {
           throw new Error("La foto registrada no pertenece al jugador indicado.");
         }
-        const { error: removeError } = await params.supabase.storage.from(params.bucketName).remove([objectPath]);
-        if (removeError) throw new Error(removeError.message);
-        const { error: clearError } = await params.supabase.from("players")
-          .update({ photo_path: null }).eq("id", player.id).eq("organization_id", organization.id).eq("photo_path", objectPath);
+        const { data: retired, error: clearError } = await params.supabase.rpc("retire_group_player_photo", {
+          p_player_id: player.id, p_organization_id: organization.id,
+          p_expected_path: objectPath, p_activity_before: activity.latest
+        });
         if (clearError) throw new Error(clearError.message);
+        if (!retired) { allPhotosRetired = false; continue; }
         summary.deletedPlayerPhotos += 1;
-        const { data: removedEvents, error: eventsError } = await params.supabase.from("player_photo_upload_events")
-          .delete().eq("target_type", "organization_player").eq("target_player_id", player.id)
-          .lte("created_at", activity.latest).select("id");
-        if (eventsError) throw new Error(eventsError.message);
-        summary.clearedUploadEvents += removedEvents?.length ?? 0;
       }
+      if (!allPhotosRetired) continue;
       const { error: snapshotError } = await params.supabase.from("organization_public_snapshots")
         .delete().eq("organization_id", organization.id);
       if (snapshotError) throw new Error(snapshotError.message);

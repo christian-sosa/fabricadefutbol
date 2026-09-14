@@ -19,6 +19,12 @@ const ADMIN_SESSION = {
 } as const;
 
 describe("admin group creation access", () => {
+  it("an archived group remains read-only even for a superadmin", async () => {
+    const fake = createFakeSupabase({ organizations: [{ id: "archived", archived_at: "2026-09-14T00:00:00Z" }] });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    await expect(getOrganizationWriteAccess({ ...ADMIN_SESSION, isSuperAdmin: true }, "archived"))
+      .resolves.toEqual({ canWrite: false, reason: expect.stringContaining("archivado") });
+  });
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-19T12:00:00.000Z"));
@@ -29,88 +35,26 @@ describe("admin group creation access", () => {
     vi.useRealTimers();
   });
 
-  it("permite crear el primer grupo free si no administra ninguno", async () => {
-    const fake = createFakeSupabase();
-    createSupabaseServerClientMock.mockResolvedValue(fake.client);
-
-    await expect(getAdminOrganizationCreationAccess(ADMIN_SESSION)).resolves.toEqual({
-      canCreateOrganization: true,
-      reason: null
-    });
+  it.each([
+    ["permite crear cuando SQL lo autoriza", true],
+    ["cuenta un grupo archivado aunque RLS no lo liste", false]
+  ])("%s", async (_name, allowed) => {
+    const rpc = vi.fn(async () => ({ data: allowed, error: null }));
+    createSupabaseServerClientMock.mockResolvedValue({ rpc });
+    const result = await getAdminOrganizationCreationAccess(ADMIN_SESSION);
+    expect(result.canCreateOrganization).toBe(allowed);
+    expect(rpc).toHaveBeenCalledWith("can_create_organization");
+    expect(result.reason).toEqual(allowed ? null : expect.stringContaining("Ya tenés un grupo"));
   });
 
-  it("bloquea el grupo free si ya creo un grupo", async () => {
-    const fake = createFakeSupabase({
-      organizations: [
-        {
-          id: "org-1",
-          name: "Liga A",
-          slug: "liga-a",
-          created_by: ADMIN_SESSION.userId,
-          created_at: "2026-04-10T00:00:00.000Z"
-        }
-      ]
-    });
-    createSupabaseServerClientMock.mockResolvedValue(fake.client);
-
-    await expect(getAdminOrganizationCreationAccess(ADMIN_SESSION)).resolves.toEqual({
-      canCreateOrganization: false,
-      reason:
-        "Ya tenés un grupo para administrar. Si querés sumar otro, escribinos y lo habilitamos manualmente."
-    });
+  it("usa también la autoridad SQL para la excepción del superadmin", async () => {
+    createSupabaseServerClientMock.mockResolvedValue({ rpc: vi.fn(async () => ({ data: true, error: null })) });
+    expect((await getAdminOrganizationCreationAccess({ ...ADMIN_SESSION, isSuperAdmin: true })).canCreateOrganization).toBe(true);
   });
 
-  it("permite al invitado crear su primer grupo propio", async () => {
-    const fake = createFakeSupabase({
-      organizations: [
-        {
-          id: "org-1",
-          name: "Liga A",
-          slug: "liga-a",
-          created_by: "other-admin",
-          created_at: "2026-04-10T00:00:00.000Z"
-        }
-      ],
-      organization_admins: [
-        {
-          id: "org-admin-1",
-          organization_id: "org-1",
-          admin_id: ADMIN_SESSION.userId
-        }
-      ]
-    });
-    createSupabaseServerClientMock.mockResolvedValue(fake.client);
-
-    await expect(getAdminOrganizationCreationAccess(ADMIN_SESSION)).resolves.toEqual({
-      canCreateOrganization: true,
-      reason: null
-    });
-  });
-
-  it("bloquea crear otro grupo al super admin cuando ya administra uno", async () => {
-    const fake = createFakeSupabase({
-      organizations: [
-        {
-          id: "org-1",
-          name: "Liga A",
-          slug: "liga-a",
-          created_by: ADMIN_SESSION.userId,
-          created_at: "2026-04-10T00:00:00.000Z"
-        }
-      ]
-    });
-    createSupabaseServerClientMock.mockResolvedValue(fake.client);
-
-    await expect(
-      getAdminOrganizationCreationAccess({
-        ...ADMIN_SESSION,
-        isSuperAdmin: true
-      })
-    ).resolves.toEqual({
-      canCreateOrganization: false,
-      reason:
-        "Ya tenés un grupo para administrar. Si querés sumar otro, escribinos y lo habilitamos manualmente."
-    });
+  it("no habilita crear si no pudo comprobar la política", async () => {
+    createSupabaseServerClientMock.mockResolvedValue({ rpc: vi.fn(async () => ({ data: null, error: { message: "offline" } })) });
+    await expect(getAdminOrganizationCreationAccess(ADMIN_SESSION)).rejects.toThrow("No se pudo verificar");
   });
 
   it("habilita escritura en grupos existentes aunque ya no haya trial o suscripcion activa", async () => {

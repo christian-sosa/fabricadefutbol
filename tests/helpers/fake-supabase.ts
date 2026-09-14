@@ -237,6 +237,7 @@ class FakeSupabaseState {
   }
 
   async runRpc(name: string, args: Record<string, unknown>) {
+    if (name === "is_super_admin") return { data: false, error: null };
     if (name === "replace_group_match_options") {
       const match = this.db.matches.find((row) => row.id === args.p_match_id && row.organization_id === args.p_organization_id);
       if (!match || match.status !== "draft") return { data: null, error: { message: "Solo se pueden regenerar opciones en borrador." } };

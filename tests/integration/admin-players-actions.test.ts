@@ -44,11 +44,44 @@ vi.mock("@/lib/queries/public", () => ({
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: createSupabaseServerClientMock
 }));
+vi.mock("@/lib/env", () => ({ getPlayerPhotosBucket: () => "player-photos", getSupabaseDbSchema: () => "app_dev" }));
+vi.mock("@/lib/player-photo-upload-limits", () => ({ assertPlayerPhotoUploadAllowed: vi.fn(), registerPlayerPhotoUploadEvent: vi.fn() }));
+vi.mock("@/lib/domain/media-cleanup", () => ({ enqueueMediaCleanup: vi.fn() }));
+vi.mock("@/lib/player-photos", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/player-photos")>(),
+  optimizePlayerAvatarImage: vi.fn(async () => Buffer.from("webp"))
+}));
 
-import { bulkCreatePlayersAction, bulkUpdatePlayersAction } from "@/app/admin/(panel)/players/actions";
+import { bulkCreatePlayersAction, bulkUpdatePlayersAction, createPlayerAction, uploadPlayerPhotoAction } from "@/app/admin/(panel)/players/actions";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 describe("admin players actions", () => {
+  it("conserva un jugador creado tras fallo Storage y reintenta sólo su foto desde la planilla", async () => {
+    const organizationId = "00000000-0000-4000-8000-000000000001";
+    const fake = createFakeSupabase({ players: [] });
+    const upload = vi.fn().mockResolvedValueOnce({ error: { message: "Storage unavailable" } }).mockResolvedValue({ error: null });
+    createSupabaseServerClientMock.mockResolvedValue({ ...fake.client, storage: { from: () => ({ upload }) } });
+    const photo = new File(["image"], "ana.webp", { type: "image/webp" });
+    const form = new FormData();
+    form.set("organizationId", organizationId); form.set("fullName", "Ana Pérez"); form.set("skillLevel", "4"); form.set("photo", photo);
+    await expect(createPlayerAction(form)).rejects.toMatchObject({ digest: expect.stringContaining("NEXT_REDIRECT") });
+    const created = fake.table("players")[0];
+    expect(fake.table("players")).toHaveLength(1);
+    const destination = new URL(redirectMock.mock.calls.at(-1)![0], "https://local.invalid");
+    expect(destination.searchParams.get("notice")).toContain("Jugador creado");
+    expect(destination.searchParams.has("error")).toBe(false);
+    expect(destination.searchParams.get("view")).toBe("edit");
+    expect(destination.searchParams.get("photoPlayer")).toBe(created.id);
+    expect(destination.hash).toBe(`#player-${created.id}`);
+    // Same row receives the next upload; no second create request is needed.
+    await fake.client.from("players").update({ photo_path: null }).eq("id", created.id);
+    const retry = new FormData();
+    retry.set("organizationId", organizationId); retry.set("playerId", String(created.id)); retry.set("photo", photo);
+    await expect(uploadPlayerPhotoAction(retry)).rejects.toMatchObject({ digest: expect.stringContaining("NEXT_REDIRECT") });
+    expect(fake.table("players")).toHaveLength(1);
+    expect(fake.find("players", (row) => row.id === created.id)?.photo_path).toContain(`/${created.id}/`);
+    expect(upload).toHaveBeenCalledTimes(2);
+  });
   it("carga una lista sin duplicar jugadores existentes ni cambiar su nivel", async () => {
     const organizationId = "00000000-0000-4000-8000-000000000001";
     const fake = createFakeSupabase({ players: [{ id: "existing", organization_id: organizationId, full_name: "Juan Pérez", initial_rank: 3, display_order: 4, skill_level: 2 }] });

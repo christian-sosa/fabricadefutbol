@@ -8,14 +8,21 @@ const VERSION = "10000000-0000-4000-8000-000000000001";
 const PATH = `app_dev/org-1/player-1/${VERSION}.webp`;
 function setup(options: { createdAt?: string; photoAt?: string; path?: string | null; purgedAt?: string | null } = {}) {
   const fake = createFakeSupabase({
-    organizations: [{ id: "org-1", created_at: options.createdAt ?? OLD, updated_at: OLD, image_path: "cover.webp", player_photos_purge_at: null, player_photos_purged_at: options.purgedAt ?? null }],
+    organizations: [{ id: "org-1", created_at: options.createdAt ?? OLD, updated_at: OLD, archived_at: null, image_path: "cover.webp", player_photos_purge_at: null, player_photos_purged_at: options.purgedAt ?? null }],
     organization_public_snapshots: [{ organization_id: "org-1", summary: {}, standings: [], match_history: [] }],
     players: [{ id: "player-1", organization_id: "org-1", created_at: OLD, updated_at: OLD, photo_path: options.path === undefined ? PATH : options.path, photo_updated_at: options.photoAt ?? OLD }],
     player_photo_upload_events: [{ id: "event-1", uploader_id: "admin-1", uploader_role: "organization_admin", target_type: "organization_player", target_player_id: "player-1", created_at: options.photoAt ?? OLD }]
   });
   const remove = vi.fn(async (paths: string[]) => ({ data: paths.map((name) => ({ name })), error: null as { message: string } | null }));
-  const run = () => purgeExpiredOrganizationPlayerPhotos({ supabase: { ...fake.client, storage: { from: () => ({ remove }) } } as never, bucketName: "player-photos-dev", schemaName: "app_dev", now: new Date(NOW) });
-  return { fake, remove, run };
+  const rpc = vi.fn(async (_name: string, args: { p_player_id: string; p_expected_path: string }) => {
+    const player = fake.table("players").find((row) => row.id === args.p_player_id);
+    if (player?.photo_path !== args.p_expected_path) return { data: false, error: null as { message: string } | null };
+    await fake.client.from("players").update({ photo_path: null }).eq("id", args.p_player_id);
+    await fake.client.from("player_photo_upload_events").delete().eq("target_player_id", args.p_player_id);
+    return { data: true, error: null as { message: string } | null };
+  });
+  const run = () => purgeExpiredOrganizationPlayerPhotos({ supabase: { ...fake.client, rpc, storage: { from: () => ({ remove }) } } as never, bucketName: "player-photos-dev", schemaName: "app_dev", now: new Date(NOW) });
+  return { fake, remove, rpc, run };
 }
 describe("organization photo retention", () => {
   beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date(NOW)); });
@@ -33,15 +40,15 @@ describe("organization photo retention", () => {
   });
 
   it("borra sólo fotos registradas vencidas y conserva portada/datos deportivos", async () => {
-    const { run, fake, remove } = setup();
-    expect(await run()).toMatchObject({ purgedOrganizations: 1, deletedPlayerPhotos: 1, clearedUploadEvents: 1 });
-    expect(remove).toHaveBeenCalledExactlyOnceWith([PATH]);
+    const { run, fake, remove, rpc } = setup();
+    expect(await run()).toMatchObject({ purgedOrganizations: 1, deletedPlayerPhotos: 1 });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("retire_group_player_photo", expect.objectContaining({ p_expected_path: PATH }));
     expect(fake.table("players")[0]).toMatchObject({ id: "player-1", photo_path: null, photo_updated_at: OLD, updated_at: OLD });
     expect(fake.table("organizations")[0].image_path).toBe("cover.webp");
     expect(fake.table("player_photo_upload_events")).toEqual([]);
     expect(fake.table("organization_public_snapshots")).toEqual([]);
     expect((await run()).purgedOrganizations).toBe(0);
-    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).not.toHaveBeenCalled();
   });
 
   it("una foto cargada hoy renueva la actividad aunque el grupo sea antiguo", async () => {
@@ -78,25 +85,25 @@ describe("organization photo retention", () => {
     expect(remove).not.toHaveBeenCalled();
   });
 
-  it("no limpia metadata si Storage falla", async () => {
-    const { run, fake, remove } = setup();
-    remove.mockResolvedValueOnce({ data: [], error: { message: "fallo de storage" } });
-    await expect(run()).rejects.toThrow("fallo de storage");
+  it("no marca una purga completa si falla la transaccion de metadata y cola", async () => {
+    const { run, fake, rpc } = setup();
+    rpc.mockResolvedValueOnce({ data: false, error: { message: "fallo de transaccion" } });
+    await expect(run()).rejects.toThrow("fallo de transaccion");
     expect(fake.table("players")[0].photo_path).toBe(PATH);
     expect(fake.table("organizations")[0].player_photos_purged_at).toBeNull();
   });
 
   it("preserva una versión nueva subida mientras se elimina la versión vencida", async () => {
-    const { run, fake, remove } = setup();
+    const { run, fake, remove, rpc } = setup();
     const newPath = "app_dev/org-1/player-1/20000000-0000-4000-8000-000000000002.webp";
-    remove.mockImplementationOnce(async (paths) => {
+    rpc.mockImplementationOnce(async () => {
       await fake.client.from("players").update({ photo_path: newPath, photo_updated_at: NOW }).eq("id", "player-1");
-      return { data: paths.map((name) => ({ name })), error: null };
+      return { data: false, error: null };
     });
     await run();
-    expect(remove).toHaveBeenCalledExactlyOnceWith([PATH]);
+    expect(remove).not.toHaveBeenCalled();
     expect(fake.table("players")[0].photo_path).toBe(newPath);
     await run();
-    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).not.toHaveBeenCalled();
   });
 });
