@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
-  "revision": "groups_hardening_20260914_v4",
-  "sha256": "d34a517c54f6029c3e84c4c83eb1cbd532d4bcdc0716fb2443a763645473417c",
+  "revision": "groups_formations_20260914_v1",
+  "sha256": "cb095c469a29455b9a4ec5b5f37ed28aaa86b25cc383543987d6e2a04ecad381",
   "bucket": "groups-sql-artifacts",
-  "object": "d34a517c54f6029c3e84c4c83eb1cbd532d4bcdc0716fb2443a763645473417c.json.gz"
+  "object": "cb095c469a29455b9a4ec5b5f37ed28aaa86b25cc383543987d6e2a04ecad381.json.gz"
 }

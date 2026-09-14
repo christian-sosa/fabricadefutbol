@@ -15,6 +15,8 @@ import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getMatchDetails } from "@/lib/queries/public";
 import { resolveMatchTeamLabels } from "@/lib/team-labels";
 import { formatRendimiento } from "@/lib/utils";
+import { FormationPitch } from "@/components/matches/formation-pitch";
+import { readMatchFormation, toFormationPlayers } from "@/lib/domain/match-formation";
 
 export async function generateMetadata({
   params,
@@ -54,6 +56,11 @@ export default async function MatchDetailPage({
   const publicMatchUrl = buildAbsolutePublicUrl(withShareTracking(publicMatchPath, "match"));
   const teamLabels = resolveMatchTeamLabels(details.match);
   const showCurrentRendimiento = details.match.status !== "finished" && !details.result;
+  const formationTeams = {
+    teamA: toFormationPlayers(details.teamAPlayers, details.match.goalkeeper_player_ids),
+    teamB: toFormationPlayers(details.teamBPlayers, details.match.goalkeeper_player_ids)
+  };
+  const formation = readMatchFormation(details.match.formation_data, details.match.modality, formationTeams);
 
   return (
     <div className="space-y-4">
@@ -85,6 +92,12 @@ export default async function MatchDetailPage({
 
       <Card>
         <CardTitle>Equipos confirmados</CardTitle>
+        {formation ? (
+          <div className="mt-3 grid min-w-0 gap-5 lg:grid-cols-2">
+            <FormationPitch formation={formation.teamA} players={formationTeams.teamA} side="A" teamLabel={teamLabels.teamA} />
+            <FormationPitch formation={formation.teamB} players={formationTeams.teamB} side="B" teamLabel={teamLabels.teamB} />
+          </div>
+        ) : (
         <div className="mt-3 grid gap-4 md:grid-cols-2">
           <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{teamLabels.teamA}</p>
@@ -125,6 +138,7 @@ export default async function MatchDetailPage({
             </ul>
           </div>
         </div>
+        )}
       </Card>
 
       <Card>

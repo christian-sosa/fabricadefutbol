@@ -25,8 +25,27 @@ vi.mock("@/lib/queries/public", () => ({
 }));
 
 import MatchDetailPage from "@/app/matches/[id]/page";
+import { getFormationPositions } from "@/lib/domain/match-formation";
 
 describe("MatchDetailPage", () => {
+  it.each(["9v9", "11v11"])("shows saved %s pitches with names and no rating list", async (modality) => {
+    const size = modality === "9v9" ? 9 : 11;
+    const preset = size === 9 ? "3-3-2" : "4-2-3-1";
+    const players = (side: string) => Array.from({ length: size }, (_, i) => ({ id: `${side}-${i}`, full_name: `${side} Jugador ${i}`, current_rating: 1234, is_guest: i === size - 1 }));
+    const teamAPlayers = players("Azul"), teamBPlayers = players("Rojo");
+    const formation = (pool: typeof teamAPlayers) => ({ formationId: preset, slots: getFormationPositions(preset).map((position, i) => ({ slotId: position.slotId, participantId: `${pool[i].is_guest ? "guest" : "player"}:${pool[i].id}` })) });
+    getMatchDetailsMock.mockResolvedValueOnce({
+      match: { id: "match-1", modality, scheduled_at: "2026-09-14T20:00:00Z", status: "confirmed", team_a_label: "Azul", team_b_label: "Rojo", goalkeeper_player_ids: [], formation_data: { teamA: formation(teamAPlayers), teamB: formation(teamBPlayers) } },
+      result: null, teamAPlayers, teamBPlayers
+    });
+    render(await MatchDetailPage({ params: Promise.resolve({ id: "match-1" }), searchParams: Promise.resolve({ org: "grupo-a" }) }));
+    expect(screen.getByRole("group", { name: "Cancha de Azul" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Cancha de Rojo" })).toBeInTheDocument();
+    expect(screen.getAllByRole("img")).toHaveLength(size * 2);
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    expect(screen.queryByText("1234")).not.toBeInTheDocument();
+    expect(screen.getByText(`Azul Jugador ${size - 1}`)).toBeInTheDocument();
+  });
   it("oculta el rendimiento actual en partidos del historial", async () => {
     getMatchDetailsMock.mockResolvedValueOnce({
       match: {

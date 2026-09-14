@@ -127,4 +127,37 @@ describe("TeamOptionCard", () => {
     expect(screen.queryByText("1000")).not.toBeInTheDocument();
     expect(screen.queryByText("950")).not.toBeInTheDocument();
   });
+
+  it("oculta niveles, tendencias y balance sin revelar el nivel por el orden de los jugadores", () => {
+    const teamA = [
+      { id: "player-z", full_name: "Zeta", current_rating: 1050, skill_level: 1 },
+      { id: "player-a", full_name: "Álvaro", current_rating: 950, skill_level: 7 },
+      { id: "guest", full_name: "Invitado especial", current_rating: 1050, skill_level: 0.5, is_guest: true }
+    ];
+    render(
+      <TeamOptionCard
+        hideLevels
+        isConfirmed
+        optionId="option-hidden"
+        optionNumber={1}
+        ratingDiff={300}
+        ratingSumA={3000}
+        ratingSumB={3300}
+        teamA={teamA}
+        teamB={[]}
+      />
+    );
+
+    const playerRows = screen.getAllByRole("listitem");
+    expect(playerRows[0]).toHaveTextContent("Álvaro");
+    expect(playerRows[1]).toHaveTextContent("Invitado especial");
+    expect(playerRows[2]).toHaveTextContent("Zeta");
+    expect(screen.queryByText(/Nivel \d/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/mejor que Estrella/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Viene bien|Viene mal/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Para revisar|bastante mas fuerte/)).not.toBeInTheDocument();
+    expect(screen.getByText("Invitado", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText("Confirmada")).toBeInTheDocument();
+    expect(teamA.map((player) => player.id)).toEqual(["player-z", "player-a", "guest"]);
+  });
 });
