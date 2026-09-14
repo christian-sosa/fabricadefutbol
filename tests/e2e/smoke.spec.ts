@@ -11,8 +11,10 @@ test.describe.configure({ mode: "serial" });
 
 async function followPublicNav(page: Page, label: string) {
   const link = page.getByRole("link", { name: label, exact: true }).filter({visible: true}).first();
-  if (!await link.isVisible()) {
-    const menu = page.getByRole("button", {name: "Abrir menu", exact: true});
+  const menu = page.getByRole("button", {name: "Abrir menu", exact: true}).filter({visible: true});
+  // Streaming may resolve the URL before the header is ready on a cold CI server.
+  await expect(link.or(menu).first()).toBeVisible();
+  if (await menu.isVisible() && !await link.isVisible()) {
     await expect(menu).toBeVisible();
     await menu.click();
     await expect(page.getByRole("button", {name: "Cerrar menu", exact: true})).toHaveAttribute("aria-expanded", "true");
