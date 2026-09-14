@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Request } from "@playwright/test";
 
 import { E2E_ORGANIZATION_ID, E2E_PLAYER_IDS } from "./test-data";
 import { getCurrentMatchDateInput } from "../../src/lib/match-datetime";
@@ -54,8 +54,14 @@ async function standingsFor(page: Page) {
 }
 const points = (standings: Standing[]) => Object.fromEntries(standings.map((row) => [row.playerId, row.currentRating]));
 
-test("login, resultado, reintento, edicion concurrente y correccion historica conservan los puntos", async ({ page, context }) => {
+async function expectNoHorizontalOverflow(page: Page) {
+  const documentSize = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+  expect(documentSize.width).toBeLessThanOrEqual(documentSize.viewport + 1);
+}
+
+test("login, resultado, reintento, edicion concurrente y correccion historica conservan los puntos", async ({ page, context }, testInfo) => {
   test.setTimeout(180_000);
+  const originalViewport = page.viewportSize()!;
   await page.goto(`/admin/login?next=${encodeURIComponent(`/admin?org=${ORG_SLUG}`)}`);
 
   const loginForm = page.locator("form").filter({
@@ -68,20 +74,57 @@ test("login, resultado, reintento, edicion concurrente y correccion historica co
   await expectGroupPath(page, "/admin");
   await expect(page.getByRole("heading", { name: "Dejá tu grupo listo para jugar" })).toBeVisible();
 
+  // This is the accredited disposable fixture; exercise real saved names without altering points.
+  const longPlayerName = "E2E Jugador con nombre largo para una pantalla chica";
+  await page.goto(`/admin/players?org=${ORG_SLUG}`);
+  await page.locator(`input[name="organizationId"][value="${E2E_ORGANIZATION_ID}"]`).first().waitFor({ state: "attached" });
+  await page.locator(`#player-${E2E_PLAYER_IDS[9]} input[name="fullName"]`).fill(longPlayerName);
+  await page.getByRole("button", { name: "Guardar toda la planilla", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Se guardaron todos los cambios de la planilla." })).toBeVisible();
+
+  await page.setViewportSize({ width: 320, height: originalViewport.height });
   await page.goto(`/admin/matches/new?org=${ORG_SLUG}`);
 
   await page.locator('input[name="scheduledDate"]').fill(getCurrentMatchDateInput());
   await page.locator('input[name="scheduledTime"]').fill("20:00");
   await page.locator('select[name="modality"]').selectOption("5v5");
 
-  for (const playerId of E2E_PLAYER_IDS) {
+  const createMatch = page.getByRole("button", { name: "Crear partido y generar equipos", exact: true });
+  for (const playerId of E2E_PLAYER_IDS.slice(0, 9)) {
     await page.locator(`input[name="playerIds"][value="${playerId}"]`).check();
   }
+  await expect(createMatch).toBeDisabled();
+  await expect(page.getByRole("status")).toContainText("Falta 1 convocado");
+  await page.locator(`input[name="playerIds"][value="${E2E_PLAYER_IDS[9]}"]`).check();
+  await expect(createMatch).toBeEnabled();
+
+  const longName = page.getByText(longPlayerName, { exact: true });
+  await expect(longName).toBeVisible();
+  await longName.scrollIntoViewIfNeeded();
+  const nameBounds = await longName.boundingBox();
+  const playsBounds = await page.getByRole("checkbox", { name: `Juega ${longPlayerName}`, exact: true }).boundingBox();
+  expect(nameBounds).not.toBeNull();
+  expect(playsBounds).not.toBeNull();
+  expect(nameBounds!.x).toBeGreaterThanOrEqual(0);
+  expect(nameBounds!.x + nameBounds!.width).toBeLessThanOrEqual(320);
+  expect(playsBounds!.y).toBeGreaterThanOrEqual(nameBounds!.y + nameBounds!.height);
+  expect(await longName.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  const avatarBounds = await page.getByRole("img", {name: `Avatar de ${longPlayerName}`, exact: true}).boundingBox();
+  expect(avatarBounds).not.toBeNull();
+  expect(Math.abs(avatarBounds!.width - avatarBounds!.height)).toBeLessThanOrEqual(1);
+  await expectNoHorizontalOverflow(page);
+  const rosterScreenshot = testInfo.outputPath("new-match-320px.png");
+  await page.screenshot({ path: rosterScreenshot, animations: "disabled" });
+  await testInfo.attach("new-match-320px", { path: rosterScreenshot, contentType: "image/png" });
 
   await page.locator(`input[name="goalkeeperPlayerIds"][value="${E2E_PLAYER_IDS[0]}"]`).check();
+  await expect(createMatch).toBeDisabled();
+  await expect(page.getByRole("status")).toContainText("Elegiste un arquero");
   await page.locator(`input[name="goalkeeperPlayerIds"][value="${E2E_PLAYER_IDS[5]}"]`).check();
+  await expect(createMatch).toBeEnabled();
 
-  await page.getByRole("button", { name: "Crear partido y generar equipos" }).click();
+  await createMatch.click();
+  await page.setViewportSize(originalViewport);
   await expect(page).toHaveURL((url) => /^\/admin\/matches\/[0-9a-f-]{36}$/.test(url.pathname));
   await expect(page.getByText("Opciones de equipos")).toBeVisible();
 
@@ -94,14 +137,52 @@ test("login, resultado, reintento, edicion concurrente y correccion historica co
 
   await page.goto(`/admin/matches/${matchId}/result?org=${ORG_SLUG}`);
   await expect(page.getByText(/Cargar resultado|Corregir resultado/)).toBeVisible();
+  await page.setViewportSize({ width: 768, height: 1024 });
 
   await page.locator('input[name="scoreA"]').fill("3");
   await page.locator('input[name="scoreB"]').fill("2");
+  const initialNotes = "Acta E2E: verificar el invitado antes de guardar.";
+  await page.getByRole("textbox", { name: "Notas opcionales", exact: true }).fill(initialNotes);
   await page.getByLabel("MVP del partido").selectOption(`player:${E2E_PLAYER_IDS[0]}`);
   await expect(page.getByText(/La figura es opcional y no suma puntos/)).toBeVisible();
+
+  const resultEndpoint = `/api/admin/organizations/${E2E_ORGANIZATION_ID}/matches/${matchId}/result`;
+  const resultForm = page.locator("form").filter({ has: page.locator('input[name="scoreA"]') });
+  let resultRequests = 0;
+  const countResultRequest = (request: Request) => {
+    if (new URL(request.url()).pathname === resultEndpoint && request.method() === "PATCH") resultRequests += 1;
+  };
+  page.on("request", countResultRequest);
+  const guestsSummary = page.locator("summary").filter({ hasText: "Invitados y reemplazos" });
+  await guestsSummary.click();
+  await page.getByRole("button", { name: "Agregar invitado", exact: true }).click();
+  await page.getByRole("textbox", { name: "Nombre del invitado de reemplazo 1", exact: true }).fill("Refuerzo pendiente");
+  await guestsSummary.click();
+  await page.getByRole("button", { name: /Guardar resultado y finalizar|Guardar correccion/ }).click();
+
+  await expect(resultForm.getByRole("alert")).toContainText("Completá el nombre y el nivel del invitado 1");
+  const guestLevel = page.getByRole("combobox", { name: "Nivel de Refuerzo pendiente", exact: true });
+  await expect(guestLevel).toBeVisible();
+  await expect(guestLevel).toBeFocused();
+  await expect(guestLevel).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator('input[name="scoreA"]')).toHaveValue("3");
+  await expect(page.locator('input[name="scoreB"]')).toHaveValue("2");
+  await expect(page.getByRole("textbox", { name: "Notas opcionales", exact: true })).toHaveValue(initialNotes);
+  expect(resultRequests).toBe(0);
+  await expectNoHorizontalOverflow(page);
+  const resultScreenshot = testInfo.outputPath("result-guests-768px.png");
+  await page.screenshot({ path: resultScreenshot, animations: "disabled" });
+  await testInfo.attach("result-guests-768px", { path: resultScreenshot, contentType: "image/png" });
+  await guestLevel.selectOption("3");
+  await expect(resultForm.getByRole("alert")).toHaveCount(0);
+  expect(resultRequests).toBe(0);
+  await page.getByRole("button", { name: "Quitar", exact: true }).click();
   await page.getByRole("button", { name: /Guardar resultado y finalizar|Guardar correccion/ }).click();
 
   await expect(page.getByText(/Resultado guardado\./)).toBeVisible();
+  expect(resultRequests).toBe(1);
+  page.off("request", countResultRequest);
+  await page.setViewportSize(originalViewport);
 
   await page.goto(`/matches/${matchId}?org=${ORG_SLUG}`);
   await expect(page.getByText("3 - 2")).toBeVisible();

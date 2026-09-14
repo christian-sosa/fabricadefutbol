@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -7,6 +7,7 @@ vi.mock("@/app/admin/(panel)/form-actions", () => ({
 }));
 
 import { NewMatchForm } from "@/components/admin/new-match-form";
+import { createMatchFormAction } from "@/app/admin/(panel)/form-actions";
 
 const DEFAULT_SCHEDULED_DATE = "2026-05-05";
 
@@ -34,6 +35,58 @@ function getCheckbox(container: HTMLElement, name: string, value: string) {
 }
 
 describe("NewMatchForm", () => {
+  it("habilita la generación automática sólo con la cantidad exacta y cero o dos arqueros", async () => {
+    const user = userEvent.setup();
+    const players = buildPlayers(11);
+    render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={players}
+      initialValues={{ modality: "5v5", playerIds: players.slice(0, 9).map((player) => player.id), goalkeeperPlayerIds: [], guests: [] }} />);
+    const submit = screen.getByRole("button", { name: "Crear partido y generar equipos" });
+
+    expect(submit).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Falta 1 convocado");
+    await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 10" }));
+    expect(submit).toBeEnabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Convocatoria completa: 10 de 10");
+
+    await user.click(screen.getByRole("checkbox", { name: "Arquero Jugador 1" }));
+    expect(submit).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Elegiste un arquero");
+    await user.click(screen.getByRole("checkbox", { name: "Arquero Jugador 2" }));
+    expect(submit).toBeEnabled();
+
+    await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 11" }));
+    expect(submit).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Sobra 1 convocado");
+  });
+
+  it("conserva el invitado incompleto, enfoca el nivel y permite corregirlo antes de crear", async () => {
+    const user = userEvent.setup();
+    const createAction = vi.mocked(createMatchFormAction);
+    createAction.mockClear();
+    const players = buildPlayers(10);
+    render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={players}
+      initialValues={{ modality: "5v5", scheduledTime: "21:00", playerIds: players.map((player) => player.id), goalkeeperPlayerIds: [], guests: [] }} />);
+
+    await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
+    await user.type(screen.getByRole("textbox", { name: "Nombre del invitado 1" }), "Refuerzo");
+    await user.click(screen.getByRole("button", { name: "Crear partido y generar equipos" }));
+
+    expect(createAction).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent("Completá el nombre y el nivel del invitado 1");
+    expect(screen.getByRole("combobox", { name: "Nivel de Refuerzo" })).toHaveFocus();
+    expect(screen.getByRole("combobox", { name: "Nivel de Refuerzo" })).toHaveAttribute("aria-invalid", "true");
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Nivel de Refuerzo" }), "2");
+    await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 10" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Crear partido y generar equipos" }));
+    await waitFor(() => expect(createAction).toHaveBeenCalledOnce());
+    const formData = createAction.mock.calls[0][0];
+    expect(formData.getAll("guestNames")).toEqual(["Refuerzo"]);
+    expect(formData.getAll("guestRatings")).toEqual(["2"]);
+    expect(formData.getAll("playerIds")).toHaveLength(9);
+  });
+
   it("distingue convocar de marcar arquero con etiquetas propias", async () => {
     const user = userEvent.setup();
     render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={buildPlayers(10)} />);

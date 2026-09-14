@@ -3,6 +3,7 @@ import { SeasonFilterLinks } from "@/components/groups/season-filter-links";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { MatchesHistoryQueryTable } from "@/components/matches/matches-history-query-table";
+import { parseMatchHistoryPage, parseMatchHistorySeason } from "@/lib/match-history-navigation";
 import {
   getMatchHistoryCardsPage,
   getOrganizationSeasons,
@@ -13,17 +14,18 @@ import {
 export default async function MatchesPage({
   searchParams
 }: {
-  searchParams: Promise<{ org?: string; season?: string }>;
+  searchParams: Promise<{ org?: string; season?: string; page?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const selectedSeason = resolvedSearchParams.season ?? "current";
+  const selectedSeason = parseMatchHistorySeason(resolvedSearchParams.season);
+  const selectedPage = parseMatchHistoryPage(resolvedSearchParams.page);
   const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
     resolvePublicOrganization(resolvedSearchParams.org),
     getViewerAdminOrganizations()
   ]);
   const [initialMatchesData, seasons] = await Promise.all([
     getMatchHistoryCardsPage(selectedOrganization?.id ?? null, {
-      page: 1,
+      page: selectedPage,
       pageSize: 10,
       season: selectedSeason
     }),
@@ -68,7 +70,7 @@ export default async function MatchesPage({
 
       <MatchesHistoryQueryTable
         initialData={initialMatchesData}
-        initialPage={1}
+        initialPage={selectedPage}
         organizationId={selectedOrganization?.id ?? null}
         organizationSlug={selectedOrganization?.slug}
         pageSize={10}

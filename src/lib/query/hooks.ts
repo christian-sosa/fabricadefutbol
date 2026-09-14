@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchOrganizationMatches, fetchOrganizationStandings, updateMatchResult } from "@/lib/query/client";
 import { organizationQueryKeys } from "@/lib/query/keys";
@@ -23,9 +23,9 @@ export function useOrganizationStandingsQuery(params: {
     enabled: Boolean(organizationId),
     initialData: params.initialData,
     staleTime: ORGANIZATION_QUERY_STALE_TIME,
-    refetchOnReconnect: false,
-    refetchOnWindowFocus: false,
-    placeholderData: keepPreviousData
+    refetchOnMount: true,
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: false
   });
 }
 
@@ -55,9 +55,16 @@ export function useOrganizationMatchesQuery(params: {
     enabled: Boolean(organizationId),
     initialData: params.initialData,
     staleTime: ORGANIZATION_QUERY_STALE_TIME,
-    refetchOnReconnect: false,
+    refetchOnMount: true,
+    refetchOnReconnect: true,
     refetchOnWindowFocus: false,
-    placeholderData: keepPreviousData
+    placeholderData: (previousData, previousQuery) => {
+      const previousKey = previousQuery?.queryKey;
+      const previousScope = previousKey?.[3] as { pageSize?: number; season?: string } | undefined;
+      return previousKey?.[1] === organizationId && previousScope?.season === season && previousScope.pageSize === pageSize
+        ? previousData
+        : undefined;
+    }
   });
 }
 

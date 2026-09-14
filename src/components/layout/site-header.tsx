@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -91,6 +91,10 @@ export function SiteHeader({
   const [mounted, setMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(initialIsAuthenticated);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
+  const signOutInFlight = useRef(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const [currentOrganizationName, setCurrentOrganizationName] = useState<string | null>(null);
 
   const publicModule = "organizations";
@@ -149,6 +153,18 @@ export function SiteHeader({
   }, [safePathname, searchKey]);
 
   useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setIsMobileMenuOpen(false);
+      menuToggleRef.current?.focus();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [isMobileMenuOpen]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function resolveOrganizationName() {
@@ -202,12 +218,24 @@ export function SiteHeader({
   }, [organizationKey]);
 
   const handleSignOut = async () => {
-    const supabase = tryCreateSupabaseBrowserClient();
-    if (supabase) {
-      await supabase.auth.signOut();
+    if (signOutInFlight.current) return;
+    signOutInFlight.current = true;
+    setIsSigningOut(true);
+    setSignOutError(null);
+    try {
+      const supabase = tryCreateSupabaseBrowserClient();
+      if (!supabase) throw new Error("Cliente de sesión no disponible");
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setIsAuthenticated(false);
+      setIsMobileMenuOpen(false);
+      router.refresh();
+    } catch {
+      setSignOutError("No pudimos cerrar la sesión. Revisá tu conexión y volvé a intentar.");
+    } finally {
+      signOutInFlight.current = false;
+      setIsSigningOut(false);
     }
-    setIsAuthenticated(false);
-    router.refresh();
   };
 
   const renderAuthControls = (compact = false) =>
@@ -215,7 +243,7 @@ export function SiteHeader({
       <div className={cn("flex flex-wrap items-center gap-2", compact ? "w-full" : "")}>
         <Link
           className={cn(
-            "rounded-xl border border-emerald-400/40 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/10 md:text-sm",
+            "inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-400/40 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/10 md:text-sm",
             compact ? "flex-1 text-center" : ""
           )}
           href={withPublicQuery("/admin", {
@@ -226,20 +254,21 @@ export function SiteHeader({
         </Link>
         <button
           className={cn(
-            "rounded-xl border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-slate-500 hover:bg-slate-900 md:text-sm",
+            "min-h-11 rounded-xl border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-slate-500 hover:bg-slate-900 disabled:cursor-wait disabled:opacity-60 md:text-sm",
             compact ? "flex-1" : ""
           )}
           onClick={handleSignOut}
+          disabled={isSigningOut}
           type="button"
         >
-          Salir
+          {isSigningOut ? "Cerrando sesión..." : "Salir"}
         </button>
       </div>
     ) : (
       <Link
         className={cn(
-          "rounded-xl border border-emerald-400/40 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/10 md:text-sm",
-          compact ? "block w-full text-center" : ""
+          "inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-400/40 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/10 md:text-sm",
+          compact ? "w-full text-center" : ""
         )}
         href={withPublicQuery("/admin/login", {
           organizationKey
@@ -250,7 +279,7 @@ export function SiteHeader({
     );
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/90 backdrop-blur">
+    <header className="sticky top-0 z-30 max-h-[100dvh] overflow-y-auto overscroll-contain border-b border-slate-800 bg-slate-950/90 backdrop-blur lg:max-h-none lg:overflow-visible">
       <div className="mx-auto max-w-6xl px-4 py-3">
         <div className="flex items-center justify-between gap-4">
           <Link className="flex min-w-0 items-center gap-3" href="/">
@@ -269,7 +298,7 @@ export function SiteHeader({
           </Link>
 
           <div className="hidden min-w-0 flex-1 items-center justify-center px-4 lg:flex">
-            <nav className="flex min-w-0 items-center gap-1 xl:gap-2">
+            <nav aria-label="Navegación principal" className="flex min-w-0 items-center gap-1 xl:gap-2">
               {primaryNavItems.map((item) => {
                 const active =
                   mounted &&
@@ -286,8 +315,9 @@ export function SiteHeader({
 
                 return (
                   <Link
+                    aria-current={active ? "page" : undefined}
                     className={cn(
-                      "whitespace-nowrap rounded-xl border px-3 py-2 text-sm font-semibold transition",
+                      "inline-flex min-h-11 items-center whitespace-nowrap rounded-xl border px-3 py-2 text-sm font-semibold transition",
                       active
                         ? "border-emerald-400/50 bg-accent text-white shadow-[0_10px_20px_-14px_rgba(16,185,129,1)]"
                         : "border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-900"
@@ -310,6 +340,7 @@ export function SiteHeader({
             aria-label={isMobileMenuOpen ? "Cerrar menu" : "Abrir menu"}
             className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-700 text-slate-200 transition hover:border-slate-500 hover:bg-slate-900 lg:hidden"
             onClick={() => setIsMobileMenuOpen((current) => !current)}
+            ref={menuToggleRef}
             type="button"
           >
             <MenuToggleIcon open={isMobileMenuOpen} />
@@ -341,10 +372,15 @@ export function SiteHeader({
           <div
             className="mt-3 space-y-4 rounded-2xl border border-slate-800 bg-slate-950/95 p-4 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.9)] lg:hidden"
             id="site-mobile-menu"
+            onClick={(event) => {
+              if (event.target instanceof Element && event.target.closest("a[href]")) {
+                setIsMobileMenuOpen(false);
+              }
+            }}
           >
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Navegacion</p>
-              <nav className="grid gap-2">
+              <nav aria-label="Navegación principal móvil" className="grid gap-2">
                 {primaryNavItems.map((item) => {
                   const active =
                     mounted &&
@@ -361,6 +397,7 @@ export function SiteHeader({
 
                   return (
                     <Link
+                      aria-current={active ? "page" : undefined}
                       className={cn(
                         "rounded-xl border px-3 py-3 text-sm font-semibold transition",
                         active
@@ -401,6 +438,11 @@ export function SiteHeader({
               {renderAuthControls(true)}
             </div>
           </div>
+        ) : null}
+        {signOutError ? (
+          <p className="mt-3 rounded-lg border border-amber-500/40 bg-slate-950 px-3 py-2 text-sm text-amber-200" role="alert">
+            {signOutError}
+          </p>
         ) : null}
       </div>
     </header>

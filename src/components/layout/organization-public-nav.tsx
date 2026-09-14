@@ -34,7 +34,7 @@ export function OrganizationPublicNav({
           <Link
             aria-current={active ? "page" : undefined}
             className={cn(
-              "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+              "inline-flex min-h-11 items-center justify-center rounded-full border px-3 py-1.5 text-xs font-semibold transition",
               active
                 ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
                 : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800",

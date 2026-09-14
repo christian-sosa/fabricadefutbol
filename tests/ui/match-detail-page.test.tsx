@@ -64,7 +64,7 @@ describe("MatchDetailPage", () => {
 
     const page = await MatchDetailPage({
       params: Promise.resolve({ id: "match-1" }),
-      searchParams: Promise.resolve({ org: "grupo-a" })
+      searchParams: Promise.resolve({ org: "grupo-a", season: "all", page: "2" })
     });
 
     render(page);
@@ -73,5 +73,6 @@ describe("MatchDetailPage", () => {
     expect(screen.getByText("Beto")).toBeInTheDocument();
     expect(screen.queryByText("1234")).not.toBeInTheDocument();
     expect(screen.queryByText("987")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Volver al historial" })).toHaveAttribute("href", "/matches?org=grupo-a&season=all&page=2");
   });
 });

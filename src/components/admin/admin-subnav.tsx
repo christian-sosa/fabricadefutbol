@@ -62,11 +62,12 @@ export function AdminSubnav() {
   return (
     <section className="rounded-2xl border border-slate-800 bg-slate-950/75 px-4 py-3">
       <div className="space-y-3">
-        <nav className="flex flex-nowrap gap-2 overflow-x-auto pb-1">
+        <nav aria-label="Administración del grupo" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           {items.map((item) => (
             <Link
+              aria-current={item.active ? "page" : undefined}
               className={cn(
-                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition md:text-sm",
+                "inline-flex min-h-11 items-center justify-center rounded-full border px-3 py-1.5 text-xs font-semibold transition md:text-sm",
                 item.active
                   ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
                   : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
