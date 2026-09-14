@@ -230,6 +230,8 @@ export type Database = {
           finished_at: string | null;
           goalkeeper_player_ids: string[];
           result_version: number;
+          formation_data: Json | null;
+          formation_version: number;
           lineup_snapshot: Json;
           id: string;
           location: string | null;
@@ -249,6 +251,8 @@ export type Database = {
           finished_at?: string | null;
           goalkeeper_player_ids?: string[];
           result_version?: number;
+          formation_data?: Json | null;
+          formation_version?: number;
           lineup_snapshot?: Json;
           id?: string;
           location?: string | null;
@@ -268,6 +272,8 @@ export type Database = {
           finished_at?: string | null;
           goalkeeper_player_ids?: string[];
           result_version?: number;
+          formation_data?: Json | null;
+          formation_version?: number;
           lineup_snapshot?: Json;
           id?: string;
           location?: string | null;
@@ -591,6 +597,10 @@ export type Database = {
       consume_shared_rate_limit: { Args: { p_key_hash: string; p_limit: number; p_window_ms: number }; Returns: Json };
       replace_group_match_options: {
         Args: { p_match_id: string; p_organization_id: string; p_expected_version: number; p_options: Json };
+        Returns: Json;
+      };
+      save_group_match_formation: {
+        Args: { p_match_id: string; p_organization_id: string; p_expected_version: number; p_formation: Json | null };
         Returns: Json;
       };
       save_group_match_result: {

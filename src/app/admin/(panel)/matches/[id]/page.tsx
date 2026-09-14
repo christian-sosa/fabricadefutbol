@@ -11,7 +11,10 @@ import {
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { MatchDateTimeFields } from "@/components/admin/match-date-time-fields";
 import { MatchTeamLabelsShareForm } from "@/components/admin/match-team-labels-share-form";
-import { TeamOptionCard } from "@/components/matches/team-option-card";
+import { TeamOptionsList } from "@/components/matches/team-options-list";
+import { MatchFormationEditor } from "@/components/admin/match-formation-editor";
+import { saveMatchFormationAction } from "@/app/admin/(panel)/matches/[id]/formation-actions";
+import { readMatchFormation, supportsMatchFormation, toFormationPlayers } from "@/lib/domain/match-formation";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -54,6 +57,11 @@ export default async function AdminMatchDetailPage({
   const resultHref = withOrgQuery(`/admin/matches/${id}/result`, selectedOrganization.slug);
   const teamLabels = resolveMatchTeamLabels(details.match);
   const canManageResult = details.match.status === "confirmed" || details.match.status === "finished";
+  const formationTeams = confirmedOption ? {
+    teamA: toFormationPlayers(confirmedOption.teamA, details.match.goalkeeper_player_ids),
+    teamB: toFormationPlayers(confirmedOption.teamB, details.match.goalkeeper_player_ids)
+  } : null;
+  const savedFormation = formationTeams ? readMatchFormation(details.match.formation_data, details.match.modality, formationTeams) : null;
 
   return (
     <div className="space-y-4">
@@ -63,6 +71,18 @@ export default async function AdminMatchDetailPage({
         <p className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-danger">
           {resolvedSearchParams.error}
         </p>
+      ) : null}
+
+      {formationTeams && details.match.status === "confirmed" && supportsMatchFormation(details.match.modality) ? (
+        <MatchFormationEditor
+          action={saveMatchFormationAction.bind(null, id, selectedOrganization.id)}
+          initialFormation={savedFormation}
+          initialVersion={details.match.formation_version ?? 0}
+          key={`${id}:${confirmedOption?.id}:${details.match.result_version}`}
+          modality={details.match.modality}
+          teamLabels={teamLabels}
+          teams={formationTeams}
+        />
       ) : null}
 
       <Card>
@@ -146,25 +166,11 @@ export default async function AdminMatchDetailPage({
             </form>
           ) : null}
         </div>
-        <div className="space-y-3">
-          {visibleOptions.map((option) => (
-            <TeamOptionCard
-              confirmAction={details.match.status === "draft" ? confirmAction : undefined}
-              isConfirmed={option.is_confirmed}
-              key={option.id}
-              optionId={option.id}
-              optionNumber={option.option_number}
-              ratingDiff={Number(option.rating_diff)}
-              ratingSumA={Number(option.rating_sum_a)}
-              ratingSumB={Number(option.rating_sum_b)}
-              teamALabel={teamLabels.teamA}
-              teamBLabel={teamLabels.teamB}
-              teamA={option.teamA}
-              teamB={option.teamB}
-            />
-          ))}
-          {!visibleOptions.length ? <p className="text-sm text-slate-400">No hay opciones generadas para este partido.</p> : null}
-        </div>
+        <TeamOptionsList confirmAction={details.match.status === "draft" ? confirmAction : undefined} options={visibleOptions.map((option) => ({
+          isConfirmed: option.is_confirmed, optionId: option.id, optionNumber: option.option_number,
+          ratingDiff: Number(option.rating_diff), ratingSumA: Number(option.rating_sum_a), ratingSumB: Number(option.rating_sum_b),
+          teamALabel: teamLabels.teamA, teamBLabel: teamLabels.teamB, teamA: option.teamA, teamB: option.teamB
+        }))} />
       </Card>
 
       {canDeleteMatch ? (

@@ -21,7 +21,7 @@ type OptionPlayer = {
   is_guest?: boolean;
 };
 
-type TeamOptionCardProps = {
+export type TeamOptionCardProps = {
   optionId: string;
   optionNumber: number;
   teamA: OptionPlayer[];
@@ -32,6 +32,7 @@ type TeamOptionCardProps = {
   teamALabel?: string;
   teamBLabel?: string;
   isConfirmed: boolean;
+  hideLevels?: boolean;
   confirmAction?: (formData: FormData) => void;
 };
 
@@ -98,8 +99,9 @@ function getSortLevel(player: OptionPlayer) {
   return Number.isFinite(level) ? level : Number.MAX_SAFE_INTEGER;
 }
 
-function sortTeamPlayers(players: OptionPlayer[]) {
+function sortTeamPlayers(players: OptionPlayer[], hideLevels: boolean) {
   return [...players].sort((a, b) => {
+    if (hideLevels) return a.full_name.localeCompare(b.full_name, "es");
     const levelDiff = getSortLevel(a) - getSortLevel(b);
     if (levelDiff !== 0) return levelDiff;
     const ratingDiff = Number(b.current_rating) - Number(a.current_rating);
@@ -114,7 +116,7 @@ function getLevelLabel(player: OptionPlayer) {
   return player.is_guest ? formatGuestSkillLevelLabel(level) : formatSkillLevelLabel(level);
 }
 
-function PlayerRow({ player }: { player: OptionPlayer }) {
+function PlayerRow({ player, hideLevels }: { player: OptionPlayer; hideLevels: boolean }) {
   const levelLabel = getLevelLabel(player);
   const ratingTrendLabel = formatRatingTrendLabel(player.current_rating);
   const shouldShowRatingTrend = !player.is_guest && ratingTrendLabel !== "Parejo";
@@ -125,32 +127,34 @@ function PlayerRow({ player }: { player: OptionPlayer }) {
         <PlayerAvatar hasPhoto={Boolean(player.photo_path)} name={player.full_name} photoUpdatedAt={player.photo_updated_at} playerId={player.is_guest ? undefined : player.id} size="sm" />
         <span className="min-w-0">
           <span className="flex flex-wrap items-center gap-1.5">
-            <span className="truncate font-semibold text-slate-100">{player.full_name}</span>
+            <span className="min-w-0 break-words font-semibold text-slate-100 [overflow-wrap:anywhere]">{player.full_name}</span>
             {player.is_guest ? (
               <span className="rounded-full border border-cyan-400/50 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
                 Invitado
               </span>
             ) : null}
           </span>
-          <span className="mt-1 flex flex-wrap gap-1.5">
-            {levelLabel ? (
-              <span className="rounded border border-slate-700 bg-slate-950 px-2 py-0.5 text-[11px] font-semibold text-slate-300">
-                {levelLabel}
-              </span>
-            ) : null}
-            {shouldShowRatingTrend ? (
-              <span
-                className={cn(
-                  "rounded border px-2 py-0.5 text-[11px] font-semibold",
-                  ratingTrendLabel === "Viene bien"
-                    ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
-                    : "border-amber-400/40 bg-amber-500/10 text-amber-200"
-                )}
-              >
-                {formatRatingTrendBadgeLabel(player.current_rating)}
-              </span>
-            ) : null}
-          </span>
+          {!hideLevels ? (
+            <span className="mt-1 flex flex-wrap gap-1.5">
+              {levelLabel ? (
+                <span className="rounded border border-slate-700 bg-slate-950 px-2 py-0.5 text-[11px] font-semibold text-slate-300">
+                  {levelLabel}
+                </span>
+              ) : null}
+              {shouldShowRatingTrend ? (
+                <span
+                  className={cn(
+                    "rounded border px-2 py-0.5 text-[11px] font-semibold",
+                    ratingTrendLabel === "Viene bien"
+                      ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+                      : "border-amber-400/40 bg-amber-500/10 text-amber-200"
+                  )}
+                >
+                  {formatRatingTrendBadgeLabel(player.current_rating)}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
         </span>
       </span>
     </li>
@@ -168,10 +172,11 @@ export function TeamOptionCard({
   teamALabel = DEFAULT_TEAM_A_LABEL,
   teamBLabel = DEFAULT_TEAM_B_LABEL,
   isConfirmed,
+  hideLevels = false,
   confirmAction
 }: TeamOptionCardProps) {
-  const sortedTeamA = sortTeamPlayers(teamA);
-  const sortedTeamB = sortTeamPlayers(teamB);
+  const sortedTeamA = sortTeamPlayers(teamA, hideLevels);
+  const sortedTeamB = sortTeamPlayers(teamB, hideLevels);
   const teamALabelInputId = `teamALabel-${optionId}`;
   const teamBLabelInputId = `teamBLabel-${optionId}`;
   const balanceSummary = buildBalanceSummary({
@@ -188,17 +193,19 @@ export function TeamOptionCard({
       <div className="mb-3 flex items-start justify-between gap-4">
         <div>
           <CardTitle>Opcion {optionNumber}</CardTitle>
-          <CardDescription className="mt-2 flex flex-wrap items-center gap-2">
-            <span
-              className={cn(
-                "rounded-full border px-2.5 py-1 text-xs font-semibold",
-                balanceToneClassName[balanceSummary.tone]
-              )}
-            >
-              {balanceSummary.label}
-            </span>
-            <span className="text-slate-300">{balanceSummary.detail}</span>
-          </CardDescription>
+          {!hideLevels ? (
+            <CardDescription className="mt-2 flex flex-wrap items-center gap-2">
+              <span
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-xs font-semibold",
+                  balanceToneClassName[balanceSummary.tone]
+                )}
+              >
+                {balanceSummary.label}
+              </span>
+              <span className="text-slate-300">{balanceSummary.detail}</span>
+            </CardDescription>
+          ) : null}
         </div>
         {isConfirmed ? (
           <span className="rounded-full border border-emerald-400/50 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">
@@ -212,7 +219,7 @@ export function TeamOptionCard({
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{teamALabel}</p>
           <ul className="space-y-2 text-sm text-slate-200">
             {sortedTeamA.map((player) => (
-              <PlayerRow key={player.id} player={player} />
+              <PlayerRow hideLevels={hideLevels} key={player.id} player={player} />
             ))}
           </ul>
         </div>
@@ -220,7 +227,7 @@ export function TeamOptionCard({
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{teamBLabel}</p>
           <ul className="space-y-2 text-sm text-slate-200">
             {sortedTeamB.map((player) => (
-              <PlayerRow key={player.id} player={player} />
+              <PlayerRow hideLevels={hideLevels} key={player.id} player={player} />
             ))}
           </ul>
         </div>
