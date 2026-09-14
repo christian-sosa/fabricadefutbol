@@ -209,6 +209,7 @@ export const GUIDES: Guide[] = [
       {
         title: "No lo uses para castigar",
         body: [
+          "En Fábrica de Fútbol, el MVP es opcional y no suma puntos. Se cuenta por temporada; cuando dos jugadores tienen los mismos puntos de rendimiento, queda primero quien tiene más MVP en ese período.",
           "El MVP funciona mejor como memoria positiva que como herramienta para señalar errores ajenos.",
           "Si el partido fue muy desparejo, podés dejarlo sin MVP o elegir una mención de esfuerzo. Forzar una figura no siempre agrega valor."
         ]

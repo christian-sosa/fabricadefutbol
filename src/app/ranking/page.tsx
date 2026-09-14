@@ -43,6 +43,9 @@ export default async function RankingPage({
           <p className="max-w-3xl text-sm text-slate-300 md:text-base">
             Puesto actual, rendimiento, forma reciente y estadísticas de cada jugador en una sola vista.
           </p>
+          <p className="max-w-3xl text-sm text-slate-400">
+            Primero se ordena por puntos de rendimiento; a igualdad de puntos, por más MVP en el período elegido. La figura del partido no suma puntos.
+          </p>
         </div>
 
         <OrganizationSwitcher

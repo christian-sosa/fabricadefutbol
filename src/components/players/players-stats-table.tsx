@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { PlayerPhotoModalTrigger } from "@/components/ui/player-photo-modal-trigger";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { cn, formatPercent, formatRendimiento } from "@/lib/utils";
+import { comparePlayerRanking } from "@/lib/domain/player-ranking";
 
 type PlayerStatsRow = {
   playerId: string;
@@ -17,6 +18,8 @@ type PlayerStatsRow = {
   draws: number;
   losses: number;
   winRate: number;
+  mvpCount?: number;
+  currentRank?: number;
 };
 
 type SortKey = "rating" | "pj" | "pg" | "pe" | "pp" | "winRate";
@@ -59,11 +62,7 @@ export function PlayersStatsTable({ players }: { players: PlayerStatsRow[] }) {
       const rawDiff = aValue - bValue;
       if (rawDiff !== 0) return sortDirection === "asc" ? rawDiff : -rawDiff;
 
-      const ratingDiff = b.currentRating - a.currentRating;
-      if (ratingDiff !== 0) return ratingDiff;
-      const matchesDiff = b.matchesPlayed - a.matchesPlayed;
-      if (matchesDiff !== 0) return matchesDiff;
-      return a.playerName.localeCompare(b.playerName);
+      return comparePlayerRanking(a, b);
     });
   }, [players, sortDirection, sortKey]);
 

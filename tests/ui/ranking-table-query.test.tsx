@@ -83,7 +83,9 @@ describe("RankingTableQuery", () => {
     render(<RankingTableQuery initialPlayers={players} organizationId="org-1" />);
 
     expect(getBodyRows()[0]).toHaveTextContent("#1");
-    expect(getBodyRows()[0]).toHaveTextContent("LucasDias");
+    expect(getBodyRows()[0]).toHaveTextContent("GonzaMastro");
+    const mobileLeader = screen.getAllByText("GonzaMastro")[0].closest("article");
+    expect(mobileLeader).toHaveTextContent("#1");
 
     await user.click(within(screen.getByRole("table")).getByRole("button", { name: /PG/ }));
 
@@ -92,7 +94,7 @@ describe("RankingTableQuery", () => {
 
     await user.click(within(screen.getByRole("table")).getByRole("button", { name: /MVP/ }));
 
-    expect(getBodyRows()[0]).toHaveTextContent("#2");
+    expect(getBodyRows()[0]).toHaveTextContent("#1");
     expect(getBodyRows()[0]).toHaveTextContent("GonzaMastro");
     const firstRowCells = within(getBodyRows()[0]).getAllByRole("cell");
     expect(firstRowCells).toHaveLength(9);
@@ -105,8 +107,8 @@ describe("RankingTableQuery", () => {
   it("muestra la forma reciente con letras y colores sin depender de Efectividad", () => {
     render(<RankingTableQuery initialPlayers={players} organizationId="org-1" />);
 
-    const firstRowCells = within(getBodyRows()[0]).getAllByRole("cell");
-    const formCell = firstRowCells.at(-1) as HTMLElement;
+    const lucasRow = getBodyRows().find((row) => row.textContent?.includes("LucasDias")) as HTMLElement;
+    const formCell = within(lucasRow).getAllByRole("cell").at(-1) as HTMLElement;
     const resultBadges = within(formCell).getAllByTitle(/Victoria|Empate|Derrota/);
 
     expect(resultBadges.map((badge) => badge.textContent)).toEqual(["V", "D", "V", "E", "V"]);

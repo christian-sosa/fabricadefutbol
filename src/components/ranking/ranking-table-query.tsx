@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { PlayerPhotoModalTrigger } from "@/components/ui/player-photo-modal-trigger";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { useOrganizationStandingsQuery } from "@/lib/query/hooks";
+import { rankPlayers } from "@/lib/domain/player-ranking";
 import { cn, formatRendimiento } from "@/lib/utils";
 import type { PlayerComputedStats, PlayerRecentResult } from "@/types/domain";
 
@@ -197,7 +198,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
     initialData: initialPlayers
   });
 
-  const players = useMemo(() => data ?? initialPlayers ?? [], [data, initialPlayers]);
+  const players = useMemo(() => rankPlayers(data ?? initialPlayers ?? []), [data, initialPlayers]);
   const [sortKey, setSortKey] = useState<SortKey>("rank");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 

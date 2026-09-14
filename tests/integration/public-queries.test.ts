@@ -253,7 +253,7 @@ describe("resolvePublicOrganization", () => {
           organization_id: ORG_ID,
           full_name: "LucasDias",
           initial_rank: 2,
-          skill_level: 3,
+          skill_level: 1,
           display_order: 2,
           current_rating: 1030,
           active: true
@@ -263,7 +263,7 @@ describe("resolvePublicOrganization", () => {
           organization_id: ORG_ID,
           full_name: "GonzaMastro",
           initial_rank: 1,
-          skill_level: 1,
+          skill_level: 3,
           display_order: 1,
           current_rating: 1030,
           active: true
@@ -290,8 +290,11 @@ describe("resolvePublicOrganization", () => {
           created_by: "admin-1"
         }
       ],
-      team_option_players: [{ team_option_id: "option-1", player_id: "player-lucas", team: "A" }],
-      match_result: [{ match_id: "match-1", score_a: 1, score_b: 0, winner_team: "A", created_by: "admin-1" }]
+      team_option_players: [
+        { team_option_id: "option-1", player_id: "player-lucas", team: "A" },
+        { team_option_id: "option-1", player_id: "player-gonza", team: "B" }
+      ],
+      match_result: [{ match_id: "match-1", score_a: 1, score_b: 0, winner_team: "A", mvp_player_id: "player-gonza", created_by: "admin-1" }]
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
@@ -299,7 +302,7 @@ describe("resolvePublicOrganization", () => {
 
     const summary = await getHomeSummary(ORG_ID);
 
-    expect(summary.topPlayers.map((player) => player.id)).toEqual(["player-lucas", "player-gonza"]);
+    expect(summary.topPlayers.map((player) => player.id)).toEqual(["player-gonza", "player-lucas"]);
   });
 
   it("corrige el top del snapshot usando el orden cacheado de standings", async () => {
@@ -656,7 +659,7 @@ describe("resolvePublicOrganization", () => {
           season_id: "season-current",
           organization_id: ORG_ID,
           player_id: "player-2",
-          current_rating: 1015
+          current_rating: 1000
         }
       ],
       matches: [
@@ -727,6 +730,8 @@ describe("resolvePublicOrganization", () => {
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     const standings = await getPlayersWithStats(ORG_ID, { season: "season-current" });
+    const oldStandings = await getPlayersWithStats(ORG_ID, { season: "season-old" });
+    const allStandings = await getPlayersWithStats(ORG_ID, { season: "all" });
     const history = await getMatchHistoryCardsPage(ORG_ID, { page: 1, pageSize: 10, season: "season-current" });
     const allHistory = await getMatchHistoryCardsPage(ORG_ID, { page: 1, pageSize: 10, season: "all" });
 
@@ -739,9 +744,11 @@ describe("resolvePublicOrganization", () => {
         player.recentResults
       ])
     ).toEqual([
-      ["player-2", 1015, 1, 1, ["V"]],
-      ["player-1", 1000, 0, 1, []]
+      ["player-2", 1000, 1, 1, ["V"]],
+      ["player-1", 1000, 0, 0, []]
     ]);
+    expect(oldStandings.map((player) => [player.playerId, player.mvpCount])).toEqual([["player-1", 1], ["player-2", 0]]);
+    expect(allStandings.map((player) => [player.playerId, player.mvpCount])).toEqual([["player-1", 1], ["player-2", 1]]);
     expect(history.matches.map((match) => match.id)).toEqual(["match-current"]);
     expect(allHistory.matches.map((match) => match.id)).toEqual(["match-current", "match-old"]);
   });

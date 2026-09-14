@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 
-import { E2E_PLAYER_IDS } from "./test-data";
+import { E2E_ORGANIZATION_ID, E2E_PLAYER_IDS } from "./test-data";
 
 const ORG_SLUG = process.env.E2E_ORG_SLUG ?? "e2e-fabrica";
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "e2e-admin@example.com";
@@ -77,6 +77,8 @@ test("login admin, crea partido, carga resultado y lo ve en publico", async ({ p
 
   await page.locator('input[name="scoreA"]').fill("3");
   await page.locator('input[name="scoreB"]').fill("2");
+  await page.getByLabel("MVP del partido").selectOption(`player:${E2E_PLAYER_IDS[0]}`);
+  await expect(page.getByText(/La figura es opcional y no suma puntos/)).toBeVisible();
   await page.getByRole("button", { name: /Guardar resultado y finalizar|Guardar correccion/ }).click();
 
   await expect(page.getByText(/Resultado guardado\./)).toBeVisible();
@@ -84,4 +86,16 @@ test("login admin, crea partido, carga resultado y lo ve en publico", async ({ p
   await page.goto(`/matches/${matchId}?org=${ORG_SLUG}`);
   await expect(page.getByText("3 - 2")).toBeVisible();
   await expect(page.getByText("Ganador: Negro")).toBeVisible();
+  await expect(page.getByText("MVP: E2E Jugador 1", { exact: true })).toBeVisible();
+
+  const response = await page.request.get(`/api/organizations/${E2E_ORGANIZATION_ID}/standings?season=current`);
+  expect(response.ok()).toBe(true);
+  const { standings } = await response.json() as {
+    standings: Array<{ playerId: string; currentRating: number; mvpCount: number }>;
+  };
+  expect(standings).toHaveLength(10);
+  expect(standings.every((player) => [990, 1010].includes(player.currentRating))).toBe(true);
+  const mvp = standings.find((player) => player.playerId === E2E_PLAYER_IDS[0]);
+  expect(mvp?.mvpCount).toBe(1);
+  expect(standings.filter((player) => player.currentRating === mvp?.currentRating)[0]?.playerId).toBe(E2E_PLAYER_IDS[0]);
 });

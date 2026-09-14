@@ -228,6 +228,7 @@ describe("MatchResultEditor", () => {
     );
 
     await user.selectOptions(screen.getByLabelText("MVP del partido"), "player:player-1");
+    expect(screen.getByText(/La figura es opcional y no suma puntos/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Guardar resultado" }));
 
     await waitFor(() => {

@@ -31,6 +31,7 @@ function buildFinishedMatch(params: {
   teamAPlayerIds?: string[];
   teamBPlayerIds?: string[];
   withResult?: boolean;
+  mvpPlayerId?: string;
 }): MatchWithTeams {
   const { id, scheduledAt, winnerTeam, teamAPlayerIds = ["player-a"], teamBPlayerIds = ["player-b"] } = params;
 
@@ -64,7 +65,7 @@ function buildFinishedMatch(params: {
             score_a: winnerTeam === "A" ? 2 : winnerTeam === "DRAW" ? 1 : 0,
             score_b: winnerTeam === "B" ? 2 : winnerTeam === "DRAW" ? 1 : 0,
             winner_team: winnerTeam,
-            mvp_player_id: null,
+            mvp_player_id: params.mvpPlayerId ?? null,
             handicap_team: null,
             mvp_guest_id: null,
             mvp_display_name: null,
@@ -78,6 +79,29 @@ function buildFinishedMatch(params: {
 }
 
 describe("calculatePlayerStats", () => {
+  it("prioriza puntos y después MVP, sin sumar puntos por ser figura", () => {
+    const stats = calculatePlayerStats({
+      players: [
+        buildPlayer({ id: "player-a", full_name: "Ariel", skill_level: 1, display_order: 1 }),
+        buildPlayer({ id: "player-b", full_name: "Beto", skill_level: 7, display_order: 10 }),
+        buildPlayer({ id: "player-c", full_name: "Carlos", current_rating: 1001 })
+      ],
+      finishedMatches: [
+        buildFinishedMatch({ id: "match-1", scheduledAt: "2026-04-01T20:00:00.000Z", winnerTeam: "A", mvpPlayerId: "player-b" }),
+        buildFinishedMatch({ id: "match-2", scheduledAt: "2026-04-02T20:00:00.000Z", winnerTeam: "A", teamBPlayerIds: [] })
+      ]
+    });
+    expect(stats.map((player) => [player.playerId, player.currentRank, player.currentRating, player.mvpCount])).toEqual([
+      ["player-c", 1, 1001, 0], ["player-b", 2, 1000, 1], ["player-a", 3, 1000, 0]
+    ]);
+  });
+
+  it("mantiene un orden estable por ID si también coinciden puntos, MVP y los demás desempates", () => {
+    const players = [buildPlayer({ id: "player-b", full_name: "Juan" }), buildPlayer({ id: "player-a", full_name: "Juan" })];
+    expect(calculatePlayerStats({ players, finishedMatches: [] }).map((player) => player.playerId)).toEqual(["player-a", "player-b"]);
+    expect(calculatePlayerStats({ players: [...players].reverse(), finishedMatches: [] }).map((player) => player.playerId)).toEqual(["player-a", "player-b"]);
+  });
+
   it("desempata el ranking publico por partidos, nivel y orden visual despues del rating", () => {
     const stats = calculatePlayerStats({
       players: [

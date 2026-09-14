@@ -370,7 +370,7 @@ export function MatchResultEditor({
           ))}
         </Select>
         <p className="mt-1 text-xs text-slate-400">
-          Si el MVP es jugador registrado suma +5. Si es invitado queda registrado sin bonus.
+          La figura es opcional y no suma puntos. Se cuenta en la temporada y desempata jugadores con el mismo rendimiento. Si es invitado, queda en el historial del partido.
         </p>
       </div>
 

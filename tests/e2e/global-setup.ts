@@ -159,6 +159,16 @@ async function seedPlayers(client: ReturnType<typeof createServiceClient>, organ
 
   const { error } = await client.from("players").upsert(rows, { onConflict: "id" });
   if (error) throw error;
+
+  // Previous runs also changed seasonal balances and cached public rankings.
+  // Reset only the disposable group's players after removing its matches.
+  await client.from("organization_season_player_ratings")
+    .update({ current_rating: 1000 })
+    .eq("organization_id", organizationId)
+    .in("player_id", [...E2E_PLAYER_IDS])
+    .throwOnError();
+  await client.from("organization_public_snapshots")
+    .delete().eq("organization_id", organizationId).throwOnError();
 }
 
 export default async function globalSetup() {

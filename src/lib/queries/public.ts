@@ -16,6 +16,7 @@ import {
 } from "@/lib/domain/organization-public-snapshot";
 import { calculateGuestDisplayRating } from "@/lib/domain/skill-level";
 import { calculatePlayerStats, type MatchWithTeams } from "@/lib/domain/stats";
+import { rankPlayers } from "@/lib/domain/player-ranking";
 import { getCurrentMatchDateTimeIso } from "@/lib/match-datetime";
 import { normalizeEmail } from "@/lib/org";
 import { isMissingSupabaseConfigurationError } from "@/lib/env";
@@ -124,7 +125,7 @@ function sortConfirmedMatchesForPublic<T extends { scheduled_at: string | null }
 }
 
 function buildTopPlayersFromStandings(standings: PlayerComputedStats[], limit = 5): HomeSummaryTopPlayer[] {
-  return standings.slice(0, limit).map((player) => ({
+  return rankPlayers(standings).slice(0, limit).map((player) => ({
     id: player.playerId,
     full_name: player.playerName,
     photo_path: player.photoPath,
@@ -388,21 +389,6 @@ async function fetchMatchTeams(matchIds: string[]) {
     .filter((item): item is MatchWithTeams => item !== null);
 }
 
-async function fetchAllTimeMvpCounts(supabase: SupabaseServerClient, organizationId: string) {
-  const allFinishedMatches = await readAllRows((from, to) => supabase.from("matches").select("id")
-    .eq("organization_id", organizationId).eq("status", "finished").order("id").range(from, to));
-  const results = await readRowsByIds(allFinishedMatches.map((match) => match.id), (ids, from, to) => supabase.from("match_result")
-    .select("mvp_player_id").in("match_id", ids).order("id").range(from, to));
-
-  const counts = new Map<string, number>();
-  for (const result of results ?? []) {
-    if (!result.mvp_player_id) continue;
-    counts.set(result.mvp_player_id, (counts.get(result.mvp_player_id) ?? 0) + 1);
-  }
-
-  return counts;
-}
-
 async function getHomeSummaryBaseLive(organizationId: string | null): Promise<HomeSummaryBase> {
   if (!organizationId) {
     return {
@@ -485,17 +471,17 @@ export async function getRankingPlayers(organizationId: string | null) {
   if (!organizationId) return [];
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("players")
-    .select("id, full_name, current_rating, initial_rank, skill_level, display_order, photo_path, photo_updated_at")
-    .eq("organization_id", organizationId)
-    .eq("active", true)
-    .order("current_rating", { ascending: false })
-    .order("skill_level", { ascending: true })
-    .order("display_order", { ascending: true })
-    .order("full_name", { ascending: true });
-  if (error) throw new Error(error.message);
-  return data ?? [];
+  const [players, standings] = await Promise.all([
+    readAllRows((from, to) => supabase.from("players")
+      .select("id, full_name, current_rating, initial_rank, skill_level, display_order, photo_path, photo_updated_at")
+      .eq("organization_id", organizationId).eq("active", true).order("id").range(from, to)),
+    getPlayersWithStatsLive(organizationId)
+  ]);
+  const playersById = new Map(players.map((player) => [player.id, player]));
+  return standings.flatMap((stats) => {
+    const player = playersById.get(stats.playerId);
+    return player ? [{ ...player, current_rating: stats.currentRating }] : [];
+  });
 }
 
 async function getPlayersWithStatsLive(
@@ -525,10 +511,7 @@ async function getPlayersWithStatsLive(
   const finishedMatches = await readAllRows((from, to) => matchesQuery.range(from, to));
 
   const matchIds = (finishedMatches ?? []).map((match) => match.id);
-  const [finishedWithTeams, allTimeMvpCounts] = await Promise.all([
-    fetchMatchTeams(matchIds),
-    fetchAllTimeMvpCounts(supabase, organizationId)
-  ]);
+  const finishedWithTeams = await fetchMatchTeams(matchIds);
 
   let playersForStats = players ?? [];
   if (seasonFilter.mode === "season") {
@@ -549,10 +532,7 @@ async function getPlayersWithStatsLive(
     players: playersForStats,
     finishedMatches: finishedWithTeams,
     matchPlayerStats: matchPlayerStats ?? []
-  }).map((player) => ({
-    ...player,
-    mvpCount: allTimeMvpCounts.get(player.playerId) ?? 0
-  }));
+  });
 }
 
 export async function getPlayersWithStats(

@@ -58,11 +58,16 @@ describe.skipIf(!existsSync(sqlPath))("group match transactions (real PostgreSQL
     return (await db.query<{ current_rating: string }>("select current_rating from public.players order by id")).rows.map((r) => Number(r.current_rating));
   }
   async function history() { return (await db.query("select player_id, delta, reason from public.rating_history order by player_id, reason")).rows; }
+  async function seasonRatings() {
+    return (await db.query("select season_id, player_id, current_rating from public.organization_season_player_ratings order by season_id, player_id")).rows;
+  }
 
   it("saves result, registered MVP and season ratings together; correction emits no new finish", async () => {
     const first = await save({ scoreA: 2, scoreB: 1, mvpParticipantId: `player:${player(1)}` });
     expect(first).toMatchObject({ first_finished: true, result_version: 1 });
-    expect(await ratings()).toEqual([1015, 1010, 990, 990, 1000]);
+    expect(await ratings()).toEqual([1010, 1010, 990, 990, 1000]);
+    expect((await db.query("select mvp_player_id, mvp_display_name from public.match_result")).rows[0]).toEqual({mvp_player_id: player(1), mvp_display_name: "Jugador 1"});
+    expect((await db.query("select * from public.rating_history where reason='mvp_bonus'")).rows).toEqual([]);
     const corrected = await save({ scoreA: 0, scoreB: 1, mvpParticipantId: null }, 1);
     expect(corrected).toMatchObject({ first_finished: false, result_version: 2 });
     expect(await ratings()).toEqual([990, 990, 1010, 1010, 1000]);
@@ -121,10 +126,41 @@ describe.skipIf(!existsSync(sqlPath))("group match transactions (real PostgreSQL
     await expect(save({ scoreA: -1, scoreB: 0 })).rejects.toThrow("enteros no negativos");
     await expect(save({ scoreA: 1.5, scoreB: 0 })).rejects.toThrow("enteros no negativos");
   });
-  it("allows a new guest MVP without granting a registered player's bonus", async () => {
+  it("records a new guest as symbolic MVP without changing any participant's points", async () => {
     await save({ scoreA: 1, scoreB: 0, mvpParticipantId: "newGuest:1", lineup: { assignments, newGuests: [{ clientId: "1", name: "Visita", rating: 2, team: "A" }] } });
     expect(await ratings()).toEqual([1010, 1010, 990, 990, 1000]);
     expect((await db.query("select mvp_display_name, mvp_player_id from public.match_result")).rows[0]).toEqual({ mvp_display_name: "Visita", mvp_player_id: null });
+  });
+  it("preserves the stored figure when reopened and changes or removes it without rewriting points", async () => {
+    await save({ scoreA: 2, scoreB: 1, mvpParticipantId: `player:${player(1)}` });
+    const beforeRatings = await ratings();
+    const beforeSeasonRatings = await seasonRatings();
+    const beforeHistory = (await db.query("select * from public.rating_history order by id")).rows;
+    await save({ scoreA: 2, scoreB: 1, notes: "Revisado" }, 1);
+    expect((await db.query("select mvp_player_id, mvp_display_name from public.match_result")).rows[0]).toEqual({mvp_player_id: player(1), mvp_display_name: "Jugador 1"});
+    await save({ scoreA: 2, scoreB: 1, mvpParticipantId: `player:${player(3)}`, lineup: {assignments} }, 2);
+    expect((await db.query("select mvp_player_id, mvp_display_name from public.match_result")).rows[0]).toEqual({mvp_player_id: player(3), mvp_display_name: "Jugador 3"});
+    await save({ scoreA: 2, scoreB: 1, mvpParticipantId: null }, 3);
+    expect((await db.query("select mvp_player_id, mvp_guest_id, mvp_display_name from public.match_result")).rows[0]).toEqual({mvp_player_id: null, mvp_guest_id: null, mvp_display_name: null});
+    expect(await ratings()).toEqual(beforeRatings);
+    expect(await seasonRatings()).toEqual(beforeSeasonRatings);
+    expect((await db.query("select * from public.rating_history order by id")).rows).toEqual(beforeHistory);
+  });
+  it("changes the figure without recalculating an old capped absence after later sporting contributions", async () => {
+    await db.query("update public.players set current_rating=10 where id=$1", [player(2)]);
+    const lineup = { assignments: assignments.map((a, i) => i === 1 ? {...a, team: "OUT"} : a), absencePenaltyParticipantIds: [`player:${player(2)}`] };
+    await save({ scoreA: 1, scoreB: 0, lineup, mvpParticipantId: `player:${player(1)}` });
+    expect(await ratings()).toEqual([1010, 1, 990, 990, 1000]);
+    // A later match can increase the absent player's accumulated and season points.
+    await db.query("update public.players set current_rating=current_rating+10 where id=$1", [player(2)]);
+    await db.query("update public.organization_season_player_ratings set current_rating=current_rating+10 where player_id=$1", [player(2)]);
+    const beforeRatings = await ratings();
+    const beforeSeasonRatings = await seasonRatings();
+    const beforeHistory = (await db.query("select * from public.rating_history order by id")).rows;
+    await save({ scoreA: 1, scoreB: 0, lineup, mvpParticipantId: `player:${player(3)}` }, 1);
+    expect(await ratings()).toEqual(beforeRatings);
+    expect(await seasonRatings()).toEqual(beforeSeasonRatings);
+    expect((await db.query("select * from public.rating_history order by id")).rows).toEqual(beforeHistory);
   });
   it("closes an expired active season and preserves the stored match's local calendar date", async () => {
     await db.exec(`insert into public.organization_seasons(organization_id, label, starts_at, ends_at, status) values ('${org}', 'Temporada 2020', '2020-01-01', '2020-12-31', 'active');
@@ -168,15 +204,35 @@ describe.skipIf(!existsSync(sqlPath))("group match transactions (real PostgreSQL
     await db.query("select public.confirm_group_match_option($1,$2,$3)", [match, org, selected.id]);
     expect((await db.query("select status from public.matches")).rows[0]).toEqual({ status: "confirmed" });
   });
-  it("correcting an older match retains contributions from a newer match", async () => {
-    await save({ scoreA: 1, scoreB: 0 });
+  it("correcting a migrated historical figure neither restores its bonus nor deducts it twice", async () => {
+    const oldResult = await save({ scoreA: 1, scoreB: 0, mvpParticipantId: `player:${player(1)}` });
+    // Reproduce the old persisted bonus before applying the migration's resulting state.
+    await db.exec(`update public.players set current_rating=current_rating+5 where id='${player(1)}';
+      update public.organization_season_player_ratings set current_rating=current_rating+5 where player_id='${player(1)}';
+      insert into public.rating_history(match_id,player_id,season_id,rating_before,rating_after,delta,season_rating_before,season_rating_after,season_delta,reason)
+      values ('${match}','${player(1)}','${oldResult.season_id}',1010,1015,5,1010,1015,5,'mvp_bonus');`);
     const match2 = id(50), option2 = id(51);
     await db.query("insert into public.matches(id,organization_id,status,confirmed_option_id,scheduled_at) values ($1,$2,'confirmed',$3,'2026-09-02T20:00:00Z')", [match2, org, option2]);
     await db.query("insert into public.team_options(id,match_id,is_confirmed,option_number) values ($1,$2,true,1)", [option2, match2]);
     for (let n = 1; n <= 4; n++) await db.query("insert into public.team_option_players values ($1,$2,$3)", [option2, player(n), n < 3 ? "A" : "B"]);
     await db.query("select public.save_group_match_result($1,$2,0,$3::jsonb,true)", [match2, org, JSON.stringify({scoreA:0,scoreB:1})]);
-    await save({ scoreA: 0, scoreB: 0 }, 1);
+    expect(await ratings()).toEqual([1005,1000,1000,1000,1000]);
+    await db.exec(`update public.players set current_rating=current_rating-5 where id='${player(1)}';
+      update public.organization_season_player_ratings set current_rating=current_rating-5 where player_id='${player(1)}';
+      delete from public.rating_history where reason='mvp_bonus';
+      update public.rating_history set rating_before=rating_before-5,rating_after=rating_after-5,
+        season_rating_before=season_rating_before-5,season_rating_after=season_rating_after-5
+        where match_id='${match2}' and player_id='${player(1)}';
+      alter table public.rating_history add constraint test_no_mvp_bonus check(reason <> 'mvp_bonus');`);
+    const newerHistory = (await db.query("select * from public.rating_history where match_id=$1 order by id", [match2])).rows;
+    await save({ scoreA: 1, scoreB: 0, mvpParticipantId: `player:${player(3)}` }, 1);
+    await save({ scoreA: 1, scoreB: 0, notes: "Revisado otra vez" }, 2);
+    expect(await ratings()).toEqual([1000,1000,1000,1000,1000]);
+    await save({ scoreA: 0, scoreB: 0 }, 3);
     expect(await ratings()).toEqual([990,990,1010,1010,1000]);
+    expect((await db.query("select * from public.rating_history where match_id=$1 order by id", [match2])).rows).toEqual(newerHistory);
+    expect((await db.query("select mvp_player_id from public.match_result where match_id=$1", [match])).rows[0]).toEqual({mvp_player_id: player(3)});
+    expect((await db.query("select * from public.rating_history where reason='mvp_bonus'")).rows).toEqual([]);
   });
   it("enforces authorization inside the private implementation", async () => {
     await db.exec(`select set_config('test.admin', '${id(999)}', false)`);

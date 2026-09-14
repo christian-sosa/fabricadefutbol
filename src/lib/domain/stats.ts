@@ -1,5 +1,6 @@
 import type { Database } from "@/types/database";
 import type { PlayerComputedStats, PlayerRecentResult, TeamSide } from "@/types/domain";
+import { comparePlayerRanking } from "@/lib/domain/player-ranking";
 
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
@@ -132,17 +133,7 @@ export function calculatePlayerStats(params: {
 
   const rankingMap = new Map(
     [...statsByPlayer.values()]
-      .sort((a, b) => {
-        const ratingDiff = b.currentRating - a.currentRating;
-        if (ratingDiff !== 0) return ratingDiff;
-        const matchesDiff = b.matchesPlayed - a.matchesPlayed;
-        if (matchesDiff !== 0) return matchesDiff;
-        const skillLevelDiff = a.skillLevel - b.skillLevel;
-        if (skillLevelDiff !== 0) return skillLevelDiff;
-        const displayOrderDiff = a.displayOrder - b.displayOrder;
-        if (displayOrderDiff !== 0) return displayOrderDiff;
-        return a.playerName.localeCompare(b.playerName);
-      })
+      .sort(comparePlayerRanking)
       .map((player, index) => [player.playerId, index + 1])
   );
 

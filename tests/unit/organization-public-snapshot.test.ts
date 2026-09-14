@@ -84,6 +84,20 @@ const payload: OrganizationPublicSnapshotPayload = {
 };
 
 describe("organization public snapshot helpers", () => {
+  it("actualiza puestos de snapshots anteriores usando MVP antes que partidos jugados", async () => {
+    const fake = createFakeSupabase({ organization_public_snapshots: [{
+      organization_id: "org-1", summary: payload.summary, match_history: [],
+      standings: [
+        { ...payload.standings[0], matchesPlayed: 20, mvpCount: 0 },
+        { ...payload.standings[0], playerId: "player-2", playerName: "Beto", currentRank: 2, matchesPlayed: 1, mvpCount: 2 }
+      ]
+    }] });
+    const snapshot = await readOrganizationPublicSnapshot(fake.client, "org-1");
+    expect(snapshot?.standings.map((player) => [player.playerId, player.currentRank, player.currentRating])).toEqual([
+      ["player-2", 1, 1140], ["player-1", 2, 1140]
+    ]);
+  });
+
   it("guarda y lee el snapshot publico desde Supabase", async () => {
     const fake = createFakeSupabase();
 

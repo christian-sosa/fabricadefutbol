@@ -83,7 +83,12 @@ const rankingDetails: HelpSectionItem[] = [
   {
     title: "Ranking",
     description:
-      "Ordena a los jugadores segun su rendimiento. Es la tabla deportiva del grupo, no una lista fija armada a mano."
+      "Ordena por puntos de rendimiento y, si están empatados, por más MVP en la temporada elegida. Podés consultar años anteriores o el historial completo."
+  },
+  {
+    title: "Figura del partido (MVP)",
+    description:
+      "Es un reconocimiento opcional y no suma puntos. Las figuras de cada jugador se cuentan por temporada y sirven para desempatar el ranking. Un invitado también puede ser figura y queda registrado en el historial."
   },
   {
     title: "Armado de equipos",

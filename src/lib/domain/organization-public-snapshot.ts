@@ -1,5 +1,6 @@
 import type { MatchHistoryItem, OrganizationMatchesResponse } from "@/lib/query/types";
 import type { PlayerComputedStats } from "@/types/domain";
+import { rankPlayers } from "@/lib/domain/player-ranking";
 
 export type OrganizationPublicSummary = {
   totalPlayers: number;
@@ -85,7 +86,7 @@ export function isOrganizationSnapshotSchemaMissing(error: QueryError | null | u
 export function buildOrganizationPublicSnapshotPayload(params: OrganizationPublicSnapshotPayload) {
   return {
     summary: params.summary,
-    standings: params.standings,
+    standings: rankPlayers(params.standings),
     matchHistory: params.matchHistory
   } satisfies OrganizationPublicSnapshotPayload;
 }
@@ -120,7 +121,7 @@ export async function readOrganizationPublicStandingsSnapshot(
   organizationId: string
 ): Promise<PlayerComputedStats[] | null> {
   const data = await readSnapshotRow(supabase, organizationId, "standings");
-  return data ? normalizeArray<PlayerComputedStats>(data.standings) : null;
+  return data ? rankPlayers(normalizeArray<PlayerComputedStats>(data.standings)) : null;
 }
 
 export async function readOrganizationPublicMatchHistorySnapshot(
@@ -142,7 +143,7 @@ export async function readOrganizationPublicSnapshot(
 
   return {
     summary,
-    standings: normalizeArray<PlayerComputedStats>(data.standings),
+    standings: rankPlayers(normalizeArray<PlayerComputedStats>(data.standings)),
     matchHistory: normalizeArray<MatchHistoryItem>(data.match_history)
   };
 }
@@ -157,7 +158,7 @@ export async function writeOrganizationPublicSnapshot(
     {
       organization_id: organizationId,
       summary: payload.summary,
-      standings: payload.standings,
+      standings: rankPlayers(payload.standings),
       match_history: payload.matchHistory,
       match_history_total_count: payload.matchHistory.length,
       refreshed_at: new Date().toISOString()
