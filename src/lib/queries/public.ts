@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { readAllRows, readRowsByIds } from "@/lib/supabase/pagination";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
-import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
+import { getSessionIsSuperAdmin } from "@/lib/auth/super-admin";
 import {
   buildOrganizationPublicSnapshotPayload,
   buildSnapshotMatchHistoryPage,
@@ -18,7 +18,6 @@ import { calculateGuestDisplayRating } from "@/lib/domain/skill-level";
 import { calculatePlayerStats, type MatchWithTeams } from "@/lib/domain/stats";
 import { rankPlayers } from "@/lib/domain/player-ranking";
 import { getCurrentMatchDateTimeIso } from "@/lib/match-datetime";
-import { normalizeEmail } from "@/lib/org";
 import { isMissingSupabaseConfigurationError } from "@/lib/env";
 import type { MatchHistoryItem, OrganizationMatchesResponse, OrganizationSeasonOption } from "@/lib/query/types";
 import type { Database } from "@/types/database";
@@ -170,6 +169,7 @@ export async function getPublicOrganizations(): Promise<PublicOrganization[]> {
     .from("organizations")
     .select("id, name, slug, is_public, created_at")
     .eq("is_public", true)
+    .is("archived_at", null)
     .order("name", { ascending: true });
 
   if (error) throw new Error(error.message);
@@ -249,11 +249,11 @@ export async function getViewerAdminOrganizations(): Promise<PublicOrganization[
 
   if (!user?.id || !user.email) return [];
 
-  const normalizedEmail = normalizeEmail(user.email);
-  if (SUPER_ADMIN_EMAIL && normalizedEmail.length > 0 && normalizedEmail === SUPER_ADMIN_EMAIL) {
+  if (await getSessionIsSuperAdmin(supabase)) {
     const { data, error } = await supabase
       .from("organizations")
       .select("id, name, slug, is_public, created_at")
+      .is("archived_at", null)
       .order("name", { ascending: true });
 
     if (error) throw new Error(error.message);
@@ -262,7 +262,7 @@ export async function getViewerAdminOrganizations(): Promise<PublicOrganization[
 
   const { data, error } = await supabase
     .from("organization_admins")
-    .select("organizations(id, name, slug, is_public, created_at)")
+    .select("organizations(id, name, slug, is_public, created_at, archived_at)")
     .eq("admin_id", user.id);
 
   if (error) throw new Error(error.message);
@@ -274,8 +274,8 @@ export async function getViewerAdminOrganizations(): Promise<PublicOrganization[
       return relation ?? null;
     })
     .filter(
-      (value): value is PublicOrganization =>
-        Boolean(value && typeof value.id === "string" && typeof value.name === "string" && typeof value.slug === "string")
+      (value): value is PublicOrganization & { archived_at: null } =>
+        Boolean(value && !value.archived_at && typeof value.id === "string" && typeof value.name === "string" && typeof value.slug === "string")
     );
 
   return organizations.sort((a, b) => a.name.localeCompare(b.name, "es"));

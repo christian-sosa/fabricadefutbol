@@ -2,7 +2,8 @@
 
 import { headers } from "next/headers";
 import { z } from "zod";
-import { checkRateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
+import { getClientIpFromHeaders } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/shared-rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getPublicAppUrl } from "@/lib/public-url";
 
@@ -13,7 +14,7 @@ export async function requestPasswordRecovery(_: RecoveryState, formData: FormDa
   const parsed = z.string().trim().email("Ingresá un email válido.").max(254).safeParse(formData.get("email"));
   if (!parsed.success) return { error: "Ingresá un email válido.", success: null };
   const appUrl = getPublicAppUrl();
-  const limit = checkRateLimit({ key: `password-recovery:${getClientIpFromHeaders(await headers())}`, limit: 3, windowMs: 15 * 60_000 });
+  const limit = await checkSharedRateLimit({ key: `password-recovery:${getClientIpFromHeaders(await headers())}`, limit: 3, windowMs: 15 * 60_000 });
   if (!limit.allowed) return { error: "Esperá unos minutos antes de solicitar otro enlace.", success: null };
   try {
     const supabase = await createSupabaseServerClient();

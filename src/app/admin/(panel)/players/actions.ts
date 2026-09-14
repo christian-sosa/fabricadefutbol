@@ -1,5 +1,7 @@
 "use server";
 
+import { enqueueMediaCleanup } from "@/lib/domain/media-cleanup";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -132,6 +134,8 @@ async function savePlayerPhotoForAdmin({
   const optimizedBuffer = await optimizePlayerAvatarImage(file);
   const objectPath = getOrganizationPlayerPhotoObjectPath(getSupabaseDbSchema(), organizationId, playerId, crypto.randomUUID());
   const bucketName = getPlayerPhotosBucket();
+  // Reserve cleanup before Storage: a crash before metadata linking leaves a durable retry.
+  await enqueueMediaCleanup(bucketName, objectPath, true);
   const { error: uploadError } = await supabase.storage
     .from(bucketName)
     .upload(objectPath, optimizedBuffer, {
@@ -155,13 +159,10 @@ async function savePlayerPhotoForAdmin({
     ? metadataUpdate.eq("photo_path", previousPhotoPath)
     : metadataUpdate.is("photo_path", null)).select("id");
   if (photoMetadataError || !updatedPlayers?.length) {
-    await supabase.storage.from(bucketName).remove([objectPath]);
+    await enqueueMediaCleanup(bucketName, objectPath);
     redirect(withMessage(organizationQueryKey, "No se pudo asociar la foto o el jugador cambió mientras subías. Recargá e intentá nuevamente."));
   }
-  if (previousPhotoPath && previousPhotoPath !== objectPath) {
-    const { error: cleanupError } = await supabase.storage.from(bucketName).remove([previousPhotoPath]);
-    if (cleanupError) logError("players.photo.previous_cleanup.failed", cleanupError, { organizationId, playerId });
-  }
+  // The metadata trigger has already queued the previous version atomically.
   const { error: snapshotError } = await supabase.from("organization_public_snapshots").delete().eq("organization_id", organizationId);
   if (snapshotError) logError("players.photo.snapshot_invalidation.failed", snapshotError, { organizationId, playerId });
 
@@ -233,16 +234,23 @@ export async function createPlayerAction(formData: FormData) {
       redirect(withMessage(organizationQueryKey, toUserMessage(error, "No se pudo crear al jugador.")));
     }
 
+    let photoIncomplete = false;
     if (photoFile) {
-      await savePlayerPhotoForAdmin({
-        supabase,
-        adminUserId: admin.userId,
-        organizationId: parsed.data.organizationId,
-        organizationQueryKey,
-        playerId: createdPlayer.id,
-        file: photoFile,
-        validatePlayer: false
-      });
+      try {
+        await savePlayerPhotoForAdmin({
+          supabase,
+          adminUserId: admin.userId,
+          organizationId: parsed.data.organizationId,
+          organizationQueryKey,
+          playerId: createdPlayer.id,
+          file: photoFile,
+          validatePlayer: false
+        });
+      } catch (photoError) {
+        // The player exists already. Recover from the photo row instead of repeating this insert.
+        photoIncomplete = true;
+        logError("players.created.photo_incomplete", photoError, { organizationId: parsed.data.organizationId, playerId: createdPlayer.id });
+      }
     }
 
     await refreshOrganizationPublicSnapshotSafe(parsed.data.organizationId);
@@ -253,6 +261,10 @@ export async function createPlayerAction(formData: FormData) {
     if (photoFile) {
       revalidatePath(`/players/${createdPlayer.id}`);
       revalidatePath(`/api/player-photo/${createdPlayer.id}`);
+    }
+    if (photoIncomplete) {
+      const notice = "Jugador creado. No pudimos completar la carga de la foto. Revisala y, si falta, volvé a subirla desde su fila.";
+      redirect(`${withOrgQuery("/admin/players", organizationQueryKey)}&view=edit&photoPlayer=${createdPlayer.id}&notice=${encodeURIComponent(notice)}#player-${createdPlayer.id}`);
     }
     redirect(withSuccess(organizationQueryKey, photoFile ? "Jugador creado correctamente con foto." : "Jugador creado correctamente."));
   } catch (error) {
@@ -419,11 +431,10 @@ export async function deletePlayerAction(formData: FormData) {
       redirect(withMessage(organizationQueryKey, "No se encontro el jugador seleccionado."));
     }
 
-    const { error: deleteError } = await supabase
-      .from("players")
-      .delete()
-      .eq("id", parsed.data.deletePlayerId)
-      .eq("organization_id", parsed.data.organizationId);
+    const { error: deleteError } = await supabase.rpc("delete_group_player", {
+      p_player_id: parsed.data.deletePlayerId,
+      p_organization_id: parsed.data.organizationId
+    });
 
     if (deleteError) {
       const cannotDeleteDueToHistory = deleteError.code === "23503";

@@ -68,6 +68,7 @@ export type Database = {
       };
       organizations: {
         Row: {
+          archived_at: string | null;
           created_at: string;
           created_by: string | null;
           id: string;
@@ -78,6 +79,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          archived_at?: string | null;
           created_at?: string;
           created_by?: string | null;
           id?: string;
@@ -88,6 +90,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          archived_at?: string | null;
           created_at?: string;
           created_by?: string | null;
           id?: string;
@@ -577,6 +580,15 @@ export type Database = {
       };
     };
     Functions: {
+      create_group_organization: { Args: { p_organization_id: string; p_name: string; p_slug: string }; Returns: Json };
+      set_group_archived: { Args: { p_organization_id: string; p_archived: boolean }; Returns: Json };
+      purge_group: { Args: { p_organization_id: string }; Returns: Json };
+      delete_group_player: { Args: { p_player_id: string; p_organization_id: string }; Returns: Json };
+      retire_group_player_photo: { Args: { p_player_id: string; p_organization_id: string; p_expected_path: string; p_activity_before: string }; Returns: boolean };
+      enqueue_media_cleanup: { Args: { p_bucket: string; p_path: string; p_pending_upload?: boolean }; Returns: undefined };
+      claim_media_cleanup: { Args: { p_limit?: number }; Returns: Json };
+      complete_media_cleanup: { Args: { p_job_id: string; p_lease_token: string; p_error?: string | null }; Returns: undefined };
+      consume_shared_rate_limit: { Args: { p_key_hash: string; p_limit: number; p_window_ms: number }; Returns: Json };
       replace_group_match_options: {
         Args: { p_match_id: string; p_organization_id: string; p_expected_version: number; p_options: Json };
         Returns: Json;

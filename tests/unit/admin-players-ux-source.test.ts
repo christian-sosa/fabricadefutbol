@@ -26,19 +26,6 @@ describe("admin players UX source", () => {
     expect(source).not.toContain("<span>Rendimiento</span>");
   });
 
-  it("usa una grilla estable para alinear nivel, foto y acciones en la planilla", () => {
-    const source = readFileSync(playersPagePath, "utf8");
-
-    expect(source).toContain("playersRosterGridColumns");
-    expect(source).toContain("minmax(260px,1.6fr)_80px");
-    expect(source).toContain("h-[38px] min-w-[170px]");
-    expect(source).toContain("lg:grid-cols-[minmax(0,1fr)_112px]");
-    expect(source).toContain('className="h-[38px] w-full lg:w-auto"');
-    expect(source).toContain('className="h-[38px] px-3 text-xs"');
-    expect(source).not.toContain("minmax(260px,1.6fr)_auto");
-    expect(source).not.toContain('className="space-y-2 lg:self-start"');
-  });
-
   it("explica la escala editable de Nivel 1 a Nivel 7", () => {
     const source = readFileSync(playersPagePath, "utf8");
 

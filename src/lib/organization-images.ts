@@ -1,25 +1,12 @@
 import sharp from "sharp";
 
 import { escapeXmlAttribute, escapeXmlText } from "@/lib/xml";
+import { MAX_ORGANIZATION_IMAGE_PIXELS, MAX_ORGANIZATION_IMAGE_SIZE_BYTES, ORGANIZATION_IMAGE_HEIGHT_PX, ORGANIZATION_IMAGE_QUALITY, ORGANIZATION_IMAGE_WIDTH_PX } from "@/lib/organization-image-constraints";
+export { isSupportedOrganizationImageFile, MAX_ORGANIZATION_IMAGE_SIZE_MB, ORGANIZATION_IMAGE_HEIGHT_PX, ORGANIZATION_IMAGE_QUALITY, ORGANIZATION_IMAGE_WIDTH_PX } from "@/lib/organization-image-constraints";
 
-export const MAX_ORGANIZATION_IMAGE_SIZE_MB = 8;
-export const ORGANIZATION_IMAGE_WIDTH_PX = 1200;
-export const ORGANIZATION_IMAGE_HEIGHT_PX = 675;
-export const ORGANIZATION_IMAGE_QUALITY = 78;
 export const ORGANIZATION_IMAGE_CACHE_CONTROL =
   "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400";
 export const ORGANIZATION_IMAGE_PLACEHOLDER_CACHE_CONTROL = "public, max-age=3600, s-maxage=3600";
-
-const ORGANIZATION_IMAGE_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-
-export function isSupportedOrganizationImageFile(file: File) {
-  if (ORGANIZATION_IMAGE_CONTENT_TYPES.has(file.type)) {
-    return true;
-  }
-
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  return ["jpg", "jpeg", "png", "webp"].includes(extension);
-}
 
 export function getOrganizationImageObjectPath(schemaName: string, organizationId: string) {
   return `${schemaName}/organizations/${organizationId}.webp`;
@@ -89,9 +76,10 @@ export function buildOrganizationImagePlaceholderSvg(organizationName: string) {
 }
 
 export async function optimizeOrganizationImage(file: File) {
+  if (!file.size || file.size > MAX_ORGANIZATION_IMAGE_SIZE_BYTES) throw new Error("La portada debe pesar hasta 3 MB.");
   const sourceBuffer = Buffer.from(await file.arrayBuffer());
 
-  return sharp(sourceBuffer)
+  return sharp(sourceBuffer, { limitInputPixels: MAX_ORGANIZATION_IMAGE_PIXELS })
     .rotate()
     .resize(ORGANIZATION_IMAGE_WIDTH_PX, ORGANIZATION_IMAGE_HEIGHT_PX, {
       fit: "cover",

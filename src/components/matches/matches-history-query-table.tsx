@@ -11,6 +11,7 @@ import { formatMatchDateTime } from "@/lib/match-datetime";
 import { useOrganizationMatchesQuery } from "@/lib/query/hooks";
 import type { OrganizationMatchesResponse } from "@/lib/query/types";
 import { withOrgQuery } from "@/lib/org";
+import { QueryFeedback } from "@/components/ui/query-feedback";
 
 type MatchesHistoryQueryTableProps = {
   organizationId: string | null;
@@ -32,7 +33,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
     setPage(initialPage);
   }, [initialPage, organizationId, season]);
 
-  const { data, isFetching } = useOrganizationMatchesQuery({
+  const { data, isFetching, isError, refetch } = useOrganizationMatchesQuery({
     organizationId,
     page,
     pageSize,
@@ -45,7 +46,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
 
   return (
     <Card>
-      {isFetching ? <div className="mb-2 text-xs text-slate-400">Actualizando historial...</div> : null}
+      <QueryFeedback error={isError} fetching={isFetching} hasData={Boolean(matches.length)} onRetry={refetch} />
 
       <div className="grid gap-3 md:hidden">
         {matches.map((match) => (
@@ -73,7 +74,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
           </article>
         ))}
 
-        {!matches.length ? (
+        {!matches.length && !isError ? (
           <p className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-6 text-sm text-slate-400">
             {isFetching ? "Cargando historial..." : "No hay partidos para este grupo."}
           </p>
@@ -113,7 +114,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
               </tr>
             ))}
 
-            {!matches.length ? (
+            {!matches.length && !isError ? (
               <tr>
                 <TD className="py-6 text-sm text-slate-400" colSpan={6}>
                   {isFetching ? "Cargando historial..." : "No hay partidos para este grupo."}

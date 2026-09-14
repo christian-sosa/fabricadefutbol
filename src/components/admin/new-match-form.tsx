@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { createMatchAction } from "@/app/admin/(panel)/matches/new/actions";
+import { createMatchFormAction } from "@/app/admin/(panel)/form-actions";
+import { ActionForm } from "@/components/ui/action-form";
 import { MatchDateTimeFields } from "@/components/admin/match-date-time-fields";
 import { Button } from "@/components/ui/button";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
@@ -267,7 +268,7 @@ export function NewMatchForm({
   };
 
   return (
-    <form action={createMatchAction} className="mt-4 space-y-4">
+    <ActionForm action={createMatchFormAction} className="mt-4 space-y-4">
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="manualAssignmentsPayload" type="hidden" value={manualAssignmentsPayload} />
       <div className="grid gap-3 md:grid-cols-3">
@@ -319,7 +320,7 @@ export function NewMatchForm({
             const shouldShowRatingTrend = ratingTrendLabel !== "Parejo";
 
             return (
-              <label
+              <div
                 className={cn(
                   "flex items-center justify-between rounded-lg border bg-slate-950 px-3 py-2 text-sm transition hover:border-slate-600",
                   selectedPlayers[player.id] ? "border-emerald-500/50" : "border-slate-800"
@@ -350,20 +351,24 @@ export function NewMatchForm({
                   </span>
                 </span>
                 <span className="flex items-center gap-2">
-                  <span className="flex items-center gap-1 rounded border border-slate-700 px-2 py-1">
+                  <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-700 px-2 py-1">
                     <span className="text-[11px] font-semibold uppercase text-slate-300">Juega</span>
                     <input
                       checked={Boolean(selectedPlayers[player.id])}
+                      aria-label={`Juega ${player.full_name}`}
+                      className="h-4 w-4 accent-emerald-400"
                       name="playerIds"
                       onChange={(event) => togglePlayerSelection(player.id, event.target.checked)}
                       type="checkbox"
                       value={player.id}
                     />
-                  </span>
-                  <span className="flex items-center gap-1 rounded border border-cyan-500/30 px-2 py-1">
+                  </label>
+                  <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-cyan-500/30 px-2 py-1">
                     <span className="text-[11px] font-semibold uppercase text-cyan-200">Arquero</span>
                     <input
                       checked={Boolean(goalkeeperPlayers[player.id]) && Boolean(selectedPlayers[player.id])}
+                      aria-label={`Arquero ${player.full_name}`}
+                      className="h-4 w-4 accent-cyan-400"
                       disabled={
                         !selectedPlayers[player.id] ||
                         (!goalkeeperPlayers[player.id] && selectedGoalkeeperIds.length >= 2)
@@ -373,9 +378,9 @@ export function NewMatchForm({
                       type="checkbox"
                       value={player.id}
                     />
-                  </span>
+                  </label>
                 </span>
-              </label>
+              </div>
             );
           })}
         </div>
@@ -566,7 +571,7 @@ export function NewMatchForm({
         </div>
       ) : null}
 
-      {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
+      {error ? <p className="text-sm font-semibold text-danger" role="alert">{error}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
         <FormSubmitButton name="creationMode" pendingLabel="Generando equipos..." value="auto">
           Crear partido y generar equipos
@@ -575,6 +580,6 @@ export function NewMatchForm({
           {showManualBuilder ? "Ocultar armado manual" : "Armar equipos yo mismo"}
         </Button>
       </div>
-    </form>
+    </ActionForm>
   );
 }

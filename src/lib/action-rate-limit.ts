@@ -1,10 +1,10 @@
 import { headers } from "next/headers";
 
 import {
-  checkRateLimit,
   getClientIpFromHeaders,
   type RateLimitResult
 } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/shared-rate-limit";
 
 const DEFAULT_WINDOW_MS = 60 * 60 * 1000;
 
@@ -67,7 +67,7 @@ export async function checkActionRateLimit(params: {
   const headerStore = await headers();
   const clientIp = getClientIpFromHeaders(headerStore);
 
-  return checkRateLimit({
+  return checkSharedRateLimit({
     key: buildActionRateLimitKey({
       scope: params.scope,
       actorId: params.actorId,

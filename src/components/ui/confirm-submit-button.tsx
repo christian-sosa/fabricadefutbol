@@ -1,6 +1,7 @@
 "use client";
 
 import type { ButtonHTMLAttributes } from "react";
+import { useFormStatus } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 
@@ -31,10 +32,12 @@ export function ConfirmSubmitButton({
   title,
   disabled
 }: ConfirmSubmitButtonProps) {
+  const { pending } = useFormStatus();
   return (
     <Button
       className={className}
-      disabled={disabled}
+      aria-busy={pending || undefined}
+      disabled={disabled || pending}
       formAction={formAction}
       formNoValidate={formNoValidate}
       name={name}
@@ -58,7 +61,7 @@ export function ConfirmSubmitButton({
       value={value}
       variant={variant}
     >
-      {label}
+      {pending ? "Procesando…" : label}
     </Button>
   );
 }

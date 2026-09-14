@@ -40,7 +40,7 @@ describe("next config security", () => {
 
     const config = await loadNextConfig("server-action-body-size");
 
-    expect(config.experimental?.serverActions?.bodySizeLimit).toBe("30mb");
+    expect(config.experimental?.serverActions?.bodySizeLimit).toBe("4mb");
   });
 
   it("declara headers de seguridad globales que no rompen scripts de Next", async () => {
@@ -57,6 +57,7 @@ describe("next config security", () => {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "Content-Security-Policy-Report-Only", value: expect.stringContaining("report-uri /api/security/csp-report") },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }
         ])

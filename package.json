@@ -15,7 +15,7 @@
     "test:watch": "vitest --project unit --project integration --project ui",
     "test:coverage": "vitest run --coverage --project unit --project integration --project ui",
     "test:e2e:preflight": "node scripts/check-e2e-env.mjs",
-    "test:e2e": "npm run test:e2e:preflight && playwright test",
+    "test:e2e": "node scripts/run-e2e.mjs",
     "typecheck": "tsc --noEmit",
     "agent:impact": "node scripts/check-agent-impact.mjs",
     "guardrails": "node scripts/check-git-guardrails.mjs",
@@ -24,6 +24,8 @@
     "prepare": "husky",
     "clean": "rimraf .next",
     "sql:build-schema": "node scripts/build-schema-sql.mjs",
+    "sql:package": "node scripts/package-sql-artifact.mjs",
+    "sql:publish-artifact": "node scripts/publish-sql-artifact.mjs",
     "storage:copy": "node scripts/copy-storage-bucket.mjs"
   },
   "dependencies": {

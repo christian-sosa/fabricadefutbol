@@ -1,10 +1,11 @@
-import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
-import { normalizeEmail } from "@/lib/org";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export function isSuperAdminEmail(email: string | null | undefined) {
-  if (!email || !SUPER_ADMIN_EMAIL) return false;
-  return normalizeEmail(email) === SUPER_ADMIN_EMAIL;
+export async function getSessionIsSuperAdmin(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>
+) {
+  const { data, error } = await supabase.rpc("is_super_admin");
+  if (error) throw new Error("No se pudieron verificar los permisos de administración.");
+  return data === true;
 }
 
 export async function getCurrentUserIsSuperAdmin() {
@@ -13,5 +14,6 @@ export async function getCurrentUserIsSuperAdmin() {
     data: { user }
   } = await supabase.auth.getUser();
 
-  return isSuperAdminEmail(user?.email);
+  if (!user) return false;
+  return getSessionIsSuperAdmin(supabase);
 }

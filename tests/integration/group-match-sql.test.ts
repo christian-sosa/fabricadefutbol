@@ -1,7 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { executePrivateSql, privateSqlAvailable } from "../helpers/private-sql";
 
 const sqlPath = path.join(process.cwd(), "supabase/group-match-workflow.sql");
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -10,7 +11,7 @@ const player = (n: number) => id(100 + n);
 const assignments = [1, 2, 3, 4].map((n) => ({ participantId: `player:${player(n)}`, team: n < 3 ? "A" : "B" }));
 
 // SQL remains an intentionally local operational source, as required by AGENTS.md.
-describe.skipIf(!existsSync(sqlPath))("group match transactions (real PostgreSQL)", () => {
+describe.skipIf(!privateSqlAvailable(sqlPath))("group match transactions (real PostgreSQL)", () => {
   let db: PGlite;
   beforeAll(async () => {
     db = new PGlite();
@@ -23,6 +24,7 @@ describe.skipIf(!existsSync(sqlPath))("group match transactions (real PostgreSQL
       create type public.match_status as enum ('draft', 'confirmed', 'finished', 'cancelled');
       create table public.organizations (id uuid primary key, created_by uuid);
       create function public.is_org_admin(p_id uuid) returns boolean language sql stable as $$ select exists(select 1 from public.organizations where id = p_id and created_by = auth.uid()) $$;
+      create function public.can_write_org(p_id uuid) returns boolean language sql stable as $$ select public.is_org_admin(p_id) $$;
       create table public.players (id uuid primary key, organization_id uuid references public.organizations, full_name text not null, current_rating numeric not null default 1000, active boolean default true);
       create table public.organization_seasons (id uuid primary key default gen_random_uuid(), organization_id uuid references public.organizations, label text, duration_months int, starts_at date, ends_at date, status text, created_by uuid, closed_at timestamptz);
       create unique index seasons_one_active on public.organization_seasons(organization_id) where status = 'active';
@@ -36,7 +38,7 @@ describe.skipIf(!existsSync(sqlPath))("group match transactions (real PostgreSQL
       create table public.match_result (id uuid primary key default gen_random_uuid(), match_id uuid unique references public.matches, score_a int check(score_a >= 0), score_b int check(score_b >= 0), winner_team public.winner_team, mvp_player_id uuid references public.players, mvp_guest_id uuid references public.match_guests, mvp_display_name text, notes text, created_by uuid);
       create table public.rating_history (id uuid primary key default gen_random_uuid(), match_id uuid references public.matches, player_id uuid references public.players, season_id uuid references public.organization_seasons, rating_before numeric, rating_after numeric, delta numeric, season_rating_before numeric, season_rating_after numeric, season_delta numeric, reason text, unique(match_id, player_id, reason));
     `);
-    await db.exec(readFileSync(sqlPath, "utf8"));
+    await executePrivateSql(db, readFileSync(sqlPath, "utf8").split("-- Integrity and lifecycle boundaries.")[0], "group-match-workflow.sql");
   }, 30_000);
   afterAll(async () => { await db?.close(); });
   beforeEach(async () => {
@@ -112,7 +114,7 @@ describe.skipIf(!existsSync(sqlPath))("group match transactions (real PostgreSQL
   it("rejects stale saves and concurrent retries with the same version", async () => {
     const outcomes = await Promise.allSettled([save({ scoreA: 1, scoreB: 0 }), save({ scoreA: 0, scoreB: 2 })]);
     expect(outcomes.filter((o) => o.status === "fulfilled")).toHaveLength(1);
-    expect(outcomes.find((o) => o.status === "rejected")).toMatchObject({ status: "rejected", reason: expect.objectContaining({ code: "40001" }) });
+    expect(outcomes.find((o) => o.status === "rejected")).toMatchObject({ status: "rejected", reason: expect.objectContaining({ code: "PT409" }) });
     expect(await history()).toHaveLength(4);
   });
   it("rejects replacements from another group and duplicate assignments", async () => {
@@ -181,7 +183,7 @@ describe.skipIf(!existsSync(sqlPath))("group match transactions (real PostgreSQL
   it("rebuilds legacy actas and infers historical handicap without changing ratings", async () => {
     await save({ scoreA: 1, scoreB: 0, lineup: { assignments: assignments.map((a, i) => i === 1 ? { ...a, team: "OUT" } : a), absencePenaltyParticipantIds: [`player:${player(2)}`], handicapTeam: "A" } });
     await db.exec("update public.matches set lineup_snapshot = '[]'::jsonb; update public.match_result set handicap_team = null");
-    await db.exec(readFileSync(sqlPath, "utf8"));
+    await executePrivateSql(db, readFileSync(sqlPath, "utf8").split("-- Integrity and lifecycle boundaries.")[0], "group-match-workflow.sql");
     expect((await db.query("select handicap_team from public.match_result")).rows[0]).toEqual({ handicap_team: "A" });
     const snapshot = (await db.query<{ lineup_snapshot: Array<{ participantId: string; penalized: boolean }> }>("select lineup_snapshot from public.matches")).rows[0].lineup_snapshot;
     expect(snapshot.find((p) => p.participantId === `player:${player(2)}`)).toMatchObject({ penalized: true });

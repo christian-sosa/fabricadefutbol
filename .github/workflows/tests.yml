@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -25,6 +28,8 @@ jobs:
       - name: Restore private SQL validation artifact
         env:
           GROUPS_SQL_BUNDLE_GZIP_BASE64: ${{ secrets.GROUPS_SQL_BUNDLE_GZIP_BASE64 }}
+          NEXT_PUBLIC_SUPABASE_URL_DEV: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL_DEV }}
+          SUPABASE_SERVICE_ROLE_KEY_DEV: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_DEV }}
         run: |
           node scripts/restore-ci-sql.mjs
           npm run sql:build-schema -- app_dev
@@ -56,102 +61,54 @@ jobs:
   e2e-smoke:
     needs: quality
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
+    concurrency:
+      group: groups-shared-app-dev-e2e
+      cancel-in-progress: false
     env:
+      NEXT_PUBLIC_SUPABASE_TARGET_ENV: development
+      E2E_BASE_URL: http://127.0.0.1:3001
+      APP_URL_DEV: http://127.0.0.1:3001
+      NEXT_PUBLIC_APP_URL_DEV: http://127.0.0.1:3001
       NEXT_PUBLIC_SUPABASE_URL_DEV: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL_DEV }}
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV }}
       SUPABASE_SERVICE_ROLE_KEY_DEV: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_DEV }}
       NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV: ${{ secrets.NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV }}
       SUPABASE_PLAYER_PHOTOS_BUCKET_DEV: ${{ secrets.SUPABASE_PLAYER_PHOTOS_BUCKET_DEV }}
       E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+      E2E_ADMIN_USER_ID: ${{ secrets.E2E_ADMIN_USER_ID }}
       E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
       E2E_ORG_SLUG: ${{ secrets.E2E_ORG_SLUG }}
       E2E_ORG_NAME: ${{ secrets.E2E_ORG_NAME }}
-      SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
 
     steps:
-      - name: Check E2E secrets
-        id: e2e-secrets
-        shell: bash
-        run: |
-          required=(
-            NEXT_PUBLIC_SUPABASE_URL_DEV
-            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV
-            SUPABASE_SERVICE_ROLE_KEY_DEV
-            NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV
-            SUPABASE_PLAYER_PHOTOS_BUCKET_DEV
-            E2E_ADMIN_EMAIL
-            E2E_ADMIN_PASSWORD
-            E2E_ORG_SLUG
-          )
-
-          missing=()
-          for key in "${required[@]}"; do
-            if [ -z "${!key}" ]; then
-              missing+=("$key")
-            fi
-          done
-
-          if [ "${#missing[@]}" -gt 0 ]; then
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping E2E smoke. Missing secrets: ${missing[*]}"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Checkout
-        if: steps.e2e-secrets.outputs.ready == 'true'
         uses: actions/checkout@v4
 
       - name: Setup Node
-        if: steps.e2e-secrets.outputs.ready == 'true'
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
-        if: steps.e2e-secrets.outputs.ready == 'true'
         run: npm ci
 
+      - name: Validate mandatory E2E configuration
+        run: npm run test:e2e:preflight
+
       - name: Install Playwright browser
-        if: steps.e2e-secrets.outputs.ready == 'true'
         run: npx playwright install --with-deps chromium
 
-      - name: Write .env.test
-        if: steps.e2e-secrets.outputs.ready == 'true'
-        run: |
-          cat <<'EOF' > .env.test
-          SUPABASE_TARGET_ENV=development
-          NEXT_PUBLIC_SUPABASE_URL_DEV=${NEXT_PUBLIC_SUPABASE_URL_DEV}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY_DEV}
-          SUPABASE_SERVICE_ROLE_KEY_DEV=${SUPABASE_SERVICE_ROLE_KEY_DEV}
-          NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV=${NEXT_PUBLIC_SUPABASE_DB_SCHEMA_DEV}
-          SUPABASE_PLAYER_PHOTOS_BUCKET_DEV=${SUPABASE_PLAYER_PHOTOS_BUCKET_DEV}
-          E2E_BASE_URL=http://127.0.0.1:3001
-          APP_URL_DEV=http://127.0.0.1:3001
-          NEXT_PUBLIC_APP_URL_DEV=http://127.0.0.1:3001
-          E2E_ADMIN_EMAIL=${E2E_ADMIN_EMAIL}
-          E2E_ADMIN_PASSWORD=${E2E_ADMIN_PASSWORD}
-          E2E_ORG_SLUG=${E2E_ORG_SLUG}
-          E2E_ORG_NAME=${E2E_ORG_NAME}
-          SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL}
-          EOF
-
-      - name: Run smoke E2E
-        if: steps.e2e-secrets.outputs.ready == 'true'
+      - name: Build and test desktop and mobile
         run: npm run test:e2e
 
-      - name: Skip smoke E2E
-        if: steps.e2e-secrets.outputs.ready != 'true'
-        run: echo "Smoke E2E skipped because required test secrets are not configured."
-
-      - name: Upload Playwright report
-        if: failure() && steps.e2e-secrets.outputs.ready == 'true'
+      # This repository is public. Traces/HTML may contain the fixture's login or cookies.
+      - name: Upload visual evidence without credentials
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-screenshots
           path: |
-            playwright-report
-            test-results
+            test-results/**/*.png
           if-no-files-found: warn

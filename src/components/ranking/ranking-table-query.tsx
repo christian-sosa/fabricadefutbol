@@ -7,6 +7,9 @@ import { PlayerPhotoModalTrigger } from "@/components/ui/player-photo-modal-trig
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { useOrganizationStandingsQuery } from "@/lib/query/hooks";
 import { rankPlayers } from "@/lib/domain/player-ranking";
+import { QueryFeedback } from "@/components/ui/query-feedback";
+import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { cn, formatRendimiento } from "@/lib/utils";
 import type { PlayerComputedStats, PlayerRecentResult } from "@/types/domain";
 
@@ -192,7 +195,7 @@ function RecentResults({ results, className }: { results?: PlayerRecentResult[];
 }
 
 export function RankingTableQuery({ organizationId, initialPlayers, season = "current" }: RankingTableQueryProps) {
-  const { data, isFetching } = useOrganizationStandingsQuery({
+  const { data, isFetching, isError, refetch } = useOrganizationStandingsQuery({
     organizationId,
     season,
     initialData: initialPlayers
@@ -218,34 +221,15 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
   };
 
   return (
-    <Card className="overflow-hidden border-slate-800 bg-slate-900/85 p-0 shadow-[0_18px_45px_-20px_rgba(16,185,129,0.55)]">
-      {isFetching ? (
-        <p aria-live="polite" className="sr-only">
-          Actualizando tabla...
-        </p>
-      ) : null}
+    <Card className="overflow-hidden border-slate-800 bg-slate-900/85 p-0">
+      <QueryFeedback error={isError} fetching={isFetching} hasData={Boolean(players.length)} onRetry={refetch} />
 
       <div className="space-y-3 p-3 lg:hidden">
-        <div className="scrollbar-none flex gap-2 overflow-x-auto pb-1">
-          {SORTABLE_COLUMNS.map((column) => {
-            const isActive = sortKey === column.key;
-            return (
-              <button
-                aria-label={`Ordenar por ${column.label}`}
-                className={cn(
-                  "inline-flex min-h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition",
-                  isActive
-                    ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
-                    : "border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-500 hover:text-slate-100"
-                )}
-                key={column.key}
-                onClick={() => onSort(column.key)}
-                type="button"
-              >
-                <SortLabel active={isActive} direction={sortDirection} label={column.label} />
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-2">
+          <Select aria-label="Ordenar ranking por" onChange={(event) => { const key = event.target.value as SortKey; setSortKey(key); setSortDirection(getInitialSortDirection(key)); }} value={sortKey}>
+            {SORTABLE_COLUMNS.map((column) => <option key={column.key} value={column.key}>{column.key === "rank" ? "Puesto actual" : column.label}</option>)}
+          </Select>
+          <Button aria-label={sortDirection === "desc" ? "Cambiar a orden ascendente" : "Cambiar a orden descendente"} onClick={() => setSortDirection((value) => value === "desc" ? "asc" : "desc")} variant="secondary">{sortDirection === "desc" ? "↓" : "↑"}</Button>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -253,18 +237,18 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
             const rank = player.currentRank;
             return (
               <article className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5" key={player.playerId}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
                     <span
                       className={cn(
-                        "inline-flex min-w-[4.25rem] justify-center rounded-full border px-3 py-1.5 text-sm font-black",
+                        "inline-flex min-w-9 shrink-0 justify-center rounded-full border px-1.5 py-1.5 text-sm font-black",
                         PODIUM_RANK_STYLES[rank] ?? "border-slate-700 bg-slate-800 text-slate-200"
                       )}
                     >
                       #{rank}
                     </span>
                     <PlayerPhotoModalTrigger
-                      avatarSize="md"
+                      avatarSize="sm"
                       hasPhoto={player.photoPath === undefined ? undefined : Boolean(player.photoPath)}
                       photoUpdatedAt={player.photoUpdatedAt}
                       nameClassName="min-w-0 break-words leading-tight"
@@ -274,12 +258,15 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
                     />
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Rendimiento</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Puntos</p>
                     <p className="text-2xl font-black text-emerald-300">{formatRendimiento(player.currentRating)}</p>
+                    <p className="text-xs font-semibold text-amber-200">{player.mvpCount ?? 0} MVP</p>
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-3">
+                <details className="mt-2 border-t border-slate-800">
+                  <summary className="flex min-h-11 cursor-pointer items-center text-xs font-semibold text-slate-400">Estadísticas de {player.playerName}</summary>
+                <div className="py-2">
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-300">Últimos 5</p>
                     <p className="text-[10px] text-slate-500">Reciente a la derecha</p>
@@ -287,8 +274,8 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
                   <RecentResults className="mt-2 justify-end" results={player.recentResults} />
                 </div>
 
-                <div className="mt-3 grid grid-cols-5 gap-1.5 text-center text-sm">
-                  {STAT_CARDS.map((item) => (
+                <div className="mt-2 grid grid-cols-4 gap-1.5 text-center text-sm">
+                  {STAT_CARDS.filter((item) => item.key !== "mvpCount").map((item) => (
                     <div
                       className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 px-1.5 py-2"
                       key={item.key}
@@ -298,11 +285,12 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
                     </div>
                   ))}
                 </div>
+                </details>
               </article>
             );
           })}
 
-          {!sortedPlayers.length ? (
+          {!sortedPlayers.length && !isError ? (
             <p className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-6 text-sm text-slate-400 sm:col-span-2">
               {isFetching ? "Cargando ranking..." : "No hay jugadores para este grupo."}
             </p>
@@ -384,7 +372,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
               );
             })}
 
-            {!sortedPlayers.length ? (
+            {!sortedPlayers.length && !isError ? (
               <tr>
                 <TD className="px-3 py-6 text-sm text-slate-400" colSpan={9}>
                   {isFetching ? "Cargando ranking..." : "No hay jugadores para este grupo."}

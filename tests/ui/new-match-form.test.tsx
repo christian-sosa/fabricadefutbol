@@ -2,8 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/app/admin/(panel)/matches/new/actions", () => ({
-  createMatchAction: vi.fn()
+vi.mock("@/app/admin/(panel)/form-actions", () => ({
+  createMatchFormAction: vi.fn(async () => ({ error: null }))
 }));
 
 import { NewMatchForm } from "@/components/admin/new-match-form";
@@ -34,6 +34,19 @@ function getCheckbox(container: HTMLElement, name: string, value: string) {
 }
 
 describe("NewMatchForm", () => {
+  it("distingue convocar de marcar arquero con etiquetas propias", async () => {
+    const user = userEvent.setup();
+    render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={buildPlayers(10)} />);
+    const plays = screen.getByRole("checkbox", { name: "Juega Jugador 1" });
+    await user.click(plays);
+    const goalkeeper = screen.getByRole("checkbox", { name: "Arquero Jugador 1" });
+    await user.click(goalkeeper);
+    expect(plays).toBeChecked();
+    expect(goalkeeper).toBeChecked();
+    await user.click(goalkeeper);
+    expect(plays).toBeChecked();
+    expect(goalkeeper).not.toBeChecked();
+  });
   it("precarga el partido anterior y permite revisar la nueva fecha", () => {
     const players = buildPlayers(10);
     const { container } = render(<NewMatchForm defaultScheduledDate="2026-09-20" organizationId="org-1" players={players}

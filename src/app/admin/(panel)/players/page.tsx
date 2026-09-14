@@ -2,19 +2,19 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import {
-  bulkUpdatePlayersAction,
-  createPlayerAction,
-  deletePlayerAction,
-  uploadPlayerPhotoAction
+  deletePlayerAction
 } from "@/app/admin/(panel)/players/actions";
+import { createPlayerFormAction, updatePlayersFormAction, uploadPlayerPhotoFormAction } from "@/app/admin/(panel)/form-actions";
+import { ActionForm } from "@/components/ui/action-form";
+import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { PhotoUploadInput } from "@/components/admin/photo-upload-input";
-import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
+import { secondaryActionClass } from "@/components/ui/styles";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { DEFAULT_SKILL_LEVEL, formatSkillLevelLabel, SKILL_LEVEL_OPTIONS } from "@/lib/domain/skill-level";
 import { getAdminPlayers } from "@/lib/queries/admin";
@@ -22,18 +22,17 @@ import { withOrgQuery } from "@/lib/org";
 import { BulkCreatePlayersForm } from "./bulk-create-form";
 
 const primaryActionLinkClass =
-  "inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110";
+  "inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110";
 
-const secondaryActionLinkClass =
-  "inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300";
+const secondaryActionLinkClass = secondaryActionClass;
 
 const playersRosterGridColumns =
-  "lg:grid-cols-[minmax(220px,2fr)_minmax(170px,0.9fr)_minmax(260px,1.6fr)_80px]";
+  "lg:grid-cols-[minmax(220px,2fr)_minmax(170px,0.9fr)_minmax(240px,1.4fr)]";
 
 export default async function AdminPlayersPage({
   searchParams
 }: {
-  searchParams: Promise<{ org?: string; error?: string; success?: string; refresh?: string; view?: string }>;
+  searchParams: Promise<{ org?: string; error?: string; success?: string; notice?: string; photoPlayer?: string; refresh?: string; view?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const { admin, selectedOrganization } = await requireAdminOrganization(resolvedSearchParams.org);
@@ -75,8 +74,9 @@ export default async function AdminPlayersPage({
           </div>
         </div>
 
-        {error ? <p className="mt-3 text-sm font-semibold text-danger">{error}</p> : null}
-        {success ? <p className="mt-3 text-sm font-semibold text-emerald-300">{success}</p> : null}
+        {error ? <p className="mt-3 text-sm font-semibold text-danger" role="alert">{error}</p> : null}
+        {success ? <p className="mt-3 text-sm font-semibold text-emerald-300" role="status">{success}</p> : null}
+        {resolvedSearchParams.notice ? <p className="mt-3 text-sm font-semibold text-amber-200" role="status">{resolvedSearchParams.notice}</p> : null}
       </Card>
 
       {showCreateForm ? (
@@ -93,7 +93,7 @@ export default async function AdminPlayersPage({
           <CardDescription>
             Carga jugadores nuevos para el grupo seleccionado. El nivel manual se usa como base para ordenar la planilla.
           </CardDescription>
-          <form action={createPlayerAction} className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_220px_1.2fr_auto] lg:items-start">
+          <ActionForm action={createPlayerFormAction} className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_220px_1.2fr_auto] lg:items-start">
             <input name="organizationId" type="hidden" value={selectedOrganization.id} />
             <Input aria-label="Nombre completo del jugador" name="fullName" placeholder="Nombre completo" required />
             <Select aria-label="Nivel de habilidad" defaultValue={String(DEFAULT_SKILL_LEVEL)} name="skillLevel" required>
@@ -104,10 +104,10 @@ export default async function AdminPlayersPage({
               ))}
             </Select>
             <PhotoUploadInput hint="Foto opcional. JPG, PNG o WEBP." required={false} />
-            <Button className="lg:self-start" type="submit">
+            <FormSubmitButton className="lg:self-start" pendingLabel="Creando jugador…">
               Crear jugador
-            </Button>
-          </form>
+            </FormSubmitButton>
+          </ActionForm>
         </Card>
       ) : null}
 
@@ -119,9 +119,11 @@ export default async function AdminPlayersPage({
             La foto se actualiza en la fila de cada jugador.
           </CardDescription>
 
-          <form action={bulkUpdatePlayersAction} id={bulkFormId} key={formRenderKey}>
+          <ActionForm action={updatePlayersFormAction} className="sticky top-20 z-10 mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/95 p-3" id={bulkFormId} key={formRenderKey}>
             <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-          </form>
+            <FormSubmitButton pendingLabel="Guardando planilla…">Guardar toda la planilla</FormSubmitButton>
+            <span className="text-xs text-slate-400">Guardá los cambios de nombre y nivel juntos.</span>
+          </ActionForm>
 
           <div className="mt-4 space-y-3">
             <div
@@ -129,7 +131,6 @@ export default async function AdminPlayersPage({
             >
               <span>Jugador</span>
               <span>Nivel</span>
-              <span>Foto</span>
               <span>Acciones</span>
             </div>
 
@@ -137,6 +138,7 @@ export default async function AdminPlayersPage({
               <div
                 className={`grid ${playersRosterGridColumns} gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3 lg:items-start`}
                 key={player.id}
+                id={`player-${player.id}`}
               >
                 <input form={bulkFormId} name="playerId" type="hidden" value={player.id} />
                 <div className="min-w-0 space-y-1.5">
@@ -144,13 +146,10 @@ export default async function AdminPlayersPage({
                     <PlayerAvatar hasPhoto={Boolean(player.photo_path)} name={player.full_name} photoUpdatedAt={player.photo_updated_at} playerId={player.id} size="sm" />
                     <Input aria-label={`Nombre de ${player.full_name}`} className="min-w-0" defaultValue={player.full_name} form={bulkFormId} name="fullName" required />
                   </div>
-                  <p className="text-xs text-slate-400">
-                    Creado {new Date(player.created_at).toLocaleDateString("es-AR")}
-                  </p>
                 </div>
                 <Select
                   aria-label={`Nivel de habilidad de ${player.full_name}`}
-                  className="h-[38px] min-w-[170px]"
+                  className="min-w-0"
                   defaultValue={String(player.skill_level)}
                   form={bulkFormId}
                   name="skillLevel"
@@ -162,33 +161,33 @@ export default async function AdminPlayersPage({
                     </option>
                   ))}
                 </Select>
-                <form
-                  action={uploadPlayerPhotoAction}
+                <details open={resolvedSearchParams.photoPlayer === player.id}>
+                  <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-slate-300">Foto y acciones de {player.full_name}</summary>
+                <ActionForm
+                  action={uploadPlayerPhotoFormAction}
                   className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_112px] lg:items-start lg:self-start"
                 >
                   <input name="organizationId" type="hidden" value={selectedOrganization.id} />
                   <input name="playerId" type="hidden" value={player.id} />
                   <PhotoUploadInput compact hint="JPG, PNG o WEBP. Reemplaza la foto actual." />
-                  <Button className="h-[38px] w-full lg:w-auto" type="submit" variant="secondary">
+                  <FormSubmitButton className="w-full lg:w-auto" pendingLabel="Subiendo…" variant="secondary">
                     Subir foto
-                  </Button>
-                </form>
-                <form action={deletePlayerAction} className="lg:self-start lg:justify-self-start">
+                  </FormSubmitButton>
+                </ActionForm>
+                <form action={deletePlayerAction} className="mt-3">
                   <input name="organizationId" type="hidden" value={selectedOrganization.id} />
                   <input name="deletePlayerId" type="hidden" value={player.id} />
                   <ConfirmSubmitButton
-                    className="h-[38px] px-3 text-xs"
+                    className="px-3 text-xs"
                     confirmMessage={`Estas seguro de eliminar a ${player.full_name}?`}
                     label="Eliminar"
                     variant="danger"
                   />
                 </form>
+                </details>
               </div>
             ))}
 
-            <Button form={bulkFormId} type="submit">
-              Guardar toda la planilla
-            </Button>
           </div>
         </Card>
       ) : null}

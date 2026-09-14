@@ -3,7 +3,8 @@ import { z } from "zod";
 import { isClientAnalyticsEventName, sanitizeAnalyticsPath, sanitizeAnalyticsProperties } from "@/lib/analytics/events";
 import { ANALYTICS_REFERRAL_COOKIE, ANALYTICS_SESSION_COOKIE, referralSchema } from "@/lib/analytics/attribution";
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
-import { checkRateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
+import { getClientIpFromHeaders } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/shared-rate-limit";
 
 const schema = z.object({ eventName: z.string().max(60), sessionId: z.string().uuid().optional(), source: z.string().max(80).optional(), path: z.string().max(500).nullable().optional(), properties: z.record(z.unknown()).optional() }).strict();
 const MAX_BYTES = 8192;
@@ -31,7 +32,7 @@ async function readBoundedJson(request: Request) {
 export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin");
   if (origin && origin !== request.nextUrl.origin) return NextResponse.json({ error: "Origen inválido." }, { status: 403 });
-  const limit = checkRateLimit({ key: `analytics:${getClientIpFromHeaders(request.headers)}`, limit: 60, windowMs: 60_000 });
+  const limit = await checkSharedRateLimit({ key: `analytics:${getClientIpFromHeaders(request.headers)}`, limit: 60, windowMs: 60_000 });
   if (!limit.allowed) return NextResponse.json({ error: "Demasiados eventos." }, { status: 429, headers: { "retry-after": "60" } });
   let body: unknown;
   try { body = await readBoundedJson(request); } catch (error) {

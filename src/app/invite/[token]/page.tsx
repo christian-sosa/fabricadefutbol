@@ -5,6 +5,7 @@ import { acceptInviteAction } from "@/app/invite/[token]/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { buildAdminLoginPath } from "@/lib/auth/redirects";
+import { requiresMfaVerification } from "@/lib/auth/mfa";
 import { normalizeEmail } from "@/lib/org";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -74,10 +75,17 @@ export default async function InviteByLinkPage({
 
   const { data: organization } = await privilegedSupabase
     .from("organizations")
-    .select("id, name")
+    .select("id, name, archived_at")
     .eq("id", invite.organization_id)
     .maybeSingle();
   const organizationName = organization?.name ?? "este grupo";
+
+  if (!organization || organization.archived_at) {
+    return <div className="py-6"><Card><CardTitle>Grupo no disponible</CardTitle>
+      <CardDescription>Este grupo no está disponible para aceptar invitaciones.</CardDescription>
+      <Link className="mt-3 inline-flex py-3 text-emerald-300" href="/admin">Volver a mis grupos</Link>
+    </Card></div>;
+  }
 
   if (invite.expires_at) {
     const expiresAtMs = Date.parse(invite.expires_at);
@@ -105,6 +113,8 @@ export default async function InviteByLinkPage({
   if (!user?.id || !user.email) {
     redirect(loginHref);
   }
+
+  if (await requiresMfaVerification(supabase, user)) redirect("/admin/security");
 
   const userEmail = normalizeEmail(user.email);
   const invitedEmail = normalizeEmail(invite.email);

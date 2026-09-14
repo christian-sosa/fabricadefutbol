@@ -4,7 +4,8 @@ const { factory, limit } = vi.hoisted(() => ({ factory: vi.fn(), limit: vi.fn(()
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: factory }));
 vi.mock("next/headers", () => ({ headers: vi.fn(async () => new Headers()) }));
 vi.mock("next/navigation", () => ({ redirect: (path: string) => { throw new Error(`redirect:${path}`); } }));
-vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: limit, getClientIpFromHeaders: () => "test-ip" }));
+vi.mock("@/lib/rate-limit", () => ({ getClientIpFromHeaders: () => "test-ip" }));
+vi.mock("@/lib/shared-rate-limit", () => ({ checkSharedRateLimit: limit }));
 import { requestPasswordRecovery } from "@/app/admin/(auth)/forgot-password/actions";
 import { updateRecoveredPassword } from "@/app/admin/(auth)/reset-password/actions";
 import { GET } from "@/app/auth/recovery/route";
