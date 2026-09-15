@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { generateBalancedTeamOptions } from "@/lib/domain/team-generator";
+import { MATCH_MODALITIES, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 
 function buildPlayers(count: number) {
   return Array.from({ length: count }, (_, index) => ({
@@ -11,6 +12,21 @@ function buildPlayers(count: number) {
 }
 
 describe("generateBalancedTeamOptions", () => {
+  it.each(MATCH_MODALITIES)("arma %s con planteles completos, sin duplicados y arqueros separados", (modality) => {
+    const size = TEAM_SIZE_BY_MODALITY[modality];
+    const players = buildPlayers(size * 2);
+    const options = generateBalancedTeamOptions({ modality, players, seed: 20260915,
+      requiredSeparatedPairs: [[players[0].id, players[1].id]] });
+    expect(options).toHaveLength(3);
+    for (const option of options) {
+      expect(option.teamA).toHaveLength(size);
+      expect(option.teamB).toHaveLength(size);
+      expect(new Set([...option.teamA, ...option.teamB].map((player) => player.id)))
+        .toEqual(new Set(players.map((player) => player.id)));
+      expect(option.teamA.some((player) => player.id === players[0].id))
+        .not.toBe(option.teamA.some((player) => player.id === players[1].id));
+    }
+  });
   it("falla si la cantidad no coincide con la modalidad", () => {
     expect(() =>
       generateBalancedTeamOptions({

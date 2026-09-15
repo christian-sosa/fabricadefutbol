@@ -35,6 +35,23 @@ function getCheckbox(container: HTMLElement, name: string, value: string) {
 }
 
 describe("NewMatchForm", () => {
+  it("ofrece F10 y exige exactamente 20 convocados", async () => {
+    const user = userEvent.setup();
+    const players = buildPlayers(21);
+    render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={players}
+      initialValues={{ modality: "10v10", playerIds: players.slice(0, 19).map((player) => player.id), goalkeeperPlayerIds: [], guests: [] }} />);
+    expect(screen.getByRole("option", { name: "10 vs 10 (20 jugadores)" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Modalidad")).toHaveValue("10v10");
+    const submit = screen.getByRole("button", { name: "Crear partido y generar equipos" });
+    expect(submit).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Falta 1 convocado");
+    await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 20" }));
+    expect(submit).toBeEnabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Convocatoria completa: 20 de 20");
+    await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 21" }));
+    expect(submit).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Sobra 1 convocado");
+  });
   it("habilita la generación automática sólo con la cantidad exacta y cero o dos arqueros", async () => {
     const user = userEvent.setup();
     const players = buildPlayers(11);

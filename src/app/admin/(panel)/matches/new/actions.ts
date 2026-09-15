@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/lib/auth/admin";
-import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
+import { MATCH_MODALITIES, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { createDraftMatchWithOptions } from "@/lib/domain/match-workflow";
 import { parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
 import { matchDateAndTimeToIso } from "@/lib/match-datetime";
@@ -22,7 +22,7 @@ const schema = z.object({
   organizationId: z.string().uuid(),
   scheduledDate: z.string().optional(),
   scheduledTime: z.string().min(1, "La hora es obligatoria."),
-  modality: z.enum(["5v5", "6v6", "7v7", "9v9", "11v11"]),
+  modality: z.enum(MATCH_MODALITIES),
   location: z.string().optional(),
   teamALabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del primer equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),
   teamBLabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del segundo equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),

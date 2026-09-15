@@ -69,7 +69,11 @@ async function placeTeamPlayers(region: Locator, teamLabel: string, expectedPlay
 }
 
 for (const scenario of [
+  { modality: "5v5", size: 5, guests: 0, schemeA: "2-2", schemeB: "1-2-1" },
+  { modality: "6v6", size: 6, guests: 2, schemeA: "2-2-1", schemeB: "1-3-1" },
+  { modality: "7v7", size: 7, guests: 4, schemeA: "2-3-1", schemeB: "3-1-2" },
   { modality: "9v9", size: 9, guests: 8, schemeA: "4-2-2", schemeB: "2-4-2" },
+  { modality: "10v10", size: 10, guests: 10, schemeA: "3-3-3", schemeB: "4-4-1" },
   { modality: "11v11", size: 11, guests: 12, schemeA: "3-5-2", schemeB: "4-2-3-1" }
 ]) {
   test(`${scenario.modality}: oculta niveles, arma las canchas y comparte una formación persistente a 320px`, async ({ page, browser }, testInfo) => {

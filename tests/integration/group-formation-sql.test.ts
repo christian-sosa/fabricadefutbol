@@ -48,14 +48,14 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
       insert into APP.match_guests(id,match_id,guest_name,guest_rating) values('${id(80)}','${id(40)}','Invitado',2);`);
   });
 
-  async function prepare(size = 9, withGoalkeepers = true) {
+  async function prepare(size = 9, withGoalkeepers = true, confirmTeams = true) {
     await sql(`update APP.matches set modality='${size}v${size}',goalkeeper_player_ids='${withGoalkeepers ? `{${id(100)},${id(100 + size)}}` : "{}"}' where id='${id(40)}';
       insert into APP.match_players(match_id,player_id) select '${id(40)}',id from APP.players where organization_id='${id(10)}';
       insert into APP.team_option_players(team_option_id,player_id,team) select '${id(50)}',id,case when initial_rank<=${size} then 'A'::APP.team_side else 'B'::APP.team_side end
         from APP.players where organization_id='${id(10)}' and initial_rank < ${2 * size};
       insert into APP.team_option_guests(team_option_id,guest_id,team) values('${id(50)}','${id(80)}','B');`);
     await login();
-    await sql(`select APP.confirm_group_match_option('${id(40)}','${id(10)}','${id(50)}')`);
+    if (confirmTeams) await sql(`select APP.confirm_group_match_option('${id(40)}','${id(10)}','${id(50)}')`);
   }
   function formation(preset = "3-3-2", otherPreset = preset): Formation {
     const size = 1 + preset.split("-").reduce((total, value) => total + Number(value), 0);
@@ -65,6 +65,48 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
   }
   const matchState = () => rows(`select formation_data,formation_version,result_version,status,goalkeeper_player_ids from APP.matches where id='${id(40)}'`);
   const result = (input: unknown, version = 1, finish = true) => db.query(`select ${schema}.save_group_match_result($1,$2,$3,$4::jsonb,$5)`, [id(40), id(10), version, JSON.stringify(input), finish]);
+
+  it.each([
+    [5, "2-2"], [5, "1-2-1"], [5, "2-1-1"],
+    [6, "2-2-1"], [6, "1-3-1"], [6, "2-1-2"],
+    [7, "2-3-1"], [7, "3-2-1"], [7, "2-2-2"], [7, "3-1-2"],
+    [10, "3-3-3"], [10, "4-3-2"], [10, "3-4-2"], [10, "4-4-1"]
+  ] as const)("publishes and clears F%s %s with the exact confirmed players, guest and goalkeeper", async (size, preset) => {
+    await prepare(size);
+    const payload = formation(preset);
+    expect(await save(payload)).toEqual({ formation_version: 1 });
+    expect((await matchState())[0]).toMatchObject({ formation_version: 1, result_version: 1, status: "confirmed", formation_data: payload });
+    expect(await rows("select id from APP.players where current_rating <> 1000")).toEqual([]);
+    expect(await rows("select id from APP.rating_history")).toEqual([]);
+    expect(await save(null, 1)).toEqual({ formation_version: 2 });
+    expect((await matchState())[0]).toMatchObject({ formation_data: null, result_version: 1 });
+  });
+
+  it("regenerates and confirms F10 teams, then saves a symbolic figure without changing sporting contracts", async () => {
+    await prepare(10, true, false);
+    const payload = formation("3-3-3");
+    const generated = { teamA: payload.teamA.slots.map((slot) => ({ id: slot.participantId })), teamB: payload.teamB.slots.map((slot) => ({ id: slot.participantId })), ratingSumA: 10000, ratingSumB: 10000, ratingDiff: 0 };
+    await db.query(`select ${schema}.replace_group_match_options($1,$2,0,$3::jsonb)`, [id(40), id(10), JSON.stringify([generated])]);
+    const newOption = (await rows(`select id from APP.team_options where match_id='${id(40)}'`))[0].id;
+    await db.query(`select ${schema}.confirm_group_match_option($1,$2,$3)`, [id(40), id(10), newOption]);
+    expect(await save(payload)).toEqual({ formation_version: 1 });
+    await result({ scoreA: 2, scoreB: 1, mvpParticipantId: `player:${id(100)}` }, 2);
+    expect((await rows(`select current_rating from APP.players where id='${id(100)}'`))[0]).toEqual({ current_rating: "1010.00" });
+    expect(await rows("select id from APP.rating_history")).toHaveLength(19);
+    const ledger = await rows("select * from APP.rating_history order by id");
+    const seasonRatings = await rows("select * from APP.organization_season_player_ratings order by player_id");
+    await result({ scoreA: 2, scoreB: 1, notes: "Revisado", mvpParticipantId: `guest:${id(80)}` }, 3);
+    expect(await rows("select * from APP.rating_history order by id")).toEqual(ledger);
+    expect(await rows("select * from APP.organization_season_player_ratings order by player_id")).toEqual(seasonRatings);
+    expect((await matchState())[0]).toMatchObject({ status: "finished", result_version: 4, formation_version: 1, formation_data: payload });
+    expect((await rows("select mvp_guest_id from APP.match_result"))[0]).toEqual({ mvp_guest_id: id(80) });
+  });
+
+  it.each([[5, "3-1"], [6, "4-1"], [7, "1-4-1"], [10, "5-4"]] as const)("rejects an unlisted F%s preset %s even when its size is correct", async (size, preset) => {
+    await prepare(size);
+    await expect(save(formation(preset))).rejects.toMatchObject({ code: "22023" });
+    expect((await matchState())[0]).toMatchObject({ formation_data: null, formation_version: 0, result_version: 1 });
+  });
 
   it.each(["3-3-2", "3-2-3", "4-3-1", "4-2-2", "2-4-2"])("publishes F9 %s with guests without modifying the sporting version or points", async (preset) => {
     await prepare();
@@ -199,15 +241,19 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     expect(await rows("select id from APP.rating_history")).toEqual([]);
     expect(await rows("select id from APP.match_result")).toEqual([]);
   });
-  it("restricts formations to confirmed F9/F11 and retains the independent nonnegative version constraint", async () => {
+  it("restricts formations to confirmed matches and retains the independent nonnegative version constraint", async () => {
     await login();
     await expect(save(formation())).rejects.toMatchObject({ code: "22023" });
     await sql("reset role"); await prepare();
     await sql(`reset role; update APP.matches set status='cancelled' where id='${id(40)}'`); await login();
     await expect(save(formation())).rejects.toMatchObject({ code: "22023" });
-    await sql(`reset role; update APP.matches set status='confirmed',modality='7v7' where id='${id(40)}'`); await login();
-    await expect(save(formation())).rejects.toMatchObject({ code: "22023" });
     await sql("reset role");
     await expect(sql(`update APP.matches set formation_version=-1 where id='${id(40)}'`)).rejects.toMatchObject({ code: "23514" });
+  });
+  it("adds F10 without enabling F8 or dropping any existing modality", async () => {
+    expect(await rows("select unnest(enum_range(null::APP.match_modality))::text modality")).toEqual(
+      ["5v5", "6v6", "7v7", "9v9", "10v10", "11v11"].map((modality) => ({ modality }))
+    );
+    await expect(sql(`update APP.matches set modality='8v8' where id='${id(40)}'`)).rejects.toMatchObject({ code: "22P02" });
   });
 });
