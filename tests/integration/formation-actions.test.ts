@@ -11,11 +11,14 @@ vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: createClie
 vi.mock("next/cache", () => ({ revalidatePath: revalidate }));
 
 import { saveMatchFormationAction } from "@/app/admin/(panel)/matches/[id]/formation-actions";
+import { MATCH_MODALITIES, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
+import { FORMATION_PRESETS, type FormationModality } from "@/lib/domain/match-formation";
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const matchId = id(1), organizationId = id(2), optionId = id(3);
-function fixture(size = 9) {
-  const preset = size === 9 ? "3-3-2" : "4-2-3-1";
+function fixture(modality: FormationModality = "9v9") {
+  const size = TEAM_SIZE_BY_MODALITY[modality];
+  const preset = FORMATION_PRESETS[modality][0];
   const slotIds = ["gk", ...preset.split("-").flatMap((lineSize, line) => Array.from({ length: Number(lineSize) }, (_, position) => `line-${line}-${position}`))];
   const teamA = Array.from({ length: size }, (_, i) => ({ id: id(100 + i), full_name: `Jugador A ${i}`, is_guest: false }));
   const teamB = Array.from({ length: size }, (_, i) => ({ id: i === size - 1 ? `guest-${id(300)}` : id(200 + i), full_name: i === size - 1 ? "Invitado" : `Jugador B ${i}`, is_guest: i === size - 1 }));
@@ -110,8 +113,8 @@ describe("formation Server Action boundaries", () => {
     }
   });
 
-  it.each([9, 11])("saves both complete F%s teams with a guest through exactly one atomic RPC", async (size) => {
-    const { details, formation } = fixture(size);
+  it.each(MATCH_MODALITIES)("saves both complete %s teams with a guest through exactly one atomic RPC", async (modality) => {
+    const { details, formation } = fixture(modality);
     getDetails.mockResolvedValueOnce(details);
     rpc.mockResolvedValueOnce({ data: { formation_version: 8 }, error: null });
     expect(await call(formation, 7)).toEqual({ ok: true, version: 8 });
@@ -149,10 +152,11 @@ describe("formation Server Action boundaries", () => {
 
   it("rejects a mismatched modality, changed roster and moved marked goalkeeper before the RPC", async () => {
     const wrongModality = fixture(); wrongModality.details.match.modality = "7v7";
+    const unsupportedModality = fixture(); unsupportedModality.details.match.modality = "8v8";
     const shorterRoster = fixture(); shorterRoster.details.options[0].teamA.pop();
     const movedGoalkeeper = fixture();
     [movedGoalkeeper.formation.teamA.slots[0].participantId, movedGoalkeeper.formation.teamA.slots[1].participantId] = [movedGoalkeeper.formation.teamA.slots[1].participantId, movedGoalkeeper.formation.teamA.slots[0].participantId];
-    for (const candidate of [wrongModality, shorterRoster, movedGoalkeeper]) {
+    for (const candidate of [wrongModality, unsupportedModality, shorterRoster, movedGoalkeeper]) {
       getDetails.mockResolvedValueOnce(candidate.details);
       expect(await call(candidate.formation)).toMatchObject({ ok: false });
       expectNoWrite();

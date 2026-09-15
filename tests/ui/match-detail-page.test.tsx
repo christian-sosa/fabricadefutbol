@@ -25,12 +25,13 @@ vi.mock("@/lib/queries/public", () => ({
 }));
 
 import MatchDetailPage from "@/app/matches/[id]/page";
-import { getFormationPositions } from "@/lib/domain/match-formation";
+import { FORMATION_PRESETS, getFormationPositions } from "@/lib/domain/match-formation";
+import { MATCH_MODALITIES, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 
 describe("MatchDetailPage", () => {
-  it.each(["9v9", "11v11"])("shows saved %s pitches with names and no rating list", async (modality) => {
-    const size = modality === "9v9" ? 9 : 11;
-    const preset = size === 9 ? "3-3-2" : "4-2-3-1";
+  it.each(MATCH_MODALITIES)("shows saved %s pitches with names and no rating list", async (modality) => {
+    const size = TEAM_SIZE_BY_MODALITY[modality];
+    const preset = FORMATION_PRESETS[modality][0];
     const players = (side: string) => Array.from({ length: size }, (_, i) => ({ id: `${side}-${i}`, full_name: `${side} Jugador ${i}`, current_rating: 1234, is_guest: i === size - 1 }));
     const teamAPlayers = players("Azul"), teamBPlayers = players("Rojo");
     const formation = (pool: typeof teamAPlayers) => ({ formationId: preset, slots: getFormationPositions(preset).map((position, i) => ({ slotId: position.slotId, participantId: `${pool[i].is_guest ? "guest" : "player"}:${pool[i].id}` })) });

@@ -69,12 +69,13 @@ function buildPlayers(count: number) {
   }));
 }
 
-function buildManualMatchForm(playerIds: string[]) {
+function buildManualMatchForm(playerIds: string[], modality: "5v5" | "10v10" = "5v5") {
+  const teamSize = modality === "10v10" ? 10 : 5;
   const formData = new FormData();
   formData.set("organizationId", ORGANIZATION_ID);
   formData.set("scheduledDate", "2026-05-20");
   formData.set("scheduledTime", "20:00");
-  formData.set("modality", "5v5");
+  formData.set("modality", modality);
   formData.set("location", "Saturno");
   formData.set("creationMode", "manual");
   formData.set("teamALabel", "Los Pibes");
@@ -84,7 +85,7 @@ function buildManualMatchForm(playerIds: string[]) {
     JSON.stringify(
       playerIds.map((playerId, index) => ({
         participantId: `player:${playerId}`,
-        team: index < 5 ? "A" : "B"
+        team: index < teamSize ? "A" : "B"
       }))
     )
   );
@@ -104,15 +105,15 @@ describe("admin new match actions", () => {
     createSupabaseServerClientMock.mockReset();
   });
 
-  it("crea un partido manual con nombres de equipos y redirige a la pagina publica", async () => {
-    const players = buildPlayers(10);
+  it.each(["5v5", "10v10"] as const)("crea un partido manual %s con nombres de equipos y redirige a la pagina publica", async (modality) => {
+    const players = buildPlayers(modality === "10v10" ? 20 : 10);
     const fake = createFakeSupabase({
       organizations: [{ id: ORGANIZATION_ID, name: "La Banda", slug: "la-banda" }],
       players
     });
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
 
-    await expect(createMatchAction(buildManualMatchForm(players.map((player) => player.id)))).rejects.toMatchObject({
+    await expect(createMatchAction(buildManualMatchForm(players.map((player) => player.id), modality))).rejects.toMatchObject({
       digest: expect.stringContaining("NEXT_REDIRECT")
     });
 
@@ -120,6 +121,7 @@ describe("admin new match actions", () => {
     expect(match).toEqual(
       expect.objectContaining({
         status: "confirmed",
+        modality,
         team_a_label: "Los Pibes",
         team_b_label: "Veteranos"
       })

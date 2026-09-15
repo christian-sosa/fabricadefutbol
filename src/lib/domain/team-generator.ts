@@ -23,7 +23,7 @@ const STRONG_COUNT_DIFF_PENALTY = 30;
 const ELITE_COUNT_DIFF_PENALTY = 20;
 // Por encima de este numero de combinaciones totales evitamos enumerar todo
 // y usamos muestreo aleatorio. Cubre hasta 9v9 (C(17,8)=24310) sin cambios;
-// 11v11 (C(21,10)=352716) pasa al camino de muestreo.
+// 10v10 (C(19,9)=92378) y 11v11 (C(21,10)=352716) usan muestreo.
 const MAX_ENUMERATED_COMBINATIONS = 50_000;
 const SAMPLE_COMBINATIONS_TARGET = 50_000;
 

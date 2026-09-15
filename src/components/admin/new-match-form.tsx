@@ -10,7 +10,7 @@ import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
-import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
+import { MATCH_MODALITIES, MATCH_MODALITY_LABELS, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import {
   formatGuestSkillLevelLabel,
   formatRatingTrendBadgeLabel,
@@ -302,11 +302,11 @@ export function NewMatchForm({
             Modalidad
           </label>
           <Select id="modality" name="modality" onChange={(event) => setModality(event.target.value as MatchModality)} value={modality}>
-            <option value="5v5">5 vs 5 (10 jugadores)</option>
-            <option value="6v6">6 vs 6 (12 jugadores)</option>
-            <option value="7v7">7 vs 7 (14 jugadores)</option>
-            <option value="9v9">9 vs 9 (18 jugadores)</option>
-            <option value="11v11">11 vs 11 (22 jugadores)</option>
+            {MATCH_MODALITIES.map((modality) => (
+              <option key={modality} value={modality}>
+                {MATCH_MODALITY_LABELS[modality]} ({TEAM_SIZE_BY_MODALITY[modality] * 2} jugadores)
+              </option>
+            ))}
           </Select>
         </div>
         <div>

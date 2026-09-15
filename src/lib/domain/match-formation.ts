@@ -1,9 +1,15 @@
 import { z } from "zod";
+import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
+import type { MatchModality } from "@/types/domain";
 
 export const FORMATION_PRESETS = {
+  "5v5": ["2-2", "1-2-1", "2-1-1"],
+  "6v6": ["2-2-1", "1-3-1", "2-1-2"],
+  "7v7": ["2-3-1", "3-2-1", "2-2-2", "3-1-2"],
   "9v9": ["3-3-2", "3-2-3", "4-3-1", "4-2-2", "2-4-2"],
+  "10v10": ["3-3-3", "4-3-2", "3-4-2", "4-4-1"],
   "11v11": ["4-4-2", "4-3-3", "4-2-3-1", "3-5-2", "3-4-3", "5-3-2"]
-} as const;
+} as const satisfies Record<MatchModality, readonly string[]>;
 
 export type FormationModality = keyof typeof FORMATION_PRESETS;
 export type FormationPlayer = { participantId: string; name: string; isGoalkeeper?: boolean };
@@ -13,7 +19,7 @@ export type MatchFormation = { teamA: TeamFormation; teamB: TeamFormation };
 export type FormationSaveResult = { ok: true; version: number } | { ok: false; error: string; conflict?: boolean };
 
 export function supportsMatchFormation(modality: string): modality is FormationModality {
-  return modality === "9v9" || modality === "11v11";
+  return Object.hasOwn(FORMATION_PRESETS, modality);
 }
 
 export function getFormationPositions(formationId: string) {
@@ -57,15 +63,16 @@ export function assignFormationPlayer(formation: TeamFormation, slotId: string, 
 
 const teamSchema = z.object({
   formationId: z.string().max(16),
-  slots: z.array(z.object({ slotId: z.string().max(30), participantId: z.string().max(50).nullable() }).strict()).max(11)
+  slots: z.array(z.object({ slotId: z.string().max(30), participantId: z.string().max(50).nullable() }).strict())
+    .max(Math.max(...Object.values(TEAM_SIZE_BY_MODALITY)))
 }).strict();
 const matchSchema = z.object({ teamA: teamSchema, teamB: teamSchema }).strict();
 
 export function validateMatchFormation(value: unknown, modality: string, teams: { teamA: FormationPlayer[]; teamB: FormationPlayer[] }): MatchFormation {
-  if (!supportsMatchFormation(modality)) throw new Error("Las formaciones están disponibles para F9 y F11.");
+  if (!supportsMatchFormation(modality)) throw new Error("La modalidad del partido no admite formaciones.");
   const parsed = matchSchema.safeParse(value);
   if (!parsed.success) throw new Error("La formación enviada no es válida.");
-  const expectedSize = modality === "9v9" ? 9 : 11;
+  const expectedSize = TEAM_SIZE_BY_MODALITY[modality];
   const allParticipants = new Set<string>();
   for (const key of ["teamA", "teamB"] as const) {
     const formation = parsed.data[key];
