@@ -48,7 +48,7 @@ export default async function AdminMatchesPage({
           {writeAccess.canWrite ? (
             <div className="flex flex-wrap gap-2">
               <Link
-                className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground transition hover:brightness-110"
                 href={createHref}
               >
                 Crear partido
@@ -149,7 +149,7 @@ export default async function AdminMatchesPage({
                         <>
                           {canLoadResult ? (
                             <Link
-                              className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                              className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground transition hover:brightness-110"
                               href={resultHref}
                             >
                               Cargar resultado

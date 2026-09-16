@@ -43,7 +43,7 @@ export function AdminNav({ isSuperAdmin }: { isSuperAdmin: boolean }) {
             className={cn(
               "inline-flex min-h-11 items-center justify-center rounded-md border px-3 py-2 text-xs font-semibold transition md:text-sm",
               active
-                ? "border-emerald-400/50 bg-accent text-white shadow-[0_10px_20px_-14px_rgba(16,185,129,1)]"
+                ? "border-emerald-400/50 bg-accent text-accent-foreground"
                 : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
             )}
             href={href}

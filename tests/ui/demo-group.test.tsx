@@ -8,8 +8,11 @@ describe("demo de Grupos", () => {
     const user = userEvent.setup();
     render(<DemoGroup />);
     expect(screen.getAllByRole("listitem")).toHaveLength(12);
+    const initialFirstTeam = within(screen.getAllByRole("list")[0]).getAllByRole("listitem").map((item) => item.textContent);
     await user.click(screen.getByRole("button", { name: "Ver otra opción de equipos" }));
     expect(screen.getByText(/Opción 2 de ejemplo/)).toBeInTheDocument();
+    expect(within(screen.getAllByRole("list")[0]).getAllByRole("listitem").map((item) => item.textContent)).not.toEqual(initialFirstTeam);
+    expect(screen.getAllByRole("listitem")).toHaveLength(12);
     await user.click(screen.getByRole("button", { name: "Ranking" }));
     const rows = within(screen.getByRole("table")).getAllByRole("row");
     expect(rows).toHaveLength(13);
@@ -17,7 +20,7 @@ describe("demo de Grupos", () => {
     expect(within(rows[2]).getAllByRole("cell").map((cell) => cell.textContent)).toEqual(["Nicolás", "1010", "0", "1", "1", "0"]);
     await user.click(screen.getByRole("button", { name: "Historial" }));
     expect(screen.getByText("Equipo A 3 — 2 Equipo B")).toBeInTheDocument();
-    expect(screen.getByText("MVP: Juan")).toBeInTheDocument();
+    expect(screen.getByText("Figura: Juan")).toBeInTheDocument();
     expect(screen.getByText(/no suma puntos/)).toBeInTheDocument();
   });
 });

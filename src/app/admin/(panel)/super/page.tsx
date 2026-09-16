@@ -36,7 +36,7 @@ export default async function SuperAdminDashboardPage() {
         </CardDescription>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link
-            className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(16,185,129,1)]"
+            className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground"
             href="/api/admin/super-metrics/export"
           >
             Exportar metricas (CSV)

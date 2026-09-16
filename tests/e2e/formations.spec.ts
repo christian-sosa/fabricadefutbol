@@ -116,6 +116,7 @@ for (const scenario of [
 
     const teamA = `Azules ${scenario.modality}`;
     const teamB = `Rojos ${scenario.modality}`;
+    await page.getByText("Personalizar nombres (opcional)", { exact: true }).first().click();
     await page.getByLabel("Nombre del primer equipo", { exact: true }).first().fill(teamA);
     await page.getByLabel("Nombre del segundo equipo", { exact: true }).first().fill(teamB);
     await page.getByRole("button", { name: "Confirmar esta opcion", exact: true }).first().click();
@@ -147,7 +148,7 @@ for (const scenario of [
         return null;
       };
     });
-    await page.getByRole("button", { name: "WhatsApp", exact: true }).click();
+    await page.getByRole("button", { name: "Compartir en WhatsApp", exact: true }).click();
     const shareTarget = new URL((await page.locator("html").getAttribute("data-e2e-shared-url"))!);
     const message = shareTarget.searchParams.get("text")!;
     expect(message).toContain(`${teamA} vs ${teamB}`);

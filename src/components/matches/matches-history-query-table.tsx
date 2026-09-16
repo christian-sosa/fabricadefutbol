@@ -7,11 +7,12 @@ import { MatchStatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
-import { formatMatchDateTime } from "@/lib/match-datetime";
+import { MatchDateTime } from "@/components/matches/match-date-time";
 import { buildMatchHistoryHref, parseMatchHistoryPage } from "@/lib/match-history-navigation";
 import { useOrganizationMatchesQuery } from "@/lib/query/hooks";
 import type { OrganizationMatchesResponse } from "@/lib/query/types";
 import { QueryFeedback } from "@/components/ui/query-feedback";
+import { resolveMatchTeamLabels } from "@/lib/team-labels";
 
 type MatchesHistoryQueryTableProps = {
   organizationId: string | null;
@@ -57,23 +58,26 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
       <QueryFeedback error={isError} fetching={isFetching} hasData={Boolean(matches.length)} onRetry={refetch} />
 
       <div className="grid gap-3 md:hidden">
-        {matches.map((match) => (
+        {matches.map((match) => {
+          const teamLabels = resolveMatchTeamLabels(match);
+          const hasResult = match.scoreA !== null && match.scoreB !== null;
+          return (
           <article className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/70 p-4" key={match.id}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-100">{formatMatchDateTime(match.scheduledAt)}</p>
-                <p className="mt-1 text-sm text-slate-400">{match.modality}</p>
+                <MatchDateTime className="text-sm font-medium text-slate-300" value={match.scheduledAt} />
+                <p className="mt-1 text-xs text-slate-400">{match.modality}</p>
               </div>
               <MatchStatusBadge status={match.status} />
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-              <div className="min-w-0 flex-1 basis-40">
-                <p className="text-sm text-slate-300">
-                  Resultado: {match.scoreA !== null && match.scoreB !== null ? `${match.scoreA} - ${match.scoreB}` : "Pendiente"}
-                </p>
-                {match.mvpDisplayName ? <p className="mt-1 break-words text-xs text-amber-200">MVP: {match.mvpDisplayName}</p> : null}
-              </div>
+            <div aria-label={hasResult ? `${teamLabels.teamA} ${match.scoreA}, ${teamLabels.teamB} ${match.scoreB}` : `${teamLabels.teamA} contra ${teamLabels.teamB}`} className="mt-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 text-center" role="group">
+              <p className="break-words text-sm font-semibold text-slate-100">{teamLabels.teamA}</p>
+              <p className="whitespace-nowrap text-2xl font-black tabular-nums text-slate-100">{hasResult ? `${match.scoreA} – ${match.scoreB}` : <span className="text-sm font-medium text-slate-400">vs.</span>}</p>
+              <p className="break-words text-sm font-semibold text-slate-100">{teamLabels.teamB}</p>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+              <div className="min-w-0 flex-1 basis-40">{match.mvpDisplayName ? <p className="break-words text-xs text-amber-200">Figura: {match.mvpDisplayName}</p> : null}</div>
               <Link
                 className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-emerald-300 hover:underline"
                 href={detailHref(match.id)}
@@ -82,7 +86,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
               </Link>
             </div>
           </article>
-        ))}
+        );})}
 
         {!matches.length && !isError ? (
           <p className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-6 text-sm text-slate-400">
@@ -98,17 +102,19 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
               <TH>Fecha</TH>
               <TH>Modalidad</TH>
               <TH>Resultado</TH>
-              <TH>MVP</TH>
+              <TH>Figura</TH>
               <TH>Estado</TH>
               <TH></TH>
             </tr>
           </THead>
           <TBody>
-            {matches.map((match) => (
+            {matches.map((match) => {
+              const teamLabels = resolveMatchTeamLabels(match);
+              return (
               <tr className="transition-colors hover:bg-slate-800/70" key={match.id}>
-                <TD>{formatMatchDateTime(match.scheduledAt)}</TD>
+                <TD><MatchDateTime value={match.scheduledAt} /></TD>
                 <TD>{match.modality}</TD>
-                <TD>{match.scoreA !== null && match.scoreB !== null ? `${match.scoreA} - ${match.scoreB}` : "Pendiente"}</TD>
+                <TD><span className="font-medium text-slate-100">{teamLabels.teamA} <strong className="whitespace-nowrap px-1 tabular-nums">{match.scoreA !== null && match.scoreB !== null ? `${match.scoreA} – ${match.scoreB}` : "vs."}</strong> {teamLabels.teamB}</span></TD>
                 <TD>{match.mvpDisplayName ?? "-"}</TD>
                 <TD>
                   <MatchStatusBadge status={match.status} />
@@ -122,7 +128,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
                   </Link>
                 </TD>
               </tr>
-            ))}
+            );})}
 
             {!matches.length && !isError ? (
               <tr>
@@ -135,7 +141,7 @@ export function MatchesHistoryQueryTable(params: MatchesHistoryQueryTableProps) 
         </Table>
       </div>
 
-      {pagination || page > 1 ? (
+      {(pagination?.totalPages ?? 0) > 1 || page > 1 ? (
         <div className="mt-4 flex flex-col gap-3 border-t border-slate-800 pt-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-slate-400">
             {pagination

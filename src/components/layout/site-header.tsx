@@ -319,7 +319,7 @@ export function SiteHeader({
                     className={cn(
                       "inline-flex min-h-11 items-center whitespace-nowrap rounded-xl border px-3 py-2 text-sm font-semibold transition",
                       active
-                        ? "border-emerald-400/50 bg-accent text-white shadow-[0_10px_20px_-14px_rgba(16,185,129,1)]"
+                        ? "border-transparent bg-accent text-accent-foreground"
                         : "border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-900"
                     )}
                     href={href}
@@ -363,7 +363,7 @@ export function SiteHeader({
                 )}
               </div>
 
-              <OrganizationPublicNav currentPath={safePathname} module={publicModule} organizationKey={organizationKey} />
+              <OrganizationPublicNav currentPath={safePathname} module={publicModule} organizationKey={organizationKey} season={searchParams.get("season")} />
             </div>
           </div>
         ) : null}
@@ -401,7 +401,7 @@ export function SiteHeader({
                       className={cn(
                         "rounded-xl border px-3 py-3 text-sm font-semibold transition",
                         active
-                          ? "border-emerald-400/50 bg-accent text-white"
+                          ? "border-transparent bg-accent text-accent-foreground"
                           : "border-slate-800 bg-slate-900/80 text-slate-200 hover:border-slate-600"
                       )}
                       href={href}
@@ -425,10 +425,12 @@ export function SiteHeader({
                   <p className="text-sm text-slate-400">Explora un grupo para ver el contenido publico.</p>
                 )}
                 <OrganizationPublicNav
+                  className="grid-cols-2"
                   currentPath={safePathname}
                   itemClassName="px-3 py-2"
                   module={publicModule}
                   organizationKey={organizationKey}
+                  season={searchParams.get("season")}
                 />
               </div>
             ) : null}

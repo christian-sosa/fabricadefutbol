@@ -17,10 +17,6 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
   const nextPath = resolveSafeNextPath(resolvedSearchParams.next, "/admin");
   return (
     <div className="mx-auto w-full max-w-md space-y-3 py-5 md:py-6">
-      <div className="text-center">
-        <h1 className="text-2xl font-black text-slate-100">Acceso al panel</h1>
-      </div>
-
       {resolvedSearchParams.confirmed ? (
         <Card className="rounded-lg border-emerald-500/40 bg-emerald-500/10">
           <CardTitle>Email confirmado</CardTitle>

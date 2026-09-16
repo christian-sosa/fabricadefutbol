@@ -11,6 +11,7 @@ type OrganizationPublicNavProps = {
   itemClassName?: string;
   module?: PublicModuleContext | null;
   organizationKey?: string | null;
+  season?: string | null;
 };
 
 function isActivePath(currentPath: string | undefined, href: string) {
@@ -23,10 +24,11 @@ export function OrganizationPublicNav({
   currentPath,
   itemClassName,
   module,
-  organizationKey
+  organizationKey,
+  season
 }: OrganizationPublicNavProps) {
   return (
-    <nav aria-label="Contenido del grupo" className={cn("flex flex-wrap items-center gap-2", className)}>
+    <nav aria-label="Contenido del grupo" className={cn("grid grid-cols-4 gap-1 rounded-xl border border-border bg-card p-1", className)}>
       {ORGANIZATION_PUBLIC_NAV_ITEMS.map((item) => {
         const active = isActivePath(currentPath, item.href);
 
@@ -34,13 +36,13 @@ export function OrganizationPublicNav({
           <Link
             aria-current={active ? "page" : undefined}
             className={cn(
-              "inline-flex min-h-11 items-center justify-center rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+              "inline-flex min-h-11 min-w-0 items-center justify-center whitespace-nowrap rounded-lg px-1 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm",
               active
-                ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
-                : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800",
+                ? "bg-accent text-accent-foreground"
+                : "text-slate-300 hover:bg-slate-800 hover:text-foreground",
               itemClassName
             )}
-            href={withPublicQuery(item.href, {
+            href={withPublicQuery(season && season !== "current" ? `${item.href}?season=${encodeURIComponent(season)}` : item.href, {
               organizationKey,
               module
             })}

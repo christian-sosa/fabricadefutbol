@@ -10,7 +10,7 @@ describe("OrganizationPublicNav", () => {
     expect(screen.getByRole("link", { name: "Grupo" })).toHaveAttribute("href", "/groups?org=grupo-a");
     expect(screen.getByRole("link", { name: "Ranking" })).toHaveAttribute("href", "/ranking?org=grupo-a");
     expect(screen.getByRole("link", { name: "Historial" })).toHaveAttribute("href", "/matches?org=grupo-a");
-    expect(screen.getByRole("link", { name: "Proximos" })).toHaveAttribute("href", "/upcoming?org=grupo-a");
+    expect(screen.getByRole("link", { name: "Próximos" })).toHaveAttribute("href", "/upcoming?org=grupo-a");
   });
 
   it("marca como activa la seccion actual", () => {
@@ -18,5 +18,13 @@ describe("OrganizationPublicNav", () => {
 
     expect(screen.getByRole("link", { name: "Historial" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Ranking" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("conserva el período al navegar y no confunde historial con próximos", () => {
+    render(<OrganizationPublicNav currentPath="/matches/partido-a" organizationKey="grupo-a" season="all" />);
+
+    expect(screen.getByRole("link", { name: "Ranking" })).toHaveAttribute("href", "/ranking?season=all&org=grupo-a");
+    expect(screen.getByRole("link", { name: "Historial" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Próximos" })).not.toHaveAttribute("aria-current");
   });
 });

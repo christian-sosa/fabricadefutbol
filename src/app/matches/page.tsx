@@ -31,20 +31,27 @@ export default async function MatchesPage({
     }),
     getOrganizationSeasons(selectedOrganization?.id ?? null)
   ]);
+  const groupSwitcher = <OrganizationSwitcher
+    basePath="/matches"
+    currentOrganizationSlug={selectedOrganization?.slug}
+    label="Elegir grupo"
+    organizations={organizations}
+    pickerOnly={Boolean(selectedOrganization)}
+    quickOrganizations={viewerAdminOrganizations}
+  />;
 
   return (
     <div className="space-y-4">
-      <h1 className="text-3xl font-black text-slate-100">
-        Historial de Partidos {selectedOrganization ? `- ${selectedOrganization.name}` : ""}
-      </h1>
-
-      <OrganizationSwitcher
-        basePath="/matches"
-        currentOrganizationSlug={selectedOrganization?.slug}
-        label="Elegir grupo"
-        organizations={organizations}
-        quickOrganizations={viewerAdminOrganizations}
-      />
+      <header className="space-y-3">
+        <h1 className="text-2xl font-black text-slate-100 sm:text-3xl">Historial de partidos</h1>
+        {selectedOrganization ? (
+          <details className="rounded-xl border border-slate-800 px-3">
+            <summary className="min-h-11 cursor-pointer content-center text-sm text-slate-300"><span className="font-semibold text-slate-100">{selectedOrganization.name}</span> · Cambiar grupo</summary>
+            <div className="pb-3 pt-1">{groupSwitcher}</div>
+          </details>
+        ) : groupSwitcher}
+        {selectedOrganization ? <OrganizationPublicNav className="lg:hidden" currentPath="/matches" organizationKey={selectedOrganization.slug} season={selectedSeason} /> : null}
+      </header>
 
       {selectedOrganization ? (
         <SeasonFilterLinks
@@ -53,19 +60,6 @@ export default async function MatchesPage({
           organizationSlug={selectedOrganization.slug}
           seasons={seasons}
         />
-      ) : null}
-
-      {selectedOrganization ? (
-        <section className="lg:hidden">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
-            <OrganizationPublicNav
-              className="grid grid-cols-2 gap-2 sm:grid-cols-4"
-              currentPath="/matches"
-              itemClassName="flex min-h-10 items-center justify-center px-2 py-2 text-center"
-              organizationKey={selectedOrganization.slug}
-            />
-          </div>
-        </section>
       ) : null}
 
       <MatchesHistoryQueryTable

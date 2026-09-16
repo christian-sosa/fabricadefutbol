@@ -5,22 +5,22 @@ import { OrganizationImage } from "@/components/groups/organization-image";
 import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
+import { MatchDateTime } from "@/components/matches/match-date-time";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
-import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withShareTracking } from "@/lib/growth";
+import { buildMatchHistoryHref, parseMatchHistorySeason } from "@/lib/match-history-navigation";
 import { getOrganizationImageUrl } from "@/lib/organization-images";
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
 import { formatRendimiento } from "@/lib/utils";
 
-export default async function GroupsPage({
-  searchParams
-}: {
-  searchParams: Promise<{ org?: string }>;
+export default async function GroupsPage({ searchParams }: {
+  searchParams: Promise<{ org?: string; season?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
+  const selectedSeason = parseMatchHistorySeason(resolvedSearchParams.season);
   const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
     resolvePublicOrganization(resolvedSearchParams.org, { defaultContext: "home" }),
     getViewerAdminOrganizations()
@@ -32,153 +32,110 @@ export default async function GroupsPage({
   const rankingShareUrl = selectedOrganization
     ? buildAbsolutePublicUrl(withShareTracking(withOrgQuery("/ranking", selectedOrganization.slug), "ranking"))
     : null;
+  const groupSwitcher = (
+    <OrganizationSwitcher
+      basePath="/groups"
+      currentOrganizationSlug={selectedOrganization?.slug}
+      label="Grupos públicos"
+      organizations={organizations}
+      pickerOnly={Boolean(selectedOrganization)}
+      quickOrganizations={viewerAdminOrganizations}
+    />
+  );
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-slate-800 bg-slate-900/75 p-5 shadow-[0_24px_40px_-30px_rgba(16,185,129,0.7)] md:p-8">
-        <h1 className="mt-2 text-3xl font-black text-slate-100 md:text-5xl">Grupos</h1>
-        <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-          Elige un grupo y recorre su ranking, historial y agenda confirmada desde un solo lugar.
-        </p>
-
-        <div className="mt-6">
-          <OrganizationSwitcher
-            basePath="/groups"
-            currentOrganizationSlug={selectedOrganization?.slug}
-            label="Grupos publicos"
-            organizations={organizations}
-            quickOrganizations={viewerAdminOrganizations}
-          />
-        </div>
-      </section>
-
+    <div className="space-y-5">
       {selectedOrganization ? (
         <>
-          <section className="lg:hidden">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
-              <OrganizationPublicNav
-                className="grid grid-cols-2 gap-2 sm:grid-cols-4"
-                currentPath="/groups"
-                itemClassName="flex min-h-10 items-center justify-center px-2 py-2 text-center"
-                organizationKey={selectedOrganization.slug}
-              />
-            </div>
-          </section>
-
-          <section className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-400">
-              Grupo seleccionado
-            </p>
-            <h2 className="text-3xl font-black text-slate-100 md:text-5xl">
-              {selectedOrganization.name}
-            </h2>
-            <GroupShareActions
-              groupName={selectedOrganization.name}
-              groupUrl={groupShareUrl ?? undefined}
-              rankingUrl={rankingShareUrl ?? undefined}
-              source="groups_page"
-            />
-          </section>
-
-          <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-            <Card className="overflow-hidden p-0">
+          <header className="space-y-4">
+            <div className="flex items-center gap-4">
               <OrganizationImage
                 alt={`Imagen de ${selectedOrganization.name}`}
-                className="aspect-[16/9] min-h-[260px] rounded-none border-0"
+                className="h-20 w-20 shrink-0 rounded-2xl sm:h-24 sm:w-24"
                 priority
                 src={getOrganizationImageUrl(selectedOrganization.id)}
               />
-            </Card>
-
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-              <Card>
-                <CardDescription>Jugadores activos</CardDescription>
-                <CardTitle className="mt-1 text-3xl">{summary.totalPlayers}</CardTitle>
-              </Card>
-              <Card>
-                <CardDescription>Partidos finalizados</CardDescription>
-                <CardTitle className="mt-1 text-3xl">{summary.totalFinishedMatches}</CardTitle>
-              </Card>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tu grupo</p>
+                <h1 className="mt-1 break-words text-2xl font-black text-slate-100 sm:text-3xl">{selectedOrganization.name}</h1>
+                <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400">
+                  <div className="flex gap-1"><dt>jugadores</dt><dd className="order-first font-semibold text-slate-100">{summary.totalPlayers}</dd></div>
+                  <div className="flex gap-1"><dt>partidos jugados</dt><dd className="order-first font-semibold text-slate-100">{summary.totalFinishedMatches}</dd></div>
+                </dl>
+              </div>
             </div>
-          </section>
+            <details className="rounded-xl border border-slate-800 px-3">
+              <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold text-slate-300">Cambiar grupo</summary>
+              <div className="pb-3 pt-1">{groupSwitcher}</div>
+            </details>
+            <OrganizationPublicNav className="lg:hidden" currentPath="/groups" organizationKey={selectedOrganization.slug} season={selectedSeason} />
+          </header>
 
-          <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+          <section className="grid gap-4 lg:grid-cols-2">
             <Card>
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle>Próximos partidos</CardTitle>
+                <Link className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery(`/upcoming${selectedSeason !== "current" ? `?season=${encodeURIComponent(selectedSeason)}` : ""}`, selectedOrganization.slug)}>Ver todos</Link>
+              </div>
+              <div className="mt-2 space-y-2">
+                {summary.upcomingMatches.length ? summary.upcomingMatches.map((match) => (
+                  <Link
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 px-3 py-3 transition hover:border-slate-600 hover:bg-slate-800"
+                    href={buildMatchHistoryHref({ matchId: match.id, organizationSlug: selectedOrganization.slug, season: selectedSeason })}
+                    key={match.id}
+                  >
+                    <span className="min-w-0">
+                      <MatchDateTime className="block text-sm font-semibold text-slate-100" value={match.scheduled_at} />
+                      <span className="mt-1 block text-xs text-slate-400">{match.modality} · Equipos confirmados</span>
+                    </span>
+                    <span className="shrink-0 text-sm font-semibold text-emerald-300">Ver partido</span>
+                  </Link>
+                )) : (
+                  <div className="py-2">
+                    <p className="text-sm text-slate-400">Todavía no hay un próximo partido confirmado.</p>
+                    <Link className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-300 hover:underline" href={buildMatchHistoryHref({ organizationSlug: selectedOrganization.slug, season: selectedSeason })}>Ver últimos resultados</Link>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <Card>
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <CardTitle>Top jugadores</CardTitle>
-                  <CardDescription className="mt-2">
-                    Vista rapida del rendimiento actual de {selectedOrganization.name}.
-                  </CardDescription>
+                  <CardTitle>Ranking actual</CardTitle>
+                  <CardDescription className="mt-1">Los primeros del grupo.</CardDescription>
                 </div>
-                <Link
-                  className="text-sm font-semibold text-emerald-300 hover:underline"
-                  href={withOrgQuery("/ranking", selectedOrganization.slug)}
-                >
-                  Ver ranking
-                </Link>
+                <Link className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery("/ranking", selectedOrganization.slug)}>Ver ranking</Link>
               </div>
-              <div className="mt-4 space-y-2">
-                {summary.topPlayers.length ? (
-                  summary.topPlayers.map((player, index) => (
-                    <Link
-                      aria-label={`Ver ranking de ${player.full_name}`}
-                      className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm transition hover:border-slate-600 hover:bg-slate-800"
-                      href={withOrgQuery("/ranking", selectedOrganization.slug)}
-                      key={player.id}
-                    >
-                      <div className="flex items-center gap-3">
+              <ol className="mt-3 divide-y divide-slate-800">
+                {summary.topPlayers.map((player, index) => (
+                  <li key={player.id}>
+                    <Link aria-label={`Ver ranking de ${player.full_name}`} className="flex min-h-14 items-center justify-between gap-3 rounded-lg py-2 text-sm transition hover:bg-slate-800" href={withOrgQuery("/ranking", selectedOrganization.slug)}>
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="w-4 text-center text-xs text-slate-400">{index + 1}</span>
                         <PlayerAvatar hasPhoto={player.photo_path === undefined ? undefined : Boolean(player.photo_path)} name={player.full_name} photoUpdatedAt={player.photo_updated_at} playerId={player.id} size="sm" />
-                        <span>
-                          #{index + 1} {player.full_name}
-                        </span>
-                      </div>
-                      <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span>
-                    </Link>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-400">Todavia no hay jugadores activos cargados.</p>
-                )}
-              </div>
-            </Card>
-
-            <Card>
-              <CardTitle>Lo que viene</CardTitle>
-              <CardDescription className="mt-2">
-                Los partidos ya confirmados para {selectedOrganization.name}.
-              </CardDescription>
-              <div className="mt-4 space-y-2">
-                {summary.upcomingMatches.length ? (
-                  summary.upcomingMatches.map((match) => (
-                    <Link
-                      className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm transition hover:border-slate-600 hover:bg-slate-800"
-                      href={withOrgQuery(`/matches/${match.id}`, selectedOrganization.slug)}
-                      key={match.id}
-                    >
-                      <span>
-                        {match.modality} - {formatMatchDateTime(match.scheduled_at)}
+                        <span className="truncate font-medium">{player.full_name}</span>
                       </span>
-                      <span className="font-semibold text-emerald-300">Ver detalle</span>
+                      <span className="shrink-0 font-semibold tabular-nums text-emerald-300">{formatRendimiento(player.current_rating)}</span>
                     </Link>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-400">No hay partidos confirmados por ahora.</p>
-                )}
-              </div>
+                  </li>
+                ))}
+              </ol>
+              {!summary.topPlayers.length ? <p className="mt-3 text-sm text-slate-400">Todavía no hay jugadores activos cargados.</p> : null}
             </Card>
           </section>
+
+          <GroupShareActions groupName={selectedOrganization.name} groupUrl={groupShareUrl ?? undefined} rankingUrl={rankingShareUrl ?? undefined} source="groups_page" />
         </>
       ) : (
-        <Card>
-          <CardTitle>No hay grupos publicos cargados</CardTitle>
-          <CardDescription>
-            Cuando exista al menos un grupo publico, desde aqui vas a poder navegar todo su contenido.
-          </CardDescription>
-        </Card>
+        <section className="space-y-4">
+          <h1 className="text-3xl font-black text-slate-100">Grupos</h1>
+          <p className="text-sm text-slate-400">Elegí tu grupo para ver el ranking, los resultados y el próximo partido.</p>
+          {groupSwitcher}
+          <Card><CardTitle>No hay grupos públicos cargados</CardTitle><CardDescription className="mt-2">Cuando haya un grupo público, vas a encontrarlo acá.</CardDescription></Card>
+        </section>
       )}
-
       <PublicGroupGrowthCta source="groups_page" />
-
     </div>
   );
 }

@@ -51,7 +51,11 @@ export function PlayerAvatar({ playerId, hasPhoto, photoUpdatedAt, name, size = 
         width: `${pixelSize}px`
       }}
     >
-      <Image
+      {!playerId || hasPhoto === false ? (
+        <span aria-label={`Avatar de ${name}`} className="absolute inset-0 flex items-center justify-center text-xs font-bold tracking-wide text-slate-100" role="img">
+          {getInitials(name)}
+        </span>
+      ) : <Image
         alt={`Avatar de ${name}`}
         className="h-full w-full object-cover"
         height={pixelSize}
@@ -60,12 +64,7 @@ export function PlayerAvatar({ playerId, hasPhoto, photoUpdatedAt, name, size = 
         src={src}
         unoptimized
         width={pixelSize}
-      />
-      {!playerId || hasPhoto === false ? (
-        <span className="absolute inset-0 flex items-center justify-center text-xs font-bold tracking-wide text-slate-100">
-          {getInitials(name)}
-        </span>
-      ) : null}
+      />}
     </div>
   );
 }

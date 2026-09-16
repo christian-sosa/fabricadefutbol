@@ -32,7 +32,7 @@ export const PUBLIC_NAV_ITEMS = [
   { href: "/groups", label: "Grupos" },
   { href: "/ranking", label: "Ranking" },
   { href: "/matches", label: "Historial" },
-  { href: "/upcoming", label: "Proximos" },
+  { href: "/upcoming", label: "Próximos" },
   { href: "/guides", label: "Guías" },
   { href: "/feedback", label: "Contacto" },
   { href: "/help", label: "Ayuda" }
@@ -50,7 +50,7 @@ export const ORGANIZATION_PUBLIC_NAV_ITEMS = [
   { href: "/groups", label: "Grupo" },
   { href: "/ranking", label: "Ranking" },
   { href: "/matches", label: "Historial" },
-  { href: "/upcoming", label: "Proximos" }
+  { href: "/upcoming", label: "Próximos" }
 ];
 
 export const ADMIN_NAV_ITEMS = [

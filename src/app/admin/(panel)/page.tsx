@@ -41,7 +41,7 @@ type OrganizationEntry = {
 };
 
 type OrganizationSeasonEntry = Awaited<ReturnType<typeof getOrganizationSeasons>>[number];
-const enterGroupLinkClass = "inline-flex items-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white";
+const enterGroupLinkClass = "inline-flex min-h-11 items-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground";
 
 function findOrganizationByKey(organizations: OrganizationEntry[], organizationKey?: string | null) {
   if (!organizationKey) return null;
@@ -133,42 +133,45 @@ function AdminOnboardingCard({
   const requiredPlayers = TEAM_SIZE_BY_MODALITY[selectedModality] * 2;
   const totalMatches =
     dashboardData.draftsCount + dashboardData.confirmedCount + dashboardData.finishedCount;
+  const draftMatch = dashboardData.latestMatches.find((match) => match.status === "draft");
+  const confirmedMatch = dashboardData.latestMatches.find((match) => match.status === "confirmed");
   const steps = [
     {
       title: "Cargá jugadores",
       description: `${dashboardData.playersCount} de ${requiredPlayers} jugadores para ${selectedModality}. Podés ajustar los niveles después.`,
-      done: dashboardData.playersCount >= requiredPlayers,
+      done: dashboardData.playersCount >= requiredPlayers || totalMatches > 0,
       href: withOrgQuery("/admin/players?view=new", organizationSlug),
       cta: "Ir a jugadores"
     },
     {
-      title: "Armá el primer partido",
-      description: "Elegí modalidad, convocados, invitados y arqueros.",
-      done: totalMatches > 0,
-      href: withOrgQuery(`/admin/matches/new?modality=${selectedModality}`, organizationSlug),
+      title: draftMatch ? "Confirmá los equipos" : "Armá el primer partido",
+      description: draftMatch ? "Tu borrador está listo. Compará las opciones y elegí los equipos que van a jugar." : "Elegí modalidad, convocados, invitados y arqueros. Después confirmá una opción de equipos.",
+      done: dashboardData.confirmedCount + dashboardData.finishedCount > 0,
+      href: withOrgQuery(draftMatch ? `/admin/matches/${draftMatch.id}` : dashboardData.draftsCount ? "/admin/matches" : `/admin/matches/new?modality=${selectedModality}`, organizationSlug),
       cta: "Armar partido"
     },
     {
-      title: "Cargá el resultado",
-      description: "El ranking, el rendimiento y el historial quedan actualizados.",
+      title: "Compartí y cargá el resultado",
+      description: "Compartí los equipos por WhatsApp. Después del partido, cargá el resultado para actualizar ranking e historial.",
       done: dashboardData.finishedCount > 0,
-      href: withOrgQuery("/admin/matches", organizationSlug),
+      href: withOrgQuery(confirmedMatch ? `/admin/matches/${confirmedMatch.id}` : "/admin/matches", organizationSlug),
       cta: "Ver partidos"
     }
   ];
 
-  if (steps.every((step) => step.done)) return null;
+  const nextStep = steps.find((step) => !step.done);
+  if (!nextStep) return null;
 
   return (
     <section className="rounded-3xl border border-emerald-400/20 bg-emerald-500/10 p-5 shadow-[0_20px_46px_-36px_rgba(16,185,129,0.8)]">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
-            Primeros pasos
+            Tu próximo paso
           </p>
-          <h2 className="mt-2 text-2xl font-black text-white">Dejá tu grupo listo para jugar</h2>
+          <h2 className="mt-2 text-2xl font-black text-white">{nextStep.title}</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Una guía rápida para pasar de grupo nuevo a primer partido con ranking e historial.
+            {nextStep.description}
           </p>
         </div>
         {!canWrite ? (
@@ -178,6 +181,13 @@ function AdminOnboardingCard({
         ) : null}
       </div>
 
+      {canWrite ? <TrackedLink
+        className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground"
+        eventName={GROWTH_EVENTS.ctaClicked}
+        eventProperties={{ cta: nextStep.cta, source: "admin_onboarding" }}
+        href={nextStep.href}
+      >Continuar: {nextStep.title.toLocaleLowerCase("es")}</TrackedLink> : null}
+
       <form className="mt-4 flex flex-wrap items-center gap-2" action="/admin">
         <input name="org" type="hidden" value={organizationSlug} />
         <label className="text-sm" htmlFor="onboarding-modality">¿Cuántos juegan?</label>
@@ -185,10 +195,11 @@ function AdminOnboardingCard({
           {MATCH_MODALITIES.map((value) => <option key={value} value={value}>{value.replace("v", " vs ")}</option>)}
         </select><Button type="submit" variant="secondary">Actualizar pasos</Button>
       </form>
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
+      <ol aria-label="Progreso del primer partido" className="mt-4 grid gap-3 md:grid-cols-3">
         {steps.map((step, index) => (
-          <div
-            className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4"
+          <li
+            aria-current={step === nextStep ? "step" : undefined}
+            className="border-t border-slate-700 pt-3"
             key={step.title}
           >
             <div className="flex items-start justify-between gap-3">
@@ -205,18 +216,9 @@ function AdminOnboardingCard({
                 {step.done ? "Listo" : "Pendiente"}
               </span>
             </div>
-            <p className="mt-2 text-sm text-slate-300">{step.description}</p>
-            <TrackedLink
-              className="mt-4 inline-flex rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:text-emerald-300"
-              eventName={GROWTH_EVENTS.ctaClicked}
-              eventProperties={{ cta: step.cta, source: "admin_onboarding" }}
-              href={step.href}
-            >
-              {step.cta}
-            </TrackedLink>
-          </div>
+          </li>
         ))}
-      </div>
+      </ol>
     </section>
   );
 }

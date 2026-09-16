@@ -86,14 +86,14 @@ describe("RankingTableQuery", () => {
     expect(getBodyRows()[0]).toHaveTextContent("#1");
     expect(getBodyRows()[0]).toHaveTextContent("GonzaMastro");
     const mobileLeader = screen.getAllByText("GonzaMastro")[0].closest("article");
-    expect(mobileLeader).toHaveTextContent("#1");
+    expect(mobileLeader).toHaveTextContent("1");
 
     await user.click(within(screen.getByRole("table")).getByRole("button", { name: /PG/ }));
 
     expect(getBodyRows()[0]).toHaveTextContent("#3");
     expect(getBodyRows()[0]).toHaveTextContent("Gabi Lamine");
 
-    await user.click(within(screen.getByRole("table")).getByRole("button", { name: /MVP/ }));
+    await user.click(within(screen.getByRole("table")).getByRole("button", { name: /Figuras/ }));
 
     expect(getBodyRows()[0]).toHaveTextContent("#1");
     expect(getBodyRows()[0]).toHaveTextContent("GonzaMastro");
@@ -123,7 +123,7 @@ describe("RankingTableQuery", () => {
     const mobilePlayerName = screen.getAllByText("Gabi Lamine")[0];
     const mobileCard = mobilePlayerName.closest("article");
     expect(mobileCard).not.toBeNull();
-    await user.click(within(mobileCard as HTMLElement).getByText("Estadísticas de Gabi Lamine"));
+    await user.click(within(mobileCard as HTMLElement).getByLabelText(/^Estadísticas de Gabi Lamine:/));
     expect(within(mobileCard as HTMLElement).getByRole("img", { name: /sin partidos jugados/ })).toBeInTheDocument();
   });
   it("conserva el ranking disponible y permite reintentar un error de actualización", async () => {

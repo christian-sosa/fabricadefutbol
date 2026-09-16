@@ -590,6 +590,8 @@ function normalizeMatchCard(match: MatchRow, result?: Database["public"]["Tables
     scheduledAt: match.scheduled_at,
     modality: match.modality,
     status: match.status,
+    team_a_label: match.team_a_label ?? null,
+    team_b_label: match.team_b_label ?? null,
     scoreA: result?.score_a ?? null,
     scoreB: result?.score_b ?? null,
     winnerTeam: result?.winner_team ?? null,
@@ -619,7 +621,7 @@ async function getMatchHistoryCardsForSnapshot(organizationId: string | null): P
 
   const supabase = await createSupabaseServerClient();
   const finishedMatches = await readAllRows((from, to) => supabase.from("matches")
-    .select("id, scheduled_at, modality, status, season_id").eq("organization_id", organizationId)
+    .select("id, scheduled_at, modality, status, season_id, team_a_label, team_b_label").eq("organization_id", organizationId)
     .in("status", ["finished", "cancelled"]).order("scheduled_at", { ascending: false }).order("id").range(from, to));
 
   const matches = (finishedMatches ?? []) as MatchRow[];
@@ -654,7 +656,7 @@ async function getMatchHistoryCardsPageLive(
   const historyQuery = (head = false) => {
     let query = supabase
       .from("matches")
-      .select("id, scheduled_at, modality, status, season_id", { count: "exact", head })
+      .select("id, scheduled_at, modality, status, season_id, team_a_label, team_b_label", { count: "exact", head })
       .eq("organization_id", organizationId)
       .in("status", ["finished", "cancelled"]);
     if (seasonFilter.mode === "season") query = query.eq("season_id", seasonFilter.season.id);
@@ -721,7 +723,9 @@ export async function getMatchHistoryCardsPage(
   if (normalizeSeasonFilter(params?.season) === "all") {
     const supabase = await createSupabaseServerClient();
     const matchHistory = await readOrganizationPublicMatchHistorySnapshot(supabase, organizationId);
-    if (matchHistory) {
+    // Older snapshots predate team labels. Read live until the next snapshot refresh
+    // rather than presenting default names for teams that may have custom names.
+    if (matchHistory?.every((match) => "team_a_label" in match && "team_b_label" in match)) {
       return buildSnapshotMatchHistoryPage({
         organizationId,
         matchHistory,
