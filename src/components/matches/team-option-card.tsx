@@ -236,8 +236,8 @@ export function TeamOptionCard({
       {!isConfirmed && confirmAction ? (
         <form action={confirmAction} className="mt-4 space-y-3">
           <input name="optionId" type="hidden" value={optionId} />
-          <div className="rounded-lg border border-slate-800 bg-slate-950 p-3">
-            <p className="text-sm font-semibold text-slate-100">Nombres para compartir</p>
+          <details className="rounded-lg border border-slate-800 bg-slate-950 p-3">
+            <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-slate-100">Personalizar nombres (opcional)</summary>
             <p className="text-xs text-slate-400">
               Si los dejas vacios se publican como {DEFAULT_TEAM_A_LABEL} y {DEFAULT_TEAM_B_LABEL}.
             </p>
@@ -265,7 +265,7 @@ export function TeamOptionCard({
                 />
               </div>
             </div>
-          </div>
+          </details>
           <Button type="submit">Confirmar esta opcion</Button>
         </form>
       ) : null}

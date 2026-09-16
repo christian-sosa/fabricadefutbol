@@ -9,6 +9,7 @@ import { ActionForm } from "@/components/ui/action-form";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { PhotoUploadInput } from "@/components/admin/photo-upload-input";
+import { PlayersRosterGuard, PlayersRosterPendingStatus } from "@/components/admin/players-roster-guard";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,7 @@ import { withOrgQuery } from "@/lib/org";
 import { BulkCreatePlayersForm } from "./bulk-create-form";
 
 const primaryActionLinkClass =
-  "inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110";
+  "inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:brightness-110";
 
 const secondaryActionLinkClass = secondaryActionClass;
 
@@ -119,7 +120,9 @@ export default async function AdminPlayersPage({
             La foto se actualiza en la fila de cada jugador.
           </CardDescription>
 
-          <ActionForm action={updatePlayersFormAction} className="sticky top-20 z-10 mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/95 p-3" id={bulkFormId} key={formRenderKey}>
+          <PlayersRosterGuard formId={bulkFormId} key={formRenderKey} organizationId={selectedOrganization.id} players={players.map(({ id, full_name, skill_level }) => ({ id, full_name, skill_level }))}>
+          <ActionForm action={updatePlayersFormAction} className="sticky top-20 z-10 mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/95 p-3" id={bulkFormId}>
+            <PlayersRosterPendingStatus />
             <input name="organizationId" type="hidden" value={selectedOrganization.id} />
             <FormSubmitButton pendingLabel="Guardando planilla…">Guardar toda la planilla</FormSubmitButton>
             <span className="text-xs text-slate-400">Guardá los cambios de nombre y nivel juntos.</span>
@@ -137,8 +140,9 @@ export default async function AdminPlayersPage({
             {players.map((player) => (
               <div
                 className={`grid ${playersRosterGridColumns} gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3 lg:items-start`}
-                key={player.id}
-                id={`player-${player.id}`}
+                 key={player.id}
+                 id={`player-${player.id}`}
+                 data-roster-player={player.id}
               >
                 <input form={bulkFormId} name="playerId" type="hidden" value={player.id} />
                 <div className="min-w-0 space-y-1.5">
@@ -188,8 +192,9 @@ export default async function AdminPlayersPage({
               </div>
             ))}
 
-          </div>
-        </Card>
+           </div>
+          </PlayersRosterGuard>
+         </Card>
       ) : null}
     </div>
   );

@@ -12,7 +12,7 @@ import {
   type RegisterState
 } from "@/app/admin/(auth)/login/actions";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { trackAnalyticsEvent } from "@/lib/analytics/client";
 import { GROWTH_EVENTS } from "@/lib/growth";
@@ -20,6 +20,50 @@ import { GROWTH_EVENTS } from "@/lib/growth";
 const initialLoginState: LoginState = { error: null };
 const initialRegisterState: RegisterState = { error: null, success: null };
 type AuthMode = "login" | "register";
+
+function PasswordField({
+  id,
+  name,
+  label,
+  autoComplete,
+  showRequirements = false
+}: {
+  id: string;
+  name: string;
+  label: string;
+  autoComplete: "new-password" | "current-password";
+  showRequirements?: boolean;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={id}>{label}</label>
+      <div className="relative">
+        <Input
+          aria-describedby={showRequirements ? `${id}-hint` : undefined}
+          autoComplete={autoComplete}
+          className="pr-24"
+          id={id}
+          minLength={showRequirements ? 6 : undefined}
+          name={name}
+          required
+          type={visible ? "text" : "password"}
+        />
+        <button
+          aria-controls={id}
+          aria-label={`${visible ? "Ocultar" : "Mostrar"} ${name === "confirmPassword" ? "confirmación de contraseña" : "contraseña"}`}
+          aria-pressed={visible}
+          className="absolute inset-y-0 right-1 my-auto min-h-11 rounded-md px-3 text-sm font-semibold text-accent hover:text-slate-100"
+          onClick={() => setVisible((value) => !value)}
+          type="button"
+        >
+          {visible ? "Ocultar" : "Mostrar"}
+        </button>
+      </div>
+      {showRequirements ? <p className="mt-1.5 text-xs text-slate-400" id={`${id}-hint`}>Usá al menos 6 caracteres.</p> : null}
+    </div>
+  );
+}
 
 function LoginSubmitButton() {
   const { pending } = useFormStatus();
@@ -76,7 +120,6 @@ function RegisterSubmitButton() {
       disabled={pending}
       onClick={() => trackAnalyticsEvent(GROWTH_EVENTS.signupStarted, { source: "login_form" })}
       type="submit"
-      variant="secondary"
     >
       {pending ? "Creando cuenta..." : "Crear cuenta"}
     </Button>
@@ -88,19 +131,32 @@ export function LoginForm({ nextPath = "/admin", initialMode = "login" }: { next
   const [loginState, loginAction] = useActionState(loginAdminAction, initialLoginState);
   const [registerState, registerAction] = useActionState(registerAdminAction, initialRegisterState);
   const isRegisterMode = mode === "register";
+  const isGroupRegistration = isRegisterMode && (nextPath === "/admin" || nextPath === "/admin/new");
+  const isInvitation = nextPath.startsWith("/invite/");
 
   return (
-    <Card className="mx-auto max-w-md overflow-hidden rounded-lg border-slate-700/80 p-0 shadow-[0_24px_80px_-40px_rgba(16,185,129,0.85)]">
-      <div className="border-b border-slate-800/90 bg-slate-950/35 px-5 py-4">
-        <CardTitle className="text-xl">{isRegisterMode ? "Crear cuenta" : "Ingresar"}</CardTitle>
-        <CardDescription className="mt-2">
-          {isRegisterMode
-            ? "Crea una cuenta para administrar tu grupo o aceptar invitaciones."
-            : "Usa Google para entrar r\u00e1pido, o ingresa con tu email."}
-        </CardDescription>
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-3xl font-black tracking-tight text-slate-100">
+          {isGroupRegistration ? "Creá tu grupo gratis" : isRegisterMode ? "Crear cuenta" : "Ingresar"}
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-slate-300">
+          {isGroupRegistration
+            ? "La cuenta es para quien organiza. Después elegís el nombre del grupo; los jugadores entran por un link."
+            : isRegisterMode
+              ? isInvitation ? "Creá tu cuenta para aceptar la invitación al grupo." : "Creá una cuenta para administrar tu grupo."
+              : "Entrá con Google o con tu email para administrar tu grupo."}
+        </p>
+        {isGroupRegistration ? (
+          <ol aria-label="Pasos para crear tu grupo" className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+            <li aria-current="step" className="font-semibold text-accent">1. Tu cuenta</li>
+            <li aria-hidden="true" className="text-slate-500">→</li>
+            <li className="text-slate-400">2. Nombre del grupo</li>
+          </ol>
+        ) : null}
       </div>
 
-      <div className="space-y-4 px-5 py-4">
+      <Card className="mx-auto max-w-md space-y-4 p-5">
         <form action={loginWithGoogleAction}>
           <input name="next" type="hidden" value={nextPath} />
           <GoogleSubmitButton />
@@ -115,7 +171,7 @@ export function LoginForm({ nextPath = "/admin", initialMode = "login" }: { next
         {isRegisterMode ? (
           <form action={registerAction} className="space-y-3">
             <input name="next" type="hidden" value={nextPath} />
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="displayName">
                   Nombre
@@ -128,29 +184,13 @@ export function LoginForm({ nextPath = "/admin", initialMode = "login" }: { next
                 </label>
                 <Input autoComplete="email" id="registerEmail" name="email" required type="email" />
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="registerPassword">
-                  Contrase&ntilde;a
-                </label>
-                <Input autoComplete="new-password" id="registerPassword" name="password" required type="password" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="confirmPassword">
-                  Confirmar contrase&ntilde;a
-                </label>
-                <Input
-                  autoComplete="new-password"
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  required
-                  type="password"
-                />
-              </div>
+              <PasswordField autoComplete="new-password" id="registerPassword" label="Contraseña" name="password" showRequirements />
+              <PasswordField autoComplete="new-password" id="confirmPassword" label="Confirmar contraseña" name="confirmPassword" />
             </div>
 
-            {registerState.error ? <p className="text-sm font-semibold text-danger">{registerState.error}</p> : null}
+            {registerState.error ? <p className="text-sm font-semibold text-danger" role="alert">{registerState.error}</p> : null}
             {registerState.success ? (
-              <p className="text-sm font-semibold text-emerald-300">{registerState.success}</p>
+              <p className="text-sm font-semibold text-emerald-300" role="status">{registerState.success}</p>
             ) : null}
             <RegisterSubmitButton />
           </form>
@@ -163,25 +203,20 @@ export function LoginForm({ nextPath = "/admin", initialMode = "login" }: { next
               </label>
               <Input autoComplete="email" id="email" name="email" required type="email" />
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="password">
-                Contrase&ntilde;a
-              </label>
-              <Input autoComplete="current-password" id="password" name="password" required type="password" />
-            </div>
+            <PasswordField autoComplete="current-password" id="password" label="Contraseña" name="password" />
 
-            {loginState.error ? <p className="text-sm font-semibold text-danger">{loginState.error}</p> : null}
+            {loginState.error ? <p className="text-sm font-semibold text-danger" role="alert">{loginState.error}</p> : null}
             <LoginSubmitButton />
             <Link className="block text-center text-sm font-semibold text-emerald-300 underline" href="/admin/forgot-password">Olvidé mi contraseña</Link>
           </form>
         )}
 
-        <div className="rounded-md border border-slate-800 bg-slate-950/45 px-3 py-3 text-center text-sm text-slate-400">
+        <div className="border-t border-slate-800 pt-3 text-center text-sm text-slate-400">
           {isRegisterMode ? (
             <>
               &iquest;Ya ten&eacute;s cuenta?{" "}
               <button
-                className="font-semibold text-emerald-300 transition hover:text-emerald-200"
+                className="inline-flex min-h-11 items-center font-semibold text-accent transition hover:text-slate-100"
                 onClick={() => setMode("login")}
                 type="button"
               >
@@ -192,7 +227,7 @@ export function LoginForm({ nextPath = "/admin", initialMode = "login" }: { next
             <>
               &iquest;No ten&eacute;s cuenta?{" "}
               <button
-                className="font-semibold text-emerald-300 transition hover:text-emerald-200"
+                className="inline-flex min-h-11 items-center font-semibold text-accent transition hover:text-slate-100"
                 onClick={() => setMode("register")}
                 type="button"
               >
@@ -201,7 +236,7 @@ export function LoginForm({ nextPath = "/admin", initialMode = "login" }: { next
             </>
           )}
         </div>
-      </div>
-    </Card>
+      </Card>
+    </div>
   );
 }

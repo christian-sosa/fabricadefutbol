@@ -15,6 +15,7 @@ type PlayerPhotoModalTriggerProps = {
   triggerClassName?: string;
   nameClassName?: string;
   avatarSize?: "sm" | "md" | "lg";
+  showPhotoLabel?: boolean;
 };
 
 export function PlayerPhotoModalTrigger({
@@ -24,7 +25,8 @@ export function PlayerPhotoModalTrigger({
   playerName,
   triggerClassName,
   nameClassName,
-  avatarSize = "sm"
+  avatarSize = "sm",
+  showPhotoLabel = false
 }: PlayerPhotoModalTriggerProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -120,8 +122,9 @@ export function PlayerPhotoModalTrigger({
         type="button"
       >
         <PlayerAvatar hasPhoto={hasPhoto} name={playerName} photoUpdatedAt={photoUpdatedAt} playerId={playerId} size={avatarSize} />
-        <span className={cn("font-semibold text-emerald-300 transition hover:text-emerald-200 hover:underline", nameClassName)}>
-          {playerName}
+        <span className={cn("min-w-0 font-semibold text-slate-100", nameClassName)}>
+          <span className="block break-words">{playerName}</span>
+          {showPhotoLabel ? <span className="block text-xs font-normal text-muted">Ver foto</span> : null}
         </span>
       </button>
 

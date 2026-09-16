@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const variantStyles = {
-  primary: "bg-accent text-white hover:brightness-110",
+  primary: "bg-accent text-accent-foreground hover:brightness-110",
   secondary: "border border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500 hover:bg-slate-800",
   ghost: "border border-slate-700 bg-slate-900 text-slate-100 hover:border-emerald-400/60 hover:text-emerald-300",
   danger: "bg-danger text-white hover:opacity-90"

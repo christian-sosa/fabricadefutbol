@@ -30,7 +30,7 @@ export default function GlobalError({
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         <button
-          className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+          className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:brightness-110"
           onClick={reset}
           type="button"
         >

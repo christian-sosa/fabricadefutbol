@@ -18,6 +18,8 @@ function historyPage(page: number): OrganizationMatchesResponse {
         scheduledAt: `2026-09-${String(22 - index).padStart(2, "0")}T21:00:00.000Z`,
         modality: "6v6" as const,
         status: "finished" as const,
+        team_a_label: "Verdes",
+        team_b_label: "Azules",
         scoreA: 3,
         scoreB: 2,
         winnerTeam: "A" as const,
@@ -59,24 +61,38 @@ test("historial recupera conexión, reintenta la página correcta y conserva nav
 
   await page.goto(`/matches?org=${ORG_SLUG}&season=all`);
   await expectHistoryPage(page, 1);
-  await expect(page.getByText(/^Página 1 de /)).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Historial de partidos" })).toBeVisible();
+  const initialResponse = await page.request.get(`${HISTORY_ENDPOINT}?season=all&page=1&pageSize=10`);
+  expect(initialResponse.ok()).toBe(true);
+  const initialPage = await initialResponse.json() as OrganizationMatchesResponse;
+  if (initialPage.pagination.totalPages > 1) {
+    await expect(page.getByText(/^Página 1 de /)).toBeVisible();
+  } else {
+    await expect(page.getByRole("button", { name: "Siguiente", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Anterior", exact: true })).toHaveCount(0);
+  }
   // An observable interaction establishes hydration before exercising the browser's online event.
-  await page.getByRole("button", { name: "Cambiar grupo", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Cerrar", exact: true })).toHaveAttribute("aria-expanded", "true");
-  await page.getByRole("button", { name: "Cerrar", exact: true }).click();
+  const groupPicker = page.getByRole("main").locator("summary").filter({ hasText: "Cambiar grupo" });
+  await groupPicker.click();
+  const groupSearch = page.getByRole("searchbox", { name: "Buscar grupo por nombre" });
+  await groupSearch.fill("grupo-inexistente-para-prueba-de-hidratacion");
+  await expect(page.getByText("No encontramos grupos con ese termino.", { exact: true })).toBeVisible();
+  await groupSearch.clear();
+  await groupPicker.click();
 
   await context.setOffline(true);
   await page.clock.setFixedTime(initialTime + 120_000);
   await context.setOffline(false);
   await expect.poll(() => requestedPages.filter((value) => value === 1).length).toBe(1);
   await expect(page.getByText("Página 1 de 3 · 21 partidos", { exact: true })).toBeVisible();
-  await expect(page.getByText("MVP: Figura de prueba 1", { exact: true })).toBeVisible();
+  await expect(page.getByText("Figura: Figura de prueba 1", { exact: true })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Verdes 3, Azules 2", exact: true }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Siguiente", exact: true }).click();
   await expectHistoryPage(page, 2);
   await expect(page.getByRole("main").getByRole("alert")).toContainText("No pudimos cargar los datos");
   await expect(page.getByText("Página 2", { exact: true })).toBeVisible();
-  await expect(page.getByText("MVP: Figura de prueba 1", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Figura: Figura de prueba 1", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Siguiente", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Anterior", exact: true })).toBeEnabled();
   const failedPageTwoAttempts = requestedPages.filter((value) => value === 2).length;
@@ -89,7 +105,7 @@ test("historial recupera conexión, reintenta la página correcta y conserva nav
   expect(requestedPages).not.toContain(3);
   await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
 
-  const mvp = page.getByText(`MVP: ${LONG_MVP}`, { exact: true });
+  const mvp = page.getByText(`Figura: ${LONG_MVP}`, { exact: true });
   const detail = page.getByRole("link", { name: "Ver detalle", exact: true }).filter({ visible: true }).first();
   await expect(mvp).toBeVisible();
   await mvp.scrollIntoViewIfNeeded();
@@ -123,7 +139,7 @@ test("historial recupera conexión, reintenta la página correcta y conserva nav
     ? `Página 2 · ${actualPage.pagination.totalCount} partidos`
     : `Página 2 de ${actualPage.pagination.totalPages} · ${actualPage.pagination.totalCount} partidos`;
   await expect(page.getByText(reloadedPagination, { exact: true })).toBeVisible();
-  await expect(page.getByText(`MVP: ${LONG_MVP}`, { exact: true })).toHaveCount(0);
+  await expect(page.getByText(`Figura: ${LONG_MVP}`, { exact: true })).toHaveCount(0);
   if (outsideRange) {
     await expect(page.getByText("No hay partidos en esta página.", { exact: true }).filter({ visible: true })).toBeVisible();
     await page.getByRole("button", { name: "Volver al inicio del historial", exact: true }).click();

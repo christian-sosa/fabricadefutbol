@@ -73,6 +73,35 @@ export default async function AdminMatchDetailPage({
         </p>
       ) : null}
 
+      <Card>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{selectedOrganization.name}</p>
+        <h1 className="mt-2 text-2xl font-black text-white">{details.result ? "Partido finalizado" : confirmedOption ? "Equipos confirmados" : "Elegí los equipos"}</h1>
+        <p className="mt-2 text-lg font-semibold text-slate-200">{details.result ? `${teamLabels.teamA} ${details.result.score_a} – ${details.result.score_b} ${teamLabels.teamB}` : confirmedOption ? "Compartí los equipos. Después del partido, cargá el resultado." : "Revisá las opciones de abajo para dejar el partido listo."}</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link className="inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground" href={details.result ? withOrgQuery(`/admin/matches/new?repeat=${id}`, selectedOrganization.slug) : confirmedOption ? "#compartir-equipos" : "#opciones-equipos"}>
+            {details.result ? "Repetir este partido" : confirmedOption ? "Compartir equipos" : "Ver opciones de equipos"}
+          </Link>
+          {canManageResult ? <Link className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold" href={resultHref}>{details.result ? "Modificar resultado" : "Cargar resultado"}</Link> : null}
+        </div>
+      </Card>
+
+      {confirmedOption ? (
+        <Card id="compartir-equipos">
+          <CardTitle>Compartir equipos</CardTitle>
+          <CardDescription className="mt-1">
+            Personalizá los nombres si querés y compartí el enlace con tu grupo.
+          </CardDescription>
+          <MatchTeamLabelsShareForm
+            action={teamLabelsUpdateAction}
+            key={`${id}:${details.match.team_a_label}:${details.match.team_b_label}`}
+            canShare={details.match.status === "confirmed"}
+            initialTeamALabel={details.match.team_a_label}
+            initialTeamBLabel={details.match.team_b_label}
+            matchUrl={publicMatchUrl}
+          />
+        </Card>
+      ) : null}
+
       {formationTeams && details.match.status === "confirmed" && supportsMatchFormation(details.match.modality) ? (
         <MatchFormationEditor
           action={saveMatchFormationAction.bind(null, id, selectedOrganization.id)}
@@ -85,8 +114,33 @@ export default async function AdminMatchDetailPage({
         />
       ) : null}
 
-      <Card>
-        <CardTitle>Editar partido</CardTitle>
+      <Card id="opciones-equipos">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>{confirmedOption ? "Equipo confirmado" : "Opciones de equipos"}</CardTitle>
+            <CardDescription>
+              {confirmedOption
+                ? "Esta es la opción confirmada para el partido."
+                : "Compará las opciones y confirmá la que prefieras. Podés generar otras mientras el partido sea un borrador."}
+            </CardDescription>
+          </div>
+          {details.match.status === "draft" ? (
+            <form action={regenerateAction}>
+              <Button type="submit" variant="ghost">
+                Regenerar opciones
+              </Button>
+            </form>
+          ) : null}
+        </div>
+        <TeamOptionsList confirmAction={details.match.status === "draft" ? confirmAction : undefined} options={visibleOptions.map((option) => ({
+          isConfirmed: option.is_confirmed, optionId: option.id, optionNumber: option.option_number,
+          ratingDiff: Number(option.rating_diff), ratingSumA: Number(option.rating_sum_a), ratingSumB: Number(option.rating_sum_b),
+          teamALabel: teamLabels.teamA, teamBLabel: teamLabels.teamB, teamA: option.teamA, teamB: option.teamB
+        }))} />
+      </Card>
+
+      <details className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
+        <summary className="flex min-h-11 cursor-pointer items-center font-semibold">Editar fecha y cancha</summary>
         <form action={matchUpdateAction} className="mt-4 grid gap-3 md:grid-cols-4">
           <MatchDateTimeFields
             dateName="scheduledDate"
@@ -107,71 +161,7 @@ export default async function AdminMatchDetailPage({
             </Button>
           </div>
         </form>
-      </Card>
-
-      {confirmedOption ? <Link className="inline-flex rounded-md border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-100" href={withOrgQuery(`/admin/matches/new?repeat=${id}`, selectedOrganization.slug)}>Repetir este partido</Link> : null}
-
-      {canManageResult ? (
-        <Card>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle>{details.result ? "Resultado cargado" : "Resultado pendiente"}</CardTitle>
-              <CardDescription className="mt-1">
-                {details.result
-                  ? `${teamLabels.teamA} ${details.result.score_a} - ${details.result.score_b} ${teamLabels.teamB}`
-                  : "El partido ya tiene equipos confirmados y esta listo para cargar el resultado."}
-              </CardDescription>
-            </div>
-            <Link
-              className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
-              href={resultHref}
-            >
-              {details.result ? "Modificar resultado" : "Cargar resultado"}
-            </Link>
-          </div>
-        </Card>
-      ) : null}
-
-      {confirmedOption ? (
-        <Card>
-          <CardTitle>Nombres para compartir</CardTitle>
-          <CardDescription className="mt-1">
-            Se guardan despues de confirmar el armado final de equipos.
-          </CardDescription>
-          <MatchTeamLabelsShareForm
-            action={teamLabelsUpdateAction}
-            canShare={details.match.status === "confirmed"}
-            initialTeamALabel={details.match.team_a_label}
-            initialTeamBLabel={details.match.team_b_label}
-            matchUrl={publicMatchUrl}
-          />
-        </Card>
-      ) : null}
-
-      <Card>
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle>{confirmedOption ? "Equipo confirmado" : "Opciones de equipos"}</CardTitle>
-            <CardDescription>
-              {confirmedOption
-                ? "Ya se eligio una opcion final. En esta vista solo mostramos el equipo confirmado."
-                : "Puedes regenerar en estado draft y confirmar una opcion final."}
-            </CardDescription>
-          </div>
-          {details.match.status === "draft" ? (
-            <form action={regenerateAction}>
-              <Button type="submit" variant="ghost">
-                Regenerar opciones
-              </Button>
-            </form>
-          ) : null}
-        </div>
-        <TeamOptionsList confirmAction={details.match.status === "draft" ? confirmAction : undefined} options={visibleOptions.map((option) => ({
-          isConfirmed: option.is_confirmed, optionId: option.id, optionNumber: option.option_number,
-          ratingDiff: Number(option.rating_diff), ratingSumA: Number(option.rating_sum_a), ratingSumB: Number(option.rating_sum_b),
-          teamALabel: teamLabels.teamA, teamBLabel: teamLabels.teamB, teamA: option.teamA, teamB: option.teamB
-        }))} />
-      </Card>
+      </details>
 
       {canDeleteMatch ? (
         <Card>

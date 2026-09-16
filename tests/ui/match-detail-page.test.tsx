@@ -61,7 +61,7 @@ describe("MatchDetailPage", () => {
         score_a: 4,
         score_b: 2,
         winner_team: "A",
-        mvp_display_name: null,
+        mvp_display_name: "Ariel",
         notes: null
       },
       teamAPlayers: [
@@ -94,5 +94,11 @@ describe("MatchDetailPage", () => {
     expect(screen.queryByText("1234")).not.toBeInTheDocument();
     expect(screen.queryByText("987")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Volver al historial" })).toHaveAttribute("href", "/matches?org=grupo-a&season=all&page=2");
+    expect(screen.getByRole("heading", { level: 1, name: "Resultado del partido" })).toBeInTheDocument();
+    const scoreboard = screen.getByRole("group", { name: "Negro 4, Blanco 2" });
+    const teams = screen.getByRole("heading", { name: "Equipos confirmados" });
+    expect(scoreboard.compareDocumentPosition(teams) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("Figura del partido: Ariel")).toBeInTheDocument();
+    expect(screen.getByText("Distinción opcional. No suma puntos.")).toBeInTheDocument();
   });
 });

@@ -33,7 +33,7 @@ function setup(options: { count?: number | null; rangeCode?: string; countFails?
         return new Response(null, { headers: options.count === null ? {} : { "content-range": `*/${options.count ?? 2}` } });
       }
       if (options.normal) return Response.json([{
-        id: "match-1", scheduled_at: "2026-09-14T21:00:00Z", modality: "6v6", status: "finished", season_id: SEASON
+        id: "match-1", scheduled_at: "2026-09-14T21:00:00Z", modality: "6v6", status: "finished", season_id: SEASON, team_a_label: "Verdes", team_b_label: "Azules"
       }], { headers: { "content-range": "0-0/1" } });
       return Response.json({ ...rangeError, code: options.rangeCode ?? "PGRST103" }, { status: 416 });
     }
@@ -95,6 +95,7 @@ describe("public history outside the available range", () => {
     const requests = setup({ normal: true });
     const result = await getMatchHistoryCardsPage(ORG, { page: 1, season: SEASON });
     expect(result.matches.map(({ id }) => id)).toEqual(["match-1"]);
+    expect(result.matches[0]).toMatchObject({ team_a_label: "Verdes", team_b_label: "Azules" });
     expect(result.pagination.totalCount).toBe(1);
     expect(requests.filter(({ url }) => url.pathname.endsWith("/matches"))).toHaveLength(1);
     expect(requests.some(({ method }) => method === "HEAD")).toBe(false);
@@ -106,7 +107,7 @@ describe("public history outside the available range", () => {
     { total: 3, page: 2, expectedIds: ["snapshot-3"] }
   ])("keeps snapshot pagination consistent with live history (total $total, page $page)", async ({ total, page, expectedIds }) => {
     const snapshot: MatchHistoryItem[] = Array.from({ length: total }, (_, index) => ({
-      id: `snapshot-${index + 1}`, scheduledAt: "2026-09-14T21:00:00Z", modality: "6v6", status: "finished", scoreA: 3, scoreB: 2, winnerTeam: "A"
+      id: `snapshot-${index + 1}`, scheduledAt: "2026-09-14T21:00:00Z", modality: "6v6", status: "finished", scoreA: 3, scoreB: 2, winnerTeam: "A", team_a_label: null, team_b_label: null
     }));
     const requests = setup({ snapshot });
     const response = await getMatchHistoryCardsPage(ORG, { page, pageSize: 2, season: "all" });
@@ -115,5 +116,12 @@ describe("public history outside the available range", () => {
     expect(requests).toHaveLength(1);
     expect(requests[0].url.pathname).toBe("/rest/v1/organization_public_snapshots");
     expect(requests[0].url.searchParams.get("organization_id")).toBe(`eq.${ORG}`);
+  });
+
+  it("loads real team names when the snapshot predates custom labels", async () => {
+    const requests = setup({ normal: true, snapshot: [{ id: "match-1", scheduledAt: "2026-09-14T21:00:00Z", modality: "6v6", status: "finished", scoreA: 3, scoreB: 2, winnerTeam: "A" }] });
+    const result = await getMatchHistoryCardsPage(ORG, { season: "all" });
+    expect(result.matches[0]).toMatchObject({ team_a_label: "Verdes", team_b_label: "Azules" });
+    expect(requests.filter(({ url }) => url.pathname.endsWith("/matches"))).toHaveLength(1);
   });
 });

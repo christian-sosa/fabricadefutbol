@@ -42,7 +42,7 @@ export default async function PricingPage() {
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <TrackedLink
-            className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+            className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:brightness-110"
             eventName={GROWTH_EVENTS.ctaClicked}
             eventProperties={{ cta: "start_now", source: "pricing_hero" }}
             href="/admin/login?mode=register"
@@ -90,7 +90,7 @@ export default async function PricingPage() {
 
             <div className="mt-5">
               <TrackedLink
-                className="inline-flex rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                className="inline-flex rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:brightness-110"
                 eventName={GROWTH_EVENTS.ctaClicked}
                 eventProperties={{ cta: "create_group", source: "pricing_plan" }}
                 href={plan.href}

@@ -2,10 +2,10 @@ import Link from "next/link";
 
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
+import { MatchDateTime } from "@/components/matches/match-date-time";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
-import { formatMatchDateTime } from "@/lib/match-datetime";
-import { withOrgQuery } from "@/lib/org";
+import { buildMatchHistoryHref, parseMatchHistorySeason } from "@/lib/match-history-navigation";
 import { getUpcomingConfirmedMatches, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
 import { resolveMatchTeamLabels } from "@/lib/team-labels";
 import { formatRendimiento } from "@/lib/utils";
@@ -13,41 +13,36 @@ import { formatRendimiento } from "@/lib/utils";
 export default async function UpcomingPage({
   searchParams
 }: {
-  searchParams: Promise<{ org?: string }>;
+  searchParams: Promise<{ org?: string; season?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
+  const selectedSeason = parseMatchHistorySeason(resolvedSearchParams.season);
   const [{ organizations, selectedOrganization }, viewerAdminOrganizations] = await Promise.all([
     resolvePublicOrganization(resolvedSearchParams.org),
     getViewerAdminOrganizations()
   ]);
   const upcoming = await getUpcomingConfirmedMatches(selectedOrganization?.id ?? null);
+  const groupSwitcher = <OrganizationSwitcher
+    basePath="/upcoming"
+    currentOrganizationSlug={selectedOrganization?.slug}
+    label="Elegir grupo"
+    organizations={organizations}
+    pickerOnly={Boolean(selectedOrganization)}
+    quickOrganizations={viewerAdminOrganizations}
+  />;
 
   return (
     <div className="space-y-4">
-      <h1 className="text-3xl font-black text-slate-100">
-        Proximos Partidos Confirmados {selectedOrganization ? `- ${selectedOrganization.name}` : ""}
-      </h1>
-
-      <OrganizationSwitcher
-        basePath="/upcoming"
-        currentOrganizationSlug={selectedOrganization?.slug}
-        label="Elegir grupo"
-        organizations={organizations}
-        quickOrganizations={viewerAdminOrganizations}
-      />
-
-      {selectedOrganization ? (
-        <section className="lg:hidden">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
-            <OrganizationPublicNav
-              className="grid grid-cols-2 gap-2 sm:grid-cols-4"
-              currentPath="/upcoming"
-              itemClassName="flex min-h-10 items-center justify-center px-2 py-2 text-center"
-              organizationKey={selectedOrganization.slug}
-            />
-          </div>
-        </section>
-      ) : null}
+      <header className="space-y-3">
+        <h1 className="text-2xl font-black text-slate-100 sm:text-3xl">Próximos partidos</h1>
+        {selectedOrganization ? (
+          <details className="rounded-xl border border-slate-800 px-3">
+            <summary className="min-h-11 cursor-pointer content-center text-sm text-slate-300"><span className="font-semibold text-slate-100">{selectedOrganization.name}</span> · Cambiar grupo</summary>
+            <div className="pb-3 pt-1">{groupSwitcher}</div>
+          </details>
+        ) : groupSwitcher}
+        {selectedOrganization ? <OrganizationPublicNav className="lg:hidden" currentPath="/upcoming" organizationKey={selectedOrganization.slug} season={selectedSeason} /> : null}
+      </header>
 
       {upcoming.length ? (
         <div className="space-y-4">
@@ -56,12 +51,15 @@ export default async function UpcomingPage({
             return (
               <Card key={item.match.id}>
                 <CardTitle>
-                  {item.match.modality} - {formatMatchDateTime(item.match.scheduled_at)}
+                  <MatchDateTime value={item.match.scheduled_at} />
                 </CardTitle>
-                <CardDescription>{item.match.location || "Sin ubicacion definida"}</CardDescription>
+                <CardDescription className="mt-1">{item.match.modality} · {item.match.location || "Cancha por confirmar"}</CardDescription>
+                <p className="mt-4 text-lg font-bold text-slate-100">{teamLabels.teamA} <span className="px-1 text-sm font-normal text-slate-400">vs.</span> {teamLabels.teamB}</p>
+                <details className="mt-3 border-t border-slate-800">
+                  <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold text-slate-300">Ver jugadores</summary>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{teamLabels.teamA}</p>
+                    <p className="mb-2 text-sm font-semibold text-slate-300">{teamLabels.teamA}</p>
                     <ul className="space-y-2 text-sm">
                       {item.teamAPlayers.map((player) => (
                         <li className="flex items-center justify-between gap-3" key={player.id}>
@@ -70,10 +68,11 @@ export default async function UpcomingPage({
                             <span className="flex items-center gap-2">
                               {player.full_name}
                               {player.is_guest ? (
-                                <span className="rounded-full border border-cyan-400/50 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
+                                <span className="rounded-full border border-slate-700 px-2 py-0.5 text-xs text-slate-300">
                                   Invitado
                                 </span>
                               ) : null}
+                              {item.match.goalkeeper_player_ids?.includes(player.id) ? <span className="text-xs text-slate-400">Arquero</span> : null}
                             </span>
                           </div>
                           {!player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
@@ -82,7 +81,7 @@ export default async function UpcomingPage({
                     </ul>
                   </div>
                   <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{teamLabels.teamB}</p>
+                    <p className="mb-2 text-sm font-semibold text-slate-300">{teamLabels.teamB}</p>
                     <ul className="space-y-2 text-sm">
                       {item.teamBPlayers.map((player) => (
                         <li className="flex items-center justify-between gap-3" key={player.id}>
@@ -91,10 +90,11 @@ export default async function UpcomingPage({
                             <span className="flex items-center gap-2">
                               {player.full_name}
                               {player.is_guest ? (
-                                <span className="rounded-full border border-cyan-400/50 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
+                                <span className="rounded-full border border-slate-700 px-2 py-0.5 text-xs text-slate-300">
                                   Invitado
                                 </span>
                               ) : null}
+                              {item.match.goalkeeper_player_ids?.includes(player.id) ? <span className="text-xs text-slate-400">Arquero</span> : null}
                             </span>
                           </div>
                           {!player.is_guest ? <span className="font-semibold text-emerald-300">{formatRendimiento(player.current_rating)}</span> : null}
@@ -103,9 +103,10 @@ export default async function UpcomingPage({
                     </ul>
                   </div>
                 </div>
+                </details>
                 <Link
-                  className="mt-4 inline-flex text-sm font-semibold text-emerald-300 hover:underline"
-                  href={withOrgQuery(`/matches/${item.match.id}`, selectedOrganization?.slug)}
+                  className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-300 hover:underline"
+                  href={buildMatchHistoryHref({ matchId: item.match.id, organizationSlug: selectedOrganization?.slug, season: selectedSeason })}
                 >
                   Ver detalle completo
                 </Link>
@@ -115,7 +116,8 @@ export default async function UpcomingPage({
         </div>
       ) : (
         <Card>
-          <CardDescription>No hay proximos partidos confirmados.</CardDescription>
+          <CardTitle>Todavía no hay partidos confirmados</CardTitle>
+          <CardDescription className="mt-2">Cuando el organizador confirme los equipos, vas a ver el próximo partido acá.</CardDescription>
         </Card>
       )}
     </div>

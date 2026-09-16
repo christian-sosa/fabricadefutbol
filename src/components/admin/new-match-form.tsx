@@ -86,7 +86,14 @@ export function NewMatchForm({
   const [showManualBuilder, setShowManualBuilder] = useState(false);
   const [manualAssignments, setManualAssignments] = useState<Record<string, TeamSide>>({});
   const [incompleteGuestKey, setIncompleteGuestKey] = useState<number | null>(null);
+  const [playerSearch, setPlayerSearch] = useState("");
+  const [onlySelected, setOnlySelected] = useState(false);
   const formId = useId();
+  const normalizedSearch = playerSearch.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").trim();
+  const visiblePlayerIds = new Set(players.filter((player) =>
+    (!onlySelected || selectedPlayers[player.id]) &&
+    player.full_name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").includes(normalizedSearch)
+  ).map((player) => player.id));
 
   const expected = EXPECTED_PLAYERS[modality];
   const teamSize = expected / 2;
@@ -332,6 +339,24 @@ export function NewMatchForm({
         <p className="mt-2 text-xs text-slate-400">
           Si marcas arqueros, deben ser exactamente 2 y se reparten uno por equipo.
         </p>
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <label className="mb-1 block text-sm font-semibold" htmlFor={`${formId}-player-search`}>Buscar jugador</label>
+            <Input
+              id={`${formId}-player-search`}
+              onChange={(event) => setPlayerSearch(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}
+              placeholder="Nombre del jugador"
+              type="search"
+              value={playerSearch}
+            />
+          </div>
+          <div aria-label="Filtrar jugadores" className="flex gap-2" role="group">
+            <Button aria-pressed={!onlySelected} onClick={() => setOnlySelected(false)} type="button" variant={!onlySelected ? "primary" : "secondary"}>Todos</Button>
+            <Button aria-pressed={onlySelected} onClick={() => setOnlySelected(true)} type="button" variant={onlySelected ? "primary" : "secondary"}>Convocados ({selectedCount})</Button>
+          </div>
+        </div>
+        <p aria-live="polite" className="mt-2 text-xs text-slate-400">{visiblePlayerIds.size ? `${visiblePlayerIds.size} jugadores en esta vista` : "No hay jugadores que coincidan con el filtro."}</p>
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           {players.map((player) => {
             const ratingTrendLabel = formatRatingTrendLabel(player.current_rating);
@@ -341,8 +366,10 @@ export function NewMatchForm({
               <div
                 className={cn(
                   "flex flex-col gap-3 rounded-lg border bg-slate-950 px-3 py-2 text-sm transition hover:border-slate-600 xl:flex-row xl:items-center xl:justify-between",
-                  selectedPlayers[player.id] ? "border-emerald-500/50" : "border-slate-800"
+                  selectedPlayers[player.id] ? "border-emerald-500/50" : "border-slate-800",
+                  !visiblePlayerIds.has(player.id) && "hidden"
                 )}
+                hidden={!visiblePlayerIds.has(player.id)}
                 key={player.id}
               >
                 <span className="flex min-w-0 items-center gap-3">
@@ -605,7 +632,8 @@ export function NewMatchForm({
       ) : null}
 
       {error ? <p className="text-sm font-semibold text-danger" role="alert">{error}</p> : null}
-      <p className="text-sm text-slate-300" id={`${formId}-roster-status`} role="status">
+      <div className="sticky bottom-3 z-20 rounded-xl border border-slate-600 bg-slate-950/95 p-3 shadow-lg backdrop-blur">
+      <p className="mb-3 text-sm text-slate-200" id={`${formId}-roster-status`} role="status">
         {rosterStatus}
         {!goalkeepersReady ? " Elegiste un arquero: marcá el segundo o desmarcá el actual." : ""}
       </p>
@@ -616,6 +644,7 @@ export function NewMatchForm({
         <Button onClick={() => setShowManualBuilder((current) => !current)} type="button" variant="secondary">
           {showManualBuilder ? "Ocultar armado manual" : "Armar equipos yo mismo"}
         </Button>
+      </div>
       </div>
     </ActionForm>
   );

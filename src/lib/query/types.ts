@@ -21,6 +21,8 @@ export type MatchHistoryItem = {
   scheduledAt: string;
   modality: MatchModality;
   status: MatchStatus;
+  team_a_label?: string | null;
+  team_b_label?: string | null;
   scoreA: number | null;
   scoreB: number | null;
   winnerTeam: WinnerTeam | null;

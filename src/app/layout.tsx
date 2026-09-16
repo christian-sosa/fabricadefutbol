@@ -5,7 +5,6 @@ import { PrivateTelemetry } from "@/components/analytics/private-telemetry";
 
 import "@/app/globals.css";
 import { GrowthEventTracker } from "@/components/analytics/growth-event-tracker";
-import { BetaNotice } from "@/components/layout/beta-notice";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ReactQueryProvider } from "@/components/providers/react-query-provider";
@@ -92,7 +91,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   initialIsAuthenticated={false}
                 />
               </Suspense>
-              <BetaNotice />
               <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8" id="contenido-principal">
                 {children}
               </main>

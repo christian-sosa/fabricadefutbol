@@ -35,6 +35,45 @@ function getCheckbox(container: HTMLElement, name: string, value: string) {
 }
 
 describe("NewMatchForm", () => {
+  it("no crea el partido al presionar Enter en el buscador con la convocatoria completa", async () => {
+    const user = userEvent.setup();
+    const createAction = vi.mocked(createMatchFormAction);
+    createAction.mockClear();
+    const players = buildPlayers(10);
+    render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={players}
+      initialValues={{ modality: "5v5", scheduledTime: "21:00", playerIds: players.map((player) => player.id), goalkeeperPlayerIds: [], guests: [] }} />);
+    const submit = screen.getByRole("button", { name: "Crear partido y generar equipos" });
+    expect(submit).toBeEnabled();
+
+    const search = screen.getByRole("searchbox", { name: "Buscar jugador" });
+    await user.type(search, "Jugador 1{Enter}");
+    expect(createAction).not.toHaveBeenCalled();
+    expect(search).toHaveFocus();
+    expect(search).toHaveValue("Jugador 1");
+
+    await user.click(submit);
+    await waitFor(() => expect(createAction).toHaveBeenCalledOnce());
+    expect(createAction.mock.calls[0][0].getAll("playerIds")).toEqual(players.map((player) => player.id));
+  });
+
+  it("busca sin acentos y conserva convocados y arqueros ocultos en el envío", async () => {
+    const user = userEvent.setup();
+    const players = buildPlayers(10);
+    players[0].full_name = "Álvaro Pérez";
+    const { container } = render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={players}
+      initialValues={{ modality: "5v5", playerIds: players.map((player) => player.id), goalkeeperPlayerIds: ["player-1", "player-2"], guests: [] }} />);
+    await user.type(screen.getByLabelText("Buscar jugador"), "alvaro");
+    expect(screen.getByRole("checkbox", { name: "Juega Álvaro Pérez" })).toBeVisible();
+    expect(screen.queryByRole("checkbox", { name: "Juega Jugador 2" })).not.toBeInTheDocument();
+    const data = new FormData(container.querySelector("form")!);
+    expect(data.getAll("playerIds")).toEqual(players.map((player) => player.id));
+    expect(data.getAll("goalkeeperPlayerIds")).toEqual(["player-1", "player-2"]);
+    await user.clear(screen.getByLabelText("Buscar jugador"));
+    await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 3" }));
+    await user.click(screen.getByRole("button", { name: "Convocados (9)" }));
+    expect(screen.queryByRole("checkbox", { name: "Juega Jugador 3" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Convocados (9)" })).toHaveAttribute("aria-pressed", "true");
+  });
   it("ofrece F10 y exige exactamente 20 convocados", async () => {
     const user = userEvent.setup();
     const players = buildPlayers(21);

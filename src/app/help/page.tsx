@@ -181,7 +181,7 @@ export default async function HelpPage({
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
-            className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(16,185,129,1)] transition hover:brightness-110"
+            className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:brightness-110"
             href={panelPath}
           >
             Crear mi grupo gratis
@@ -311,7 +311,7 @@ export default async function HelpPage({
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link
-            className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+            className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:brightness-110"
             href={panelPath}
           >
             Crear mi grupo gratis

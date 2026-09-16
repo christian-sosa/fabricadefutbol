@@ -23,11 +23,11 @@ function pageData(page: number): OrganizationMatchesResponse {
   };
 }
 const clients: QueryClient[] = [];
-function mountHistory(initialPage = 1) {
+function mountHistory(initialPage = 1, initialData = pageData(initialPage)) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 600_000 } } });
   clients.push(client);
   return render(<QueryClientProvider client={client}>
-    <MatchesHistoryQueryTable organizationId="group-1" organizationSlug="la-banda" season="all" initialPage={initialPage} initialData={pageData(initialPage)} />
+    <MatchesHistoryQueryTable organizationId="group-1" organizationSlug="la-banda" season="all" initialPage={initialPage} initialData={initialData} />
   </QueryClientProvider>);
 }
 
@@ -43,6 +43,22 @@ beforeEach(() => {
 afterEach(() => { clients.forEach((client) => client.clear()); clients.length = 0; });
 
 describe("history navigation", () => {
+  it("shows custom team names and the sporting date, without controls for a single page", () => {
+    const data = pageData(1);
+    data.matches[0] = { ...data.matches[0], team_a_label: "Verdes", team_b_label: "Azules", scheduledAt: "2026-01-01T00:30:00Z" };
+    data.pagination = { ...data.pagination, totalCount: 1, totalPages: 1, hasNextPage: false };
+    mountHistory(1, data);
+    expect(screen.getByRole("group", { name: "Verdes 1, Azules 0" })).toBeInTheDocument();
+    expect(screen.getAllByTitle("01/01/2026 00:30")[0]).toHaveTextContent("1 ene 2026, 00:30");
+    expect(screen.queryByRole("button", { name: "Siguiente" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Anterior" })).not.toBeInTheDocument();
+  });
+
+  it("keeps default team names for older cached rows", () => {
+    mountHistory();
+    expect(screen.getByRole("group", { name: "Negro 1, Blanco 0" })).toBeInTheDocument();
+  });
+
   it("retries the requested page after failure, without showing page one as its result or skipping to page three", async () => {
     const user = userEvent.setup();
     const fetcher = vi.fn()
@@ -54,7 +70,7 @@ describe("history navigation", () => {
     await screen.findByRole("alert");
     expect(window.location.search).toBe("?org=la-banda&season=all&page=2");
     expect(screen.getByText("Página 2")).toBeInTheDocument();
-    expect(screen.queryAllByText("MVP: Figura de página 1")).toHaveLength(0);
+    expect(screen.queryAllByText("Figura: Figura de página 1")).toHaveLength(0);
     expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Anterior" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Reintentar" }));

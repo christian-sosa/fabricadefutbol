@@ -72,7 +72,12 @@ test("login, resultado, reintento, edicion concurrente y correccion historica co
   await loginForm.getByLabel("Contraseña", { exact: true }).fill(ADMIN_PASSWORD);
   await loginForm.getByRole("button", { name: "Ingresar con email", exact: true }).click();
   await expectGroupPath(page, "/admin");
-  await expect(page.getByRole("heading", { name: "Dejá tu grupo listo para jugar" })).toBeVisible();
+  const onboarding = page.locator("section").filter({ has: page.getByText("Tu próximo paso", { exact: true }) });
+  await expect(onboarding.getByRole("heading")).toBeVisible();
+  await expect(onboarding.getByRole("link", { name: /^Continuar:/ })).toBeVisible();
+  const progress = onboarding.getByRole("list", { name: "Progreso del primer partido" });
+  await expect(progress.getByRole("listitem")).toHaveCount(3);
+  await expect(progress.locator('[aria-current="step"]')).toHaveCount(1);
 
   // This is the accredited disposable fixture; exercise real saved names without altering points.
   const longPlayerName = "E2E Jugador con nombre largo para una pantalla chica";
@@ -126,7 +131,7 @@ test("login, resultado, reintento, edicion concurrente y correccion historica co
   await createMatch.click();
   await page.setViewportSize(originalViewport);
   await expect(page).toHaveURL((url) => /^\/admin\/matches\/[0-9a-f-]{36}$/.test(url.pathname));
-  await expect(page.getByText("Opciones de equipos")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Opciones de equipos", exact: true })).toBeVisible();
 
   const matchId = page.url().match(/\/admin\/matches\/([^?]+)/)?.[1];
   expect(matchId).toBeTruthy();
@@ -185,9 +190,9 @@ test("login, resultado, reintento, edicion concurrente y correccion historica co
   await page.setViewportSize(originalViewport);
 
   await page.goto(`/matches/${matchId}?org=${ORG_SLUG}`);
-  await expect(page.getByText("3 - 2")).toBeVisible();
-  await expect(page.getByText("Ganador: Negro")).toBeVisible();
-  await expect(page.getByText("MVP: E2E Jugador 1", { exact: true })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Negro 3, Blanco 2", exact: true })).toBeVisible();
+  await expect(page.getByText("Ganó Negro")).toBeVisible();
+  await expect(page.getByText("Figura del partido: E2E Jugador 1", { exact: true })).toBeVisible();
 
   const response = await page.request.get(`/api/organizations/${E2E_ORGANIZATION_ID}/standings?season=current`);
   expect(response.ok()).toBe(true);
@@ -254,7 +259,7 @@ test("login, resultado, reintento, edicion concurrente y correccion historica co
   const corrected = points(await standingsFor(page));
   for (const prior of standings) expect(corrected[prior.playerId]).toBe(laterPoints[prior.playerId] - 2 * (prior.currentRating - 1000));
   await page.goto(`/matches/${laterMatchId}?org=${ORG_SLUG}`);
-  await expect(page.getByText("2 - 0", {exact: true})).toBeVisible();
+  await expect(page.getByRole("group", { name: "Negro 2, Blanco 0", exact: true })).toBeVisible();
 });
 
 test("ranking visible sin desborde y controles accesibles por teclado", async ({page, isMobile}, testInfo) => {

@@ -13,7 +13,7 @@ test("menú accesible en horizontal y navegación táctil a 320 px", async ({pag
   const accountLink = menu.getByRole("link", {name: "Ingresar / Registro", exact: true});
   await accountLink.scrollIntoViewIfNeeded();
   await expect(accountLink).toBeInViewport();
-  const headerSize = await page.locator("header").boundingBox();
+  const headerSize = await page.getByRole("banner").boundingBox();
   expect(headerSize!.height).toBeLessThanOrEqual(360);
   await accountLink.focus();
   await page.keyboard.press("Escape");

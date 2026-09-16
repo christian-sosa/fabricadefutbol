@@ -27,12 +27,14 @@ export function OrganizationSwitcher({
   organizations,
   quickOrganizations = [],
   currentOrganizationSlug,
+  pickerOnly = false,
   label = "Grupos"
 }: {
   basePath: string;
   organizations: OrganizationOption[];
   quickOrganizations?: OrganizationOption[];
   currentOrganizationSlug?: string | null;
+  pickerOnly?: boolean;
   label?: string;
 }) {
   const [query, setQuery] = useState("");
@@ -72,13 +74,13 @@ export function OrganizationSwitcher({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
+      {!pickerOnly ? <div className="flex items-center justify-between gap-3">
         <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
           {selectedOrganization ? <p className="truncate font-semibold text-slate-100 md:hidden">{selectedOrganization.name}</p> : null}
         </div>
         {selectedOrganization ? <button aria-expanded={expanded} className="shrink-0 rounded-md border border-slate-700 px-3 py-2 text-sm md:hidden" onClick={() => setExpanded((value) => !value)} type="button">{expanded ? "Cerrar" : "Cambiar grupo"}</button> : null}
-      </div>
-      <div className={cn("space-y-3", selectedOrganization && !expanded ? "hidden md:block" : "block")}>
+      </div> : null}
+      <div className={cn("space-y-3", !pickerOnly && selectedOrganization && !expanded ? "hidden md:block" : "block")}>
 
       {safeQuickOrganizations.length ? (
         <div className="space-y-2">

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { Card } from "@/components/ui/card";
+import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { PlayerPhotoModalTrigger } from "@/components/ui/player-photo-modal-trigger";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { useOrganizationStandingsQuery } from "@/lib/query/hooks";
@@ -63,7 +64,7 @@ const STAT_CARDS = [
   },
   {
     key: "mvpCount",
-    label: "MVP",
+    label: "Figuras",
     value: (player: PlayerComputedStats) => player.mvpCount ?? 0,
     className: "text-amber-200"
   }
@@ -80,7 +81,7 @@ const SORTABLE_COLUMNS: Array<{ key: SortKey; label: string }> = [
   { key: "pg", label: "PG" },
   { key: "pe", label: "PE" },
   { key: "pp", label: "PP" },
-  { key: "mvp", label: "MVP" }
+  { key: "mvp", label: "Figuras" }
 ];
 
 type RankingTableQueryProps = {
@@ -232,59 +233,46 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
           <Button aria-label={sortDirection === "desc" ? "Cambiar a orden ascendente" : "Cambiar a orden descendente"} onClick={() => setSortDirection((value) => value === "desc" ? "asc" : "desc")} variant="secondary">{sortDirection === "desc" ? "↓" : "↑"}</Button>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="divide-y divide-border">
           {sortedPlayers.map((player) => {
             const rank = player.currentRank;
+            const figures = player.mvpCount ?? 0;
             return (
-              <article className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5" key={player.playerId}>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <span
-                      className={cn(
-                        "inline-flex min-w-9 shrink-0 justify-center rounded-full border px-1.5 py-1.5 text-sm font-black",
-                        PODIUM_RANK_STYLES[rank] ?? "border-slate-700 bg-slate-800 text-slate-200"
-                      )}
-                    >
-                      #{rank}
+              <article className="min-w-0" key={player.playerId}>
+                <details className="group">
+                  <summary
+                    aria-label={`Estadísticas de ${player.playerName}: puesto ${rank}, ${formatRendimiento(player.currentRating)} puntos, ${player.matchesPlayed} partidos, ${figures} figuras`}
+                    className="flex min-h-20 cursor-pointer list-none items-center gap-2 rounded-lg px-1 py-3 hover:bg-slate-800/40 [&::-webkit-details-marker]:hidden"
+                  >
+                    <span className={cn("w-7 shrink-0 text-center text-sm font-bold", rank === 1 ? "text-accent" : "text-muted")}>
+                      {rank}
                     </span>
-                    <PlayerPhotoModalTrigger
-                      avatarSize="sm"
-                      hasPhoto={player.photoPath === undefined ? undefined : Boolean(player.photoPath)}
-                      photoUpdatedAt={player.photoUpdatedAt}
-                      nameClassName="min-w-0 break-words leading-tight"
-                      playerId={player.playerId}
-                      playerName={player.playerName}
-                      triggerClassName="min-w-0 max-w-full"
-                    />
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Puntos</p>
-                    <p className="text-2xl font-black text-emerald-300">{formatRendimiento(player.currentRating)}</p>
-                    <p className="text-xs font-semibold text-amber-200">{player.mvpCount ?? 0} MVP</p>
-                  </div>
-                </div>
-
-                <details className="mt-2 border-t border-slate-800">
-                  <summary className="flex min-h-11 cursor-pointer items-center text-xs font-semibold text-slate-400">Estadísticas de {player.playerName}</summary>
-                <div className="py-2">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-300">Últimos 5</p>
-                    <p className="text-[10px] text-slate-500">Reciente a la derecha</p>
-                  </div>
-                  <RecentResults className="mt-2 justify-end" results={player.recentResults} />
-                </div>
-
-                <div className="mt-2 grid grid-cols-4 gap-1.5 text-center text-sm">
-                  {STAT_CARDS.filter((item) => item.key !== "mvpCount").map((item) => (
-                    <div
-                      className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 px-1.5 py-2"
-                      key={item.key}
-                    >
-                      <p className="text-[11px] uppercase tracking-wide text-slate-500">{item.label}</p>
-                      <p className={cn("mt-1 font-semibold", item.className)}>{item.value(player)}</p>
+                    <PlayerAvatar hasPhoto={player.photoPath === undefined ? undefined : Boolean(player.photoPath)} name={player.playerName} photoUpdatedAt={player.photoUpdatedAt} playerId={player.playerId} size="sm" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block break-words text-sm font-semibold text-foreground">{player.playerName}</span>
+                      <span className="mt-0.5 block text-xs text-muted">{player.matchesPlayed} PJ · <span className="group-open:hidden">Ver estadísticas</span><span className="hidden group-open:inline">Ocultar estadísticas</span></span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block text-lg font-bold tabular-nums text-foreground">{formatRendimiento(player.currentRating)} <span className="text-xs font-normal text-muted">pts</span></span>
+                      {figures > 0 ? <span className="block text-xs text-amber-200">{figures} {figures === 1 ? "figura" : "figuras"}</span> : null}
+                    </span>
+                  </summary>
+                  <div className="space-y-3 rounded-lg bg-slate-950 p-3 pb-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-300">Últimos 5</p>
+                      <p className="text-xs text-muted">Reciente a la derecha</p>
                     </div>
-                  ))}
-                </div>
+                    <RecentResults className="justify-start" results={player.recentResults} />
+                    <dl className="grid grid-cols-4 gap-2 text-center text-sm">
+                      {STAT_CARDS.filter((item) => item.key !== "mvpCount").map((item) => (
+                        <div key={item.key}>
+                          <dt className="text-xs text-muted">{item.label}</dt>
+                          <dd className={cn("mt-1 font-semibold", item.className)}>{item.value(player)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    {player.photoPath !== null ? <PlayerPhotoModalTrigger avatarSize="sm" hasPhoto={player.photoPath === undefined ? undefined : Boolean(player.photoPath)} photoUpdatedAt={player.photoUpdatedAt} playerId={player.playerId} playerName={player.playerName} showPhotoLabel /> : null}
+                  </div>
                 </details>
               </article>
             );
@@ -302,13 +290,13 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
         <Table className="table-fixed text-sm text-slate-100">
           <colgroup>
             <col className="w-[7%]" />
-            <col className="w-[25%]" />
+            <col className="w-[24%]" />
             <col className="w-[13%]" />
             <col className="w-[6%]" />
             <col className="w-[6%]" />
             <col className="w-[6%]" />
             <col className="w-[6%]" />
-            <col className="w-[7%]" />
+            <col className="w-[8%]" />
             <col className="w-[24%]" />
           </colgroup>
           <THead className="bg-slate-800/90 text-slate-300">
@@ -355,7 +343,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
                     </span>
                   </TD>
                   <TD className="px-2.5 py-4 lg:px-3">
-                    <PlayerPhotoModalTrigger avatarSize="md" hasPhoto={player.photoPath === undefined ? undefined : Boolean(player.photoPath)} photoUpdatedAt={player.photoUpdatedAt} playerId={player.playerId} playerName={player.playerName} />
+                    <PlayerPhotoModalTrigger avatarSize="md" showPhotoLabel hasPhoto={player.photoPath === undefined ? undefined : Boolean(player.photoPath)} photoUpdatedAt={player.photoUpdatedAt} playerId={player.playerId} playerName={player.playerName} />
                   </TD>
                   <TD className="px-2.5 py-4 text-base font-semibold text-emerald-300 lg:px-3">
                     {formatRendimiento(player.currentRating)}
