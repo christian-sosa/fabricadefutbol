@@ -29,6 +29,23 @@ import { FORMATION_PRESETS, getFormationPositions } from "@/lib/domain/match-for
 import { MATCH_MODALITIES, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 
 describe("MatchDetailPage", () => {
+  it("vuelve al calendario conservando grupo, temporada y página del historial", async () => {
+    const season = "00000000-0000-4000-8000-000000000001";
+    getMatchDetailsMock.mockResolvedValueOnce({
+      match: { id: "match-calendar", modality: "5v5", scheduled_at: "2025-12-31T00:30:00.000Z", status: "finished" },
+      result: null,
+      teamAPlayers: [],
+      teamBPlayers: []
+    });
+    render(await MatchDetailPage({
+      params: Promise.resolve({ id: "match-calendar" }),
+      searchParams: Promise.resolve({ org: "grupo-a", season, page: "3", view: "calendar" })
+    }));
+
+    expect(screen.getByRole("link", { name: "Volver al calendario" })).toHaveAttribute("href", `/matches?org=grupo-a&season=${season}&page=3&view=calendar`);
+    expect(getMatchDetailsMock).toHaveBeenLastCalledWith("match-calendar", "grupo-a");
+  });
+
   it.each(MATCH_MODALITIES)("shows saved %s pitches with names and no rating list", async (modality) => {
     const size = TEAM_SIZE_BY_MODALITY[modality];
     const preset = FORMATION_PRESETS[modality][0];

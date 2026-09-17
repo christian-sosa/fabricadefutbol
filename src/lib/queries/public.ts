@@ -738,6 +738,37 @@ export async function getMatchHistoryCardsPage(
   return getMatchHistoryCardsPageLive(organizationId, { page, pageSize, season: params?.season });
 }
 
+export async function getMatchCalendarActivity(
+  organizationId: string | null,
+  season?: string
+): Promise<{
+  matches: { id: string; scheduledAt: string; modality: string }[];
+  season: OrganizationSeasonOption | null;
+}> {
+  if (!organizationId) return { matches: [], season: null };
+
+  const supabase = await createSupabaseServerClient();
+  const seasonFilter = await resolveSeasonFilter(supabase, organizationId, season);
+  const matches = await readAllRows((from, to) => {
+    let query = supabase
+      .from("matches")
+      .select("id, scheduled_at, modality", { count: "exact" })
+      .eq("organization_id", organizationId)
+      .eq("status", "finished");
+    if (seasonFilter.mode === "season") query = query.eq("season_id", seasonFilter.season.id);
+    return query.order("scheduled_at", { ascending: true }).order("id").range(from, to);
+  });
+
+  return {
+    matches: matches.map((match) => ({
+      id: match.id,
+      scheduledAt: match.scheduled_at,
+      modality: match.modality
+    })),
+    season: seasonFilter.season
+  };
+}
+
 export async function getMatchHistoryCards(organizationId: string | null) {
   const data = await getMatchHistoryCardsPage(organizationId, {
     page: 1,

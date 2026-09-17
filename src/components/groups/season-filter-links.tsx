@@ -8,12 +8,14 @@ type SeasonFilterLinksProps = {
   currentSeason: string;
   organizationSlug?: string | null;
   seasons: OrganizationSeasonOption[];
+  view?: "calendar";
 };
 
-function buildSeasonHref(basePath: string, organizationSlug: string | null | undefined, season: string) {
+function buildSeasonHref(basePath: string, organizationSlug: string | null | undefined, season: string, view?: "calendar") {
   const params = new URLSearchParams();
   if (organizationSlug) params.set("org", organizationSlug);
   if (season !== "current") params.set("season", season);
+  if (view) params.set("view", view);
   const queryString = params.toString().replace(/\+/g, "%20");
   return queryString ? `${basePath}?${queryString}` : basePath;
 }
@@ -22,7 +24,8 @@ export function SeasonFilterLinks({
   basePath,
   currentSeason,
   organizationSlug,
-  seasons
+  seasons,
+  view
 }: SeasonFilterLinksProps) {
   const activeSeason = seasons.find((season) => season.status === "active") ?? null;
   const closedSeasons = seasons.filter((season) => season.status !== "active");
@@ -53,7 +56,7 @@ export function SeasonFilterLinks({
                 ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
                 : "border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-500 hover:text-slate-100"
             )}
-            href={buildSeasonHref(basePath, organizationSlug, item.key)}
+            href={buildSeasonHref(basePath, organizationSlug, item.key, view)}
             key={item.key}
           >
             {item.label}

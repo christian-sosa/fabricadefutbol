@@ -21,4 +21,11 @@ describe("match history navigation", () => {
       .toBe("/matches?org=grupo");
     expect(buildMatchHistoryHref({})).toBe("/matches");
   });
+
+  it("preserves calendar context for details and ignores unrecognized view values", () => {
+    expect(buildMatchHistoryHref({ organizationSlug: "grupo", season: "all", page: 2, matchId: "match-1", view: "calendar" }))
+      .toBe("/matches/match-1?org=grupo&season=all&page=2&view=calendar");
+    expect(buildMatchHistoryHref({ organizationSlug: "grupo", view: "https://example.com" }))
+      .toBe("/matches?org=grupo");
+  });
 });

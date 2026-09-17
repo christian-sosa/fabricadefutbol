@@ -49,7 +49,7 @@ export default async function MatchDetailPage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ org?: string; season?: string; page?: string }>;
+  searchParams: Promise<{ org?: string; season?: string; page?: string; view?: string }>;
 }) {
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   const details = await getMatchDetails(id, resolvedSearchParams.org);
@@ -69,9 +69,10 @@ export default async function MatchDetailPage({
       <Link className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-300 hover:underline" href={buildMatchHistoryHref({
         organizationSlug: resolvedSearchParams.org,
         season: resolvedSearchParams.season,
-        page: parseMatchHistoryPage(resolvedSearchParams.page)
+        page: parseMatchHistoryPage(resolvedSearchParams.page),
+        view: resolvedSearchParams.view
       })}>
-        Volver al historial
+        {resolvedSearchParams.view === "calendar" ? "Volver al calendario" : "Volver al historial"}
       </Link>
       {resolvedSearchParams.org ? <OrganizationPublicNav className="lg:hidden" currentPath="/matches" organizationKey={resolvedSearchParams.org} season={parseMatchHistorySeason(resolvedSearchParams.season)} /> : null}
       <Card>
