@@ -110,13 +110,13 @@ export default async function GroupsPage({ searchParams }: {
               <ol className="mt-3 divide-y divide-slate-800">
                 {summary.topPlayers.map((player, index) => (
                   <li key={player.id}>
-                    <Link aria-label={`Ver ranking de ${player.full_name}`} className="flex min-h-14 items-center justify-between gap-3 rounded-lg py-2 text-sm transition hover:bg-slate-800" href={withOrgQuery("/ranking", selectedOrganization.slug)}>
+                    <Link aria-label={`Ver ranking de ${player.full_name}`} className="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg py-2 text-sm transition hover:bg-slate-800 lg:pr-3" href={withOrgQuery("/ranking", selectedOrganization.slug)}>
                       <span className="flex min-w-0 items-center gap-3">
-                        <span className="w-4 text-center text-xs text-slate-400">{index + 1}</span>
+                        <span className="w-4 shrink-0 text-center text-xs text-slate-400">{index + 1}</span>
                         <PlayerAvatar hasPhoto={player.photo_path === undefined ? undefined : Boolean(player.photo_path)} name={player.full_name} photoUpdatedAt={player.photo_updated_at} playerId={player.id} size="sm" />
                         <span className="truncate font-medium">{player.full_name}</span>
                       </span>
-                      <span className="shrink-0 font-semibold tabular-nums text-emerald-300">{formatRendimiento(player.current_rating)}</span>
+                      <span className="min-w-12 text-right font-semibold tabular-nums text-emerald-300">{formatRendimiento(player.current_rating)}</span>
                     </Link>
                   </li>
                 ))}

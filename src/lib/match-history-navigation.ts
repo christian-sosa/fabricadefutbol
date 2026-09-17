@@ -16,6 +16,7 @@ export function buildMatchHistoryHref(params: {
   season?: string | null;
   page?: number;
   matchId?: string;
+  view?: string;
 }) {
   const search = new URLSearchParams();
   if (params.organizationSlug) search.set("org", params.organizationSlug);
@@ -23,6 +24,7 @@ export function buildMatchHistoryHref(params: {
   const page = parseMatchHistoryPage(String(params.page ?? 1));
   if (season !== "current") search.set("season", season);
   if (page > 1) search.set("page", String(page));
+  if (params.view === "calendar") search.set("view", "calendar");
   const pathname = params.matchId ? `/matches/${encodeURIComponent(params.matchId)}` : "/matches";
   return search.size ? `${pathname}?${search.toString()}` : pathname;
 }
