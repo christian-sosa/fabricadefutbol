@@ -26,11 +26,13 @@ export function MatchActivityCalendar({ matches, organizationSlug, season, today
   const playedDates = matches.map((match) => matchIsoToDateInput(match.scheduledAt))
     .filter((day) => isActivityDate(day) && day <= end).sort();
   const firstDay = playedDates[0] ?? end;
+  // Legacy seasons can contain matches played before their recorded creation date.
+  const start = seasonStartsAt && firstDay < seasonStartsAt ? firstDay : seasonStartsAt;
   const lastDay = playedDates.at(-1) ?? end;
   const [range, setRange] = useState({ from: firstDay, to: end });
   const [month, setMonth] = useState(lastDay.slice(0, 7));
   const [selectedDay, setSelectedDay] = useState<string | null>(lastDay);
-  const validRange = isActivityDate(range.from) && isActivityDate(range.to) && range.from <= range.to && range.to <= end && (!seasonStartsAt || range.from >= seasonStartsAt);
+  const validRange = isActivityDate(range.from) && isActivityDate(range.to) && range.from <= range.to && range.to <= end && (!start || range.from >= start);
   const activity = useMemo(() => summarizeMatchActivity(matches, range.from, validRange ? range.to : ""), [matches, range.from, range.to, validRange]);
   const minMonth = validRange ? range.from.slice(0, 7) : firstDay.slice(0, 7);
   const maxMonth = validRange ? range.to.slice(0, 7) : end.slice(0, 7);
@@ -64,15 +66,15 @@ export function MatchActivityCalendar({ matches, organizationSlug, season, today
         </div>
         <div className="mt-5 grid gap-3 border-t border-emerald-400/15 pt-5 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto] lg:items-end">
           <label className="min-w-0 flex-1 text-xs font-semibold text-slate-300">Desde
-            <Input aria-describedby={!validRange ? "activity-range-error" : undefined} aria-invalid={!validRange} className="mt-1.5 [color-scheme:dark]" max={range.to || end} min={seasonStartsAt} onChange={(event) => setRange({ ...range, from: event.target.value })} type="date" value={range.from} />
+            <Input aria-describedby={!validRange ? "activity-range-error" : undefined} aria-invalid={!validRange} className="mt-1.5 [color-scheme:dark]" max={range.to || end} min={start} onChange={(event) => setRange({ ...range, from: event.target.value })} type="date" value={range.from} />
           </label>
           <label className="min-w-0 flex-1 text-xs font-semibold text-slate-300">Hasta
             <Input aria-describedby={!validRange ? "activity-range-error" : undefined} aria-invalid={!validRange} className="mt-1.5 [color-scheme:dark]" max={end} min={range.from} onChange={(event) => setRange({ ...range, to: event.target.value })} type="date" value={range.to} />
           </label>
           <Button onClick={() => chooseRange(firstDay, end)} variant="secondary">Desde el primer partido</Button>
-          <Button onClick={() => chooseRange(seasonStartsAt && seasonStartsAt > shiftActivityDate(end, -29) ? seasonStartsAt : shiftActivityDate(end, -29), end)} variant="secondary">Últimos 30 días</Button>
+          <Button onClick={() => chooseRange(start && start > shiftActivityDate(end, -29) ? start : shiftActivityDate(end, -29), end)} variant="secondary">Últimos 30 días</Button>
         </div>
-        {!validRange ? <p className="mt-3 text-sm text-amber-200" id="activity-range-error" role="alert">Elegí fechas válidas: Desde debe ser anterior o igual a Hasta, y Hasta no puede superar el {formatActivityDate(end)}.{seasonStartsAt ? ` Esta temporada empieza el ${formatActivityDate(seasonStartsAt)}. Para ampliar el período, elegí Histórico.` : ""}</p> : (
+        {!validRange ? <p className="mt-3 text-sm text-amber-200" id="activity-range-error" role="alert">Elegí fechas válidas: Desde debe ser anterior o igual a Hasta, y Hasta no puede superar el {formatActivityDate(end)}.{start ? ` El período disponible empieza el ${formatActivityDate(start)}. Para ampliar el período, elegí Histórico.` : ""}</p> : (
           <div aria-live="polite" className="mt-6">
             <p className="text-sm text-slate-300">Del <strong className="text-slate-100">{formatActivityDate(range.from)}</strong> al <strong className="text-slate-100">{formatActivityDate(range.to)}</strong>, el grupo jugó:</p>
             <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-6 sm:grid-cols-3">

@@ -114,6 +114,44 @@ describe("MatchActivityCalendar", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("31 de diciembre de 2025");
   });
 
+  it.each([false, true])("conserva el primer partido asignado aunque sea anterior al inicio registrado (sólo anteriores: %s)", async (onlyEarlierMatches) => {
+    const legacyMatches = [
+      { id: "first", scheduledAt: "2026-03-17T00:30:00.000Z", modality: "5v5" },
+      ...(!onlyEarlierMatches ? [{ id: "recent", scheduledAt: "2026-09-14T20:00:00.000Z", modality: "7v7" }] : [])
+    ];
+    mountCalendar({ matches: legacyMatches, season: "00000000-0000-4000-8000-000000000001", seasonStartsAt: "2026-04-04" });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Desde")).toHaveValue("2026-03-17");
+    expect(screen.getByLabelText("Desde")).toHaveAttribute("min", "2026-03-17");
+    expect(metric("Partidos")).toHaveTextContent(String(legacyMatches.length));
+
+    await userEvent.click(screen.getByRole("button", { name: "Últimos 30 días" }));
+    await userEvent.click(screen.getByRole("button", { name: "Desde el primer partido" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Desde")).toHaveValue("2026-03-17");
+    expect(screen.getByLabelText("Hasta")).toHaveValue("2026-09-17");
+    expect(metric("Partidos")).toHaveTextContent(String(legacyMatches.length));
+    expect(screen.getByText(/Promedio sobre los 185 días/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Ir al mes"), { target: { value: "2026-03" } });
+    await userEvent.click(screen.getByRole("button", { name: "17 de marzo de 2026: 1 partido" }));
+    expect(screen.getByRole("link", { name: /5v5.*00:30 hs.*Ver partido/ })).toHaveAttribute("href", "/matches/first?org=la-banda&season=00000000-0000-4000-8000-000000000001&page=3&view=calendar");
+    fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-03-16" } });
+    expect(screen.getByRole("alert")).toHaveTextContent("El período disponible empieza el 17 de marzo de 2026");
+  });
+
+  it("incluye los partidos anteriores al inicio registrado al elegir los últimos 30 días", async () => {
+    mountCalendar({
+      seasonStartsAt: "2026-04-04", today: "2026-04-10",
+      matches: [{ id: "first", scheduledAt: "2026-03-17T20:00:00.000Z", modality: "5v5" }]
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Últimos 30 días" }));
+    expect(screen.getByLabelText("Desde")).toHaveValue("2026-03-17");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(metric("Partidos")).toHaveTextContent("1");
+  });
+
   it("explica el estado vacío cuando todavía no hay partidos finalizados", () => {
     mountCalendar({ matches: [] });
     expect(screen.getByText("El calendario espera el primer partido")).toBeInTheDocument();
