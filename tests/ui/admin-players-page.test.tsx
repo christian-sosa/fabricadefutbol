@@ -1,20 +1,119 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render as renderUi, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AdminPlayersPage from "@/app/admin/(panel)/players/page";
+import { organizationQueryKeys } from "@/lib/query/keys";
 
-const mocks = vi.hoisted(() => ({ update: vi.fn(), upload: vi.fn() }));
+const mocks = vi.hoisted(() => ({ update: vi.fn(), upload: vi.fn(), injury: vi.fn() }));
 vi.mock("@/app/admin/(panel)/players/actions", () => ({ deletePlayerAction: vi.fn(), bulkCreatePlayersAction: vi.fn() }));
-vi.mock("@/app/admin/(panel)/form-actions", () => ({ createPlayerFormAction: vi.fn(), updatePlayersFormAction: mocks.update, uploadPlayerPhotoFormAction: mocks.upload }));
+vi.mock("@/app/admin/(panel)/form-actions", () => ({ createPlayerFormAction: vi.fn(), updatePlayersFormAction: mocks.update, uploadPlayerPhotoFormAction: mocks.upload, setPlayerInjuryFormAction: mocks.injury }));
 vi.mock("@/components/admin/admin-current-group-card", () => ({ AdminCurrentGroupCard: () => <p>Grupo actual: Los viernes</p> }));
 vi.mock("@/lib/auth/admin", () => ({ requireAdminOrganization: async () => ({ admin: {}, selectedOrganization: { id: "org-1", slug: "viernes", name: "Los viernes" } }), getOrganizationWriteAccess: async () => ({ canWrite: true }) }));
 vi.mock("@/lib/queries/admin", () => ({ getAdminPlayers: async () => [
-  { id: "player-1", full_name: "Ana Pérez", skill_level: 3, photo_path: null },
-  { id: "player-2", full_name: "Luz Díaz", skill_level: 4, photo_path: null }
+  { id: "player-1", full_name: "Ana Pérez", skill_level: 3, photo_path: null, is_injured: false },
+  { id: "player-2", full_name: "Luz Díaz", skill_level: 4, photo_path: null, is_injured: true }
 ] }));
-beforeEach(() => { window.sessionStorage.clear(); mocks.update.mockReset().mockResolvedValue({ error: null }); mocks.upload.mockReset(); });
+let queryClient: QueryClient;
+beforeEach(() => {
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60_000 } } });
+  window.sessionStorage.clear();
+  mocks.update.mockReset().mockResolvedValue({ error: null }); mocks.upload.mockReset(); mocks.injury.mockReset().mockResolvedValue({ error: null });
+});
+
+function render(element: ReactNode) {
+  return renderUi(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>);
+}
 
 describe("planilla de jugadores", () => {
+  it("refresca rankings recientes del grupo, incluida otra temporada, antes de terminar el guardado", async () => {
+    const user = userEvent.setup();
+    const currentKey = organizationQueryKeys.standings("org-1");
+    const historicalKey = organizationQueryKeys.standings("org-1", "all");
+    const otherGroupKey = organizationQueryKeys.standings("org-2");
+    const previous = [{ playerId: "player-1", isInjured: false }];
+    const updated = [{ playerId: "player-1", isInjured: true }];
+    let finishRefetch!: (data: typeof updated) => void;
+    const fetchCurrent = vi.fn(() => new Promise<typeof updated>((resolve) => { finishRefetch = resolve; }));
+    const fetchHistorical = vi.fn().mockResolvedValue(updated);
+    const fetchOtherGroup = vi.fn().mockResolvedValue(previous);
+    queryClient.setQueryDefaults(currentKey, { queryFn: fetchCurrent });
+    queryClient.setQueryDefaults(historicalKey, { queryFn: fetchHistorical });
+    queryClient.setQueryDefaults(otherGroupKey, { queryFn: fetchOtherGroup });
+    for (const key of [currentKey, historicalKey, otherGroupKey]) queryClient.setQueryData(key, previous);
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    const button = screen.getByRole("button", { name: "Marcar lesionado a Ana Pérez" });
+    await user.click(button);
+    await waitFor(() => expect(fetchCurrent).toHaveBeenCalledOnce());
+    expect(fetchHistorical).toHaveBeenCalledOnce();
+    expect(fetchOtherGroup).not.toHaveBeenCalled();
+    expect(button).toBeDisabled();
+    await act(async () => { finishRefetch(updated); });
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(queryClient.getQueryData(currentKey)).toEqual(updated);
+    expect(queryClient.getQueryData(historicalKey)).toEqual(updated);
+    expect(queryClient.getQueryData(otherGroupKey)).toEqual(previous);
+  });
+
+  it("muestra lesiones y permite marcarlas o quitarlas sin abrir las acciones secundarias", async () => {
+    const user = userEvent.setup();
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    const injuryButton = screen.getByRole("button", { name: "Marcar lesionado a Ana Pérez" });
+    const recoverButton = screen.getByRole("button", { name: "Marcar recuperado a Luz Díaz" });
+    expect(injuryButton).toBeVisible();
+    expect(recoverButton).toBeVisible();
+    expect(screen.getByText("Lesionado")).toBeVisible();
+    expect(injuryButton).toHaveAccessibleDescription(/no se cuentan como ausentes/);
+    await user.click(injuryButton);
+    await waitFor(() => expect(mocks.injury).toHaveBeenCalledOnce());
+    const marked = mocks.injury.mock.calls[0][0] as FormData;
+    expect(Array.from(marked.entries())).toEqual([["organizationId", "org-1"], ["playerId", "player-1"], ["isInjured", "true"]]);
+    await user.click(recoverButton);
+    await waitFor(() => expect(mocks.injury).toHaveBeenCalledTimes(2));
+    const recovered = mocks.injury.mock.calls[1][0] as FormData;
+    expect(recovered.get("playerId")).toBe("player-2");
+    expect(recovered.get("isInjured")).toBe("false");
+  });
+
+  it("protege la planilla sin guardar al intentar cambiar una lesión", async () => {
+    const user = userEvent.setup();
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    const name = screen.getByRole("textbox", { name: "Nombre de Ana Pérez" });
+    await user.clear(name);
+    await user.type(name, "Ana nueva");
+    await user.click(screen.getByRole("button", { name: "Marcar lesionado a Ana Pérez" }));
+    expect(mocks.injury).not.toHaveBeenCalled();
+    expect(name).toHaveValue("Ana nueva");
+    expect(screen.getByText(/Guardá o descartá la planilla antes de cambiar lesiones/)).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Descartar cambios" }));
+    await user.click(screen.getByRole("button", { name: "Marcar lesionado a Ana Pérez" }));
+    await waitFor(() => expect(mocks.injury).toHaveBeenCalledOnce());
+  });
+
+  it("bloquea edición durante una lesión pendiente y permite reintentar si falla", async () => {
+    const user = userEvent.setup();
+    let finishSave!: (result: { error: string | null }) => void;
+    mocks.injury.mockImplementationOnce(() => new Promise((resolve) => { finishSave = resolve; }));
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    const injuryButton = screen.getByRole("button", { name: "Marcar lesionado a Ana Pérez" });
+    const name = screen.getByRole("textbox", { name: "Nombre de Ana Pérez" });
+    await user.click(injuryButton);
+    await waitFor(() => expect(mocks.injury).toHaveBeenCalledOnce());
+    expect(injuryButton).toBeDisabled();
+    expect(name).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Guardar toda la planilla" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Marcar recuperado a Luz Díaz" })).toBeDisabled();
+    await act(async () => { finishSave({ error: "No se pudo guardar el estado de lesión." }); });
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo guardar el estado de lesión.");
+    expect(injuryButton).toBeEnabled();
+    expect(name).toBeEnabled();
+    expect(name).toHaveValue("Ana Pérez");
+    await user.click(injuryButton);
+    await waitFor(() => expect(mocks.injury).toHaveBeenCalledTimes(2));
+    expect((mocks.injury.mock.calls[1][0] as FormData).get("isInjured")).toBe("true");
+  });
+
   it("bloquea edición, descarte y fotos durante el guardado sin quitar datos del envío", async () => {
     const user = userEvent.setup();
     let finishSave!: (result: { error: string | null }) => void;

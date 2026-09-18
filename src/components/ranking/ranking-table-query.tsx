@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { Card } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { PlayerPhotoModalTrigger } from "@/components/ui/player-photo-modal-trigger";
+import { PlayerInjuryBadge } from "@/components/ui/player-injury-badge";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { useOrganizationStandingsQuery } from "@/lib/query/hooks";
 import { rankPlayers } from "@/lib/domain/player-ranking";
+import { ABSENT_MATCH_THRESHOLD } from "@/lib/domain/player-activity";
+import { formatMatchDateTime } from "@/lib/match-datetime";
 import { QueryFeedback } from "@/components/ui/query-feedback";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -195,6 +198,33 @@ function RecentResults({ results, className }: { results?: PlayerRecentResult[];
   );
 }
 
+function PlayerActivity({ player }: { player: PlayerComputedStats }) {
+  const lastPlayedDate = player.lastPlayedAt ? new Date(player.lastPlayedAt) : null;
+  const lastPlayedLabel = lastPlayedDate && !Number.isNaN(lastPlayedDate.getTime())
+    ? formatMatchDateTime(lastPlayedDate).split(" ")[0]
+    : null;
+  const matchesWithoutPlaying = player.matchesSinceLastPlayed;
+  const isAbsent = player.isAbsent && !player.isInjured;
+
+  if (!player.isInjured && !isAbsent && !(typeof matchesWithoutPlaying === "number" && matchesWithoutPlaying > 0) && !lastPlayedLabel && player.lastPlayedAt !== null) {
+    return null;
+  }
+
+  return (
+    <span className="mt-1 block space-y-1 text-xs font-normal text-muted">
+      {player.isInjured ? <PlayerInjuryBadge /> : isAbsent ? (
+        <span className="inline-flex rounded-md border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 font-medium text-amber-200">Ausente</span>
+      ) : null}
+      {typeof matchesWithoutPlaying === "number" && matchesWithoutPlaying > 0 ? (
+        <span className="block">{matchesWithoutPlaying} {matchesWithoutPlaying === 1 ? "partido sin jugar" : "partidos sin jugar"}</span>
+      ) : null}
+      {lastPlayedLabel ? (
+        <span className="block">Último: <time dateTime={player.lastPlayedAt ?? undefined}>{lastPlayedLabel}</time></span>
+      ) : player.lastPlayedAt === null ? <span className="block">Sin debut</span> : null}
+    </span>
+  );
+}
+
 export function RankingTableQuery({ organizationId, initialPlayers, season = "current" }: RankingTableQueryProps) {
   const { data, isFetching, isError, refetch } = useOrganizationStandingsQuery({
     organizationId,
@@ -205,11 +235,24 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
   const players = useMemo(() => rankPlayers(data ?? initialPlayers ?? []), [data, initialPlayers]);
   const [sortKey, setSortKey] = useState<SortKey>("rank");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [excludeAbsent, setExcludeAbsent] = useState(false);
+  const activityDescriptionId = useId();
+  const absentCount = players.filter((player) => player.isAbsent && !player.isInjured).length;
 
   const sortedPlayers = useMemo(
-    () => sortRankingPlayers(players, sortKey, sortDirection),
-    [players, sortDirection, sortKey]
+    () => sortRankingPlayers(
+      excludeAbsent ? players.filter((player) => !player.isAbsent || player.isInjured) : players,
+      sortKey,
+      sortDirection
+    ),
+    [players, sortDirection, sortKey, excludeAbsent]
   );
+
+  const emptyMessage = isFetching
+    ? "Cargando ranking..."
+    : excludeAbsent && players.length > 0
+      ? "No hay jugadores visibles. Desactivá «Excluir ausentes» para ver a todos."
+      : "No hay jugadores para este grupo.";
 
   const onSort = (nextSortKey: SortKey) => {
     if (nextSortKey === sortKey) {
@@ -224,6 +267,26 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
   return (
     <Card className="overflow-hidden border-slate-800 bg-slate-900/85 p-0">
       <QueryFeedback error={isError} fetching={isFetching} hasData={Boolean(players.length)} onRetry={refetch} />
+
+      <div className="space-y-2 border-b border-slate-800 p-3 lg:px-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800/50">
+            <input
+              aria-describedby={activityDescriptionId}
+              checked={excludeAbsent}
+              className="h-4 w-4 accent-emerald-400"
+              onChange={(event) => setExcludeAbsent(event.target.checked)}
+              type="checkbox"
+            />
+            Excluir ausentes
+            {absentCount > 0 ? <span aria-hidden="true" className="text-xs text-muted">({absentCount})</span> : null}
+          </label>
+          {excludeAbsent ? <p aria-live="polite" className="text-xs text-muted">Mostrando {sortedPlayers.length} de {players.length} jugadores · Se conservan los puestos</p> : null}
+        </div>
+        <p className="max-w-3xl text-xs leading-relaxed text-muted" id={activityDescriptionId}>
+          Ausente: {ABSENT_MATCH_THRESHOLD} partidos finalizados seguidos sin jugar. Los lesionados siguen visibles. La actividad es actual, independientemente de la temporada elegida.
+        </p>
+      </div>
 
       <div className="space-y-3 p-3 lg:hidden">
         <div className="flex items-center gap-2">
@@ -241,7 +304,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
               <article className="min-w-0" key={player.playerId}>
                 <details className="group">
                   <summary
-                    aria-label={`Estadísticas de ${player.playerName}: puesto ${rank}, ${formatRendimiento(player.currentRating)} puntos, ${player.matchesPlayed} partidos, ${figures} figuras`}
+                    aria-label={`Estadísticas de ${player.playerName}: puesto ${rank}, ${formatRendimiento(player.currentRating)} puntos, ${player.matchesPlayed} partidos, ${figures} figuras${player.isInjured ? ", lesionado" : player.isAbsent ? ", ausente" : ""}`}
                     className="flex min-h-20 cursor-pointer list-none items-center gap-2 rounded-lg px-1 py-3 hover:bg-slate-800/40 [&::-webkit-details-marker]:hidden"
                   >
                     <span className={cn("w-7 shrink-0 text-center text-sm font-bold", rank === 1 ? "text-accent" : "text-muted")}>
@@ -251,6 +314,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
                     <span className="min-w-0 flex-1">
                       <span className="block break-words text-sm font-semibold text-foreground">{player.playerName}</span>
                       <span className="mt-0.5 block text-xs text-muted">{player.matchesPlayed} PJ · <span className="group-open:hidden">Ver estadísticas</span><span className="hidden group-open:inline">Ocultar estadísticas</span></span>
+                      <PlayerActivity player={player} />
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="block text-lg font-bold tabular-nums text-foreground">{formatRendimiento(player.currentRating)} <span className="text-xs font-normal text-muted">pts</span></span>
@@ -280,7 +344,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
 
           {!sortedPlayers.length && !isError ? (
             <p className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-6 text-sm text-slate-400 sm:col-span-2">
-              {isFetching ? "Cargando ranking..." : "No hay jugadores para este grupo."}
+              {emptyMessage}
             </p>
           ) : null}
         </div>
@@ -344,6 +408,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
                   </TD>
                   <TD className="px-2.5 py-4 lg:px-3">
                     <PlayerPhotoModalTrigger avatarSize="md" showPhotoLabel hasPhoto={player.photoPath === undefined ? undefined : Boolean(player.photoPath)} photoUpdatedAt={player.photoUpdatedAt} playerId={player.playerId} playerName={player.playerName} />
+                    <PlayerActivity player={player} />
                   </TD>
                   <TD className="px-2.5 py-4 text-base font-semibold text-emerald-300 lg:px-3">
                     {formatRendimiento(player.currentRating)}
@@ -363,7 +428,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
             {!sortedPlayers.length && !isError ? (
               <tr>
                 <TD className="px-3 py-6 text-sm text-slate-400" colSpan={9}>
-                  {isFetching ? "Cargando ranking..." : "No hay jugadores para este grupo."}
+                  {emptyMessage}
                 </TD>
               </tr>
             ) : null}

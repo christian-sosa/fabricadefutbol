@@ -17,6 +17,7 @@ import {
 import { calculateGuestDisplayRating } from "@/lib/domain/skill-level";
 import { calculatePlayerStats, type MatchWithTeams } from "@/lib/domain/stats";
 import { rankPlayers } from "@/lib/domain/player-ranking";
+import { ABSENT_MATCH_THRESHOLD, calculatePlayerActivity } from "@/lib/domain/player-activity";
 import { getCurrentMatchDateTimeIso } from "@/lib/match-datetime";
 import { isMissingSupabaseConfigurationError } from "@/lib/env";
 import type { MatchHistoryItem, OrganizationMatchesResponse, OrganizationSeasonOption } from "@/lib/query/types";
@@ -66,13 +67,17 @@ function normalizeSeasonFilter(value: SeasonFilterInput) {
   return normalized.length ? normalized : "current";
 }
 
-function hasRecentResultsData(standings: PlayerComputedStats[]) {
+function hasCurrentStandingsData(standings: PlayerComputedStats[]) {
   return standings.every((player) => {
     const recentResults = (player as Partial<PlayerComputedStats>).recentResults;
     return (
       Array.isArray(recentResults) &&
       recentResults.length <= 5 &&
-      recentResults.every((result) => result === "V" || result === "E" || result === "D")
+      recentResults.every((result) => result === "V" || result === "E" || result === "D") &&
+      typeof player.isInjured === "boolean" &&
+      typeof player.isAbsent === "boolean" &&
+      typeof player.matchesSinceLastPlayed === "number" &&
+      (player.lastPlayedAt === null || typeof player.lastPlayedAt === "string")
     );
   });
 }
@@ -498,20 +503,19 @@ async function getPlayersWithStatsLive(
     .eq("organization_id", organizationId).eq("active", true).order("current_rating", { ascending: false })
     .order("skill_level").order("display_order").order("full_name").order("id").range(from, to));
 
-  let matchesQuery = supabase
+  const matchesQuery = supabase
     .from("matches")
     .select("*")
     .eq("organization_id", organizationId)
     .eq("status", "finished")
     .order("scheduled_at", { ascending: true }).order("id");
-  if (seasonFilter.mode === "season") {
-    matchesQuery = matchesQuery.eq("season_id", seasonFilter.season.id);
-  }
-
   const finishedMatches = await readAllRows((from, to) => matchesQuery.range(from, to));
-
-  const matchIds = (finishedMatches ?? []).map((match) => match.id);
-  const finishedWithTeams = await fetchMatchTeams(matchIds);
+  const allFinishedWithTeams = await fetchMatchTeams(finishedMatches.map((match) => match.id));
+  const activityByPlayer = calculatePlayerActivity(players, allFinishedWithTeams);
+  const finishedWithTeams = seasonFilter.mode === "season"
+    ? allFinishedWithTeams.filter((item) => item.match.season_id === seasonFilter.season.id)
+    : allFinishedWithTeams;
+  const matchIds = finishedWithTeams.map((item) => item.match.id);
 
   let playersForStats = players ?? [];
   if (seasonFilter.mode === "season") {
@@ -532,7 +536,7 @@ async function getPlayersWithStatsLive(
     players: playersForStats,
     finishedMatches: finishedWithTeams,
     matchPlayerStats: matchPlayerStats ?? []
-  });
+  }).map((stats) => ({ ...stats, ...activityByPlayer.get(stats.playerId) }));
 }
 
 export async function getPlayersWithStats(
@@ -546,7 +550,18 @@ export async function getPlayersWithStats(
   if (normalizeSeasonFilter(options?.season) === "all") {
     const supabase = await createSupabaseServerClient();
     const standings = await readOrganizationPublicStandingsSnapshot(supabase, organizationId);
-    if (standings && hasRecentResultsData(standings)) return standings;
+    if (standings && hasCurrentStandingsData(standings)) {
+      // Injury is current admin state. A concurrent snapshot refresh must never
+      // put an older injury flag back after the database invalidation trigger.
+      const players = await readAllRows((from, to) => supabase.from("players")
+        .select("id, is_injured").eq("organization_id", organizationId).eq("active", true).order("id").range(from, to));
+      const injuries = new Map(players.map((player) => [player.id, player.is_injured === true]));
+      return standings.filter((player) => injuries.has(player.playerId)).map((player) => ({
+        ...player,
+        isInjured: injuries.get(player.playerId)!,
+        isAbsent: !injuries.get(player.playerId) && (player.matchesSinceLastPlayed ?? 0) >= ABSENT_MATCH_THRESHOLD
+      }));
+    }
   }
 
   return getPlayersWithStatsLive(organizationId, options);

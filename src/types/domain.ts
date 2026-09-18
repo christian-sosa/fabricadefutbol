@@ -38,6 +38,11 @@ export type PlayerComputedStats = {
   goals: number;
   assists: number;
   mvpCount?: number;
+  /** Current activity across all seasons, independent of the ranking's season. */
+  isInjured?: boolean;
+  lastPlayedAt?: string | null;
+  matchesSinceLastPlayed?: number;
+  isAbsent?: boolean;
 };
 
 export type MatchResultInput = {
