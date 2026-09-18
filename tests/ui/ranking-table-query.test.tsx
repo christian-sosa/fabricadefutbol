@@ -136,7 +136,7 @@ describe("RankingTableQuery", () => {
     expect(refetch).toHaveBeenCalledOnce();
   });
 
-  it("excluye ausentes sin cambiar los puestos y mantiene lesionados en ambas vistas", async () => {
+  it("excluye inactivos sin cambiar los puestos y mantiene lesionados en ambas vistas", async () => {
     const user = userEvent.setup();
     const activityPlayers: PlayerComputedStats[] = players.map((player) => ({
       ...player,
@@ -147,10 +147,10 @@ describe("RankingTableQuery", () => {
     }));
     render(<RankingTableQuery initialPlayers={activityPlayers} organizationId="org-1" />);
 
-    const checkbox = screen.getByRole("checkbox", { name: "Excluir ausentes" });
+    const checkbox = screen.getByRole("checkbox", { name: "Excluir inactivos" });
     expect(checkbox).not.toBeChecked();
     expect(getBodyRows()).toHaveLength(3);
-    expect(screen.getAllByText("Ausente")).toHaveLength(2);
+    expect(screen.getAllByText("Inactivo")).toHaveLength(2);
     expect(screen.getAllByText("Lesionado")).toHaveLength(2);
 
     await user.click(checkbox);
@@ -162,7 +162,7 @@ describe("RankingTableQuery", () => {
     expect(getBodyRows()[1]).toHaveTextContent("#3");
     expect(getBodyRows()[1]).toHaveTextContent("Gabi Lamine");
     expect(getBodyRows()[1]).toHaveTextContent("Lesionado");
-    expect(getBodyRows()[1]).not.toHaveTextContent("Ausente");
+    expect(getBodyRows()[1]).not.toHaveTextContent("Inactivo");
     expect(screen.getByLabelText(/^Estadísticas de Gabi Lamine: puesto 3,.*lesionado$/)).toBeInTheDocument();
     expect(screen.getByText("Mostrando 2 de 3 jugadores · Se conservan los puestos")).toBeInTheDocument();
 
@@ -179,7 +179,7 @@ describe("RankingTableQuery", () => {
   it("muestra la fecha de cancha sin correr el día al consultar otra temporada y distingue sin debut", () => {
     const activityPlayers: PlayerComputedStats[] = [
       { ...players[0], lastPlayedAt: "2026-09-18T01:00:00.000Z", matchesSinceLastPlayed: 8, isAbsent: true },
-      { ...players[1], lastPlayedAt: null, matchesSinceLastPlayed: 1, isAbsent: false }
+      { ...players[1], matchesPlayed: 0, lastPlayedAt: null, matchesSinceLastPlayed: 1, isAbsent: true }
     ];
     render(<RankingTableQuery initialPlayers={activityPlayers} organizationId="org-1" season="2024" />);
 
@@ -187,12 +187,12 @@ describe("RankingTableQuery", () => {
     expect(screen.getAllByText("18/09/2026")).toHaveLength(2);
     expect(screen.getAllByText("1 partido sin jugar")).toHaveLength(2);
     expect(screen.getAllByText("Sin debut")).toHaveLength(2);
-    expect(screen.getByRole("checkbox", { name: "Excluir ausentes" })).toHaveAccessibleDescription(
-      "Ausente: 8 partidos finalizados seguidos sin jugar o 1 mes calendario desde el último partido. Sin debut, se cuenta desde el alta. Los lesionados siguen visibles. La actividad es actual, independientemente de la temporada elegida."
+    expect(screen.getByRole("checkbox", { name: "Excluir inactivos" })).toHaveAccessibleDescription(
+      "Inactivo: 8 partidos finalizados seguidos sin jugar o 1 mes calendario desde el último partido. Sin debut, se considera inactivo. Los lesionados siguen visibles. La actividad es actual, independientemente de la temporada elegida."
     );
   });
 
-  it("filtra la ausencia por un mes aunque no haya nuevos partidos y conserva al lesionado", async () => {
+  it("filtra la inactividad por un mes aunque no haya nuevos partidos y conserva al lesionado", async () => {
     const activityPlayers: PlayerComputedStats[] = [
       { ...players[0], lastPlayedAt: "2026-08-10T21:00:00.000Z", matchesSinceLastPlayed: 0, isAbsent: true, isInjured: false },
       { ...players[1], lastPlayedAt: "2026-08-10T21:00:00.000Z", matchesSinceLastPlayed: 0, isAbsent: false, isInjured: true },
@@ -200,8 +200,8 @@ describe("RankingTableQuery", () => {
     ];
     render(<RankingTableQuery initialPlayers={activityPlayers} organizationId="org-1" />);
 
-    expect(screen.getAllByText("Ausente")).toHaveLength(2);
-    await userEvent.click(screen.getByRole("checkbox", { name: "Excluir ausentes" }));
+    expect(screen.getAllByText("Inactivo")).toHaveLength(2);
+    await userEvent.click(screen.getByRole("checkbox", { name: "Excluir inactivos" }));
 
     expect(screen.queryByText("LucasDias")).not.toBeInTheDocument();
     expect(getBodyRows()).toHaveLength(2);
@@ -212,13 +212,34 @@ describe("RankingTableQuery", () => {
     expect(getBodyRows()[1]).toHaveTextContent("7 partidos sin jugar");
   });
 
+  it("excluye de inmediato a quien no debutó aunque no se hayan jugado partidos y mantiene al lesionado sin debut", async () => {
+    const withoutDebut = { matchesPlayed: 0, wins: 0, draws: 0, losses: 0, mvpCount: 0, recentResults: [], lastPlayedAt: null, matchesSinceLastPlayed: 0 };
+    const activityPlayers: PlayerComputedStats[] = [
+      { ...players[0], ...withoutDebut, isAbsent: true, isInjured: false },
+      { ...players[1], ...withoutDebut, isAbsent: false, isInjured: true },
+      { ...players[2], lastPlayedAt: "2026-09-17T21:00:00.000Z", matchesSinceLastPlayed: 0, isAbsent: false, isInjured: false }
+    ];
+    render(<RankingTableQuery initialPlayers={activityPlayers} organizationId="org-1" />);
+
+    expect(screen.getAllByText("Inactivo")).toHaveLength(2);
+    expect(screen.getAllByText("Sin debut")).toHaveLength(4);
+    await userEvent.click(screen.getByRole("checkbox", { name: "Excluir inactivos" }));
+
+    expect(screen.queryByText("LucasDias")).not.toBeInTheDocument();
+    expect(getBodyRows()).toHaveLength(2);
+    const injuredRow = getBodyRows().find((row) => row.textContent?.includes("GonzaMastro"))!;
+    expect(injuredRow).toHaveTextContent("Sin debut");
+    expect(injuredRow).toHaveTextContent("Lesionado");
+    expect(injuredRow).not.toHaveTextContent("Inactivo");
+  });
+
   it("no inventa datos de actividad cuando un ranking anterior no los incluye", () => {
     render(<RankingTableQuery initialPlayers={players} organizationId="org-1" />);
 
     expect(screen.queryByText("Sin debut")).not.toBeInTheDocument();
     expect(screen.queryByText(/^Último:/)).not.toBeInTheDocument();
     expect(screen.queryByText(/^\d+ partidos? sin jugar$/)).not.toBeInTheDocument();
-    expect(screen.queryByText("Ausente")).not.toBeInTheDocument();
+    expect(screen.queryByText("Inactivo")).not.toBeInTheDocument();
     expect(screen.queryByText("Lesionado")).not.toBeInTheDocument();
   });
 
@@ -226,20 +247,20 @@ describe("RankingTableQuery", () => {
     const user = userEvent.setup();
     render(<RankingTableQuery initialPlayers={players.map((player) => ({ ...player, isAbsent: true }))} organizationId="org-1" />);
 
-    await user.click(screen.getByRole("checkbox", { name: "Excluir ausentes" }));
+    await user.click(screen.getByRole("checkbox", { name: "Excluir inactivos" }));
 
-    expect(screen.getAllByText("No hay jugadores visibles. Desactivá «Excluir ausentes» para ver a todos.")).toHaveLength(2);
+    expect(screen.getAllByText("No hay jugadores visibles. Desactivá «Excluir inactivos» para ver a todos.")).toHaveLength(2);
     expect(screen.queryByText("No hay jugadores para este grupo.")).not.toBeInTheDocument();
     expect(screen.getByText("Mostrando 0 de 3 jugadores · Se conservan los puestos")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("checkbox", { name: "Excluir ausentes" }));
+    await user.click(screen.getByRole("checkbox", { name: "Excluir inactivos" }));
     expect(getBodyRows()).toHaveLength(3);
   });
 
   it("mantiene el estado vacío del grupo al activar el filtro sin jugadores", async () => {
     render(<RankingTableQuery initialPlayers={[]} organizationId="org-1" />);
 
-    await userEvent.click(screen.getByRole("checkbox", { name: "Excluir ausentes" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Excluir inactivos" }));
 
     expect(screen.getAllByText("No hay jugadores para este grupo.")).toHaveLength(2);
     expect(screen.queryByText(/No hay jugadores visibles/)).not.toBeInTheDocument();

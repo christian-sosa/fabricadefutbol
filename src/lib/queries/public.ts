@@ -554,7 +554,7 @@ export async function getPlayersWithStats(
       // Injury and calendar absence are current state, even when the snapshot
       // predates an admin change or the player reaching one month without playing.
       const players = await readAllRows((from, to) => supabase.from("players")
-        .select("id, is_injured, created_at").eq("organization_id", organizationId).eq("active", true).order("id").range(from, to));
+        .select("id, is_injured").eq("organization_id", organizationId).eq("active", true).order("id").range(from, to));
       const currentPlayers = new Map(players.map((player) => [player.id, player]));
       const now = new Date();
       return standings.filter((player) => currentPlayers.has(player.playerId)).map((player) => ({
@@ -563,8 +563,7 @@ export async function getPlayersWithStats(
         isAbsent: isPlayerAbsent({
           isInjured: currentPlayers.get(player.playerId)!.is_injured === true,
           matchesSinceLastPlayed: player.matchesSinceLastPlayed ?? 0,
-          lastPlayedAt: player.lastPlayedAt ?? null,
-          createdAt: currentPlayers.get(player.playerId)!.created_at
+          lastPlayedAt: player.lastPlayedAt ?? null
         }, now)
       }));
     }

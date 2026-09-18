@@ -25,17 +25,17 @@ function getActivityBaseline(lastPlayedAt: string | null, createdAt: string | un
     : Number.NaN;
 }
 
-/** Match dates use court time; registration and the clock use actual UTC instants. */
+/** Match dates use court time; the clock uses an actual UTC instant. */
 export function isPlayerAbsent(activity: {
   isInjured: boolean;
   matchesSinceLastPlayed: number;
   lastPlayedAt: string | null;
-  createdAt?: string;
 }, now: Date = new Date()) {
   if (activity.isInjured) return false;
+  if (activity.lastPlayedAt === null) return true;
   if (activity.matchesSinceLastPlayed >= ABSENT_MATCH_THRESHOLD) return true;
 
-  const baseline = new Date(getActivityBaseline(activity.lastPlayedAt, activity.createdAt));
+  const baseline = new Date(activity.lastPlayedAt);
   if (!Number.isFinite(baseline.getTime())) return false;
 
   // One calendar month, clamped to the last day of shorter months, from midnight BA.
@@ -81,7 +81,7 @@ export function calculatePlayerActivity(players: ActivityPlayer[], matches: Matc
       isInjured,
       lastPlayedAt,
       matchesSinceLastPlayed,
-      isAbsent: isPlayerAbsent({ isInjured, matchesSinceLastPlayed, lastPlayedAt, createdAt: player.created_at }, now)
+      isAbsent: isPlayerAbsent({ isInjured, matchesSinceLastPlayed, lastPlayedAt }, now)
     } satisfies PlayerActivity];
   }));
 }

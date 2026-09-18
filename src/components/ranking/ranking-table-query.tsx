@@ -213,7 +213,7 @@ function PlayerActivity({ player }: { player: PlayerComputedStats }) {
   return (
     <span className="mt-1 block space-y-1 text-xs font-normal text-muted">
       {player.isInjured ? <PlayerInjuryBadge /> : isAbsent ? (
-        <span className="inline-flex rounded-md border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 font-medium text-amber-200">Ausente</span>
+        <span className="inline-flex rounded-md border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 font-medium text-amber-200">Inactivo</span>
       ) : null}
       {typeof matchesWithoutPlaying === "number" && matchesWithoutPlaying > 0 ? (
         <span className="block">{matchesWithoutPlaying} {matchesWithoutPlaying === 1 ? "partido sin jugar" : "partidos sin jugar"}</span>
@@ -251,7 +251,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
   const emptyMessage = isFetching
     ? "Cargando ranking..."
     : excludeAbsent && players.length > 0
-      ? "No hay jugadores visibles. Desactivá «Excluir ausentes» para ver a todos."
+      ? "No hay jugadores visibles. Desactivá «Excluir inactivos» para ver a todos."
       : "No hay jugadores para este grupo.";
 
   const onSort = (nextSortKey: SortKey) => {
@@ -278,13 +278,13 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
               onChange={(event) => setExcludeAbsent(event.target.checked)}
               type="checkbox"
             />
-            Excluir ausentes
+            Excluir inactivos
             {absentCount > 0 ? <span aria-hidden="true" className="text-xs text-muted">({absentCount})</span> : null}
           </label>
           {excludeAbsent ? <p aria-live="polite" className="text-xs text-muted">Mostrando {sortedPlayers.length} de {players.length} jugadores · Se conservan los puestos</p> : null}
         </div>
         <p className="max-w-3xl text-xs leading-relaxed text-muted" id={activityDescriptionId}>
-          Ausente: {ABSENT_MATCH_THRESHOLD} partidos finalizados seguidos sin jugar o 1 mes calendario desde el último partido. Sin debut, se cuenta desde el alta. Los lesionados siguen visibles. La actividad es actual, independientemente de la temporada elegida.
+          Inactivo: {ABSENT_MATCH_THRESHOLD} partidos finalizados seguidos sin jugar o 1 mes calendario desde el último partido. Sin debut, se considera inactivo. Los lesionados siguen visibles. La actividad es actual, independientemente de la temporada elegida.
         </p>
       </div>
 
@@ -304,7 +304,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
               <article className="min-w-0" key={player.playerId}>
                 <details className="group">
                   <summary
-                    aria-label={`Estadísticas de ${player.playerName}: puesto ${rank}, ${formatRendimiento(player.currentRating)} puntos, ${player.matchesPlayed} partidos, ${figures} figuras${player.isInjured ? ", lesionado" : player.isAbsent ? ", ausente" : ""}`}
+                    aria-label={`Estadísticas de ${player.playerName}: puesto ${rank}, ${formatRendimiento(player.currentRating)} puntos, ${player.matchesPlayed} partidos, ${figures} figuras${player.isInjured ? ", lesionado" : player.isAbsent ? ", inactivo" : ""}`}
                     className="flex min-h-20 cursor-pointer list-none items-center gap-2 rounded-lg px-1 py-3 hover:bg-slate-800/40 [&::-webkit-details-marker]:hidden"
                   >
                     <span className={cn("w-7 shrink-0 text-center text-sm font-bold", rank === 1 ? "text-accent" : "text-muted")}>

@@ -64,7 +64,7 @@ describe("planilla de jugadores", () => {
     expect(injuryButton).toBeVisible();
     expect(recoverButton).toBeVisible();
     expect(screen.getByText("Lesionado")).toBeVisible();
-    expect(injuryButton).toHaveAccessibleDescription(/no se cuentan como ausentes/);
+    expect(injuryButton).toHaveAccessibleDescription(/no se cuentan como inactivos/);
     await user.click(injuryButton);
     await waitFor(() => expect(mocks.injury).toHaveBeenCalledOnce());
     const marked = mocks.injury.mock.calls[0][0] as FormData;
