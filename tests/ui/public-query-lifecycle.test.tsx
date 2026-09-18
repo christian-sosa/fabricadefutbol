@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider, onlineManager } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, focusManager, onlineManager } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -21,7 +21,7 @@ function matches(organizationId = "group-1"): OrganizationMatchesResponse {
   return { organizationId, matches: [], pagination: { page: 1, pageSize: 10, totalCount: 20, totalPages: 2, hasNextPage: true, hasPreviousPage: false } };
 }
 
-afterEach(() => { clients.forEach((client) => client.clear()); clients.length = 0; onlineManager.setOnline(true); });
+afterEach(() => { clients.forEach((client) => client.clear()); clients.length = 0; onlineManager.setOnline(true); focusManager.setFocused(undefined); });
 
 describe("public query lifecycle", () => {
   it("revalidates an old ranking on return even when the cache already has initial data", async () => {
@@ -40,6 +40,23 @@ describe("public query lifecycle", () => {
     const { result } = renderHook(() => useOrganizationStandingsQuery({ organizationId: "group-1", initialData: players }), { wrapper });
     expect(result.current.data).toEqual(players);
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("refreshes expired calendar absence when returning to an already open ranking", async () => {
+    const { client, wrapper } = setup();
+    const before = [{ ...players[0], isAbsent: false }];
+    const after = [{ ...players[0], isAbsent: true }];
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ standings: after }));
+    vi.stubGlobal("fetch", fetcher);
+    const { result } = renderHook(() => useOrganizationStandingsQuery({ organizationId: "group-1", initialData: before }), { wrapper });
+    expect(fetcher).not.toHaveBeenCalled();
+    act(() => {
+      focusManager.setFocused(false);
+      client.setQueryData(organizationQueryKeys.standings("group-1"), before, { updatedAt: Date.now() - 120_000 });
+      focusManager.setFocused(true);
+    });
+    await waitFor(() => expect(result.current.data).toEqual(after));
+    expect(fetcher).toHaveBeenCalledOnce();
   });
 
   it("recovers an expired query when connection returns", async () => {

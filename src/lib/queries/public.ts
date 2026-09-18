@@ -17,7 +17,7 @@ import {
 import { calculateGuestDisplayRating } from "@/lib/domain/skill-level";
 import { calculatePlayerStats, type MatchWithTeams } from "@/lib/domain/stats";
 import { rankPlayers } from "@/lib/domain/player-ranking";
-import { ABSENT_MATCH_THRESHOLD, calculatePlayerActivity } from "@/lib/domain/player-activity";
+import { calculatePlayerActivity, isPlayerAbsent } from "@/lib/domain/player-activity";
 import { getCurrentMatchDateTimeIso } from "@/lib/match-datetime";
 import { isMissingSupabaseConfigurationError } from "@/lib/env";
 import type { MatchHistoryItem, OrganizationMatchesResponse, OrganizationSeasonOption } from "@/lib/query/types";
@@ -551,15 +551,21 @@ export async function getPlayersWithStats(
     const supabase = await createSupabaseServerClient();
     const standings = await readOrganizationPublicStandingsSnapshot(supabase, organizationId);
     if (standings && hasCurrentStandingsData(standings)) {
-      // Injury is current admin state. A concurrent snapshot refresh must never
-      // put an older injury flag back after the database invalidation trigger.
+      // Injury and calendar absence are current state, even when the snapshot
+      // predates an admin change or the player reaching one month without playing.
       const players = await readAllRows((from, to) => supabase.from("players")
-        .select("id, is_injured").eq("organization_id", organizationId).eq("active", true).order("id").range(from, to));
-      const injuries = new Map(players.map((player) => [player.id, player.is_injured === true]));
-      return standings.filter((player) => injuries.has(player.playerId)).map((player) => ({
+        .select("id, is_injured, created_at").eq("organization_id", organizationId).eq("active", true).order("id").range(from, to));
+      const currentPlayers = new Map(players.map((player) => [player.id, player]));
+      const now = new Date();
+      return standings.filter((player) => currentPlayers.has(player.playerId)).map((player) => ({
         ...player,
-        isInjured: injuries.get(player.playerId)!,
-        isAbsent: !injuries.get(player.playerId) && (player.matchesSinceLastPlayed ?? 0) >= ABSENT_MATCH_THRESHOLD
+        isInjured: currentPlayers.get(player.playerId)!.is_injured === true,
+        isAbsent: isPlayerAbsent({
+          isInjured: currentPlayers.get(player.playerId)!.is_injured === true,
+          matchesSinceLastPlayed: player.matchesSinceLastPlayed ?? 0,
+          lastPlayedAt: player.lastPlayedAt ?? null,
+          createdAt: currentPlayers.get(player.playerId)!.created_at
+        }, now)
       }));
     }
   }

@@ -464,6 +464,34 @@ describe("resolvePublicOrganization", () => {
     expect(standings[1]).toMatchObject({ playerId: "player-2", isInjured: false, isAbsent: true, currentRating: 1140 });
   });
 
+  it("recalculates snapshot absence as the calendar advances without new matches", async () => {
+    const players = buildPlayers().map((player) => ({
+      ...player,
+      created_at: "2026-03-20T02:00:00Z", // March 19 in Buenos Aires.
+      is_injured: player.id === "player-4"
+    }));
+    const fake = createFakeSupabase({
+      players,
+      organization_public_snapshots: [{ organization_id: ORG_ID, standings: players.filter((player) => player.active).map((player) => ({
+        playerId: player.id, playerName: player.full_name, currentRating: player.current_rating,
+        matchesPlayed: player.id === "player-2" ? 0 : 1, recentResults: [], isInjured: false,
+        // An old snapshot can contain the previous five-match rule or an older date.
+        isAbsent: player.id === "player-3",
+        lastPlayedAt: player.id === "player-2" ? null : player.id === "player-3" ? "2026-04-18T21:00:00Z" : "2026-03-19T01:00:00Z",
+        matchesSinceLastPlayed: player.id === "player-3" ? 7 : 0
+      })) }]
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    vi.setSystemTime(new Date("2026-04-19T02:59:59Z"));
+    const before = await getPlayersWithStats(ORG_ID, { season: "all" });
+    expect(before.map((player) => player.isAbsent)).toEqual([false, false, false, false]);
+
+    vi.setSystemTime(new Date("2026-04-19T03:00:00Z"));
+    const after = await getPlayersWithStats(ORG_ID, { season: "all" });
+    expect(after.map((player) => player.isAbsent)).toEqual([true, true, false, false]);
+    expect(after.map((player) => player.currentRating)).toEqual(before.map((player) => player.currentRating));
+  });
+
   it("excluye confirmados vencidos usando la hora de cancha, no UTC del servidor", async () => {
     vi.setSystemTime(new Date("2026-04-27T21:00:00.000Z")); // 18:00 en Argentina.
     const fake = createFakeSupabase({
@@ -766,7 +794,7 @@ describe("resolvePublicOrganization", () => {
     expect(oldStandings.map((player) => [player.playerId, player.mvpCount])).toEqual([["player-1", 1], ["player-2", 0]]);
     for (const rows of [standings, oldStandings, allStandings]) {
       expect(rows.find((player) => player.playerId === "player-1")).toMatchObject({
-        lastPlayedAt: "2025-10-18T21:00:00.000Z", matchesSinceLastPlayed: 1, isAbsent: false, isInjured: false
+        lastPlayedAt: "2025-10-18T21:00:00.000Z", matchesSinceLastPlayed: 1, isAbsent: true, isInjured: false
       });
       expect(rows.find((player) => player.playerId === "player-2")).toMatchObject({
         lastPlayedAt: "2026-04-18T21:00:00.000Z", matchesSinceLastPlayed: 0

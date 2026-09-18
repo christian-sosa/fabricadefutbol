@@ -25,7 +25,7 @@ export function useOrganizationStandingsQuery(params: {
     staleTime: ORGANIZATION_QUERY_STALE_TIME,
     refetchOnMount: true,
     refetchOnReconnect: true,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: true
   });
 }
 
