@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { calculatePlayerActivity } from "@/lib/domain/player-activity";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { calculatePlayerActivity, isPlayerAbsent } from "@/lib/domain/player-activity";
 import type { MatchWithTeams } from "@/lib/domain/stats";
 
 const player = { id: "player", organization_id: "org", created_at: "2026-01-01T00:00:00Z" };
@@ -12,19 +12,28 @@ function match(day: number, played = false, overrides: Partial<MatchWithTeams["m
 }
 
 describe("current player activity", () => {
-  it("marks absence at five completed matches and resets it on return", () => {
-    const matches = [match(1, true), ...[2, 3, 4, 5].map((day) => match(day))];
-    expect(calculatePlayerActivity([player], matches).get(player.id)).toMatchObject({ isAbsent: false, matchesSinceLastPlayed: 4 });
-    matches.push(match(6));
-    expect(calculatePlayerActivity([player], matches).get(player.id)).toEqual({ isAbsent: true, matchesSinceLastPlayed: 5, lastPlayedAt: "2026-01-01T20:00:00Z", isInjured: false });
-    matches.push(match(7, true));
-    expect(calculatePlayerActivity([player], matches.reverse()).get(player.id)).toMatchObject({ isAbsent: false, matchesSinceLastPlayed: 0, lastPlayedAt: "2026-01-07T20:00:00Z" });
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-12T12:00:00Z"));
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it("marks absence at eight completed matches and resets it on return", () => {
+    const matches = [match(1, true), ...[2, 3, 4, 5, 6, 7, 8].map((day) => match(day))];
+    expect(calculatePlayerActivity([player], matches).get(player.id)).toMatchObject({ isAbsent: false, matchesSinceLastPlayed: 7 });
+    matches.push(match(9));
+    expect(calculatePlayerActivity([player], matches).get(player.id)).toEqual({ isAbsent: true, matchesSinceLastPlayed: 8, lastPlayedAt: "2026-01-01T20:00:00Z", isInjured: false });
+    matches.push(match(10, true));
+    expect(calculatePlayerActivity([player], matches.reverse()).get(player.id)).toMatchObject({ isAbsent: false, matchesSinceLastPlayed: 0, lastPlayedAt: "2026-01-10T20:00:00Z" });
   });
 
   it("exempts injured players without losing their last participation", () => {
-    const matches = [match(1, true), ...[2, 3, 4, 5, 6].map((day) => match(day))];
-    expect(calculatePlayerActivity([{ ...player, is_injured: true }], matches).get(player.id)).toMatchObject({ isAbsent: false, isInjured: true, matchesSinceLastPlayed: 5 });
+    const matches = [match(1, true), ...[2, 3, 4, 5, 6, 7, 8, 9].map((day) => match(day))];
+    expect(calculatePlayerActivity([{ ...player, is_injured: true }], matches).get(player.id)).toMatchObject({ isAbsent: false, isInjured: true, matchesSinceLastPlayed: 8 });
     expect(calculatePlayerActivity([{ ...player, is_injured: false }], matches).get(player.id)?.isAbsent).toBe(true);
+    expect(calculatePlayerActivity([{ ...player, is_injured: true }], [match(1, true)], new Date("2026-03-01T12:00:00Z")).get(player.id))
+      .toMatchObject({ isAbsent: false, isInjured: true, lastPlayedAt: "2026-01-01T20:00:00Z" });
   });
 
   it("never counts cancelled, unfinished, resultless, duplicate or foreign-group matches", () => {
@@ -38,11 +47,14 @@ describe("current player activity", () => {
     const matches = [1, 2, 3, 4, 5, 6].map((day) => match(day));
     expect(calculatePlayerActivity([recentPlayer], matches).get(player.id)).toMatchObject({ lastPlayedAt: null, matchesSinceLastPlayed: 2, isAbsent: false });
     matches[0].teamBPlayerIds = [player.id];
-    expect(calculatePlayerActivity([recentPlayer], matches).get(player.id)).toMatchObject({ lastPlayedAt: "2026-01-01T20:00:00Z", matchesSinceLastPlayed: 5, isAbsent: true });
+    expect(calculatePlayerActivity([recentPlayer], matches).get(player.id)).toMatchObject({ lastPlayedAt: "2026-01-01T20:00:00Z", matchesSinceLastPlayed: 5, isAbsent: false });
   });
 
-  it("does not turn time without group matches into absences", () => {
+  it("allows a full calendar month since registration for a player without a debut", () => {
     expect(calculatePlayerActivity([player], []).get(player.id)).toEqual({ lastPlayedAt: null, matchesSinceLastPlayed: 0, isAbsent: false, isInjured: false });
+    // UTC Jan 1 registration is Dec 31 in Buenos Aires: the month ends on Jan 31.
+    expect(calculatePlayerActivity([player], [], new Date("2026-01-31T02:59:59Z")).get(player.id)?.isAbsent).toBe(false);
+    expect(calculatePlayerActivity([player], [], new Date("2026-01-31T03:00:00Z")).get(player.id)?.isAbsent).toBe(true);
   });
 
   it("counts distinct matches at the same scheduled time with a stable order", () => {
@@ -55,5 +67,29 @@ describe("current player activity", () => {
   it("compares registration UTC with the group's stored court time", () => {
     const registered = { ...player, created_at: "2026-01-01T23:00:00Z" }; // 20:00 Buenos Aires
     expect(calculatePlayerActivity([registered], [match(1, false, { scheduled_at: "2026-01-01T21:00:00Z" })]).get(player.id)?.matchesSinceLastPlayed).toBe(1);
+  });
+
+  it("counts a month from the player's own last match even without newer group matches", () => {
+    expect(calculatePlayerActivity([player], [match(1, true)], new Date("2026-02-01T03:00:00Z")).get(player.id))
+      .toMatchObject({ isAbsent: true, matchesSinceLastPlayed: 0, lastPlayedAt: "2026-01-01T20:00:00Z" });
+  });
+
+  it.each([
+    ["2026-08-18T01:00:00Z", "2026-09-18T03:00:00Z"],
+    ["2026-01-31T20:00:00Z", "2026-02-28T03:00:00Z"],
+    ["2028-01-31T20:00:00Z", "2028-02-29T03:00:00Z"],
+    ["2026-08-31T20:00:00Z", "2026-09-30T03:00:00Z"],
+    ["2026-12-31T20:00:00Z", "2027-01-31T03:00:00Z"]
+  ])("reaches one calendar month from %s at midnight Buenos Aires %s", (lastPlayedAt, threshold) => {
+    const activity = { isInjured: false, matchesSinceLastPlayed: 0, lastPlayedAt };
+    expect(isPlayerAbsent(activity, new Date(Date.parse(threshold) - 1))).toBe(false);
+    expect(isPlayerAbsent(activity, new Date(threshold))).toBe(true);
+  });
+
+  it("does not infer a calendar absence from missing or invalid dates", () => {
+    for (const lastPlayedAt of [null, "invalid", "2027-01-01T20:00:00Z"]) {
+      expect(isPlayerAbsent({ isInjured: false, matchesSinceLastPlayed: 7, lastPlayedAt })).toBe(false);
+    }
+    expect(isPlayerAbsent({ isInjured: false, matchesSinceLastPlayed: 8, lastPlayedAt: null })).toBe(true);
   });
 });

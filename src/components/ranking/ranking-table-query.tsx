@@ -284,7 +284,7 @@ export function RankingTableQuery({ organizationId, initialPlayers, season = "cu
           {excludeAbsent ? <p aria-live="polite" className="text-xs text-muted">Mostrando {sortedPlayers.length} de {players.length} jugadores · Se conservan los puestos</p> : null}
         </div>
         <p className="max-w-3xl text-xs leading-relaxed text-muted" id={activityDescriptionId}>
-          Ausente: {ABSENT_MATCH_THRESHOLD} partidos finalizados seguidos sin jugar. Los lesionados siguen visibles. La actividad es actual, independientemente de la temporada elegida.
+          Ausente: {ABSENT_MATCH_THRESHOLD} partidos finalizados seguidos sin jugar o 1 mes calendario desde el último partido. Sin debut, se cuenta desde el alta. Los lesionados siguen visibles. La actividad es actual, independientemente de la temporada elegida.
         </p>
       </div>
 

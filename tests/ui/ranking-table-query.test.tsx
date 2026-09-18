@@ -178,18 +178,38 @@ describe("RankingTableQuery", () => {
 
   it("muestra la fecha de cancha sin correr el día al consultar otra temporada y distingue sin debut", () => {
     const activityPlayers: PlayerComputedStats[] = [
-      { ...players[0], lastPlayedAt: "2026-09-18T01:00:00.000Z", matchesSinceLastPlayed: 5, isAbsent: true },
+      { ...players[0], lastPlayedAt: "2026-09-18T01:00:00.000Z", matchesSinceLastPlayed: 8, isAbsent: true },
       { ...players[1], lastPlayedAt: null, matchesSinceLastPlayed: 1, isAbsent: false }
     ];
     render(<RankingTableQuery initialPlayers={activityPlayers} organizationId="org-1" season="2024" />);
 
-    expect(screen.getAllByText("5 partidos sin jugar")).toHaveLength(2);
+    expect(screen.getAllByText("8 partidos sin jugar")).toHaveLength(2);
     expect(screen.getAllByText("18/09/2026")).toHaveLength(2);
     expect(screen.getAllByText("1 partido sin jugar")).toHaveLength(2);
     expect(screen.getAllByText("Sin debut")).toHaveLength(2);
     expect(screen.getByRole("checkbox", { name: "Excluir ausentes" })).toHaveAccessibleDescription(
-      "Ausente: 5 partidos finalizados seguidos sin jugar. Los lesionados siguen visibles. La actividad es actual, independientemente de la temporada elegida."
+      "Ausente: 8 partidos finalizados seguidos sin jugar o 1 mes calendario desde el último partido. Sin debut, se cuenta desde el alta. Los lesionados siguen visibles. La actividad es actual, independientemente de la temporada elegida."
     );
+  });
+
+  it("filtra la ausencia por un mes aunque no haya nuevos partidos y conserva al lesionado", async () => {
+    const activityPlayers: PlayerComputedStats[] = [
+      { ...players[0], lastPlayedAt: "2026-08-10T21:00:00.000Z", matchesSinceLastPlayed: 0, isAbsent: true, isInjured: false },
+      { ...players[1], lastPlayedAt: "2026-08-10T21:00:00.000Z", matchesSinceLastPlayed: 0, isAbsent: false, isInjured: true },
+      { ...players[2], lastPlayedAt: "2026-09-17T21:00:00.000Z", matchesSinceLastPlayed: 7, isAbsent: false, isInjured: false }
+    ];
+    render(<RankingTableQuery initialPlayers={activityPlayers} organizationId="org-1" />);
+
+    expect(screen.getAllByText("Ausente")).toHaveLength(2);
+    await userEvent.click(screen.getByRole("checkbox", { name: "Excluir ausentes" }));
+
+    expect(screen.queryByText("LucasDias")).not.toBeInTheDocument();
+    expect(getBodyRows()).toHaveLength(2);
+    expect(getBodyRows()[0]).toHaveTextContent("GonzaMastro");
+    expect(getBodyRows()[0]).toHaveTextContent("Lesionado");
+    expect(getBodyRows()[1]).toHaveTextContent("Gabi Lamine");
+    expect(getBodyRows()[1]).toHaveTextContent("#3");
+    expect(getBodyRows()[1]).toHaveTextContent("7 partidos sin jugar");
   });
 
   it("no inventa datos de actividad cuando un ranking anterior no los incluye", () => {
