@@ -45,16 +45,21 @@ describe("current player activity", () => {
   it("starts counting non-debutants at registration and accepts historical participation", () => {
     const recentPlayer = { ...player, created_at: "2026-01-05T00:00:00Z" };
     const matches = [1, 2, 3, 4, 5, 6].map((day) => match(day));
-    expect(calculatePlayerActivity([recentPlayer], matches).get(player.id)).toMatchObject({ lastPlayedAt: null, matchesSinceLastPlayed: 2, isAbsent: false });
+    expect(calculatePlayerActivity([recentPlayer], matches).get(player.id)).toMatchObject({ lastPlayedAt: null, matchesSinceLastPlayed: 2, isAbsent: true });
     matches[0].teamBPlayerIds = [player.id];
     expect(calculatePlayerActivity([recentPlayer], matches).get(player.id)).toMatchObject({ lastPlayedAt: "2026-01-01T20:00:00Z", matchesSinceLastPlayed: 5, isAbsent: false });
   });
 
-  it("allows a full calendar month since registration for a player without a debut", () => {
-    expect(calculatePlayerActivity([player], []).get(player.id)).toEqual({ lastPlayedAt: null, matchesSinceLastPlayed: 0, isAbsent: false, isInjured: false });
-    // UTC Jan 1 registration is Dec 31 in Buenos Aires: the month ends on Jan 31.
-    expect(calculatePlayerActivity([player], [], new Date("2026-01-31T02:59:59Z")).get(player.id)?.isAbsent).toBe(false);
-    expect(calculatePlayerActivity([player], [], new Date("2026-01-31T03:00:00Z")).get(player.id)?.isAbsent).toBe(true);
+  it("marks a player inactive immediately until their first completed match", () => {
+    const newPlayer = { ...player, created_at: new Date().toISOString() };
+    expect(calculatePlayerActivity([newPlayer], []).get(player.id)).toEqual({ lastPlayedAt: null, matchesSinceLastPlayed: 0, isAbsent: true, isInjured: false });
+    expect(calculatePlayerActivity([newPlayer], [match(12, true, { status: "confirmed" })]).get(player.id)?.isAbsent).toBe(true);
+    expect(calculatePlayerActivity([newPlayer], [match(12, true)]).get(player.id)).toMatchObject({ isAbsent: false, lastPlayedAt: "2026-01-12T20:00:00Z" });
+  });
+
+  it("keeps injured players without a debut exempt from inactivity", () => {
+    expect(calculatePlayerActivity([{ ...player, is_injured: true }], []).get(player.id))
+      .toEqual({ lastPlayedAt: null, matchesSinceLastPlayed: 0, isAbsent: false, isInjured: true });
   });
 
   it("counts distinct matches at the same scheduled time with a stable order", () => {
@@ -86,8 +91,8 @@ describe("current player activity", () => {
     expect(isPlayerAbsent(activity, new Date(threshold))).toBe(true);
   });
 
-  it("does not infer a calendar absence from missing or invalid dates", () => {
-    for (const lastPlayedAt of [null, "invalid", "2027-01-01T20:00:00Z"]) {
+  it("does not infer calendar inactivity from invalid or future dates", () => {
+    for (const lastPlayedAt of ["invalid", "2027-01-01T20:00:00Z"]) {
       expect(isPlayerAbsent({ isInjured: false, matchesSinceLastPlayed: 7, lastPlayedAt })).toBe(false);
     }
     expect(isPlayerAbsent({ isInjured: false, matchesSinceLastPlayed: 8, lastPlayedAt: null })).toBe(true);

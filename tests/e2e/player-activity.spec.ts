@@ -25,7 +25,7 @@ async function followNavigationLink(page: Page, label: string) {
   await link.click();
 }
 
-test("la lesión se guarda desde admin y permanece visible al excluir ausentes sin cambiar puntos", async ({ page, isMobile }, testInfo) => {
+test("la lesión se guarda desde admin y permanece visible al excluir inactivos sin cambiar puntos", async ({ page, isMobile }, testInfo) => {
   test.setTimeout(120_000);
   const adminPath = `/admin/players?org=${ORG_SLUG}`;
   await page.goto(`/admin/login?next=${encodeURIComponent(adminPath)}`);
@@ -67,12 +67,12 @@ test("la lesión se guarda desde admin y permanece visible al excluir ausentes s
     await followNavigationLink(page, "Grupos");
     await followNavigationLink(page, "Ranking");
     await expect(rankingRow.getByText("Lesionado", { exact: true })).toBeVisible();
-    const excludeAbsent = page.getByRole("checkbox", { name: "Excluir ausentes", exact: true });
+    const excludeAbsent = page.getByRole("checkbox", { name: "Excluir inactivos", exact: true });
     await excludeAbsent.check();
     await expect(excludeAbsent).toBeChecked();
     await expect(rankingRow).toBeVisible();
     await expect(rankingRow.getByText("Lesionado", { exact: true })).toBeVisible();
-    await expect(rankingRow.getByText("Ausente", { exact: true })).toHaveCount(0);
+    await expect(rankingRow.getByText("Inactivo", { exact: true })).toHaveCount(0);
     const size = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: window.innerWidth }));
     expect(size.width).toBeLessThanOrEqual(size.viewport + 1);
     const screenshot = testInfo.outputPath("ranking-lesionado.png");

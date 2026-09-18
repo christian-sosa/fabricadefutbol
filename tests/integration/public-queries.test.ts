@@ -467,7 +467,7 @@ describe("resolvePublicOrganization", () => {
   it("recalculates snapshot absence as the calendar advances without new matches", async () => {
     const players = buildPlayers().map((player) => ({
       ...player,
-      created_at: "2026-03-20T02:00:00Z", // March 19 in Buenos Aires.
+      created_at: "2026-04-19T02:00:00Z", // A player without a debut is inactive from the day of registration.
       is_injured: player.id === "player-4"
     }));
     const fake = createFakeSupabase({
@@ -484,7 +484,7 @@ describe("resolvePublicOrganization", () => {
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
     vi.setSystemTime(new Date("2026-04-19T02:59:59Z"));
     const before = await getPlayersWithStats(ORG_ID, { season: "all" });
-    expect(before.map((player) => player.isAbsent)).toEqual([false, false, false, false]);
+    expect(before.map((player) => player.isAbsent)).toEqual([false, true, false, false]);
 
     vi.setSystemTime(new Date("2026-04-19T03:00:00Z"));
     const after = await getPlayersWithStats(ORG_ID, { season: "all" });

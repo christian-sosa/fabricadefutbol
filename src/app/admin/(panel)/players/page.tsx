@@ -122,7 +122,7 @@ export default async function AdminPlayersPage({
             La foto se actualiza en la fila de cada jugador.
           </CardDescription>
           <p className="mt-2 text-sm text-slate-400" id="player-injury-help">
-            Las lesiones se guardan al instante. Los lesionados siguen en el ranking y no se cuentan como ausentes.
+            Las lesiones se guardan al instante. Los lesionados siguen en el ranking y no se cuentan como inactivos.
           </p>
 
           <PlayersRosterGuard formId={bulkFormId} key={formRenderKey} organizationId={selectedOrganization.id} players={players.map(({ id, full_name, skill_level }) => ({ id, full_name, skill_level }))}>

@@ -443,7 +443,7 @@ export async function setPlayerInjuryAction(formData: FormData) {
     revalidatePath(`/players/${parsed.data.playerId}`);
     revalidatePath("/");
     const message = isInjured
-      ? "Jugador marcado como lesionado. Sigue visible en el ranking y no se cuenta como ausente."
+      ? "Jugador marcado como lesionado. Sigue visible en el ranking y no se cuenta como inactivo."
       : "Jugador marcado como recuperado. Se vuelve a considerar su asistencia habitual.";
     redirect(`${withSuccess(organizationQueryKey, message)}&view=edit#player-${parsed.data.playerId}`);
   } catch (error) {
