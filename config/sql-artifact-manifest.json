@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
-  "revision": "groups_all_formations_f10_20260915_v1",
-  "sha256": "eea4a7404cd69df8fefde9474fabc88890309d0cdff5e7e42d32562450d25bc9",
+  "revision": "player-injury-status-20260918",
+  "sha256": "e56f73374784c117c84bda02d8b406780e2d067752066a671778f9cf8b0d17f9",
   "bucket": "groups-sql-artifacts",
-  "object": "eea4a7404cd69df8fefde9474fabc88890309d0cdff5e7e42d32562450d25bc9.json.gz"
+  "object": "e56f73374784c117c84bda02d8b406780e2d067752066a671778f9cf8b0d17f9.json.gz"
 }

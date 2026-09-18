@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { createSupabaseServerClientMock, redirectMock, revalidatePathMock } = vi.hoisted(() => ({
   createSupabaseServerClientMock: vi.fn(),
@@ -52,10 +52,89 @@ vi.mock("@/lib/player-photos", async (importOriginal) => ({
   optimizePlayerAvatarImage: vi.fn(async () => Buffer.from("webp"))
 }));
 
-import { bulkCreatePlayersAction, bulkUpdatePlayersAction, createPlayerAction, uploadPlayerPhotoAction } from "@/app/admin/(panel)/players/actions";
+import { bulkCreatePlayersAction, bulkUpdatePlayersAction, createPlayerAction, setPlayerInjuryAction, uploadPlayerPhotoAction } from "@/app/admin/(panel)/players/actions";
+import { assertOrganizationAdminAction } from "@/lib/auth/admin";
+import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
+beforeEach(() => { vi.clearAllMocks(); });
+
 describe("admin players actions", () => {
+  const organizationId = "00000000-0000-4000-8000-000000000001";
+  const playerId = "00000000-0000-4000-8000-000000000002";
+  const otherPlayerId = "00000000-0000-4000-8000-000000000003";
+  const otherOrganizationId = "00000000-0000-4000-8000-000000000004";
+
+  function injuryForm(value: string | null = "true", id = playerId) {
+    const form = new FormData();
+    form.set("organizationId", organizationId);
+    form.set("playerId", id);
+    if (value !== null) form.set("isInjured", value);
+    return form;
+  }
+
+  it("guarda y recupera una lesión de forma idempotente sin cambiar puntos ni otros jugadores", async () => {
+    const fake = createFakeSupabase({ players: [
+      { id: playerId, organization_id: organizationId, full_name: "Ana Pérez", is_injured: false, current_rating: 1175, skill_level: 3, active: true },
+      { id: otherPlayerId, organization_id: organizationId, is_injured: true, current_rating: 1100 }
+    ] });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+
+    for (const value of ["true", "true", "false", "false"]) {
+      await expect(setPlayerInjuryAction(injuryForm(value))).rejects.toMatchObject({ digest: expect.stringContaining("NEXT_REDIRECT") });
+      expect(fake.find("players", (row) => row.id === playerId)).toMatchObject({
+        is_injured: value === "true", full_name: "Ana Pérez", current_rating: 1175, skill_level: 3, active: true
+      });
+      expect(fake.find("players", (row) => row.id === otherPlayerId)?.is_injured).toBe(true);
+      const destination = new URL(redirectMock.mock.calls.at(-1)![0], "https://local.invalid");
+      expect(destination.searchParams.has("error")).toBe(false);
+      expect(destination.searchParams.get("success")).toBeTruthy();
+      expect(destination.searchParams.get("org")).toBe("la-banda");
+      expect(destination.searchParams.get("view")).toBe("edit");
+      expect(destination.hash).toBe(`#player-${playerId}`);
+    }
+
+    expect(assertOrganizationAdminAction).toHaveBeenCalledWith(organizationId);
+    expect(refreshOrganizationPublicSnapshotSafe).toHaveBeenCalledWith(organizationId);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/admin/players");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/ranking");
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/players/${playerId}`);
+  });
+
+  it.each([null, "", "on", "1", "yes", "FALSE"])("rechaza estado de lesión inválido %s antes de escribir", async (value) => {
+    const fake = createFakeSupabase({ players: [{ id: playerId, organization_id: organizationId, is_injured: false }] });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    await expect(setPlayerInjuryAction(injuryForm(value))).rejects.toMatchObject({ digest: expect.stringContaining("error=") });
+    expect(fake.find("players", (row) => row.id === playerId)?.is_injured).toBe(false);
+    expect(createSupabaseServerClientMock).not.toHaveBeenCalled();
+  });
+
+  it("no escribe si no tiene permisos de administración", async () => {
+    vi.mocked(assertOrganizationAdminAction).mockRejectedValueOnce(new Error("No tenés permisos para editar este grupo."));
+    await expect(setPlayerInjuryAction(injuryForm())).rejects.toMatchObject({ digest: expect.stringContaining("error=") });
+    expect(createSupabaseServerClientMock).not.toHaveBeenCalled();
+    expect(refreshOrganizationPublicSnapshotSafe).not.toHaveBeenCalled();
+  });
+
+  it.each(["otro grupo", "eliminado"])("informa que falta el jugador (%s) sin anunciar éxito ni modificar otra organización", async (scenario) => {
+    const fake = createFakeSupabase({ players: scenario === "otro grupo"
+      ? [{ id: playerId, organization_id: otherOrganizationId, is_injured: false }]
+      : [] });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    await expect(setPlayerInjuryAction(injuryForm())).rejects.toMatchObject({ digest: expect.stringContaining("error=") });
+    expect(fake.find("players", (row) => row.id === playerId)?.is_injured).not.toBe(true);
+    expect(refreshOrganizationPublicSnapshotSafe).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("informa un fallo de guardado sin cambiar el estado ni refrescar snapshots", async () => {
+    const fake = createFakeSupabase({ players: [{ id: playerId, organization_id: organizationId, is_injured: false }], queryFailures: { players: { update: "Database unavailable" } } });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    await expect(setPlayerInjuryAction(injuryForm())).rejects.toMatchObject({ digest: expect.stringContaining("error=") });
+    expect(fake.find("players", (row) => row.id === playerId)?.is_injured).toBe(false);
+    expect(refreshOrganizationPublicSnapshotSafe).not.toHaveBeenCalled();
+  });
+
   it("conserva un jugador creado tras fallo Storage y reintenta sólo su foto desde la planilla", async () => {
     const organizationId = "00000000-0000-4000-8000-000000000001";
     const fake = createFakeSupabase({ players: [] });

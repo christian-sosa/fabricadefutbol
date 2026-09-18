@@ -124,8 +124,8 @@ export function PlayersRosterGuard({ children, formId, organizationId, players }
     <fieldset className="min-w-0" disabled={pending}>
     <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-700 px-3 py-2">
       <p className="flex-1 text-sm text-slate-200" id={messageId} ref={messageRef} role="status" tabIndex={-1}>
-        {pending ? "Guardando planilla. Esperá a que termine para seguir editando." : changedCount ? `${changedCount} ${changedCount === 1 ? "jugador con cambios" : "jugadores con cambios"} sin guardar.` : "La planilla está guardada."}
-        {blockedAction ? " Guardá o descartá la planilla antes de subir fotos o eliminar jugadores." : ""}
+        {pending ? "Guardando cambios. Esperá a que termine para seguir editando." : changedCount ? `${changedCount} ${changedCount === 1 ? "jugador con cambios" : "jugadores con cambios"} sin guardar.` : "La planilla está guardada."}
+        {blockedAction ? " Guardá o descartá la planilla antes de cambiar lesiones, subir fotos o eliminar jugadores." : ""}
       </p>
       {changedCount ? <Button aria-describedby={messageId} onClick={discard} type="button" variant="ghost">Descartar cambios</Button> : null}
     </div>

@@ -105,6 +105,7 @@ export type Database = {
       players: {
         Row: {
           active: boolean;
+          is_injured?: boolean;
           created_at: string;
           current_rating: number;
           display_order: number;
@@ -120,6 +121,7 @@ export type Database = {
         };
         Insert: {
           active?: boolean;
+          is_injured?: boolean;
           created_at?: string;
           current_rating?: number;
           display_order?: number;
@@ -135,6 +137,7 @@ export type Database = {
         };
         Update: {
           active?: boolean;
+          is_injured?: boolean;
           created_at?: string;
           current_rating?: number;
           display_order?: number;

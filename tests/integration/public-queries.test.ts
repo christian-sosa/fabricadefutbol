@@ -448,6 +448,22 @@ describe("resolvePublicOrganization", () => {
     expect(standings.find((player) => player.playerId === "player-2")?.recentResults).toEqual(["D"]);
   });
 
+  it("uses current injury state even when a concurrent refresh persisted an older snapshot", async () => {
+    const fake = createFakeSupabase({
+      players: buildPlayers().map((player) => ({ ...player, is_injured: player.id === "player-1" })),
+      organization_public_snapshots: [{ organization_id: ORG_ID, standings: [
+        { playerId: "player-1", playerName: "Arquero", currentRank: 1, currentRating: 1200, matchesPlayed: 1,
+          recentResults: ["V"], isInjured: false, isAbsent: true, lastPlayedAt: "2026-01-01T21:00:00Z", matchesSinceLastPlayed: 6 },
+        { playerId: "player-2", playerName: "Defensor", currentRank: 2, currentRating: 1140, matchesPlayed: 1,
+          recentResults: ["V"], isInjured: true, isAbsent: false, lastPlayedAt: "2026-01-01T21:00:00Z", matchesSinceLastPlayed: 6 }
+      ] }]
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    const standings = await getPlayersWithStats(ORG_ID, { season: "all" });
+    expect(standings[0]).toMatchObject({ playerId: "player-1", isInjured: true, isAbsent: false, currentRating: 1200 });
+    expect(standings[1]).toMatchObject({ playerId: "player-2", isInjured: false, isAbsent: true, currentRating: 1140 });
+  });
+
   it("excluye confirmados vencidos usando la hora de cancha, no UTC del servidor", async () => {
     vi.setSystemTime(new Date("2026-04-27T21:00:00.000Z")); // 18:00 en Argentina.
     const fake = createFakeSupabase({
@@ -748,6 +764,14 @@ describe("resolvePublicOrganization", () => {
       ["player-1", 1000, 0, 0, []]
     ]);
     expect(oldStandings.map((player) => [player.playerId, player.mvpCount])).toEqual([["player-1", 1], ["player-2", 0]]);
+    for (const rows of [standings, oldStandings, allStandings]) {
+      expect(rows.find((player) => player.playerId === "player-1")).toMatchObject({
+        lastPlayedAt: "2025-10-18T21:00:00.000Z", matchesSinceLastPlayed: 1, isAbsent: false, isInjured: false
+      });
+      expect(rows.find((player) => player.playerId === "player-2")).toMatchObject({
+        lastPlayedAt: "2026-04-18T21:00:00.000Z", matchesSinceLastPlayed: 0
+      });
+    }
     expect(allStandings.map((player) => [player.playerId, player.mvpCount])).toEqual([["player-1", 1], ["player-2", 1]]);
     expect(history.matches.map((match) => match.id)).toEqual(["match-current"]);
     expect(allHistory.matches.map((match) => match.id)).toEqual(["match-current", "match-old"]);

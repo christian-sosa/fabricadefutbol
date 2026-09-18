@@ -48,6 +48,10 @@ const photoSchema = z.object({
   playerId: z.string().uuid()
 });
 
+const injurySchema = photoSchema.extend({
+  isInjured: z.enum(["true", "false"], { message: "Seleccioná un estado de lesión válido." })
+});
+
 const rowSchema = z.object({
   id: z.string().uuid(),
   fullName: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
@@ -397,6 +401,54 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
     redirect(withMessage(organizationId, toUserMessage(error, "No se pudo guardar la planilla.")));
+  }
+}
+
+export async function setPlayerInjuryAction(formData: FormData) {
+  const organizationId = String(formData.get("organizationId") ?? "");
+
+  try {
+    const parsed = injurySchema.safeParse({
+      organizationId: formData.get("organizationId"),
+      playerId: formData.get("playerId"),
+      isInjured: formData.get("isInjured")
+    });
+    if (!parsed.success) {
+      redirect(withMessage(organizationId, "No se pudo validar el jugador o el estado de lesión."));
+    }
+
+    await assertOrganizationAdminAction(parsed.data.organizationId);
+    const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
+    const supabase = await createSupabaseServerClient();
+    const isInjured = parsed.data.isInjured === "true";
+
+    // Send the intended state, not a toggle: retries must never undo the change.
+    const { data: updatedPlayers, error } = await supabase.from("players")
+      .update({ is_injured: isInjured })
+      .eq("id", parsed.data.playerId)
+      .eq("organization_id", parsed.data.organizationId)
+      .select("id");
+
+    if (error) {
+      redirect(withMessage(organizationQueryKey, toUserMessage(error, "No se pudo guardar el estado de lesión.")));
+    }
+    if (!updatedPlayers?.length) {
+      redirect(withMessage(organizationQueryKey, "No se encontró el jugador en el grupo seleccionado. Recargá la planilla."));
+    }
+
+    await refreshOrganizationPublicSnapshotSafe(parsed.data.organizationId);
+    revalidatePath("/admin/players");
+    revalidatePath("/players");
+    revalidatePath("/ranking");
+    revalidatePath(`/players/${parsed.data.playerId}`);
+    revalidatePath("/");
+    const message = isInjured
+      ? "Jugador marcado como lesionado. Sigue visible en el ranking y no se cuenta como ausente."
+      : "Jugador marcado como recuperado. Se vuelve a considerar su asistencia habitual.";
+    redirect(`${withSuccess(organizationQueryKey, message)}&view=edit#player-${parsed.data.playerId}`);
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(withMessage(organizationId, toUserMessage(error, "No se pudo guardar el estado de lesión.")));
   }
 }
 

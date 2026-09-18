@@ -86,6 +86,7 @@ async function seedPlayers(client: ReturnType<typeof createServiceClient>, organ
     initial_rank: index + 1,
     current_rating: 1000,
     active: true,
+    is_injured: false,
     notes: "e2e"
   }));
 
