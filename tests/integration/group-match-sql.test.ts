@@ -75,6 +75,94 @@ describe.skipIf(!privateSqlAvailable(sqlPath))("group match transactions (real P
     expect(await ratings()).toEqual([990, 990, 1010, 1010, 1000]);
     expect(await history()).toHaveLength(4);
   });
+  it.each(["9v9", "10v10", "11v11"])("rates assigned substitutes in %s and leaves unused substitutes unchanged", async (modality) => {
+    await db.query("update public.matches set modality=$1", [modality]);
+    await db.query("insert into public.players(id, organization_id, full_name) values ($1,$2,'Suplente rival'),($3,$2,'No ingreso')", [player(6), org, player(7)]);
+    await db.query("insert into public.match_players(match_id,player_id,is_substitute,substitute_team) values ($1,$2,true,null),($1,$3,true,'B'),($1,$4,true,null)", [match, player(5), player(6), player(7)]);
+    const lineup = { assignments: [...assignments,
+      {participantId: `player:${player(5)}`, team: "A"},
+      {participantId: `player:${player(6)}`, team: "B"},
+      {participantId: `player:${player(7)}`, team: "OUT"}] };
+    await save({scoreA: 2, scoreB: 1, lineup});
+    expect(await ratings()).toEqual([1010, 1010, 990, 990, 1010, 990, 1000]);
+    expect(await history()).toHaveLength(6);
+    expect((await db.query("select substitute_team from public.match_players where is_substitute order by player_id")).rows).toEqual([{substitute_team:"A"},{substitute_team:"B"},{substitute_team:null}]);
+    const before = (await db.query("select * from public.rating_history order by id")).rows;
+    await save({scoreA: 2, scoreB: 1, notes: "Suplentes confirmados"}, 1);
+    expect((await db.query("select * from public.rating_history order by id")).rows).toEqual(before);
+  });
+  it("keeps an unassigned substitute OUT and does not infer handicap from unequal benches", async () => {
+    await db.exec("update public.matches set modality='9v9'");
+    await db.query("insert into public.match_players(match_id,player_id,is_substitute) values ($1,$2,true)", [match, player(5)]);
+    await expect(save({scoreA: 2, scoreB: 0, lineup: {assignments: [...assignments,{participantId:`player:${player(5)}`,team:"A"}], handicapTeam:"B"}})).rejects.toThrow("menos jugadores");
+    await save({scoreA: 1, scoreB: 0});
+    expect(await ratings()).toEqual([1010, 1010, 990, 990, 1000]);
+    expect((await db.query<{lineup_snapshot: unknown[]}>("select lineup_snapshot from public.matches")).rows[0].lineup_snapshot).toContainEqual({participantId:`player:${player(5)}`,fullName:"Jugador 5",source:"player",team:"OUT",penalized:false});
+  });
+  it("requires every called-up substitute in the final lineup and includes guest substitutes", async () => {
+    await db.exec("update public.matches set modality='11v11'");
+    await db.query("insert into public.match_guests(id,match_id,guest_name,guest_rating,is_substitute) values ($1,$2,'Banco invitado',2,true)", [id(90), match]);
+    await expect(save({scoreA: 1, scoreB: 0, lineup:{assignments}})).rejects.toThrow("todos los participantes");
+    await save({scoreA: 1, scoreB: 0, lineup:{assignments:[...assignments,{participantId:`guest:${id(90)}`,team:"A"}]},scorers:[{participantId:`guest:${id(90)}`,goals:1}]});
+    expect((await db.query("select guest_id,team,goals from public.match_goal_scorers")).rows).toEqual([{guest_id:id(90),team:"A",goals:1}]);
+  });
+  it("saves partial goal attribution and preserves, edits or clears it without rewriting sporting points", async () => {
+    await db.exec("update public.matches set modality='10v10'");
+    await save({scoreA: 3, scoreB: 1, scorers:[{participantId:`player:${player(1)}`,goals:2},{participantId:`player:${player(3)}`,goals:1}]});
+    expect((await db.query("select player_id,team,goals,display_name from public.match_goal_scorers order by participant_id")).rows).toEqual([
+      {player_id:player(1),team:"A",goals:2,display_name:"Jugador 1"}, {player_id:player(3),team:"B",goals:1,display_name:"Jugador 3"}]);
+    const before = (await db.query("select * from public.rating_history order by id")).rows;
+    const beforeSeason = await seasonRatings();
+    await save({scoreA:3,scoreB:1,notes:"Sin cambiar goleadores"},1);
+    expect((await db.query("select goals from public.match_goal_scorers order by participant_id")).rows).toEqual([{goals:2},{goals:1}]);
+    await save({scoreA:3,scoreB:1,scorers:[{participantId:`player:${player(2)}`,goals:3}]},2);
+    expect((await db.query("select player_id,goals from public.match_goal_scorers")).rows).toEqual([{player_id:player(2),goals:3}]);
+    await save({scoreA:3,scoreB:1,scorers:[]},3);
+    expect((await db.query("select * from public.match_goal_scorers")).rows).toEqual([]);
+    expect((await db.query("select * from public.rating_history order by id")).rows).toEqual(before);
+    expect(await seasonRatings()).toEqual(beforeSeason);
+    expect(await ratings()).toEqual([1010,1010,990,990,1000]);
+  });
+  it.each(["newGuest:bench", "guest-new:bench"])("resolves a new guest scorer alias %s atomically", async (alias) => {
+    await db.exec("update public.matches set modality='9v9'");
+    await save({scoreA:2,scoreB:0,lineup:{assignments,newGuests:[{clientId:"bench",name:"Goleador invitado",rating:2,team:"A"}]},scorers:[{participantId:alias,goals:2}]});
+    const result = (await db.query<{participant_id:string;guest_id:string;display_name:string}>("select participant_id,guest_id,display_name from public.match_goal_scorers")).rows[0];
+    expect(result).toEqual({participant_id:`guest:${result.guest_id}`,guest_id:result.guest_id,display_name:"Goleador invitado"});
+    expect(await history()).toHaveLength(4);
+  });
+  it("rejects invalid scorers and rolls back the entire result transaction", async () => {
+    await db.exec("update public.matches set modality='9v9'");
+    const cases = [
+      [{participantId:`player:${player(1)}`,goals:0}],
+      [{participantId:`player:${player(1)}`,goals:1.5}],
+      [{participantId:`player:${player(1)}`,goals:"1"}],
+      [{participantId:`player:${player(1)}`,goals:3}],
+      [{participantId:`player:${player(3)}`,goals:1}],
+      [{participantId:`player:${player(5)}`,goals:1}],
+      [{participantId:`player:${player(1)}`,goals:1},{participantId:`player:${player(1)}`,goals:1}],
+      [{participantId:`player:${player(1)}`,goals:1},{participantId:`player:${player(2)}`,goals:2}],
+      [{participantId:"guest-new:new",goals:3}]
+    ];
+    for (const scorers of cases) {
+      await expect(save({scoreA:2,scoreB:0,lineup:{assignments,newGuests:[{clientId:"new",name:"Invitado",rating:2,team:"A"}]},scorers})).rejects.toThrow();
+    }
+    await expect(save({scoreA:1,scoreB:0,lineup:{assignments:assignments.map((p,i)=>i===0?{...p,team:"OUT"}:p)},scorers:[{participantId:`player:${player(1)}`,goals:1}]})).rejects.toThrow("formacion final");
+    expect(await history()).toEqual([]);
+    expect((await db.query("select * from public.match_goal_scorers")).rows).toEqual([]);
+    expect((await db.query("select * from public.match_guests")).rows).toEqual([]);
+    expect((await db.query("select result_version from public.matches")).rows).toEqual([{result_version:0}]);
+  });
+  it("validates preserved scorers against corrections and restricts them to F9/F10/F11", async () => {
+    await expect(save({scoreA:2,scoreB:0,scorers:[{participantId:`player:${player(1)}`,goals:2}]})).rejects.toThrow("F9");
+    await db.exec("update public.matches set modality='9v9'");
+    await save({scoreA:2,scoreB:0,scorers:[{participantId:`player:${player(1)}`,goals:2}]});
+    const before = await history();
+    await expect(save({scoreA:1,scoreB:0},1)).rejects.toThrow("superar el resultado");
+    await expect(save({scoreA:2,scoreB:0,lineup:{assignments:assignments.map((p,i)=>i===0?{...p,team:"OUT"}:p)}},1)).rejects.toThrow("formacion final");
+    expect(await history()).toEqual(before);
+    expect((await db.query("select score_a from public.match_result")).rows).toEqual([{score_a:2}]);
+    await save({scoreA:1,scoreB:0,scorers:[]},1);
+  });
   it("rejects invalid MVP without reverting old ratings, result or history", async () => {
     await save({ scoreA: 1, scoreB: 0 });
     const before = await history();

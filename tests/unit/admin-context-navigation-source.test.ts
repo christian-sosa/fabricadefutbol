@@ -13,7 +13,7 @@ describe("admin context navigation source", () => {
     const groupCardSource = readFileSync(groupCardPath, "utf8");
     const adminLandingSource = readFileSync(adminLandingPath, "utf8");
 
-    expect(groupCardSource).toContain("configuracion se guardan aca");
+    expect(groupCardSource).toContain("Jugadores, partidos e historial de tu grupo");
     expect(adminLandingSource).toContain("Creá tu primer grupo");
     expect(groupCardSource).not.toContain("facturacion");
     expect(adminLandingSource).not.toContain("facturacion");
@@ -24,6 +24,8 @@ describe("admin context navigation source", () => {
 
     expect(adminLandingSource).toContain("resolvedSearchParams.org");
     expect(adminLandingSource).toContain("const selectedOrganization = resolvedSearchParams.org");
+    expect(adminLandingSource).toContain('resolvedSearchParams.view === "groups"');
+    expect(readFileSync(groupCardPath, "utf8")).toContain('href="/admin?view=groups"');
     expect(adminLandingSource).not.toContain(
       "const selectedOrganization = findOrganizationByKey(organizations, resolvedSearchParams.org);"
     );

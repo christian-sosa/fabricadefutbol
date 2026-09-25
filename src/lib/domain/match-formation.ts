@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
+import { supportsMatchExtras } from "@/lib/domain/match-scorers";
 import type { MatchModality } from "@/types/domain";
 
 export const FORMATION_PRESETS = {
@@ -82,7 +83,7 @@ export function validateMatchFormation(value: unknown, modality: string, teams: 
     if (slotIds.length !== expectedSize || new Set(slotIds).size !== expectedSize || positions.some((position) => !slotIds.includes(position.slotId))) throw new Error("La formación debe incluir todas las posiciones una sola vez.");
     const players = teams[key];
     const roster = new Set(players.map((player) => player.participantId));
-    if (roster.size !== expectedSize || players.length !== expectedSize) throw new Error("Los equipos cambiaron. Revisá los jugadores confirmados antes de armar la formación.");
+    if (roster.size !== players.length || (supportsMatchExtras(modality) ? roster.size < expectedSize : roster.size !== expectedSize)) throw new Error("Los equipos cambiaron. Revisá los jugadores confirmados antes de armar la formación.");
     const used = new Set<string>();
     for (const slot of formation.slots) {
       if (!slot.participantId) throw new Error("Completá todas las posiciones de ambos equipos antes de guardar.");

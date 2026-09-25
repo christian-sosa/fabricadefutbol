@@ -9,12 +9,13 @@ import { WhatsAppShareButton } from "@/components/matches/whatsapp-share-button"
 import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { MatchDateTime } from "@/components/matches/match-date-time";
+import { MatchSubstitutesList } from "@/components/matches/match-substitutes-list";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { buildMatchHistoryHref, parseMatchHistoryPage, parseMatchHistorySeason } from "@/lib/match-history-navigation";
 import { withShareTracking } from "@/lib/growth";
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
-import { getMatchDetails } from "@/lib/queries/public";
+import { getMatchDetails, type PublicMatchSubstitute } from "@/lib/queries/public";
 import { resolveMatchTeamLabels } from "@/lib/team-labels";
 import { formatRendimiento } from "@/lib/utils";
 import { FormationPitch } from "@/components/matches/formation-pitch";
@@ -63,6 +64,15 @@ export default async function MatchDetailPage({
     teamB: toFormationPlayers(details.teamBPlayers, details.match.goalkeeper_player_ids)
   };
   const formation = readMatchFormation(details.match.formation_data, details.match.modality, formationTeams);
+  const substitutes = details.substitutes ?? [];
+  // A pitch shows only the starting positions; keep every additional participant visible.
+  const formationExtras: PublicMatchSubstitute[] = formation ? (["A", "B"] as const).flatMap((side) => {
+    const key = side === "A" ? "teamA" : "teamB";
+    const onPitch = new Set(formation[key].slots.map((slot) => slot.participantId));
+    return (side === "A" ? details.teamAPlayers : details.teamBPlayers)
+      .filter((player) => !onPitch.has(toFormationPlayers([player])[0].participantId))
+      .map((player) => ({ ...player, team: side }));
+  }) : [];
 
   return (
     <div className="space-y-4">
@@ -91,6 +101,7 @@ export default async function MatchDetailPage({
               matchUrl={publicMatchUrl}
               teamAName={teamLabels.teamA}
               teamBName={teamLabels.teamB}
+              substitutes={[...substitutes, ...formationExtras].map((player) => ({ name: player.full_name, team: player.team }))}
             />
           ) : null}
         </div>
@@ -166,6 +177,8 @@ export default async function MatchDetailPage({
           </div>
         </div>
         )}
+        <MatchSubstitutesList players={formationExtras} teamLabels={teamLabels} title={details.result ? "También jugaron" : "Suplentes con equipo"} />
+        <MatchSubstitutesList players={substitutes} teamLabels={teamLabels} />
       </Card>
 
       <PublicGroupGrowthCta source="match_detail" />

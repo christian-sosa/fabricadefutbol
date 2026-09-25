@@ -12,6 +12,7 @@ type TableName =
   | "matches"
   | "match_players"
   | "match_guests"
+  | "match_goal_scorers"
   | "team_options"
   | "team_option_players"
   | "team_option_guests"
@@ -63,6 +64,7 @@ function createEmptyDatabase(): FakeDatabase {
     matches: [],
     match_players: [],
     match_guests: [],
+    match_goal_scorers: [],
     team_options: [],
     team_option_players: [],
     team_option_guests: [],

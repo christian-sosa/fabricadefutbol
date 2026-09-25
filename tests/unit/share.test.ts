@@ -16,6 +16,14 @@ const shareEmojis = {
 } as const;
 
 describe("share helpers", () => {
+  it("incluye suplentes asignados y sin equipo usando los nombres guardados", () => {
+    const message = buildMatchWhatsAppMessage({
+      matchUrl: "https://fabricadefutbol.com.ar/matches/abc", teamAName: "Rojo", teamBName: "Azul",
+      substitutes: [{ name: "Leo", team: "A" }, { name: "Juan", team: "B" }, { name: "Nico", team: null }]
+    });
+    expect(message).toContain("Suplentes:\n• Leo (Rojo)\n• Juan (Azul)\n• Nico (equipo por definir)");
+    expect(message).toContain("https://fabricadefutbol.com.ar/matches/abc");
+  });
   it("arma el mensaje de WhatsApp para un partido confirmado", () => {
     const matchUrl = "https://fabricadefutbol.com.ar/matches/abc-123";
 

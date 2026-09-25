@@ -76,4 +76,15 @@ describe("AdminSubnav", () => {
     expect(screen.getByRole("link", { name: "Partidos" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("link", { name: "Nuevo partido" })).not.toBeInTheDocument();
   });
+
+  it("mantiene Goleadores activo y conserva el grupo en su historial privado", () => {
+    navigationState.pathname = "/admin/scorers";
+    navigationState.searchParams = new URLSearchParams({ org: "grupo-a" });
+
+    render(<AdminSubnav />);
+
+    expect(screen.getByRole("link", { name: "Goleadores" })).toHaveAttribute("href", "/admin/scorers?org=grupo-a");
+    expect(screen.getByRole("link", { name: "Goleadores" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Partidos" })).not.toHaveAttribute("aria-current");
+  });
 });

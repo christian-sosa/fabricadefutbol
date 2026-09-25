@@ -14,6 +14,7 @@ import {
   saveMatchResult
 } from "@/lib/domain/match-workflow";
 import { parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
+import { matchScorersSchema } from "@/lib/domain/match-scorers";
 import { matchDateAndTimeToIso, matchIsoToDateInput } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
 import { withOrgQuery } from "@/lib/org";
@@ -33,6 +34,7 @@ const resultSchema = z.object({
   scoreB: z.coerce.number().int().nonnegative(),
   notes: z.string().optional(),
   mvpParticipantId: z.string().optional(),
+  scorersPayload: z.string().optional(),
   lineupPayload: z.string().optional()
 });
 
@@ -210,6 +212,7 @@ export async function saveResultAction(matchId: string, organizationId: string, 
       scoreB: formData.get("scoreB"),
       notes: formData.get("notes"),
       mvpParticipantId: formData.get("mvpParticipantId"),
+      scorersPayload: formData.get("scorersPayload") ?? undefined,
       lineupPayload: formData.get("lineupPayload")
     });
     if (!parsed.success) {
@@ -238,6 +241,11 @@ export async function saveResultAction(matchId: string, organizationId: string, 
       parsedLineup = parsedPayload.data;
     }
 
+    let scorers: z.infer<typeof matchScorersSchema> | undefined;
+    if (parsed.data.scorersPayload !== undefined) {
+      try { scorers = matchScorersSchema.parse(JSON.parse(parsed.data.scorersPayload)); }
+      catch { throw new Error("Revisá los goleadores: usá cantidades enteras positivas y un registro por participante."); }
+    }
     const supabase = await createSupabaseServerClient();
     const outcome = await saveMatchResult({
       supabase,
@@ -250,6 +258,7 @@ export async function saveResultAction(matchId: string, organizationId: string, 
         scoreB: parsed.data.scoreB,
         notes: parsed.data.notes,
         mvpParticipantId: parsed.data.mvpParticipantId?.trim() || null,
+        scorers,
         lineup: parsedLineup
       }
     });

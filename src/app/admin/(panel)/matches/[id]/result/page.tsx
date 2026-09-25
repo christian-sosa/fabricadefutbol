@@ -6,8 +6,10 @@ import { MatchResultEditorQuery } from "@/components/admin/match-result-editor-q
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { readMatchLineupSnapshot } from "@/lib/domain/match-sheet";
+import { supportsMatchExtras } from "@/lib/domain/match-scorers";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminMatchDetails, getSelectablePlayers } from "@/lib/queries/admin";
+import { getAdminMatchScorers, getAdminMatchSubstitutes } from "@/lib/queries/admin-match-extras";
 import { resolveMatchTeamLabels } from "@/lib/team-labels";
 
 type OptionMember = {
@@ -35,6 +37,11 @@ export default async function AdminMatchResultPage({
 
   const details = await getAdminMatchDetails(id, selectedOrganization.id);
   if (!details) notFound();
+  const enableScorers = supportsMatchExtras(details.match.modality);
+  const [substitutes, scorers] = enableScorers ? await Promise.all([
+    getAdminMatchSubstitutes(id, selectedOrganization.id), getAdminMatchScorers(id)
+  ]) : [[], []];
+  const substituteIds = new Set(substitutes.map((participant) => participant.participantId));
 
   const canManageResult = details.match.status === "confirmed" || details.match.status === "finished";
   const confirmedOption = details.options.find((option) => option.is_confirmed) ?? null;
@@ -57,6 +64,11 @@ export default async function AdminMatchResultPage({
         }))
       ]
     : [];
+  const confirmedIds = new Set(confirmedParticipants.map((participant) => participant.participantId));
+  const allParticipants = [
+    ...confirmedParticipants.map((participant) => ({ ...participant, isSubstitute: substituteIds.has(participant.participantId) })),
+    ...substitutes.filter((participant) => !confirmedIds.has(participant.participantId))
+  ];
   const selectablePlayers = await getSelectablePlayers(selectedOrganization.id);
   const availableReplacementPlayers = selectablePlayers.map((player) => ({
     id: player.id,
@@ -64,12 +76,15 @@ export default async function AdminMatchResultPage({
     rating: Number(player.current_rating)
   }));
   const snapshot = readMatchLineupSnapshot(details.match.lineup_snapshot);
-  const participantRatings = new Map(confirmedParticipants.map((participant) => [participant.participantId, participant.rating]));
+  const participantRatings = new Map(allParticipants.map((participant) => [participant.participantId, participant.rating]));
   const playerRatings = new Map(selectablePlayers.map((player) => [`player:${player.id}`, Number(player.current_rating)]));
   const editableParticipants = snapshot.length
-    ? snapshot.map((participant) => ({ ...participant, initialTeam: participant.team,
-        rating: participantRatings.get(participant.participantId) ?? playerRatings.get(participant.participantId) ?? 1000 }))
-    : confirmedParticipants;
+    ? [
+        ...snapshot.map((participant) => ({ ...participant, initialTeam: participant.team, isSubstitute: substituteIds.has(participant.participantId),
+          rating: participantRatings.get(participant.participantId) ?? playerRatings.get(participant.participantId) ?? 1000 })),
+        ...substitutes.filter((participant) => !snapshot.some((entry) => entry.participantId === participant.participantId))
+      ]
+    : allParticipants;
   const defaultAbsencePenaltyParticipantIds = snapshot.filter((participant) => participant.penalized).map((participant) => participant.participantId);
   const defaultMvpParticipantId = details.result?.mvp_player_id
     ? `player:${details.result.mvp_player_id}`
@@ -93,10 +108,13 @@ export default async function AdminMatchResultPage({
       <Card>
         <CardTitle>{details.result ? "Corregir resultado" : "Cargar resultado"}</CardTitle>
         <CardDescription>
-          Carga marcador, ausencias y reemplazos en una sola accion.
+          {enableScorers ? "Revisá quiénes jugaron, cargá el marcador y anotá los goleadores en una sola acción." : "Carga marcador, ausencias y reemplazos en una sola accion."}
         </CardDescription>
         {canManageResult && editableParticipants.length ? (
           <MatchResultEditorQuery
+            key={`${id}:${details.match.result_version ?? 0}`}
+            enableScorers={enableScorers}
+            defaultScorers={scorers.map((scorer) => ({ participantId: scorer.participant_id, goals: scorer.goals }))}
             availablePlayers={availableReplacementPlayers}
             expectedVersion={details.match.result_version ?? 0}
             defaultAbsencePenaltyParticipantIds={defaultAbsencePenaltyParticipantIds}
@@ -119,8 +137,9 @@ export default async function AdminMatchResultPage({
           </p>
         )}
       </Card>
+      {enableScorers ? <Link className="flex min-h-11 w-fit items-center text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery("/admin/scorers", selectedOrganization.slug)}>Ver historial privado de goleadores</Link> : null}
 
-      <Link className="text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery(`/admin/matches/${id}`, selectedOrganization.slug)}>
+      <Link className="flex min-h-11 w-fit items-center text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery(`/admin/matches/${id}`, selectedOrganization.slug)}>
         Volver a editar partido
       </Link>
     </div>

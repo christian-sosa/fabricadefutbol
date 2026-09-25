@@ -22,7 +22,8 @@ import { getCurrentMatchDateTimeIso } from "@/lib/match-datetime";
 import { isMissingSupabaseConfigurationError } from "@/lib/env";
 import type { MatchHistoryItem, OrganizationMatchesResponse, OrganizationSeasonOption } from "@/lib/query/types";
 import type { Database } from "@/types/database";
-import type { PlayerComputedStats } from "@/types/domain";
+import type { PlayerComputedStats, TeamSide } from "@/types/domain";
+import { supportsMatchExtras } from "@/lib/domain/match-scorers";
 
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
@@ -106,6 +107,39 @@ type MatchParticipantDisplay = {
   current_rating: number;
   is_guest: boolean;
 };
+
+export type PublicMatchSubstitute = MatchParticipantDisplay & { team: TeamSide | null };
+
+async function fetchPublicMatchSubstitutes(
+  supabase: SupabaseServerClient,
+  matchIds: string[],
+  organizationId: string
+) {
+  const result = new Map<string, PublicMatchSubstitute[]>();
+  if (!matchIds.length) return result;
+  const [roster, guests] = await Promise.all([
+    readRowsByIds(matchIds, (ids, from, to) => supabase.from("match_players")
+      .select("id, match_id, player_id, substitute_team").in("match_id", ids).eq("is_substitute", true).order("id").range(from, to)),
+    readRowsByIds(matchIds, (ids, from, to) => supabase.from("match_guests")
+      .select("id, match_id, guest_name, guest_rating, substitute_team").in("match_id", ids).eq("is_substitute", true).order("id").range(from, to))
+  ]);
+  const players = await readRowsByIds(roster.map((row) => row.player_id), (ids, from, to) => supabase.from("players")
+    .select("id, full_name, current_rating, photo_path, photo_updated_at").eq("organization_id", organizationId).in("id", ids).order("id").range(from, to));
+  const playersById = indexBy(players);
+  for (const row of roster) {
+    const player = playersById.get(row.player_id);
+    if (!player) continue;
+    const current = result.get(row.match_id) ?? [];
+    current.push({ ...player, is_guest: false, team: row.substitute_team });
+    result.set(row.match_id, current);
+  }
+  for (const guest of guests) {
+    const current = result.get(guest.match_id) ?? [];
+    current.push({ id: `guest-${guest.id}`, full_name: guest.guest_name, current_rating: calculateGuestDisplayRating(guest.guest_rating), is_guest: true, team: guest.substitute_team });
+    result.set(guest.match_id, current);
+  }
+  return result;
+}
 
 function sortParticipantsByRating(players: MatchParticipantDisplay[]) {
   return [...players].sort((a, b) => Number(b.current_rating) - Number(a.current_rating));
@@ -847,7 +881,10 @@ export async function getUpcomingConfirmedMatches(organizationId: string | null)
   if (error) throw new Error(error.message);
 
   const ids = (data ?? []).map((match) => match.id);
-  const matchesWithTeams = await fetchMatchTeams(ids);
+  const [matchesWithTeams, substitutesByMatch] = await Promise.all([
+    fetchMatchTeams(ids),
+    fetchPublicMatchSubstitutes(supabase, (data ?? []).filter((match) => supportsMatchExtras(match.modality)).map((match) => match.id), organizationId)
+  ]);
   const playerIds = matchesWithTeams.flatMap((match) => [...match.teamAPlayerIds, ...match.teamBPlayerIds]);
   const optionIds = matchesWithTeams.map((match) => match.match.confirmed_option_id).filter(notNull);
 
@@ -904,6 +941,9 @@ export async function getUpcomingConfirmedMatches(organizationId: string | null)
     if (!item) throw new Error("No se encontro el partido confirmado al ordenar la agenda publica.");
     return {
       ...item,
+      substitutes: (substitutesByMatch.get(item.match.id) ?? []).filter((player) => player.is_guest
+        ? !safeOptionGuests.some((guest) => guest.team_option_id === item.match.confirmed_option_id && `guest-${guest.guest_id}` === player.id)
+        : !item.teamAPlayerIds.includes(player.id) && !item.teamBPlayerIds.includes(player.id)),
       teamAPlayers: sortParticipantsByRating([
         ...item.teamAPlayerIds.map((id) => playersById.get(id)).filter(notNull),
         ...safeOptionGuests
@@ -936,12 +976,16 @@ export async function getMatchDetails(matchId: string, organizationKey?: string 
   if (matchError) throw new Error(matchError.message);
   if (!match) return null;
 
-  const withTeams = await fetchMatchTeams([matchId]);
+  const [withTeams, substitutesByMatch] = await Promise.all([
+    fetchMatchTeams([matchId]),
+    fetchPublicMatchSubstitutes(supabase, supportsMatchExtras(match.modality) ? [matchId] : [], match.organization_id)
+  ]);
   const details = withTeams[0];
   if (!details) {
     return {
       match,
       result: null,
+      substitutes: substitutesByMatch.get(matchId) ?? [],
       teamAPlayers: [],
       teamBPlayers: []
     };
@@ -997,6 +1041,9 @@ export async function getMatchDetails(matchId: string, organizationKey?: string 
   return {
     match: details.match,
     result: details.result,
+    substitutes: (substitutesByMatch.get(matchId) ?? []).filter((player) => player.is_guest
+      ? !safeOptionGuests.some((guest) => `guest-${guest.guest_id}` === player.id)
+      : !details.teamAPlayerIds.includes(player.id) && !details.teamBPlayerIds.includes(player.id)),
     teamAPlayers: sortParticipantsByRating([
       ...details.teamAPlayerIds.map((id) => playersById.get(id)).filter(notNull),
       ...safeOptionGuests

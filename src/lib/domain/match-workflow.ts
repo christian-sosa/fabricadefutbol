@@ -7,7 +7,7 @@ import {
 import { generateBalancedTeamOptions } from "@/lib/domain/team-generator";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizeTeamLabel } from "@/lib/team-labels";
-import type { MatchModality, MatchResultInput, TeamSide } from "@/types/domain";
+import type { MatchModality, MatchResultInput, SubstituteAssignment, TeamSide } from "@/types/domain";
 
 type DbClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
@@ -48,6 +48,7 @@ type CreateDraftInput = {
   invitedGuests: DraftGuestInput[];
   teamCreationMode?: "auto" | "manual";
   manualTeamAssignments?: ManualTeamAssignmentInput[];
+  substituteAssignments?: SubstituteAssignment[];
   goalkeeperPlayerIds?: string[];
   teamALabel?: string | null;
   teamBLabel?: string | null;
@@ -80,6 +81,39 @@ function validatePlayerCount(modality: MatchModality, registeredPlayersCount: nu
   if (total !== expected) {
     throw new Error(`Para ${modality} necesitas exactamente ${expected} jugadores entre registrados e invitados.`);
   }
+}
+
+export function validateSubstituteAssignments(params: {
+  modality: MatchModality;
+  participantIds: string[];
+  assignments: SubstituteAssignment[];
+  goalkeeperPlayerIds: string[];
+}) {
+  const { modality, participantIds, assignments, goalkeeperPlayerIds } = params;
+  if (assignments.length && !["9v9", "10v10", "11v11"].includes(modality)) {
+    throw new Error("Los suplentes están disponibles únicamente en F9, F10 y F11.");
+  }
+  const participants = new Set(participantIds);
+  if (participants.size !== participantIds.length) {
+    throw new Error("Hay participantes duplicados en la convocatoria.");
+  }
+  const assignmentsById = new Map<string, TeamSide | null>();
+  for (const assignment of assignments) {
+    if (!participants.has(assignment.participantId)) {
+      throw new Error("Los suplentes deben formar parte de la convocatoria.");
+    }
+    if (assignmentsById.has(assignment.participantId)) {
+      throw new Error("Hay suplentes duplicados en la convocatoria.");
+    }
+    if (assignment.team !== null && assignment.team !== "A" && assignment.team !== "B") {
+      throw new Error("El equipo de un suplente debe ser válido o quedar sin asignar.");
+    }
+    if (goalkeeperPlayerIds.some((id) => toPlayerParticipantId(id) === assignment.participantId)) {
+      throw new Error("Los arqueros titulares no pueden estar marcados como suplentes.");
+    }
+    assignmentsById.set(assignment.participantId, assignment.team);
+  }
+  return assignmentsById;
 }
 
 function validateGoalkeeperSelection(selectedPlayerIds: string[], goalkeeperPlayerIds: string[]) {
@@ -385,8 +419,9 @@ async function insertDraftGuests(params: {
   supabase: DbClient;
   matchId: string;
   invitedGuests: DraftGuestInput[];
+  substitutesById: Map<string, TeamSide | null>;
 }) {
-  const { supabase, matchId, invitedGuests } = params;
+  const { supabase, matchId, invitedGuests, substitutesById } = params;
   if (!invitedGuests.length) return [] as Array<{ key: string; id: string; guest_name: string; guest_rating: number }>;
 
   const insertedGuests: Array<{ key: string; id: string; guest_name: string; guest_rating: number }> = [];
@@ -396,7 +431,9 @@ async function insertDraftGuests(params: {
       .insert({
         match_id: matchId,
         guest_name: guest.name,
-        guest_rating: guest.rating
+        guest_rating: guest.rating,
+        is_substitute: substitutesById.has(toGuestParticipantId(guest.key)),
+        substitute_team: substitutesById.get(toGuestParticipantId(guest.key)) ?? null
       })
       .select("id, guest_name, guest_rating")
       .single();
@@ -431,11 +468,20 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
     invitedGuests,
     teamCreationMode = "auto",
     manualTeamAssignments,
+    substituteAssignments = [],
     goalkeeperPlayerIds = [],
     teamALabel,
     teamBLabel
   } = input;
-  validatePlayerCount(modality, selectedPlayerIds.length, invitedGuests.length);
+  const substitutesById = validateSubstituteAssignments({
+    modality,
+    participantIds: [...selectedPlayerIds.map(toPlayerParticipantId), ...invitedGuests.map((guest) => toGuestParticipantId(guest.key))],
+    assignments: substituteAssignments,
+    goalkeeperPlayerIds
+  });
+  const starterPlayerIds = selectedPlayerIds.filter((id) => !substitutesById.has(toPlayerParticipantId(id)));
+  const starterGuests = invitedGuests.filter((guest) => !substitutesById.has(toGuestParticipantId(guest.key)));
+  validatePlayerCount(modality, starterPlayerIds.length, starterGuests.length);
   validateGoalkeeperSelection(selectedPlayerIds, goalkeeperPlayerIds);
 
   const players = await fetchSelectedPlayers(supabase, organizationId, selectedPlayerIds);
@@ -461,7 +507,12 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
   }
 
   if (selectedPlayerIds.length) {
-    const matchPlayersRows = selectedPlayerIds.map((playerId) => ({ match_id: match.id, player_id: playerId }));
+    const matchPlayersRows = selectedPlayerIds.map((playerId) => ({
+      match_id: match.id,
+      player_id: playerId,
+      is_substitute: substitutesById.has(toPlayerParticipantId(playerId)),
+      substitute_team: substitutesById.get(toPlayerParticipantId(playerId)) ?? null
+    }));
     const { error: matchPlayersError } = await supabase.from("match_players").insert(matchPlayersRows);
     if (matchPlayersError) {
       throw new Error(`No se pudieron asociar jugadores al partido: ${matchPlayersError.message}`);
@@ -471,9 +522,13 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
   const insertedGuests = await insertDraftGuests({
     supabase,
     matchId: match.id,
-    invitedGuests
+    invitedGuests,
+    substitutesById
   });
-  const participants = toBalancePlayers(players, insertedGuests);
+  const participants = toBalancePlayers(
+    players.filter((player) => !substitutesById.has(toPlayerParticipantId(player.id))),
+    insertedGuests.filter((guest) => !substitutesById.has(toGuestParticipantId(guest.key)))
+  );
 
   if (teamCreationMode === "manual") {
     if (!manualTeamAssignments?.length) {
@@ -548,8 +603,8 @@ export async function regenerateDraftTeamOptions(params: {
 
   const [{ data: matchPlayers, error: matchPlayersError }, { data: matchGuests, error: matchGuestsError }] =
     await Promise.all([
-      supabase.from("match_players").select("player_id").eq("match_id", matchId),
-      supabase.from("match_guests").select("id, guest_name, guest_rating").eq("match_id", matchId)
+      supabase.from("match_players").select("player_id, is_substitute").eq("match_id", matchId),
+      supabase.from("match_guests").select("id, guest_name, guest_rating, is_substitute").eq("match_id", matchId)
     ]);
   if (matchPlayersError) throw new Error(`No se pudieron leer convocados: ${matchPlayersError.message}`);
   if (matchGuestsError) {
@@ -559,11 +614,12 @@ export async function regenerateDraftTeamOptions(params: {
     throw new Error(`No se pudieron leer invitados: ${matchGuestsError.message}`);
   }
 
-  const playerIds = (matchPlayers ?? []).map((row) => row.player_id);
-  validatePlayerCount(match.modality, playerIds.length, (matchGuests ?? []).length);
+  const playerIds = (matchPlayers ?? []).filter((row) => !row.is_substitute).map((row) => row.player_id);
+  const starterGuests = (matchGuests ?? []).filter((guest) => !guest.is_substitute);
+  validatePlayerCount(match.modality, playerIds.length, starterGuests.length);
 
   const players = await fetchSelectedPlayers(supabase, match.organization_id, playerIds);
-  const participants = toBalancePlayers(players, matchGuests ?? []);
+  const participants = toBalancePlayers(players, starterGuests);
 
   const options = generateBalancedTeamOptions({
     players: participants,

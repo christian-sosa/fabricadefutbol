@@ -33,6 +33,11 @@ function buildOrganizationItems(pathname: string, organizationKey: string | null
       active: isMatchArea
     },
     {
+      href: withOrgQuery("/admin/scorers", organizationKey),
+      label: "Goleadores",
+      active: pathname === "/admin/scorers"
+    },
+    {
       href: withOrgQuery("/admin/admins", organizationKey),
       label: "Admins",
       active: isAdminsArea
@@ -60,17 +65,17 @@ export function AdminSubnav() {
   if (!items.length) return null;
 
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-950/75 px-4 py-3">
+    <section className="border-t border-slate-800 bg-slate-950/50 p-2 sm:px-4 sm:py-3">
       <div className="space-y-3">
-        <nav aria-label="Administración del grupo" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        <nav aria-label="Administración del grupo" className="flex gap-1 overflow-x-auto sm:gap-2">
           {items.map((item) => (
             <Link
               aria-current={item.active ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-11 items-center justify-center rounded-full border px-3 py-1.5 text-xs font-semibold transition md:text-sm",
+                "inline-flex min-h-11 shrink-0 flex-1 items-center justify-center rounded-xl border px-3 py-2 text-xs font-semibold transition md:text-sm",
                 item.active
-                  ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
-                  : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
+                  ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-200"
+                  : "border-transparent text-slate-400 hover:bg-slate-800 hover:text-white"
               )}
               href={item.href}
               key={item.href}

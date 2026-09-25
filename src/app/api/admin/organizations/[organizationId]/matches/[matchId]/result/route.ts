@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { assertOrganizationAdminAction } from "@/lib/auth/admin";
 import { saveMatchResult } from "@/lib/domain/match-workflow";
+import { matchScorersSchema } from "@/lib/domain/match-scorers";
 import { parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
 import { toUserMessage } from "@/lib/errors";
 import { logError, logInfo, logWarn } from "@/lib/observability/log";
@@ -24,6 +25,7 @@ const requestSchema = z.object({
   scoreB: z.number().int().nonnegative(),
   notes: z.string().optional(),
   mvpParticipantId: z.union([z.string().min(1), z.null()]).optional(),
+  scorers: matchScorersSchema.optional(),
   lineup: z
     .object({
       assignments: z

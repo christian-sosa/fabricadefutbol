@@ -22,7 +22,7 @@ import {
 } from "@/lib/domain/skill-level";
 import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL, TEAM_LABEL_MAX_LENGTH } from "@/lib/team-labels";
 import { cn } from "@/lib/utils";
-import type { MatchModality, TeamSide } from "@/types/domain";
+import type { MatchModality, SubstituteAssignment, TeamSide } from "@/types/domain";
 
 type SelectablePlayer = {
   id: string;
@@ -62,6 +62,7 @@ export type NewMatchDefaults = {
   playerIds: string[];
   goalkeeperPlayerIds: string[];
   guests: Array<{ name: string; rating: number }>;
+  substituteAssignments?: SubstituteAssignment[];
 };
 
 export function NewMatchForm({
@@ -85,6 +86,9 @@ export function NewMatchForm({
   const [guestRows, setGuestRows] = useState<GuestRow[]>(() => (initialValues?.guests ?? []).map((guest, index) => ({ key: index + 1, name: guest.name, rating: String(guest.rating) })));
   const [showManualBuilder, setShowManualBuilder] = useState(false);
   const [manualAssignments, setManualAssignments] = useState<Record<string, TeamSide>>({});
+  const [substituteAssignments, setSubstituteAssignments] = useState<Record<string, TeamSide | null>>(
+    () => Object.fromEntries((initialValues?.substituteAssignments ?? []).map((assignment) => [assignment.participantId, assignment.team]))
+  );
   const [incompleteGuestKey, setIncompleteGuestKey] = useState<number | null>(null);
   const [playerSearch, setPlayerSearch] = useState("");
   const [onlySelected, setOnlySelected] = useState(false);
@@ -97,6 +101,7 @@ export function NewMatchForm({
 
   const expected = EXPECTED_PLAYERS[modality];
   const teamSize = expected / 2;
+  const supportsSubstitutes = ["9v9", "10v10", "11v11"].includes(modality);
 
   const selectedRosterPlayers = useMemo(
     () => players.filter((player) => Boolean(selectedPlayers[player.id])),
@@ -124,6 +129,21 @@ export function NewMatchForm({
 
   const validGuestCount = validGuests.length;
   const totalCurrent = selectedCount + validGuestCount;
+  const activeSubstituteAssignments = useMemo<SubstituteAssignment[]>(() => {
+    if (!supportsSubstitutes) return [];
+    const participantIds = new Set([
+      ...selectedRosterPlayers.map((player) => `player:${player.id}`),
+      ...validGuests.map((guest) => `guest:${guest.key}`)
+    ]);
+    return Object.entries(substituteAssignments)
+      .filter(([participantId]) => participantIds.has(participantId))
+      .map(([participantId, team]) => ({ participantId, team }));
+  }, [supportsSubstitutes, selectedRosterPlayers, validGuests, substituteAssignments]);
+  const substituteIds = useMemo(
+    () => new Set(activeSubstituteAssignments.map((assignment) => assignment.participantId)),
+    [activeSubstituteAssignments]
+  );
+  const starterCount = totalCurrent - substituteIds.size;
 
   const selectedGoalkeeperIds = useMemo(
     () =>
@@ -148,8 +168,8 @@ export function NewMatchForm({
         rating: guest.rating,
         source: "guest" as const
       }))
-    ],
-    [selectedRosterPlayers, validGuests]
+    ].filter((participant) => !substituteIds.has(participant.participantId)),
+    [selectedRosterPlayers, validGuests, substituteIds]
   );
 
   useEffect(() => {
@@ -202,12 +222,13 @@ export function NewMatchForm({
   const manualTeamBCount = manualParticipants.length - manualTeamACount;
 
   const goalkeepersReady = selectedGoalkeeperIds.length === 0 || selectedGoalkeeperIds.length === 2;
-  const rosterComplete = totalCurrent === expected;
-  const rosterStatus = totalCurrent < expected
-    ? `${expected - totalCurrent === 1 ? "Falta 1 convocado" : `Faltan ${expected - totalCurrent} convocados`} para completar ${expected}.`
-    : totalCurrent > expected
-      ? `${totalCurrent - expected === 1 ? "Sobra 1 convocado" : `Sobran ${totalCurrent - expected} convocados`}. Quitá jugadores o cambiá la modalidad.`
-      : `Convocatoria completa: ${totalCurrent} de ${expected}.`;
+  const rosterComplete = starterCount === expected;
+  const rosterStatus = (starterCount < expected
+    ? `${expected - starterCount === 1 ? "Falta 1 convocado" : `Faltan ${expected - starterCount} convocados`} para completar ${expected}${supportsSubstitutes ? " titulares" : ""}.`
+    : starterCount > expected
+      ? `${starterCount - expected === 1 ? "Sobra 1 convocado" : `Sobran ${starterCount - expected} convocados`}. ${supportsSubstitutes ? "Marcá suplentes o quitá jugadores." : "Quitá jugadores o cambiá la modalidad."}`
+      : `Convocatoria completa: ${starterCount} de ${expected}${supportsSubstitutes ? " titulares" : ""}.`)
+    + (substituteIds.size ? ` Más ${substituteIds.size} ${substituteIds.size === 1 ? "suplente" : "suplentes"}.` : "");
   const goalkeepersSeparatedInManual = useMemo(() => {
     if (selectedGoalkeeperIds.length !== 2) return true;
     const first = manualAssignments[`player:${selectedGoalkeeperIds[0]}`];
@@ -238,6 +259,16 @@ export function NewMatchForm({
 
   const removeGuest = (guestKey: number) => {
     setGuestRows((current) => current.filter((guest) => guest.key !== guestKey));
+    updateParticipantRole(`guest:${guestKey}`, "starter");
+  };
+
+  const updateParticipantRole = (participantId: string, value: string) => {
+    setSubstituteAssignments((current) => {
+      const next = { ...current };
+      if (value === "starter") delete next[participantId];
+      else next[participantId] = value === "A" || value === "B" ? value : null;
+      return next;
+    });
   };
 
   const updateGuest = (guestKey: number, field: "name" | "rating", value: string) => {
@@ -253,6 +284,7 @@ export function NewMatchForm({
     }));
 
     if (!checked) {
+      updateParticipantRole(`player:${playerId}`, "starter");
       setGoalkeeperPlayers((current) => {
         if (!current[playerId]) return current;
         const next = { ...current };
@@ -296,6 +328,7 @@ export function NewMatchForm({
     }}>
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="manualAssignmentsPayload" type="hidden" value={manualAssignmentsPayload} />
+      <input name="substituteAssignmentsPayload" type="hidden" value={JSON.stringify(activeSubstituteAssignments)} />
       <div className="grid gap-3 md:grid-cols-3">
         <MatchDateTimeFields
           dateName="scheduledDate"
@@ -308,7 +341,10 @@ export function NewMatchForm({
           <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="modality">
             Modalidad
           </label>
-          <Select id="modality" name="modality" onChange={(event) => setModality(event.target.value as MatchModality)} value={modality}>
+          <Select id="modality" name="modality" onChange={(event) => {
+            setModality(event.target.value as MatchModality);
+            if (!["9v9", "10v10", "11v11"].includes(event.target.value)) setSubstituteAssignments({});
+          }} value={modality}>
             {MATCH_MODALITIES.map((modality) => (
               <option key={modality} value={modality}>
                 {MATCH_MODALITY_LABELS[modality]} ({TEAM_SIZE_BY_MODALITY[modality] * 2} jugadores)
@@ -329,16 +365,19 @@ export function NewMatchForm({
           <div>
             <p className="text-sm font-semibold text-slate-100">Jugadores registrados</p>
             <p className="text-xs text-slate-400">
-              Selecciona jugadores fijos y completa invitados para llegar a {expected} convocados.
+              Selecciona jugadores fijos y completa invitados para llegar a {expected} {supportsSubstitutes ? "titulares" : "convocados"}.
             </p>
           </div>
           <p className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-300">
-            Actual: {totalCurrent}/{expected}
+            {supportsSubstitutes ? "Titulares" : "Actual"}: {starterCount}/{expected}{substituteIds.size ? ` · ${substituteIds.size} suplentes` : ""}
           </p>
         </div>
         <p className="mt-2 text-xs text-slate-400">
           Si marcas arqueros, deben ser exactamente 2 y se reparten uno por equipo.
         </p>
+        {supportsSubstitutes ? <p className="mt-2 rounded-lg border border-indigo-400/20 bg-indigo-500/10 p-3 text-sm text-indigo-200">
+          Podés sumar suplentes y dejar su equipo para después. Al cargar la formación final, elegí el equipo de quienes jugaron para que también sumen o pierdan puntos.
+        </p> : null}
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
             <label className="mb-1 block text-sm font-semibold" htmlFor={`${formId}-player-search`}>Buscar jugador</label>
@@ -416,6 +455,7 @@ export function NewMatchForm({
                       className="h-4 w-4 accent-cyan-400"
                       disabled={
                         !selectedPlayers[player.id] ||
+                        substituteIds.has(`player:${player.id}`) ||
                         (!goalkeeperPlayers[player.id] && selectedGoalkeeperIds.length >= 2)
                       }
                       name="goalkeeperPlayerIds"
@@ -424,6 +464,20 @@ export function NewMatchForm({
                       value={player.id}
                     />
                   </label>
+                  {supportsSubstitutes && selectedPlayers[player.id] ? (
+                    <Select
+                      aria-label={`Rol de ${player.full_name}`}
+                      className="min-h-11 w-full xl:w-44"
+                      disabled={Boolean(goalkeeperPlayers[player.id])}
+                      onChange={(event) => updateParticipantRole(`player:${player.id}`, event.target.value)}
+                      value={substituteIds.has(`player:${player.id}`) ? substituteAssignments[`player:${player.id}`] ?? "substitute" : "starter"}
+                    >
+                      <option value="starter">Titular</option>
+                      <option value="substitute">Suplente · sin equipo</option>
+                      <option value="A">Suplente · primer equipo</option>
+                      <option value="B">Suplente · segundo equipo</option>
+                    </Select>
+                  ) : null}
                 </span>
               </div>
             );
@@ -502,6 +556,17 @@ export function NewMatchForm({
                 <Button onClick={() => removeGuest(guest.key)} type="button" variant="danger">
                   Quitar
                 </Button>
+                {supportsSubstitutes ? <Select
+                  aria-label={`Rol de ${guest.name.trim() || `invitado ${index + 1}`}`}
+                  className="md:col-span-3"
+                  onChange={(event) => updateParticipantRole(`guest:${guest.key}`, event.target.value)}
+                  value={Object.hasOwn(substituteAssignments, `guest:${guest.key}`) ? substituteAssignments[`guest:${guest.key}`] ?? "substitute" : "starter"}
+                >
+                  <option value="starter">Titular</option>
+                  <option value="substitute">Suplente · sin equipo</option>
+                  <option value="A">Suplente · primer equipo</option>
+                  <option value="B">Suplente · segundo equipo</option>
+                </Select> : null}
                 {showGuestError ? <p className="text-sm text-danger md:col-span-3" id={guestErrorId} role="alert">Completá el nombre y el nivel del invitado {index + 1}, o quitá la fila.</p> : null}
               </div>
               );
@@ -518,7 +583,7 @@ export function NewMatchForm({
             <div>
               <p className="text-sm font-semibold text-slate-100">Armado manual de equipos</p>
               <p className="text-xs text-slate-400">
-                Asigna cada convocado al primer o segundo equipo. Deben quedar {teamSize} por lado.
+                Asigna cada {supportsSubstitutes ? "titular" : "convocado"} al primer o segundo equipo. Deben quedar {teamSize} por lado.
               </p>
             </div>
             <p className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-300">

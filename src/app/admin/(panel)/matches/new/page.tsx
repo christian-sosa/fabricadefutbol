@@ -7,7 +7,7 @@ import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth
 import { getCurrentMatchDateInput, matchIsoToTimeInput } from "@/lib/match-datetime";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { MatchModality } from "@/types/domain";
+import type { MatchModality, SubstituteAssignment } from "@/types/domain";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminMatchDetails, getSelectablePlayers } from "@/lib/queries/admin";
 
@@ -44,16 +44,30 @@ export default async function NewMatchPage({
       if (template && option) {
         const members = [...option.teamA, ...option.teamB];
         const activePlayerIds = new Set(players.map((player) => player.id));
-        const playerIds = members.filter((member) => !member.is_guest && activePlayerIds.has(member.id)).map((member) => member.id);
-        const goalkeeperIds = (template.match.goalkeeper_player_ids ?? []).filter((id: string) => playerIds.includes(id));
-        const { data: guests, error: guestError } = await supabase.from("match_guests").select("id, guest_name, guest_rating").eq("match_id", repeatId);
+        const [{ data: guests, error: guestError }, { data: roster, error: rosterError }] = await Promise.all([
+          supabase.from("match_guests").select("id, guest_name, guest_rating, is_substitute, substitute_team").eq("match_id", repeatId),
+          supabase.from("match_players").select("player_id, is_substitute, substitute_team").eq("match_id", repeatId)
+        ]);
         if (guestError) throw new Error(guestError.message);
+        if (rosterError) throw new Error(rosterError.message);
+        const substitutePlayers = (roster ?? []).filter((row) => row.is_substitute && activePlayerIds.has(row.player_id));
+        const playerIds = [...new Set([
+          ...members.filter((member) => !member.is_guest && activePlayerIds.has(member.id)).map((member) => member.id),
+          ...substitutePlayers.map((row) => row.player_id)
+        ])];
+        const goalkeeperIds = (template.match.goalkeeper_player_ids ?? []).filter((id: string) => playerIds.includes(id));
         const usedGuests = new Set(members.filter((member) => member.is_guest).map((member) => member.id));
+        const copiedGuests = (guests ?? []).filter((guest) => usedGuests.has(guest.id) || guest.is_substitute);
+        const substituteAssignments: SubstituteAssignment[] = [
+          ...substitutePlayers.map((row) => ({ participantId: `player:${row.player_id}`, team: row.substitute_team })),
+          ...copiedGuests.flatMap((guest, index) => guest.is_substitute ? [{ participantId: `guest:${index + 1}`, team: guest.substitute_team }] : [])
+        ];
         initialValues = {
           modality: template.match.modality, location: template.match.location ?? "",
           scheduledTime: matchIsoToTimeInput(template.match.scheduled_at), playerIds,
           goalkeeperPlayerIds: goalkeeperIds.length === 2 ? goalkeeperIds : [],
-          guests: (guests ?? []).filter((guest) => usedGuests.has(guest.id)).map((guest) => ({ name: guest.guest_name, rating: Number(guest.guest_rating) }))
+          guests: copiedGuests.map((guest) => ({ name: guest.guest_name, rating: Number(guest.guest_rating) })),
+          substituteAssignments
         };
       }
     }

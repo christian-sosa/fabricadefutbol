@@ -102,6 +102,49 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     expect((await rows("select mvp_guest_id from APP.match_result"))[0]).toEqual({ mvp_guest_id: id(80) });
   });
 
+  it("keeps a complete pitch when an assigned bench player participates and allows choosing N of N+ players", async () => {
+    await prepare(9, false, false);
+    await sql(`update APP.match_players set is_substitute=true,substitute_team='A' where player_id='${id(117)}';
+      select APP.confirm_group_match_option('${id(40)}','${id(10)}','${id(50)}')`);
+    const payload = formation();
+    await save(payload);
+    const assignments = [
+      ...payload.teamA.slots.map((slot)=>({participantId:slot.participantId,team:"A"})),
+      ...payload.teamB.slots.map((slot)=>({participantId:slot.participantId,team:"B"})),
+      {participantId:`player:${id(117)}`,team:"A"}
+    ];
+    await result({lineup:{assignments}},1,false);
+    expect((await matchState())[0]).toMatchObject({formation_data:payload,formation_version:1,result_version:2});
+    expect(await save(payload,1)).toEqual({formation_version:2});
+    payload.teamA.slots[1].participantId = `player:${id(117)}`;
+    expect(await save(payload,2)).toEqual({formation_version:3});
+    expect((await matchState())[0]).toMatchObject({formation_data:payload,result_version:2});
+    await result({scoreA:2,scoreB:1,scorers:[{participantId:`player:${id(117)}`,goals:1}]},2);
+    expect((await rows(`select current_rating from APP.players where id='${id(117)}'`))[0]).toEqual({current_rating:"1010.00"});
+    expect((await matchState())[0]).toMatchObject({formation_data:payload,formation_version:3,result_version:3});
+  });
+
+  it("rejects generated options that replace a starter with a called-up substitute", async () => {
+    await prepare(9, false, false);
+    await sql(`update APP.match_players set is_substitute=true where player_id='${id(117)}'`);
+    const payload = formation();
+    payload.teamA.slots[1].participantId = `player:${id(117)}`;
+    const generated = {teamA:payload.teamA.slots.map((slot)=>({id:slot.participantId})),teamB:payload.teamB.slots.map((slot)=>({id:slot.participantId})),ratingSumA:9000,ratingSumB:9000,ratingDiff:0};
+    await expect(db.query(`select ${schema}.replace_group_match_options($1,$2,0,$3::jsonb)`,[id(40),id(10),JSON.stringify([generated])])).rejects.toThrow(/convocatoria activa/);
+    expect(await rows("select id from APP.team_options")).toEqual([{id:id(50)}]);
+    expect((await matchState())[0]).toMatchObject({result_version:0,status:"draft"});
+  });
+
+  it("retains exact team size for visual formations in smaller modalities", async () => {
+    await prepare(5,false);
+    const payload=formation("2-2");
+    await save(payload);
+    const assignments=[...payload.teamA.slots.map((s)=>({participantId:s.participantId,team:"A"})),...payload.teamB.slots.map((s)=>({participantId:s.participantId,team:"B"}))];
+    await result({lineup:{assignments,newPlayers:[{playerId:id(117),team:"A"}]}},1,false);
+    expect((await matchState())[0]).toMatchObject({formation_data:null,formation_version:2,result_version:2});
+    await expect(save(payload,2)).rejects.toThrow(/cantidad de jugadores/);
+  });
+
   it.each([[5, "3-1"], [6, "4-1"], [7, "1-4-1"], [10, "5-4"]] as const)("rejects an unlisted F%s preset %s even when its size is correct", async (size, preset) => {
     await prepare(size);
     await expect(save(formation(preset))).rejects.toMatchObject({ code: "22023" });

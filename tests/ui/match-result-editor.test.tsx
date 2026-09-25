@@ -4,6 +4,66 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MatchResultEditor } from "@/components/admin/match-result-editor";
 
+describe("goleadores privados y suplentes", () => {
+  it("asigna equipo al suplente y guarda sus goles junto con el acta", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<MatchResultEditor enableScorers defaultScoreA={2} defaultScoreB={0} existingParticipants={[
+      ...existingParticipants, { participantId: "player:sub", fullName: "Suplente", rating: 1000, source: "player", initialTeam: "OUT", isSubstitute: true }
+    ]} onSubmit={onSubmit} submitLabel="Guardar" />);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Equipo de Suplente" }), "A");
+    await user.click(screen.getByText("Goleadores"));
+    await user.type(screen.getByRole("spinbutton", { name: "Goles de Suplente" }), "1");
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+    expect(onSubmit.mock.calls[0][0].scorers).toEqual([{ participantId: "player:sub", goals: 1 }]);
+    expect(onSubmit.mock.calls[0][0].lineup.assignments).toContainEqual({ participantId: "player:sub", team: "A" });
+  });
+
+  it("bloquea autores que superan el marcador y permite goles sin autor", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<MatchResultEditor enableScorers defaultScoreA={2} defaultScoreB={0} existingParticipants={existingParticipants} onSubmit={onSubmit} submitLabel="Guardar" />);
+    await user.click(screen.getByText("Goleadores"));
+    const goals = screen.getByRole("spinbutton", { name: "Goles de Jugador 1" });
+    await user.type(goals, "3");
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent("no pueden superar el marcador");
+    await user.clear(goals);
+    await user.type(goals, "1");
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+    expect(onSubmit.mock.calls[0][0].scorers).toEqual([{ participantId: "player:player-1", goals: 1 }]);
+  });
+
+  it("evita perder goles silenciosamente al sacar a un goleador de la formación", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<MatchResultEditor enableScorers defaultScoreA={2} defaultScoreB={0} defaultScorers={[{ participantId: "player:player-1", goals: 2 }]} existingParticipants={existingParticipants} onSubmit={onSubmit} submitLabel="Guardar" />);
+    await user.click(screen.getByText("Editar formacion"));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Equipo de Jugador 1" }), "OUT");
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent("Un goleador no puede quedar sin jugar");
+    await user.click(screen.getByRole("button", { name: "Quitar goles de Jugador 1" }));
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+    expect(onSubmit.mock.calls[0][0].scorers).toEqual([]);
+  });
+
+  it("conserva la selección explícita de desventaja aunque un lado tenga más suplentes", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<MatchResultEditor enableScorers defaultHandicapTeam="A" defaultScoreA={2} defaultScoreB={0} existingParticipants={[
+      ...existingParticipants, { participantId: "player:sub", fullName: "Suplente", rating: 1000, source: "player", initialTeam: "A", isSubstitute: true }
+    ]} onSubmit={onSubmit} submitLabel="Guardar" />);
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+    expect(onSubmit.mock.calls[0][0].lineup.handicapTeam).toBe("A");
+  });
+});
+
 const existingParticipants = [
   {
     participantId: "player:player-1",

@@ -49,6 +49,42 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
   const confirm = async () => { await login(); await sql(`select APP.confirm_group_match_option('${id(40)}','${id(10)}','${id(50)}')`); };
   const finish = async () => { await confirm(); await sql(`select APP.save_group_match_result('${id(40)}','${id(10)}',1,'{"scoreA":2,"scoreB":1}')`); };
 
+  it("keeps scorer history private to group admins and writes it only through the atomic result RPC", async () => {
+    await sql(`update APP.matches set modality='9v9';
+      insert into APP.players(id,organization_id,full_name,initial_rank) values ${Array.from({length:8},(_,n)=>`('${id(30+n)}','${id(10)}','Extra ${n}',${n+11})`).join(",")};
+      insert into APP.match_players(match_id,player_id) select '${id(40)}',id from APP.players where initial_rank>10;
+      update APP.team_option_players set team='A' where player_id in (select id from APP.players where initial_rank<=9);
+      insert into APP.team_option_players(team_option_id,player_id,team) select '${id(50)}',id,'B' from APP.players where initial_rank>10;`);
+    await confirm();
+    await sql(`select APP.save_group_match_result('${id(40)}','${id(10)}',1,'{"scoreA":2,"scoreB":1,"scorers":[{"participantId":"player:${id(20)}","goals":2}]}')`);
+    expect(await rows("select participant_id,goals from APP.match_goal_scorers")).toEqual([{participant_id:`player:${id(20)}`,goals:2}]);
+    for (const mutation of [
+      `update APP.match_goal_scorers set goals=9`,
+      `delete from APP.match_goal_scorers`,
+      `insert into APP.match_goal_scorers(match_id,participant_id,player_id,team,goals,display_name) values('${id(40)}','player:${id(21)}','${id(21)}','A',1,'Forged')`
+    ]) await expect(sql(mutation)).rejects.toThrow(/permission denied/);
+    await login(2);
+    expect(await rows("select * from APP.match_goal_scorers")).toEqual([]);
+    await expect(sql(`select APP.save_group_match_result('${id(40)}','${id(10)}',2,'{"scoreA":2,"scoreB":1,"scorers":[]}')`)).rejects.toThrow(/No autorizado/);
+    await login(3,"aal2");
+    expect(await rows("select goals from APP.match_goal_scorers")).toEqual([{goals:2}]);
+    await sql("reset role; select set_config('test.uid','',false); set role anon");
+    await expect(rows("select * from APP.match_goal_scorers")).rejects.toThrow(/permission denied/);
+    expect(await rows("select id from APP.matches where status='finished'")).toHaveLength(1);
+    await sql("reset role; set role service_role");
+    await expect(rows("select * from APP.match_goal_scorers")).rejects.toThrow(/permission denied/);
+  });
+
+  it("limits bench call-ups to larger modalities and excludes them from starting options", async () => {
+    await login();
+    await expect(sql(`update APP.match_players set is_substitute=true where player_id='${id(20)}'`)).rejects.toThrow(/F9/);
+    await sql(`update APP.matches set modality='9v9'; update APP.match_players set is_substitute=true,substitute_team='A' where player_id='${id(20)}'`);
+    await expect(sql(`update APP.matches set modality='5v5'`)).rejects.toThrow(/F9/);
+    await expect(sql(`update APP.match_players set is_substitute=false where player_id='${id(20)}'`)).rejects.toThrow(/substitute_team_check/);
+    await expect(sql(`select APP.confirm_group_match_option('${id(40)}','${id(10)}','${id(50)}')`)).rejects.toThrow(/convocatoria/);
+    expect(await rows("select status,result_version from APP.matches")).toEqual([{status:"draft",result_version:0}]);
+  });
+
   it("creates group, membership, season and audit atomically; stable form IDs make retries idempotent", async () => {
     await login(3, "aal2");
     const first = (await rows(`select APP.create_group_organization('${id(70)}','New group','one') result`))[0].result;
