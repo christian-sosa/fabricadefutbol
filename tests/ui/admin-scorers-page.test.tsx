@@ -9,7 +9,7 @@ vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 
 import AdminScorersPage from "@/app/admin/(panel)/scorers/page";
 
-const emptyHistory = { page: 1, pageCount: 1, scorers: [], totalScorers: 0, totalGoals: 0, guestGoals: 0, matchesWithScorers: 0 };
+const emptyHistory = { page: 1, pageCount: 1, scorers: [], totalScorers: 0, totalGoals: 0, guestGoals: 0, matchesRecorded: 0 };
 
 describe("goleadores históricos privados", () => {
   beforeEach(() => {
@@ -20,10 +20,10 @@ describe("goleadores históricos privados", () => {
 
   it("muestra totales históricos y un ranking por jugador con paginación del grupo", async () => {
     mocks.history.mockResolvedValue({
-      page: 2, pageCount: 3, totalScorers: 45, totalGoals: 305, guestGoals: 5, matchesWithScorers: 40,
+      page: 2, pageCount: 3, totalScorers: 45, totalGoals: 305, guestGoals: 5, matchesRecorded: 40,
       scorers: [
-        { playerId: "p1", displayName: "Ana", goals: 12, matchesScored: 7, rank: 21 },
-        { playerId: "p2", displayName: "Pablo", goals: 12, matchesScored: 5, rank: 21 }
+        { playerId: "p1", displayName: "Ana", goals: 12, matchesPlayed: 7, rank: 21 },
+        { playerId: "p2", displayName: "Pablo", goals: 12, matchesPlayed: 5, rank: 21 }
       ]
     });
     render(await AdminScorersPage({ searchParams: Promise.resolve({ org: "la-banda", page: "2" }) }));
@@ -33,14 +33,15 @@ describe("goleadores históricos privados", () => {
     expect(screen.getByText("Todas las temporadas")).toBeInTheDocument();
     expect(screen.getByText("Goles registrados").parentElement).toHaveTextContent("305");
     expect(screen.getByText("Goleadores del grupo").parentElement).toHaveTextContent("45");
-    expect(screen.getByText("Partidos con registro").parentElement).toHaveTextContent("40");
+    expect(screen.getByText("Partidos computados").parentElement).toHaveTextContent("40");
     const table = screen.getByRole("table", { name: "Goleadores históricos del grupo" });
-    const ana = within(table).getByRole("rowheader", { name: "Ana 7 partidos con gol" }).closest("tr")!;
+    const ana = within(table).getByRole("rowheader", { name: "Ana 7 partidos computados" }).closest("tr")!;
     expect(within(ana).getByRole("cell", { name: "12 goles" })).toBeInTheDocument();
     expect(within(table).getAllByRole("cell", { name: "21" })).toHaveLength(2);
     expect(screen.queryByRole("link", { name: "Ver acta" })).not.toBeInTheDocument();
     expect(screen.getByText(/El total incluye 5 goles de invitados/)).toBeInTheDocument();
     expect(screen.getByText(/Sólo los administradores del grupo pueden ver/)).toBeInTheDocument();
+    expect(screen.getByText(/Los empates 0–0 también cuentan/)).toHaveTextContent("Los demás resultados sin goleadores cargados quedan fuera del conteo.");
     expect(screen.getByRole("link", { name: /Ir a partidos/ })).toHaveAttribute("href", "/admin/matches?org=la-banda");
     expect(screen.getByRole("link", { name: "Anterior" })).toHaveAttribute("href", "/admin/scorers?page=1&org=la-banda");
     expect(screen.getByRole("link", { name: "Siguiente" })).toHaveAttribute("href", "/admin/scorers?page=3&org=la-banda");
@@ -61,7 +62,7 @@ describe("goleadores históricos privados", () => {
   });
 
   it("explica los goles de invitados cuando todavía no hay jugadores registrados en el ranking", async () => {
-    mocks.history.mockResolvedValue({ ...emptyHistory, totalGoals: 1, guestGoals: 1, matchesWithScorers: 1 });
+    mocks.history.mockResolvedValue({ ...emptyHistory, totalGoals: 1, guestGoals: 1, matchesRecorded: 1 });
     render(await AdminScorersPage({ searchParams: Promise.resolve({ org: "la-banda" }) }));
     expect(screen.getByText("Todavía no hay goles registrados de jugadores del grupo")).toBeInTheDocument();
     expect(screen.getByText(/El total incluye 1 gol de invitados/)).toBeInTheDocument();

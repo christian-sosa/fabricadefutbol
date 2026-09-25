@@ -31,7 +31,7 @@ export default async function AdminScorersPage({ searchParams }: { searchParams:
           {[
             { label: "Goles registrados", value: history.totalGoals },
             { label: "Goleadores del grupo", value: history.totalScorers },
-            { label: "Partidos con registro", value: history.matchesWithScorers }
+            { label: "Partidos computados", value: history.matchesRecorded }
           ].map(({ label, value }) => (
             <div key={label} className="min-w-0">
               <dt className="text-xs leading-relaxed text-slate-400">{label}</dt>
@@ -66,7 +66,7 @@ export default async function AdminScorersPage({ searchParams }: { searchParams:
                   <td className="py-4 align-top"><span className={`inline-flex min-h-8 min-w-8 items-center justify-center rounded-lg px-1 font-bold tabular-nums ${scorer.rank === 1 ? "bg-emerald-400/15 text-emerald-200" : "text-slate-400"}`}>{number.format(scorer.rank)}</span></td>
                   <th scope="row" className="break-words px-2 py-4 font-semibold text-slate-100">
                     {scorer.displayName}{" "}
-                    <span className="mt-1 block text-xs font-normal text-slate-400">{number.format(scorer.matchesScored)} {scorer.matchesScored === 1 ? "partido con gol" : "partidos con gol"}</span>
+                    <span className="mt-1 block text-xs font-normal text-slate-400">{number.format(scorer.matchesPlayed)} {scorer.matchesPlayed === 1 ? "partido computado" : "partidos computados"}</span>
                   </th>
                   <td className="py-4 text-right align-top text-xl font-black tabular-nums text-emerald-300">{number.format(scorer.goals)}{" "}<span className="sr-only">{scorer.goals === 1 ? "gol" : "goles"}</span></td>
                 </tr>
@@ -90,6 +90,7 @@ export default async function AdminScorersPage({ searchParams }: { searchParams:
       </Card>
 
       <div className="space-y-2 px-1 text-xs leading-relaxed text-slate-400">
+        <p>Para cada jugador se cuentan los partidos en los que jugó y se cargó al menos un goleador, aunque él no haya marcado. Los empates 0–0 también cuentan. Los demás resultados sin goleadores cargados quedan fuera del conteo.</p>
         {history.guestGoals > 0 ? <p>El total incluye {number.format(history.guestGoals)} {history.guestGoals === 1 ? "gol de invitados" : "goles de invitados"}. Podés consultar sus autores en las actas de los partidos.</p> : null}
         <p>Sólo los administradores del grupo pueden ver este registro. Se cuentan únicamente los goles con autor cargado. No modifican los puntos ni se publican en el ranking del grupo.</p>
       </div>

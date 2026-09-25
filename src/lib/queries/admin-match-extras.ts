@@ -56,7 +56,7 @@ export type AdminHistoricalScorer = {
   playerId: string;
   displayName: string;
   goals: number;
-  matchesScored: number;
+  matchesPlayed: number;
   rank: number;
 };
 
@@ -67,23 +67,29 @@ export type AdminHistoricalScorers = {
   totalScorers: number;
   totalGoals: number;
   guestGoals: number;
-  matchesWithScorers: number;
+  matchesRecorded: number;
 };
 
 export async function getAdminHistoricalScorers(organizationId: string, page = 1): Promise<AdminHistoricalScorers> {
   const supabase = await createSupabaseServerClient();
   const pageSize = 20;
   const { data: matches, error: matchesError } = await readAllRows((from, to) => supabase.from("matches")
-    .select("id, scheduled_at", { count: "exact" })
+    .select("id, scheduled_at, confirmed_option_id", { count: "exact" })
     .eq("organization_id", organizationId).eq("status", "finished").in("modality", ["9v9", "10v10", "11v11"])
     .order("scheduled_at", { ascending: false }).order("id").range(from, to));
   if (matchesError) throw new Error(matchesError.message);
 
   // Read every season before paginating players; paging matches would undercount totals.
-  // Both reads use count-aware pagination, including when the API caps its response.
-  const scorers = await readRowsByIds(matches.map((match) => match.id), (ids, from, to) => supabase.from("match_goal_scorers")
-    .select("match_id, participant_id, player_id, display_name, goals", { count: "exact" })
-    .in("match_id", ids).order("match_id").order("participant_id").range(from, to));
+  // Every read uses count-aware pagination, including when the API caps its response.
+  const matchIds = matches.map((match) => match.id);
+  const [scorers, scorelessDraws] = await Promise.all([
+    readRowsByIds(matchIds, (ids, from, to) => supabase.from("match_goal_scorers")
+      .select("match_id, participant_id, player_id, display_name, goals", { count: "exact" })
+      .in("match_id", ids).order("match_id").order("participant_id").range(from, to)),
+    readRowsByIds(matchIds, (ids, from, to) => supabase.from("match_result")
+      .select("match_id", { count: "exact" }).in("match_id", ids)
+      .eq("score_a", 0).eq("score_b", 0).order("match_id").range(from, to))
+  ]);
   const matchRecency = new Map(matches.map((match, index) => [match.id, index]));
   const playersById = new Map<string, {
     displayName: string;
@@ -91,12 +97,12 @@ export async function getAdminHistoricalScorers(organizationId: string, page = 1
     goals: number;
     matchIds: Set<string>;
   }>();
-  const matchesWithScorers = new Set<string>();
+  const matchesRecorded = new Set(scorelessDraws.map((result) => result.match_id));
   let totalGoals = 0;
   let guestGoals = 0;
   for (const scorer of scorers) {
     totalGoals += scorer.goals;
-    matchesWithScorers.add(scorer.match_id);
+    matchesRecorded.add(scorer.match_id);
     // Guest IDs belong to a single match, so names cannot establish a historical identity.
     if (!scorer.player_id) {
       guestGoals += scorer.goals;
@@ -107,7 +113,6 @@ export async function getAdminHistoricalScorers(organizationId: string, page = 1
       displayName: scorer.display_name, latestMatchIndex: matchIndex, goals: 0, matchIds: new Set<string>()
     };
     player.goals += scorer.goals;
-    player.matchIds.add(scorer.match_id);
     if (matchIndex < player.latestMatchIndex) {
       player.displayName = scorer.display_name;
       player.latestMatchIndex = matchIndex;
@@ -115,13 +120,25 @@ export async function getAdminHistoricalScorers(organizationId: string, page = 1
     playersById.set(scorer.player_id, player);
   }
 
-  const players = await readRowsByIds([...playersById.keys()], (ids, from, to) => supabase.from("players")
-    .select("id, full_name", { count: "exact" }).eq("organization_id", organizationId)
-    .in("id", ids).order("id").range(from, to));
+  const recordedOptions = new Map(matches.flatMap((match) => matchesRecorded.has(match.id) && match.confirmed_option_id
+    ? [[match.confirmed_option_id, match.id] as const] : []));
+  const [players, participants] = await Promise.all([
+    readRowsByIds([...playersById.keys()], (ids, from, to) => supabase.from("players")
+      .select("id, full_name", { count: "exact" }).eq("organization_id", organizationId)
+      .in("id", ids).order("id").range(from, to)),
+    readRowsByIds(playersById.size ? [...recordedOptions.keys()] : [], (ids, from, to) => supabase.from("team_option_players")
+      .select("team_option_id, player_id", { count: "exact" }).in("team_option_id", ids)
+      .in("team", ["A", "B"]).order("team_option_id").order("player_id").range(from, to))
+  ]);
+  // The result RPC rebuilds this confirmed option from final A/B assignments.
+  // It includes substitutes who played and excludes unused substitutes and absences.
+  for (const participant of participants) {
+    playersById.get(participant.player_id)?.matchIds.add(recordedOptions.get(participant.team_option_id)!);
+  }
   const currentNames = new Map(players.map((player) => [player.id, player.full_name]));
   const ranking = [...playersById].map(([playerId, player]) => ({
     playerId, displayName: currentNames.get(playerId) ?? player.displayName,
-    goals: player.goals, matchesScored: player.matchIds.size, rank: 0
+    goals: player.goals, matchesPlayed: player.matchIds.size, rank: 0
   })).sort((left, right) => right.goals - left.goals
     || left.displayName.localeCompare(right.displayName, "es")
     || left.playerId.localeCompare(right.playerId));
@@ -134,6 +151,6 @@ export async function getAdminHistoricalScorers(organizationId: string, page = 1
   const offset = (currentPage - 1) * pageSize;
   return {
     scorers: ranking.slice(offset, offset + pageSize), page: currentPage, pageCount,
-    totalScorers: ranking.length, totalGoals, guestGoals, matchesWithScorers: matchesWithScorers.size
+    totalScorers: ranking.length, totalGoals, guestGoals, matchesRecorded: matchesRecorded.size
   };
 }

@@ -64,9 +64,42 @@ test("F9: suplentes, puntos y goleadores privados persisten y se pueden corregir
   expect(await points(page)).toBe(before + 10);
   await page.goto(`/admin/scorers?org=${org}`);
   await expect(page.getByRole("heading", { name: "Goleadores históricos" })).toBeVisible();
-  const scorer = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: `${substituteName} 1 partido con gol`, exact: true }) });
+  const scorer = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: `${substituteName} 1 partido computado`, exact: true }) });
   await expect(scorer.getByRole("cell", { name: "2 goles", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Ver acta", exact: true })).toHaveCount(0);
+
+  // Un resultado sin autores no suma partidos; al corregirlo a 0–0 sí cuenta.
+  await page.goto(`/admin/matches/new?org=${org}`);
+  await page.locator('input[name="scheduledDate"]').fill(getCurrentMatchDateInput());
+  await page.locator('input[name="scheduledTime"]').fill("22:00");
+  await page.getByRole("combobox", { name: "Modalidad", exact: true }).selectOption("9v9");
+  for (const id of E2E_PLAYER_IDS) await page.locator(`input[name="playerIds"][value="${id}"]`).check();
+  for (let index = 1; index <= 8; index++) {
+    await page.getByRole("button", { name: "Agregar invitado", exact: true }).click();
+    await page.getByRole("textbox", { name: `Nombre del invitado ${index}`, exact: true }).fill(`E2E Historial Invitado ${index}`);
+    await page.getByRole("combobox", { name: `Nivel de E2E Historial Invitado ${index}`, exact: true }).selectOption("3");
+  }
+  await page.getByRole("button", { name: "Crear partido y generar equipos", exact: true }).click();
+  await expect(page).toHaveURL((url) => /^\/admin\/matches\/[0-9a-f-]{36}$/.test(url.pathname));
+  const unrecordedMatchId = new URL(page.url()).pathname.split("/").at(-1)!;
+  await page.getByRole("button", { name: "Confirmar esta opcion", exact: true }).first().click();
+  await expect(page).toHaveURL((url) => url.pathname === `/matches/${unrecordedMatchId}`);
+  await page.goto(`/admin/matches/${unrecordedMatchId}/result?org=${org}`);
+  await page.locator('input[name="scoreA"]').fill("1");
+  await page.locator('input[name="scoreB"]').fill("0");
+  await page.getByRole("button", { name: "Guardar resultado y finalizar", exact: true }).click();
+  await expect(page).toHaveURL((url) => url.pathname === "/admin/matches" && url.searchParams.has("success"));
+  await page.goto(`/admin/scorers?org=${org}`);
+  await expect(scorer.getByRole("cell", { name: "2 goles", exact: true })).toBeVisible();
+
+  await page.goto(`/admin/matches/${unrecordedMatchId}/result?org=${org}`);
+  await page.locator('input[name="scoreA"]').fill("0");
+  await page.getByRole("button", { name: "Guardar correccion", exact: true }).click();
+  await expect(page).toHaveURL((url) => url.pathname === "/admin/matches" && url.searchParams.has("success"));
+  await page.goto(`/admin/scorers?org=${org}`);
+  const scorerWithDraw = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: `${substituteName} 2 partidos computados`, exact: true }) });
+  await expect(scorerWithDraw.getByRole("cell", { name: "2 goles", exact: true })).toBeVisible();
+  await expect(page.getByText(/Los empates 0–0 también cuentan/)).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("scorers-history.png"), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 
