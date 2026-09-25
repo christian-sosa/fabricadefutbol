@@ -4,6 +4,7 @@ export type MatchWhatsAppShareParams = {
   matchUrl: string;
   teamAName?: string;
   teamBName?: string;
+  substitutes?: Array<{ name: string; team: "A" | "B" | null }>;
 };
 
 export type GroupWhatsAppShareParams = {
@@ -30,13 +31,15 @@ const WHATSAPP_SHARE_EMOJIS = {
 export function buildMatchWhatsAppMessage({
   matchUrl,
   teamAName = DEFAULT_TEAM_A_LABEL,
-  teamBName = DEFAULT_TEAM_B_LABEL
+  teamBName = DEFAULT_TEAM_B_LABEL,
+  substitutes = []
 }: MatchWhatsAppShareParams) {
   return [
     `${WHATSAPP_SHARE_EMOJIS.soccer} Partido confirmado`,
     "",
     `${WHATSAPP_SHARE_EMOJIS.fire} Equipos armados`,
     `${WHATSAPP_SHARE_EMOJIS.matchup} ${teamAName} vs ${teamBName}`,
+    ...(substitutes.length ? ["", "Suplentes:", ...substitutes.map((player) => `• ${player.name} (${player.team === "A" ? teamAName : player.team === "B" ? teamBName : "equipo por definir"})`)] : []),
     "",
     `${WHATSAPP_SHARE_EMOJIS.pointer} Ver jugadores y posiciones:`,
     matchUrl

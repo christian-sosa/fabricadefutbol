@@ -29,6 +29,38 @@ import { FORMATION_PRESETS, getFormationPositions } from "@/lib/domain/match-for
 import { MATCH_MODALITIES, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 
 describe("MatchDetailPage", () => {
+  it("muestra suplentes convocados en una sección separada con su equipo opcional", async () => {
+    getMatchDetailsMock.mockResolvedValueOnce({
+      match: { id: "match-bench", modality: "9v9", scheduled_at: "2026-09-25T20:00:00Z", status: "confirmed", team_a_label: "Rojo", team_b_label: "Azul" },
+      result: null, teamAPlayers: [], teamBPlayers: [],
+      substitutes: [
+        { id: "player-bench", full_name: "Leo suplente", current_rating: 1000, is_guest: false, team: "A" },
+        { id: "guest-bench", full_name: "Nico invitado", current_rating: 1000, is_guest: true, team: null }
+      ]
+    });
+    render(await MatchDetailPage({ params: Promise.resolve({ id: "match-bench" }), searchParams: Promise.resolve({}) }));
+    expect(screen.getByRole("region", { name: "Suplentes convocados" })).toHaveTextContent("Leo suplente");
+    expect(screen.getByRole("region", { name: "Suplentes convocados" })).toHaveTextContent("Rojo");
+    expect(screen.getByRole("region", { name: "Suplentes convocados" })).toHaveTextContent("Equipo por definir");
+  });
+
+  it("conserva visibles los jugadores extra del acta final cuando hay formación guardada", async () => {
+    const modality = "9v9";
+    const preset = FORMATION_PRESETS[modality][0];
+    const players = (side: string) => Array.from({ length: 9 }, (_, i) => ({ id: `${side}-${i}`, full_name: `${side} ${i}`, current_rating: 1000, is_guest: false }));
+    const teamAPlayers = players("Rojo"), teamBPlayers = players("Azul");
+    const formation = (pool: typeof teamAPlayers) => ({ formationId: preset, slots: getFormationPositions(preset).map((position, i) => ({ slotId: position.slotId, participantId: `player:${pool[i].id}` })) });
+    const formationData = { teamA: formation(teamAPlayers), teamB: formation(teamBPlayers) };
+    teamAPlayers.push({ id: "extra", full_name: "También participó", current_rating: 1000, is_guest: false });
+    getMatchDetailsMock.mockResolvedValueOnce({
+      match: { id: "match-final", modality, scheduled_at: "2026-09-25T20:00:00Z", status: "finished", formation_data: formationData, goalkeeper_player_ids: [] },
+      result: { score_a: 1, score_b: 0, winner_team: "A" }, teamAPlayers, teamBPlayers, substitutes: []
+    });
+    render(await MatchDetailPage({ params: Promise.resolve({ id: "match-final" }), searchParams: Promise.resolve({}) }));
+    expect(screen.getByRole("region", { name: "También jugaron" })).toHaveTextContent("También participó");
+    expect(screen.getAllByRole("img")).toHaveLength(19);
+  });
+
   it("vuelve al calendario conservando grupo, temporada y página del historial", async () => {
     const season = "00000000-0000-4000-8000-000000000001";
     getMatchDetailsMock.mockResolvedValueOnce({

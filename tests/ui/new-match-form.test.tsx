@@ -35,6 +35,46 @@ function getCheckbox(container: HTMLElement, name: string, value: string) {
 }
 
 describe("NewMatchForm", () => {
+  it("permite suplentes sin equipo, conserva todos los convocados y excluye suplentes del armado manual", async () => {
+    const user = userEvent.setup();
+    const players = buildPlayers(21);
+    const { container } = render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={players}
+      initialValues={{ modality: "10v10", playerIds: players.map((player) => player.id), goalkeeperPlayerIds: [], guests: [{ name: "Refuerzo", rating: 2 }] }} />);
+    const submit = screen.getByRole("button", { name: "Crear partido y generar equipos" });
+    expect(submit).toBeDisabled();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Rol de Jugador 21" }), "substitute");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Rol de Refuerzo" }), "B");
+    expect(submit).toBeEnabled();
+    expect(screen.getByRole("status")).toHaveTextContent("20 de 20 titulares. Más 2 suplentes");
+    expect(screen.getByRole("checkbox", { name: "Arquero Jugador 21" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Armar equipos yo mismo" }));
+    expect(screen.getByRole("button", { name: "Crear partido con equipos manuales" })).toBeEnabled();
+    const data = new FormData(container.querySelector("form")!);
+    expect(data.getAll("playerIds")).toHaveLength(21);
+    expect(JSON.parse(String(data.get("manualAssignmentsPayload")))).toHaveLength(20);
+    expect(JSON.parse(String(data.get("substituteAssignmentsPayload")))).toEqual([
+      { participantId: "player:player-21", team: null },
+      { participantId: "guest:1", team: "B" }
+    ]);
+    expect(screen.queryByRole("combobox", { name: "Equipo de Jugador 21" })).not.toBeInTheDocument();
+  });
+
+  it("precarga suplentes al repetir, limpia sus roles al desconvocar y no los ofrece en F7", async () => {
+    const user = userEvent.setup();
+    const players = buildPlayers(19);
+    const { container } = render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={players}
+      initialValues={{ modality: "9v9", playerIds: players.map((player) => player.id), goalkeeperPlayerIds: ["player-1", "player-2"], guests: [],
+        substituteAssignments: [{ participantId: "player:player-19", team: "A" }] }} />);
+    expect(screen.getByRole("combobox", { name: "Rol de Jugador 19" })).toHaveValue("A");
+    expect(screen.getByRole("combobox", { name: "Rol de Jugador 1" })).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 19" }));
+    expect(JSON.parse(String(new FormData(container.querySelector("form")!).get("substituteAssignmentsPayload")))).toEqual([]);
+    await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 19" }));
+    expect(screen.getByRole("combobox", { name: "Rol de Jugador 19" })).toHaveValue("starter");
+    await user.selectOptions(screen.getByLabelText("Modalidad"), "7v7");
+    expect(screen.queryByRole("combobox", { name: "Rol de Jugador 19" })).not.toBeInTheDocument();
+  });
+
   it("no crea el partido al presionar Enter en el buscador con la convocatoria completa", async () => {
     const user = userEvent.setup();
     const createAction = vi.mocked(createMatchFormAction);

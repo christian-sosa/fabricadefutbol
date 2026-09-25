@@ -7,7 +7,7 @@ import { z } from "zod";
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { assertOrganizationAdminAction, getOrganizationQueryKeyById } from "@/lib/auth/admin";
 import { MATCH_MODALITIES, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
-import { createDraftMatchWithOptions } from "@/lib/domain/match-workflow";
+import { createDraftMatchWithOptions, validateSubstituteAssignments } from "@/lib/domain/match-workflow";
 import { parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
 import { matchDateAndTimeToIso } from "@/lib/match-datetime";
 import { isNextRedirectError } from "@/lib/next-redirect";
@@ -17,6 +17,7 @@ import { withOrgQuery } from "@/lib/org";
 import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizeTeamLabel, TEAM_LABEL_MAX_LENGTH } from "@/lib/team-labels";
+import type { SubstituteAssignment } from "@/types/domain";
 
 const schema = z.object({
   organizationId: z.string().uuid(),
@@ -46,6 +47,24 @@ const manualAssignmentsSchema = z.array(
     team: z.enum(["A", "B"])
   })
 );
+
+const substituteAssignmentsSchema = z.array(z.object({
+  participantId: z.string().min(1),
+  team: z.enum(["A", "B"]).nullable()
+}));
+
+function parseSubstituteAssignments(formData: FormData): SubstituteAssignment[] {
+  const rawPayload = String(formData.get("substituteAssignmentsPayload") ?? "[]");
+  let payload: unknown;
+  try {
+    payload = JSON.parse(rawPayload);
+  } catch {
+    throw new Error("La convocatoria de suplentes es inválida.");
+  }
+  const parsed = substituteAssignmentsSchema.safeParse(payload);
+  if (!parsed.success) throw new Error("La convocatoria de suplentes es inválida.");
+  return parsed.data;
+}
 
 function withError(organizationId: string, error: string) {
   const basePath = withOrgQuery("/admin/matches/new", organizationId);
@@ -164,6 +183,16 @@ export async function createMatchAction(formData: FormData) {
     const invitedGuests = parseGuestsFromForm(formData);
     const creationMode = parseCreationMode(formData);
     const goalkeeperPlayerIds = parseGoalkeeperSelection(formData);
+    const substituteAssignments = parseSubstituteAssignments(formData);
+    const substitutesById = validateSubstituteAssignments({
+      modality: parsed.data.modality,
+      participantIds: [
+        ...parsed.data.playerIds.map((id) => `player:${id}`),
+        ...invitedGuests.map((guest) => `guest:${guest.key}`)
+      ],
+      assignments: substituteAssignments,
+      goalkeeperPlayerIds
+    });
 
     for (const goalkeeperId of goalkeeperPlayerIds) {
       if (!parsed.data.playerIds.includes(goalkeeperId)) {
@@ -172,12 +201,12 @@ export async function createMatchAction(formData: FormData) {
     }
 
     const expected = TEAM_SIZE_BY_MODALITY[parsed.data.modality] * 2;
-    const totalParticipants = parsed.data.playerIds.length + invitedGuests.length;
+    const totalParticipants = parsed.data.playerIds.length + invitedGuests.length - substitutesById.size;
     if (totalParticipants !== expected) {
       redirect(
         withError(
           organizationQueryKey,
-          `Para ${parsed.data.modality} debes convocar exactamente ${expected} jugadores en total. Actualmente hay ${totalParticipants}.`
+          `Para ${parsed.data.modality} debes convocar exactamente ${expected} titulares. Actualmente hay ${totalParticipants}.`
         )
       );
     }
@@ -188,14 +217,14 @@ export async function createMatchAction(formData: FormData) {
       const expectedParticipantIds = new Set<string>([
         ...parsed.data.playerIds.map((playerId) => `player:${playerId}`),
         ...invitedGuests.map((guest) => `guest:${guest.key}`)
-      ]);
+      ].filter((participantId) => !substitutesById.has(participantId)));
       const usedParticipantIds = new Set<string>();
       let teamACount = 0;
       let teamBCount = 0;
 
       for (const assignment of parsedAssignments) {
         if (!expectedParticipantIds.has(assignment.participantId)) {
-          throw new Error("El armado manual incluye participantes que no estan convocados.");
+          throw new Error("El armado manual debe incluir únicamente a los titulares convocados.");
         }
         if (usedParticipantIds.has(assignment.participantId)) {
           throw new Error("Hay participantes duplicados en el armado manual.");
@@ -206,7 +235,7 @@ export async function createMatchAction(formData: FormData) {
       }
 
       if (usedParticipantIds.size !== expectedParticipantIds.size) {
-        throw new Error("El armado manual debe incluir a todos los convocados exactamente una vez.");
+        throw new Error("El armado manual debe incluir a todos los titulares exactamente una vez.");
       }
 
       const expectedTeamSize = TEAM_SIZE_BY_MODALITY[parsed.data.modality];
@@ -242,6 +271,7 @@ export async function createMatchAction(formData: FormData) {
       invitedGuests,
       teamCreationMode: creationMode,
       manualTeamAssignments,
+      substituteAssignments,
       goalkeeperPlayerIds,
       teamALabel: creationMode === "manual" ? normalizeTeamLabel(parsed.data.teamALabel) : null,
       teamBLabel: creationMode === "manual" ? normalizeTeamLabel(parsed.data.teamBLabel) : null

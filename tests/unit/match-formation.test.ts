@@ -6,6 +6,13 @@ const players = (team: string, size: number): FormationPlayer[] => Array.from({ 
 const complete = (preset: string, team: FormationPlayer[]) => ({ formationId: preset, slots: getFormationPositions(preset).map((position, i) => ({ slotId: position.slotId, participantId: team[i].participantId })) });
 
 describe("match formation", () => {
+  it("permite elegir los nueve en cancha de un plantel con suplentes sin duplicar jugadores", () => {
+    const teams = { teamA: players("A", 10), teamB: players("B", 11) };
+    const formation = { teamA: complete("3-3-2", teams.teamA), teamB: complete("3-3-2", teams.teamB) };
+    expect(validateMatchFormation(formation, "9v9", teams)).toEqual(formation);
+    const duplicate = { ...teams, teamA: [...teams.teamA, teams.teamA[0]] };
+    expect(() => validateMatchFormation(formation, "9v9", duplicate)).toThrow("Los equipos cambiaron");
+  });
   it("supports the full modality catalog without introducing F8 or object prototype names", () => {
     expect(Object.keys(FORMATION_PRESETS)).toEqual(MATCH_MODALITIES);
     for (const modality of MATCH_MODALITIES) expect(supportsMatchFormation(modality)).toBe(true);

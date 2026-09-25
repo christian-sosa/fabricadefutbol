@@ -14,7 +14,7 @@ import {
 } from "@/lib/domain/skill-level";
 import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL } from "@/lib/team-labels";
 import { formatRendimiento } from "@/lib/utils";
-import type { MatchResultInput, TeamSide } from "@/types/domain";
+import type { MatchResultInput, MatchScorerInput, TeamSide } from "@/types/domain";
 
 type ExistingParticipant = {
   participantId: string;
@@ -22,6 +22,7 @@ type ExistingParticipant = {
   rating: number;
   source: "player" | "guest";
   initialTeam: TeamSide | "OUT";
+  isSubstitute?: boolean;
 };
 
 type ReplacementPlayerOption = {
@@ -54,6 +55,8 @@ type MatchResultEditorProps = {
   defaultScoreB: number;
   defaultMvpParticipantId?: string | null;
   defaultNotes?: string | null;
+  enableScorers?: boolean;
+  defaultScorers?: MatchScorerInput[];
   submitLabel: string;
   teamALabel?: string;
   teamBLabel?: string;
@@ -75,6 +78,8 @@ export function MatchResultEditor({
   defaultScoreB,
   defaultMvpParticipantId = null,
   defaultNotes,
+  enableScorers = false,
+  defaultScorers = [],
   submitLabel,
   teamALabel = DEFAULT_TEAM_A_LABEL,
   teamBLabel = DEFAULT_TEAM_B_LABEL
@@ -98,6 +103,9 @@ export function MatchResultEditor({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [incompleteGuestId, setIncompleteGuestId] = useState<number | null>(null);
+  const [scoreAValue, setScoreAValue] = useState(String(defaultScoreA));
+  const [scoreBValue, setScoreBValue] = useState(String(defaultScoreB));
+  const [scorerGoals, setScorerGoals] = useState<Record<string, string>>(() => Object.fromEntries(defaultScorers.map((scorer) => [scorer.participantId, String(scorer.goals)])));
   const formId = useId();
 
   const existingPlayerIds = useMemo(() => {
@@ -139,6 +147,23 @@ export function MatchResultEditor({
   );
 
   const validNewGuests = useMemo(() => newGuests.filter((guest) => isValidGuest(guest)), [newGuests]);
+  const scorerOptions = [
+    ...existingParticipants.map((participant) => ({ participantId: participant.participantId, name: participant.fullName, team: assignments[participant.participantId] ?? "OUT" })),
+    ...replacementPlayers.map((player) => ({ participantId: `player:${player.playerId}`, name: playersById.get(player.playerId)?.fullName ?? "Jugador", team: player.team })),
+    ...validNewGuests.map((guest) => ({ participantId: `newGuest:${guest.id}`, name: `${guest.name.trim()} (invitado)`, team: guest.team }))
+  ];
+  const scorers = scorerOptions.filter((participant) => Number(scorerGoals[participant.participantId]) > 0)
+    .map((participant) => ({ participantId: participant.participantId, goals: Number(scorerGoals[participant.participantId]) }));
+  const goalsForTeam = (team: TeamSide) => scorerOptions.filter((participant) => participant.team === team)
+    .reduce((total, participant) => total + (Number(scorerGoals[participant.participantId]) || 0), 0);
+  const scorerError = !enableScorers ? null : scorerOptions.some((participant) => {
+    const value = Number(scorerGoals[participant.participantId] || 0);
+    return !Number.isInteger(value) || value < 0 || value > 999;
+  }) ? "Los goles por jugador deben ser enteros entre 0 y 999."
+    : scorerOptions.some((participant) => participant.team === "OUT" && Number(scorerGoals[participant.participantId]) > 0)
+      ? "Un goleador no puede quedar sin jugar. Asignale un equipo o quitá sus goles."
+      : goalsForTeam("A") > Number(scoreAValue) || goalsForTeam("B") > Number(scoreBValue)
+        ? "Los goles asignados a jugadores no pueden superar el marcador de su equipo." : null;
   const mvpOptions = useMemo(() => {
     const existingOptions = existingParticipants
       .filter((participant) => assignments[participant.participantId] !== "OUT")
@@ -202,9 +227,9 @@ export function MatchResultEditor({
 
   useEffect(() => {
     if (!handicapEnabled) return;
-    if (teamACount === teamBCount) return;
+    if (enableScorers || teamACount === teamBCount) return;
     setHandicapTeam(teamACount < teamBCount ? "A" : "B");
-  }, [handicapEnabled, teamACount, teamBCount]);
+  }, [enableScorers, handicapEnabled, teamACount, teamBCount]);
 
   useEffect(() => {
     setAbsencePenalties((current) => {
@@ -262,6 +287,12 @@ export function MatchResultEditor({
       row?.querySelector<HTMLElement>(`[data-guest-field="${field}"]`)?.focus();
       return;
     }
+    if (scorerError) {
+      event.preventDefault();
+      setSubmitError(scorerError);
+      event.currentTarget.querySelector<HTMLDetailsElement>("[data-scorers]")?.setAttribute("open", "");
+      return;
+    }
     if (!onSubmit) return;
     event.preventDefault();
     setSubmitError(null);
@@ -284,6 +315,7 @@ export function MatchResultEditor({
         scoreB,
         notes,
         mvpParticipantId: selectedMvpParticipantId || null,
+        ...(enableScorers ? { scorers } : {}),
         lineup: {
           assignments: existingParticipants.map((participant) => ({
             participantId: participant.participantId,
@@ -316,6 +348,7 @@ export function MatchResultEditor({
       <input name="expectedVersion" type="hidden" value={expectedVersion} />
       <input name="lineupPayload" type="hidden" value={lineupPayload} />
       <input name="mvpParticipantId" type="hidden" value={selectedMvpParticipantId} />
+      {enableScorers ? <input name="scorersPayload" type="hidden" value={JSON.stringify(scorers)} /> : null}
 
       <section className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -350,13 +383,13 @@ export function MatchResultEditor({
           <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="scoreA">
             Goles de {teamALabel}
           </label>
-          <Input defaultValue={defaultScoreA} id="scoreA" min={0} name="scoreA" required type="number" />
+          <Input value={scoreAValue} onChange={(event) => setScoreAValue(event.target.value)} id="scoreA" min={0} step={1} name="scoreA" required type="number" />
         </div>
         <div>
           <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="scoreB">
             Goles de {teamBLabel}
           </label>
-          <Input defaultValue={defaultScoreB} id="scoreB" min={0} name="scoreB" required type="number" />
+          <Input value={scoreBValue} onChange={(event) => setScoreBValue(event.target.value)} id="scoreB" min={0} step={1} name="scoreB" required type="number" />
         </div>
         <div className="md:col-span-2">
           <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor={`${formId}-notes`}>Notas opcionales</label>
@@ -392,12 +425,12 @@ export function MatchResultEditor({
         </p>
       </div>
 
-      <details className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+      <details open={existingParticipants.some((participant) => participant.isSubstitute) ? true : undefined} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
         <summary className="flex cursor-pointer list-none flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span>
             <span className="block text-sm font-semibold text-slate-100">Formacion final</span>
             <span className="mt-1 block text-xs text-slate-400">
-              Cambia equipos, marca quien no asistio y aplica penalizacion solo si corresponde. {teamALabel}: {teamACount} | {teamBLabel}: {teamBCount}
+              {enableScorers ? "Asigná a cada suplente el equipo en el que jugó. Quienes no jugaron no reciben puntos por el resultado." : "Cambia equipos, marca quien no asistio y aplica penalizacion solo si corresponde."} {teamALabel}: {teamACount} | {teamBLabel}: {teamBCount}
             </span>
           </span>
           <span className="inline-flex w-fit items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-100">
@@ -405,13 +438,14 @@ export function MatchResultEditor({
           </span>
         </summary>
         <div className="mt-3 space-y-2">
-          {existingParticipants.map((participant) => (
+          {[...existingParticipants].sort((a, b) => Number(Boolean(b.isSubstitute)) - Number(Boolean(a.isSubstitute))).map((participant) => (
             <div
               className="grid gap-2 rounded-lg border border-slate-800 bg-slate-900/80 p-2 lg:grid-cols-[minmax(0,1fr)_180px_minmax(190px,auto)]"
               key={participant.participantId}
             >
               <div className="min-w-0 break-words text-sm text-slate-200">
                 {participant.fullName}
+                {participant.isSubstitute ? <span className="ml-2 rounded-full bg-amber-400/10 px-2 py-0.5 text-xs font-semibold text-amber-200">Suplente</span> : null}
                 <span className="ml-2 text-xs text-slate-400">
                   {participant.source === "guest" ? "Invitado" : `Rendimiento ${formatRendimiento(participant.rating)}`}
                 </span>
@@ -459,6 +493,28 @@ export function MatchResultEditor({
           ))}
         </div>
       </details>
+
+      {enableScorers ? (
+        <details data-scorers className="rounded-xl border border-emerald-400/20 bg-slate-950/60 p-4" open={defaultScorers.length ? true : undefined}>
+          <summary className="cursor-pointer text-sm font-semibold text-slate-100">Goleadores <span className="ml-2 text-xs font-normal text-slate-400">Opcional · sólo administradores</span></summary>
+          <p className="mt-2 text-xs leading-relaxed text-slate-400">Anotá cuántos goles hizo cada jugador. Podés dejar goles sin autor; no suman puntos ni se muestran en estadísticas públicas.</p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {(["A", "B"] as const).map((team) => <section key={team} className="rounded-xl border border-slate-800 p-3">
+              <h3 className="text-sm font-bold text-slate-100">{team === "A" ? teamALabel : teamBLabel}</h3>
+              <p className="mt-1 text-xs text-slate-400">{goalsForTeam(team)} de {team === "A" ? scoreAValue || "0" : scoreBValue || "0"} goles asignados</p>
+              <div className="mt-3 space-y-2">{scorerOptions.filter((participant) => participant.team === team).map((participant) => <label key={participant.participantId} className="flex items-center justify-between gap-3 text-sm text-slate-200">
+                <span className="min-w-0 break-words">{participant.name}</span>
+                <Input aria-label={`Goles de ${participant.name}`} className="w-20 shrink-0" type="number" min={0} max={999} step={1} inputMode="numeric" value={scorerGoals[participant.participantId] ?? ""} placeholder="0" onChange={(event) => setScorerGoals((current) => ({ ...current, [participant.participantId]: event.target.value }))} />
+              </label>)}</div>
+            </section>)}
+          </div>
+          {scorerOptions.filter((participant) => participant.team === "OUT" && Number(scorerGoals[participant.participantId]) > 0).map((participant) => <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-amber-200" key={participant.participantId}>
+            <span>{participant.name} tiene goles cargados pero figura sin jugar.</span>
+            <Button type="button" variant="ghost" onClick={() => setScorerGoals((current) => ({ ...current, [participant.participantId]: "0" }))}>Quitar goles de {participant.name}</Button>
+          </div>)}
+          {scorerError ? <p className="mt-3 text-sm text-amber-200" role="status">{scorerError}</p> : null}
+        </details>
+      ) : null}
 
       <details className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
         <summary className="flex cursor-pointer list-none flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

@@ -135,4 +135,31 @@ describe("admin new match actions", () => {
     expect(String(redirectedTo)).not.toContain("/admin/matches");
     expect(refreshOrganizationPublicSnapshotSafeMock).toHaveBeenCalledWith(ORGANIZATION_ID);
   });
+
+  it("crea F10 manual con suplente sin equipo y conserva exactamente diez titulares por lado", async () => {
+    const players = buildPlayers(21);
+    const fake = createFakeSupabase({ players });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    const form = buildManualMatchForm(players.slice(0, 20).map((player) => player.id), "10v10");
+    form.append("playerIds", players[20].id);
+    form.set("substituteAssignmentsPayload", JSON.stringify([{ participantId: `player:${players[20].id}`, team: null }]));
+    await expect(createMatchAction(form)).rejects.toMatchObject({ digest: expect.stringContaining("NEXT_REDIRECT") });
+    expect(fake.table("matches")[0]?.status).toBe("confirmed");
+    expect(fake.table("team_option_players")).toHaveLength(20);
+    expect(fake.table("match_players").find((row) => row.player_id === players[20].id)).toMatchObject({ is_substitute: true, substitute_team: null });
+    expect(redirectMock.mock.calls.at(-1)?.[0]).toContain(`/matches/${fake.table("matches")[0].id}`);
+  });
+
+  it.each([
+    { payload: "{malformed", message: "inválida" },
+    { payload: JSON.stringify([{ participantId: "player:outside", team: null }]), message: "formar parte" },
+    { payload: JSON.stringify([{ participantId: "player:00000000-0000-4000-8000-000000000101", team: "C" }]), message: "inválida" }
+  ])("valida suplentes manipulados sin crear partidos: $message", async ({ payload, message }) => {
+    const form = buildManualMatchForm(buildPlayers(20).map((player) => player.id), "10v10");
+    form.set("substituteAssignmentsPayload", payload);
+    await expect(createMatchAction(form)).rejects.toMatchObject({ digest: expect.stringContaining("NEXT_REDIRECT") });
+    const url = new URL(String(redirectMock.mock.calls.at(-1)?.[0]), "http://localhost");
+    expect(url.searchParams.get("error")).toContain(message);
+    expect(createSupabaseServerClientMock).not.toHaveBeenCalled();
+  });
 });

@@ -3,19 +3,21 @@
 import { Button } from "@/components/ui/button";
 import { trackAnalyticsEvent } from "@/lib/analytics/client";
 import { GROWTH_EVENTS } from "@/lib/growth";
-import { buildWhatsAppShareUrl, getWhatsAppShareTarget } from "@/lib/share";
+import { buildWhatsAppShareUrl, getWhatsAppShareTarget, type MatchWhatsAppShareParams } from "@/lib/share";
 
 type WhatsAppShareButtonProps = {
   matchUrl: string;
   teamAName?: string;
   teamBName?: string;
   className?: string;
+  substitutes?: MatchWhatsAppShareParams["substitutes"];
 };
 
 export function WhatsAppShareButton({
   matchUrl,
   teamAName,
   teamBName,
+  substitutes,
   className
 }: WhatsAppShareButtonProps) {
   const handleClick = () => {
@@ -27,7 +29,8 @@ export function WhatsAppShareButton({
         {
           matchUrl,
           teamAName,
-          teamBName
+          teamBName,
+          substitutes
         },
         target
       ),

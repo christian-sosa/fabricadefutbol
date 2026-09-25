@@ -30,6 +30,67 @@ function buildPlayers(count: number, organizationId = ORG_ID) {
 }
 
 describe("match workflow", () => {
+  it.each(["9v9", "10v10", "11v11"] as const)("conserva suplentes de %s fuera del balance al crear y regenerar", async (modality) => {
+    const starterCount = Number(modality.split("v")[0]) * 2;
+    const players = buildPlayers(starterCount + 1);
+    const fake = createFakeSupabase({ players });
+    const substituteId = players.at(-1)!.id;
+    const matchId = await createDraftMatchWithOptions({
+      supabase: fake.client as never, adminId: ADMIN_ID, organizationId: ORG_ID,
+      scheduledAt: SCHEDULED_AT, modality, selectedPlayerIds: players.map((player) => player.id),
+      invitedGuests: [{ key: "bench", name: "Refuerzo", rating: 2 }],
+      substituteAssignments: [
+        { participantId: `player:${substituteId}`, team: null },
+        { participantId: "guest:bench", team: "B" }
+      ]
+    });
+    expect(fake.find("match_players", (row) => row.player_id === substituteId)).toMatchObject({ is_substitute: true, substitute_team: null });
+    expect(fake.table("match_guests")[0]).toMatchObject({ is_substitute: true, substitute_team: "B" });
+    const verifyOptions = () => {
+      expect(fake.table("team_option_guests")).toHaveLength(0);
+      expect(fake.table("team_options")).toHaveLength(3);
+      for (const option of fake.table("team_options")) {
+        const roster = fake.table("team_option_players").filter((row) => row.team_option_id === option.id);
+        expect(roster).toHaveLength(starterCount);
+        expect(roster.some((row) => row.player_id === substituteId)).toBe(false);
+        expect(roster.filter((row) => row.team === "A")).toHaveLength(starterCount / 2);
+      }
+    };
+    verifyOptions();
+    await regenerateDraftTeamOptions({ supabase: fake.client as never, adminId: ADMIN_ID, organizationId: ORG_ID, matchId });
+    verifyOptions();
+  });
+
+  it.each([
+    { modality: "5v5" as const, assignments: [{ participantId: "player:player-11", team: null }], goalkeepers: [], message: "únicamente en F9" },
+    { modality: "9v9" as const, assignments: [{ participantId: "player:unknown", team: null }], goalkeepers: [], message: "formar parte" },
+    { modality: "9v9" as const, assignments: [{ participantId: "player:player-1", team: null }, { participantId: "player:player-1", team: null }], goalkeepers: [], message: "duplicados" },
+    { modality: "9v9" as const, assignments: [{ participantId: "player:player-1", team: null }], goalkeepers: ["player-1", "player-2"], message: "arqueros titulares" }
+  ])("rechaza suplentes inválidos antes de crear registros: $message", async ({ modality, assignments, goalkeepers, message }) => {
+    const players = buildPlayers(19);
+    const fake = createFakeSupabase({ players });
+    await expect(createDraftMatchWithOptions({
+      supabase: fake.client as never, adminId: ADMIN_ID, organizationId: ORG_ID,
+      scheduledAt: SCHEDULED_AT, modality, selectedPlayerIds: players.map((player) => player.id), invitedGuests: [],
+      substituteAssignments: assignments, goalkeeperPlayerIds: goalkeepers
+    })).rejects.toThrow(message);
+    expect(fake.table("matches")).toHaveLength(0);
+  });
+
+  it("confirma equipos manuales de F10 con suplentes aparte", async () => {
+    const players = buildPlayers(21);
+    const fake = createFakeSupabase({ players });
+    const matchId = await createDraftMatchWithOptions({
+      supabase: fake.client as never, adminId: ADMIN_ID, organizationId: ORG_ID,
+      scheduledAt: SCHEDULED_AT, modality: "10v10", selectedPlayerIds: players.map((player) => player.id), invitedGuests: [],
+      substituteAssignments: [{ participantId: "player:player-21", team: "A" }], teamCreationMode: "manual",
+      manualTeamAssignments: players.slice(0, 20).map((player, index) => ({ participantId: `player:${player.id}`, team: index < 10 ? "A" : "B" }))
+    });
+    expect(fake.find("matches", (row) => row.id === matchId)?.status).toBe("confirmed");
+    expect(fake.table("team_option_players")).toHaveLength(20);
+    expect(fake.table("match_players")).toHaveLength(21);
+  });
+
   it("crea un partido draft automatico con opciones y respeta arqueros separados", async () => {
     const players = buildPlayers(10);
     const fake = createFakeSupabase({

@@ -5,6 +5,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/utils";
 import { requireAdminSession } from "@/lib/auth/admin";
 import { getSuperAdminDashboardMetrics } from "@/lib/queries/admin";
+import { withOrgQuery } from "@/lib/org";
 
 function metricNumber(value: number) {
   return new Intl.NumberFormat("es-AR").format(value);
@@ -28,18 +29,22 @@ export default async function SuperAdminDashboardPage() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400">Analitica global</p>
-        <CardTitle className="mt-2">Dashboard de super admin</CardTitle>
+      <Card className="rounded-2xl border-emerald-400/20 bg-gradient-to-br from-emerald-500/10 to-slate-900 p-5 sm:p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400">Vista global</p>
+        <h1 className="mt-2 text-3xl font-black tracking-tight text-white">Panel de super admin</h1>
         <CardDescription className="mt-1">
-          Foto general del sistema en tiempo real. Ultima actualizacion: {formatDateTime(metrics.generatedAt)}.
+          La actividad de Fábrica de Fútbol, en un solo lugar. Actualizado: {formatDateTime(metrics.generatedAt)}.
         </CardDescription>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Link className="inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground" href="/admin?view=groups">
+            Administrar grupos
+          </Link>
+          <a className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-800" href="#grupos-con-actividad">Ver grupos con más jugadores</a>
           <Link
-            className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-800"
             href="/api/admin/super-metrics/export"
           >
-            Exportar metricas (CSV)
+            Exportar métricas (CSV)
           </Link>
         </div>
       </Card>
@@ -123,49 +128,30 @@ export default async function SuperAdminDashboardPage() {
         </> : <CardDescription className="mt-2">La medición de referencias no está disponible. Los datos de actividad de grupos siguen calculándose desde partidos.</CardDescription>}
       </Card>
 
-      <Card>
-        <CardTitle>Top grupos (por cantidad de jugadores)</CardTitle>
-        <CardDescription className="mt-1">
-          Ranking operativo para detectar donde hay mas carga de uso y administracion.
-        </CardDescription>
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-left text-sm text-slate-100">
-            <thead className="bg-slate-800/80 text-slate-300">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Grupo</th>
-                <th className="px-4 py-3 font-semibold">Jugadores</th>
-                <th className="px-4 py-3 font-semibold">Activos</th>
-                <th className="px-4 py-3 font-semibold">Partidos</th>
-                <th className="px-4 py-3 font-semibold">Finalizados</th>
-                <th className="px-4 py-3 font-semibold">Admins</th>
-                <th className="px-4 py-3 font-semibold">Invites pendientes</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {metrics.topOrganizations.map((organization) => (
-                <tr key={organization.id}>
-                  <td className="px-4 py-3">
-                    <p className="font-semibold">{organization.name}</p>
-                    <p className="text-xs text-slate-400">{organization.slug}</p>
-                  </td>
-                  <td className="px-4 py-3">{metricNumber(organization.players)}</td>
-                  <td className="px-4 py-3">{metricNumber(organization.activePlayers)}</td>
-                  <td className="px-4 py-3">{metricNumber(organization.matches)}</td>
-                  <td className="px-4 py-3">{metricNumber(organization.finishedMatches)}</td>
-                  <td className="px-4 py-3">{metricNumber(organization.admins)}</td>
-                  <td className="px-4 py-3">{metricNumber(organization.pendingInvites)}</td>
-                </tr>
-              ))}
-              {!metrics.topOrganizations.length ? (
-                <tr>
-                  <td className="px-4 py-4 text-slate-400" colSpan={7}>
-                    No hay grupos cargados.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+      <Card className="scroll-mt-6 rounded-2xl p-5 sm:p-6" id="grupos-con-actividad">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div><CardTitle>Grupos con más jugadores</CardTitle>
+            <CardDescription className="mt-1">Una vista por grupo para encontrar dónde hay más actividad.</CardDescription>
+          </div>
+          <Link className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-300 hover:underline" href="/admin?view=groups">Buscar entre todos los grupos →</Link>
         </div>
+        <ul className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {metrics.topOrganizations.map((organization, index) => (
+            <li className="min-w-0 rounded-2xl border border-slate-700/80 bg-slate-950/50 p-5" key={organization.id}>
+              <div className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-sm font-bold text-slate-400">{index + 1}</span>
+                <div className="min-w-0"><h3 className="break-words font-bold text-white">{organization.name}</h3><p className="mt-1 break-all text-xs text-slate-500">{organization.slug}</p></div>
+              </div>
+              <dl className="mt-5 grid grid-cols-2 gap-4">
+                <div><dt className="text-xs text-slate-400">Jugadores</dt><dd className="mt-1 text-2xl font-bold text-white">{metricNumber(organization.players)}</dd><dd className="text-xs text-slate-500">{metricNumber(organization.activePlayers)} activos</dd></div>
+                <div><dt className="text-xs text-slate-400">Partidos</dt><dd className="mt-1 text-2xl font-bold text-white">{metricNumber(organization.matches)}</dd><dd className="text-xs text-slate-500">{metricNumber(organization.finishedMatches)} finalizados</dd></div>
+              </dl>
+              <p className="mt-4 border-t border-slate-800 pt-3 text-xs text-slate-400">{metricNumber(organization.admins)} admins · {metricNumber(organization.pendingInvites)} invitaciones pendientes</p>
+              <Link aria-label={`Administrar ${organization.name}`} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery("/admin", organization.slug)}>Administrar grupo →</Link>
+            </li>
+          ))}
+        </ul>
+        {!metrics.topOrganizations.length ? <p className="mt-4 text-sm text-slate-400">No hay grupos cargados.</p> : null}
       </Card>
 
       <Card>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { MatchResultEditor } from "@/components/admin/match-result-editor";
 import { useUpdateMatchResultMutation } from "@/lib/query/hooks";
-import type { TeamSide } from "@/types/domain";
+import type { MatchScorerInput, TeamSide } from "@/types/domain";
 
 type ExistingParticipant = {
   participantId: string;
@@ -13,6 +13,7 @@ type ExistingParticipant = {
   rating: number;
   source: "player" | "guest";
   initialTeam: TeamSide | "OUT";
+  isSubstitute?: boolean;
 };
 
 type ReplacementPlayerOption = {
@@ -33,6 +34,8 @@ type MatchResultEditorQueryProps = {
   defaultScoreB: number;
   defaultMvpParticipantId?: string | null;
   defaultNotes?: string | null;
+  enableScorers?: boolean;
+  defaultScorers?: MatchScorerInput[];
   submitLabel: string;
   successRedirectHref?: string;
   teamALabel?: string;

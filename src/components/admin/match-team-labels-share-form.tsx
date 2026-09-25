@@ -10,7 +10,7 @@ import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { formActionResult } from "@/lib/form-action-result";
 import { trackAnalyticsEvent } from "@/lib/analytics/client";
 import { GROWTH_EVENTS } from "@/lib/growth";
-import { buildWhatsAppShareUrl, getWhatsAppShareTarget } from "@/lib/share";
+import { buildWhatsAppShareUrl, getWhatsAppShareTarget, type MatchWhatsAppShareParams } from "@/lib/share";
 import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL, normalizeTeamLabel, TEAM_LABEL_MAX_LENGTH } from "@/lib/team-labels";
 
 type MatchTeamLabelsShareFormProps = {
@@ -19,13 +19,15 @@ type MatchTeamLabelsShareFormProps = {
   initialTeamALabel: string | null;
   initialTeamBLabel: string | null;
   matchUrl: string;
+  substitutes?: MatchWhatsAppShareParams["substitutes"];
 };
 
 function MatchTeamLabelsFields({
   canShare,
   initialTeamALabel,
   initialTeamBLabel,
-  matchUrl
+  matchUrl,
+  substitutes
 }: Omit<MatchTeamLabelsShareFormProps, "action">) {
   const { pending } = useFormStatus();
   const [teamALabel, setTeamALabel] = useState(initialTeamALabel ?? "");
@@ -46,7 +48,8 @@ function MatchTeamLabelsFields({
         {
           matchUrl,
           teamAName: savedTeamA,
-          teamBName: savedTeamB
+          teamBName: savedTeamB,
+          substitutes
         },
         target
       ),

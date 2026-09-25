@@ -23,6 +23,8 @@ import { matchIsoToDateInput, matchIsoToTimeInput } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getAdminMatchDetails } from "@/lib/queries/admin";
+import { getAdminMatchSubstitutes } from "@/lib/queries/admin-match-extras";
+import { supportsMatchExtras } from "@/lib/domain/match-scorers";
 import { resolveMatchTeamLabels } from "@/lib/team-labels";
 
 export default async function AdminMatchDetailPage({
@@ -42,6 +44,7 @@ export default async function AdminMatchDetailPage({
   }
   const details = await getAdminMatchDetails(id, selectedOrganization.id);
   if (!details) notFound();
+  const substitutes = supportsMatchExtras(details.match.modality) ? await getAdminMatchSubstitutes(id, selectedOrganization.id) : [];
 
   const confirmAction = confirmOptionAction.bind(null, id, selectedOrganization.id);
   const regenerateAction = regenerateOptionsAction.bind(null, id, selectedOrganization.id);
@@ -98,6 +101,7 @@ export default async function AdminMatchDetailPage({
             initialTeamALabel={details.match.team_a_label}
             initialTeamBLabel={details.match.team_b_label}
             matchUrl={publicMatchUrl}
+            substitutes={substitutes.map((player) => ({ name: player.fullName, team: player.initialTeam === "OUT" ? null : player.initialTeam }))}
           />
         </Card>
       ) : null}
@@ -138,6 +142,15 @@ export default async function AdminMatchDetailPage({
           teamALabel: teamLabels.teamA, teamBLabel: teamLabels.teamB, teamA: option.teamA, teamB: option.teamB
         }))} />
       </Card>
+
+      {substitutes.length ? <Card>
+        <CardTitle>Banco de suplentes</CardTitle>
+        <CardDescription>Al cargar el resultado, confirmá en qué equipo jugó cada suplente para que reciba sus puntos.</CardDescription>
+        <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{substitutes.map((participant) => <li className="flex items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-950/50 p-3" key={participant.participantId}>
+          <span className="min-w-0 break-words text-sm font-semibold">{participant.fullName}</span>
+          <span className="shrink-0 rounded-full bg-amber-400/10 px-2 py-1 text-xs text-amber-200">{participant.initialTeam === "A" ? teamLabels.teamA : participant.initialTeam === "B" ? teamLabels.teamB : "Sin equipo"}</span>
+        </li>)}</ul>
+      </Card> : null}
 
       <details className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
         <summary className="flex min-h-11 cursor-pointer items-center font-semibold">Editar fecha y cancha</summary>

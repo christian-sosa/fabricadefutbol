@@ -3,6 +3,7 @@ import Link from "next/link";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { MatchDateTime } from "@/components/matches/match-date-time";
+import { MatchSubstitutesList } from "@/components/matches/match-substitutes-list";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { buildMatchHistoryHref, parseMatchHistorySeason } from "@/lib/match-history-navigation";
@@ -103,6 +104,7 @@ export default async function UpcomingPage({
                     </ul>
                   </div>
                 </div>
+                <MatchSubstitutesList players={item.substitutes ?? []} teamLabels={teamLabels} />
                 </details>
                 <Link
                   className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-300 hover:underline"

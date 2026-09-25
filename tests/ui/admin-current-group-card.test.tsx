@@ -45,7 +45,7 @@ describe("AdminCurrentGroupCard", () => {
     expect(screen.getByText("La Banda")).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: /La Banda/ })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Super Admin" })).toHaveAttribute("href", "/admin/super");
-    expect(screen.getByRole("link", { name: "Cambiar espacio" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("link", { name: "Cambiar grupo" })).toHaveAttribute("href", "/admin?view=groups");
     expect(screen.queryByRole("button", { name: "Cerrar sesion" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Nuevo grupo" })).not.toBeInTheDocument();
   });

@@ -12,6 +12,8 @@ import { ActionForm } from "@/components/ui/action-form";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { TrackedLink } from "@/components/analytics/tracked-link";
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
+import { AdminGroupDirectory } from "@/components/admin/admin-group-directory";
+import { AdminMatchOverview } from "@/components/admin/admin-match-overview";
 import { GroupActivityValueCard } from "@/components/admin/group-activity-value-card";
 import { OrganizationImage } from "@/components/groups/organization-image";
 import { Button } from "@/components/ui/button";
@@ -41,7 +43,6 @@ type OrganizationEntry = {
 };
 
 type OrganizationSeasonEntry = Awaited<ReturnType<typeof getOrganizationSeasons>>[number];
-const enterGroupLinkClass = "inline-flex min-h-11 items-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground";
 
 function findOrganizationByKey(organizations: OrganizationEntry[], organizationKey?: string | null) {
   if (!organizationKey) return null;
@@ -226,28 +227,36 @@ function AdminOnboardingCard({
 export default async function AdminDashboardPage({
   searchParams
 }: {
-  searchParams: Promise<{ org?: string; error?: string; checkout?: string; success?: string; modality?: string }>;
+  searchParams: Promise<{ org?: string; view?: string; error?: string; checkout?: string; success?: string; modality?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
+  const showGroupsDirectory = resolvedSearchParams.view === "groups";
   const { admin, organizations } = await getAdminOrganizationContext(resolvedSearchParams.org);
 
   const [creationAccess, archivedOrganizations] = await Promise.all([
     getAdminOrganizationCreationAccess(admin),
     getArchivedAdminOrganizations(admin)
   ]);
-  if (!resolvedSearchParams.org && organizations.length === 1 && !archivedOrganizations.length) {
+  if (!showGroupsDirectory && !resolvedSearchParams.org && organizations.length === 1 && !archivedOrganizations.length) {
     redirect(withOrgQuery("/admin", organizations[0].slug));
   }
   const selectedOrganization = resolvedSearchParams.org
     ? findOrganizationByKey(organizations, resolvedSearchParams.org)
-    : organizations.length === 1 ? organizations[0] : null;
-  if (!selectedOrganization) {
+    : !showGroupsDirectory && organizations.length === 1 ? organizations[0] : null;
+  if (showGroupsDirectory || !selectedOrganization) {
     const newOrganizationId = randomUUID();
     return <div className="space-y-4">
       <AdminFeedback error={resolvedSearchParams.error} success={resolvedSearchParams.success} />
-      <Card><CardTitle>{organizations.length ? "Tus grupos" : "Creá tu primer grupo"}</CardTitle>
-        <CardDescription className="mt-2">Empezá por el nombre. Después podés pegar la lista de jugadores y armar el primer partido.</CardDescription>
-        {organizations.length ? <div className="mt-4 space-y-3">{organizations.map((organization) => <Link className={enterGroupLinkClass} href={withOrgQuery("/admin", organization.slug)} key={organization.id}>{organization.name}</Link>)}</div> :
+      <Card className="rounded-2xl p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Tu espacio de trabajo</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-white">{organizations.length ? "Tus grupos" : "Creá tu primer grupo"}</h1>
+            <CardDescription className="mt-2 max-w-2xl">{organizations.length ? "Elegí el grupo que querés administrar. Cada uno tiene sus jugadores, partidos e historial." : "Empezá por el nombre. Después podés pegar la lista de jugadores y armar el primer partido."}</CardDescription>
+          </div>
+          {organizations.length && creationAccess.canCreateOrganization ? <Link className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-200" href="/admin/new">+ Nuevo grupo</Link> : null}
+        </div>
+        {organizations.length ? <div className="mt-6"><AdminGroupDirectory organizations={organizations} /></div> :
           <ActionForm action={createOrganizationFormAction} className="mt-4 flex flex-col gap-3 sm:flex-row">
             <input name="organizationId" type="hidden" value={newOrganizationId} />
             <Input aria-label="Nombre del grupo" name="name" placeholder="Nombre del grupo" required />
@@ -277,13 +286,19 @@ export default async function AdminDashboardPage({
         success={resolvedSearchParams.success}
       />
 
-      <AdminCurrentGroupCard admin={admin} organization={selectedOrganization} />
+      <AdminCurrentGroupCard admin={admin} organization={selectedOrganization} titleAs="h1" />
 
       <AdminOnboardingCard
         canWrite={canWriteSelectedOrganization}
         dashboardData={dashboardData}
         organizationSlug={selectedOrganization.slug}
         modality={resolvedSearchParams.modality ?? dashboardData.latestMatches[0]?.modality}
+      />
+
+      <AdminMatchOverview
+        canWrite={canWriteSelectedOrganization}
+        matches={dashboardData.latestMatches}
+        organizationSlug={selectedOrganization.slug}
       />
 
       <GroupActivityValueCard
@@ -332,9 +347,10 @@ export default async function AdminDashboardPage({
       </details>
 
       {admin.isSuperAdmin ? (
-        <Card>
-          <CardTitle>Archivar grupo</CardTitle>
-          <CardDescription className="mt-1 text-slate-200">
+        <details className="rounded-2xl border border-slate-800 p-4">
+          <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-slate-400">Administración avanzada</summary>
+          <CardTitle className="mt-4">Archivar grupo</CardTitle>
+          <CardDescription className="mt-1">
             Ocultá el grupo y pausá su administración conservando jugadores, fotos e historial. Podés restaurarlo desde los grupos archivados.
           </CardDescription>
           <form action={archiveOrganizationAction} className="mt-4">
@@ -345,7 +361,7 @@ export default async function AdminDashboardPage({
               variant="secondary"
             />
           </form>
-        </Card>
+        </details>
       ) : null}
       <ArchivedGroups organizations={archivedOrganizations} />
     </div>

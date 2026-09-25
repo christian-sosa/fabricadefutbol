@@ -293,18 +293,24 @@ export type Database = {
       };
       match_players: {
         Row: {
+          is_substitute: boolean;
+          substitute_team: "A" | "B" | null;
           created_at: string;
           id: string;
           match_id: string;
           player_id: string;
         };
         Insert: {
+          is_substitute?: boolean;
+          substitute_team?: "A" | "B" | null;
           created_at?: string;
           id?: string;
           match_id: string;
           player_id: string;
         };
         Update: {
+          is_substitute?: boolean;
+          substitute_team?: "A" | "B" | null;
           created_at?: string;
           id?: string;
           match_id?: string;
@@ -314,6 +320,8 @@ export type Database = {
       };
       match_guests: {
         Row: {
+          is_substitute: boolean;
+          substitute_team: "A" | "B" | null;
           created_at: string;
           guest_name: string;
           guest_rating: number;
@@ -321,6 +329,8 @@ export type Database = {
           match_id: string;
         };
         Insert: {
+          is_substitute?: boolean;
+          substitute_team?: "A" | "B" | null;
           created_at?: string;
           guest_name: string;
           guest_rating: number;
@@ -328,11 +338,49 @@ export type Database = {
           match_id: string;
         };
         Update: {
+          is_substitute?: boolean;
+          substitute_team?: "A" | "B" | null;
           created_at?: string;
           guest_name?: string;
           guest_rating?: number;
           id?: string;
           match_id?: string;
+        };
+        Relationships: [];
+      };
+      match_goal_scorers: {
+        Row: {
+          id: string;
+          created_at: string;
+          match_id: string;
+          participant_id: string;
+          player_id: string | null;
+          guest_id: string | null;
+          team: "A" | "B";
+          goals: number;
+          display_name: string;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          match_id: string;
+          participant_id: string;
+          player_id: string | null;
+          guest_id: string | null;
+          team: "A" | "B";
+          goals: number;
+          display_name: string;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          match_id?: string;
+          participant_id?: string;
+          player_id?: string | null;
+          guest_id?: string | null;
+          team?: "A" | "B";
+          goals?: number;
+          display_name?: string;
         };
         Relationships: [];
       };

@@ -978,6 +978,36 @@ describe("resolvePublicOrganization", () => {
     expect(details?.teamBPlayers.map((player) => player.full_name)).toEqual(["Defensor"]);
   });
 
+  it.each(["9v9", "10v10", "11v11"] as const)("muestra banco %s sin duplicar ni quitar suplentes que ya integran los equipos", async (modality) => {
+    const fake = createFakeSupabase({
+      organizations: buildOrganizations(), players: buildPlayers(),
+      matches: [{ id: "match-bench", organization_id: ORG_ID, scheduled_at: "2026-04-21T21:00:00.000Z", modality, status: "confirmed", confirmed_option_id: "option-bench" }],
+      team_options: [{ id: "option-bench", match_id: "match-bench", is_confirmed: true }],
+      match_players: [
+        { id: "mp-1", match_id: "match-bench", player_id: "player-1", is_substitute: true, substitute_team: "A" },
+        { id: "mp-2", match_id: "match-bench", player_id: "player-2", is_substitute: true, substitute_team: null }
+      ],
+      team_option_players: [{ team_option_id: "option-bench", player_id: "player-1", team: "A" }],
+      match_guests: [
+        { id: "guest-on-team", match_id: "match-bench", guest_name: "Ya jugó", guest_rating: 2, is_substitute: true, substitute_team: "B" },
+        { id: "guest-bench", match_id: "match-bench", guest_name: "En el banco", guest_rating: 3, is_substitute: true, substitute_team: "A" }
+      ],
+      team_option_guests: [{ team_option_id: "option-bench", guest_id: "guest-on-team", team: "B" }]
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    const details = await getMatchDetails("match-bench", "liga-a");
+    expect(details?.teamAPlayers.map((player) => player.id)).toEqual(["player-1"]);
+    expect(details?.teamBPlayers.map((player) => player.full_name)).toEqual(["Ya jugó"]);
+    expect(details?.substitutes).toEqual([
+      expect.objectContaining({ id: "player-2", team: null, is_guest: false }),
+      expect.objectContaining({ id: "guest-guest-bench", team: "A", is_guest: true })
+    ]);
+    const upcoming = await getUpcomingConfirmedMatches(ORG_ID);
+    expect(upcoming[0]?.substitutes).toEqual(details?.substitutes);
+    expect(upcoming[0]?.teamAPlayers.map((player) => player.id)).toEqual(["player-1"]);
+    expect(upcoming[0]?.teamBPlayers.map((player) => player.full_name)).toEqual(["Ya jugó"]);
+  });
+
   it("calcula estadisticas publicas por jugador a partir de partidos finalizados", async () => {
     const fake = createFakeSupabase({
       players: buildPlayers(),
