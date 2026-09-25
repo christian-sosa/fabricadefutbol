@@ -74,7 +74,7 @@ export function AdminMatchOverview({
       )}
       <div className="mt-4 flex flex-wrap gap-x-6 border-t border-slate-800 pt-3">
         <Link className="inline-flex min-h-11 items-center text-sm text-slate-300 hover:text-white" href={withOrgQuery("/admin/players", organizationSlug)}>Administrar jugadores →</Link>
-        <Link className="inline-flex min-h-11 items-center text-sm text-slate-300 hover:text-white" href={withOrgQuery("/admin/scorers", organizationSlug)}>Historial de goleadores →</Link>
+        <Link className="inline-flex min-h-11 items-center text-sm text-slate-300 hover:text-white" href={withOrgQuery("/admin/scorers", organizationSlug)}>Goleadores históricos →</Link>
       </div>
     </Card>
   );
