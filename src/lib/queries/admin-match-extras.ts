@@ -3,6 +3,7 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { calculateGuestDisplayRating } from "@/lib/domain/skill-level";
 import { readAllRows } from "@/lib/queries/read-all-rows";
+import { readRowsByIds } from "@/lib/supabase/pagination";
 import type { TeamSide } from "@/types/domain";
 
 export type AdminMatchSubstitute = {
@@ -51,32 +52,88 @@ export async function getAdminMatchScorers(matchId: string) {
   return data ?? [];
 }
 
-export async function getAdminScorerHistory(organizationId: string, page = 1) {
+export type AdminHistoricalScorer = {
+  playerId: string;
+  displayName: string;
+  goals: number;
+  matchesScored: number;
+  rank: number;
+};
+
+export type AdminHistoricalScorers = {
+  scorers: AdminHistoricalScorer[];
+  page: number;
+  pageCount: number;
+  totalScorers: number;
+  totalGoals: number;
+  guestGoals: number;
+  matchesWithScorers: number;
+};
+
+export async function getAdminHistoricalScorers(organizationId: string, page = 1): Promise<AdminHistoricalScorers> {
   const supabase = await createSupabaseServerClient();
   const pageSize = 20;
-  const { count, error: countError } = await supabase.from("matches")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId).eq("status", "finished").in("modality", ["9v9", "10v10", "11v11"]);
-  if (countError) throw new Error(countError.message);
-  const pageCount = Math.max(1, Math.ceil((count ?? 0) / pageSize));
+  const { data: matches, error: matchesError } = await readAllRows((from, to) => supabase.from("matches")
+    .select("id, scheduled_at", { count: "exact" })
+    .eq("organization_id", organizationId).eq("status", "finished").in("modality", ["9v9", "10v10", "11v11"])
+    .order("scheduled_at", { ascending: false }).order("id").range(from, to));
+  if (matchesError) throw new Error(matchesError.message);
+
+  // Read every season before paginating players; paging matches would undercount totals.
+  // Both reads use count-aware pagination, including when the API caps its response.
+  const scorers = await readRowsByIds(matches.map((match) => match.id), (ids, from, to) => supabase.from("match_goal_scorers")
+    .select("match_id, participant_id, player_id, display_name, goals", { count: "exact" })
+    .in("match_id", ids).order("match_id").order("participant_id").range(from, to));
+  const matchRecency = new Map(matches.map((match, index) => [match.id, index]));
+  const playersById = new Map<string, {
+    displayName: string;
+    latestMatchIndex: number;
+    goals: number;
+    matchIds: Set<string>;
+  }>();
+  const matchesWithScorers = new Set<string>();
+  let totalGoals = 0;
+  let guestGoals = 0;
+  for (const scorer of scorers) {
+    totalGoals += scorer.goals;
+    matchesWithScorers.add(scorer.match_id);
+    // Guest IDs belong to a single match, so names cannot establish a historical identity.
+    if (!scorer.player_id) {
+      guestGoals += scorer.goals;
+      continue;
+    }
+    const matchIndex = matchRecency.get(scorer.match_id)!;
+    const player = playersById.get(scorer.player_id) ?? {
+      displayName: scorer.display_name, latestMatchIndex: matchIndex, goals: 0, matchIds: new Set<string>()
+    };
+    player.goals += scorer.goals;
+    player.matchIds.add(scorer.match_id);
+    if (matchIndex < player.latestMatchIndex) {
+      player.displayName = scorer.display_name;
+      player.latestMatchIndex = matchIndex;
+    }
+    playersById.set(scorer.player_id, player);
+  }
+
+  const players = await readRowsByIds([...playersById.keys()], (ids, from, to) => supabase.from("players")
+    .select("id, full_name", { count: "exact" }).eq("organization_id", organizationId)
+    .in("id", ids).order("id").range(from, to));
+  const currentNames = new Map(players.map((player) => [player.id, player.full_name]));
+  const ranking = [...playersById].map(([playerId, player]) => ({
+    playerId, displayName: currentNames.get(playerId) ?? player.displayName,
+    goals: player.goals, matchesScored: player.matchIds.size, rank: 0
+  })).sort((left, right) => right.goals - left.goals
+    || left.displayName.localeCompare(right.displayName, "es")
+    || left.playerId.localeCompare(right.playerId));
+  ranking.forEach((scorer, index) => {
+    scorer.rank = index > 0 && scorer.goals === ranking[index - 1].goals ? ranking[index - 1].rank : index + 1;
+  });
+
+  const pageCount = Math.max(1, Math.ceil(ranking.length / pageSize));
   const currentPage = Math.min(pageCount, Number.isSafeInteger(page) ? Math.max(1, page) : 1);
   const offset = (currentPage - 1) * pageSize;
-  const { data: matches, error: matchesError } = await supabase.from("matches")
-    .select("id, scheduled_at, modality, team_a_label, team_b_label")
-    .eq("organization_id", organizationId).eq("status", "finished").in("modality", ["9v9", "10v10", "11v11"])
-    .order("scheduled_at", { ascending: false }).order("id").range(offset, offset + pageSize - 1);
-  if (matchesError) throw new Error(matchesError.message);
-  if (!matches?.length) return { matches: [], pageCount, page: currentPage };
-  const matchIds = matches.map((match) => match.id);
-  const { data: scorers, error } = await readAllRows((from, to) => supabase.from("match_goal_scorers")
-    .select("match_id, participant_id, display_name, team, goals", { count: "exact" })
-    .in("match_id", matchIds).order("match_id").order("participant_id").range(from, to));
-  if (error) throw new Error(error.message);
-  const scorersByMatch = new Map<string, typeof scorers>();
-  for (const scorer of scorers) {
-    const group = scorersByMatch.get(scorer.match_id) ?? [];
-    group.push(scorer);
-    scorersByMatch.set(scorer.match_id, group);
-  }
-  return { matches: matches.map((match) => ({ ...match, scorers: scorersByMatch.get(match.id) ?? [] })), pageCount, page: currentPage };
+  return {
+    scorers: ranking.slice(offset, offset + pageSize), page: currentPage, pageCount,
+    totalScorers: ranking.length, totalGoals, guestGoals, matchesWithScorers: matchesWithScorers.size
+  };
 }

@@ -63,9 +63,10 @@ test("F9: suplentes, puntos y goleadores privados persisten y se pueden corregir
   await expect(page).toHaveURL((url) => url.pathname === "/admin/matches" && url.searchParams.has("success"));
   expect(await points(page)).toBe(before + 10);
   await page.goto(`/admin/scorers?org=${org}`);
-  await expect(page.getByRole("heading", { name: "Historial de goleadores" })).toBeVisible();
-  await expect(page.getByText(substituteName, { exact: true })).toBeVisible();
-  await expect(page.getByText("2 goles", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Goleadores históricos" })).toBeVisible();
+  const scorer = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: `${substituteName} 1 partido con gol`, exact: true }) });
+  await expect(scorer.getByRole("cell", { name: "2 goles", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ver acta", exact: true })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("scorers-history.png"), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 
@@ -73,7 +74,7 @@ test("F9: suplentes, puntos y goleadores privados persisten y se pueden corregir
   try {
     const publicPage = await anonymous.newPage();
     await publicPage.goto(`${new URL(page.url()).origin}/matches/${matchId}?org=${org}`);
-    await expect(publicPage.getByRole("heading", { name: "Historial de goleadores" })).toHaveCount(0);
+    await expect(publicPage.getByRole("heading", { name: "Goleadores históricos" })).toHaveCount(0);
     await expect(publicPage.getByText("2 goles", { exact: true })).toHaveCount(0);
     await publicPage.goto(`${new URL(page.url()).origin}/admin/scorers?org=${org}`);
     await expect(publicPage).toHaveURL((url) => url.pathname === "/admin/login");
