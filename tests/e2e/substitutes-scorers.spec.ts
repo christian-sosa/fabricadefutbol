@@ -30,12 +30,16 @@ test("F9: suplentes, puntos y goleadores privados persisten y se pueden corregir
   await page.getByRole("combobox", { name: "Modalidad", exact: true }).selectOption("9v9");
   for (const id of E2E_PLAYER_IDS) await page.locator(`input[name="playerIds"][value="${id}"]`).check();
   const substituteName = (await page.locator(`input[name="playerIds"][value="${E2E_PLAYER_IDS[9]}"]`).getAttribute("aria-label"))!.replace(/^Juega /, "");
-  await page.getByRole("combobox", { name: `Rol de ${substituteName}`, exact: true }).selectOption("A");
   for (let index = 1; index <= 10; index++) {
     await page.getByRole("button", { name: "Agregar invitado", exact: true }).click();
     await page.getByRole("textbox", { name: `Nombre del invitado ${index}`, exact: true }).fill(`E2E Suplentes Invitado ${index}`);
     await page.getByRole("combobox", { name: `Nivel de E2E Suplentes Invitado ${index}`, exact: true }).selectOption("3");
   }
+  await expect(page.getByRole("region", { name: "Elegí los suplentes" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: `Rol de ${substituteName}`, exact: true })).toHaveValue("starter");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("new-match-substitute-picker.png"), fullPage: true });
+  await page.getByRole("combobox", { name: `Rol de ${substituteName}`, exact: true }).selectOption("A");
   await page.getByRole("combobox", { name: "Rol de E2E Suplentes Invitado 10", exact: true }).selectOption("substitute");
   await page.getByRole("button", { name: "Crear partido y generar equipos", exact: true }).click();
   await expect(page).toHaveURL((url) => /^\/admin\/matches\/[0-9a-f-]{36}$/.test(url.pathname));
