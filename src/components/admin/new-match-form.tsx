@@ -144,6 +144,7 @@ export function NewMatchForm({
     [activeSubstituteAssignments]
   );
   const starterCount = totalCurrent - substituteIds.size;
+  const showSubstitutePicker = supportsSubstitutes && (totalCurrent > expected || substituteIds.size > 0);
 
   const selectedGoalkeeperIds = useMemo(
     () =>
@@ -464,20 +465,6 @@ export function NewMatchForm({
                       value={player.id}
                     />
                   </label>
-                  {supportsSubstitutes && selectedPlayers[player.id] ? (
-                    <Select
-                      aria-label={`Rol de ${player.full_name}`}
-                      className="min-h-11 w-full xl:w-44"
-                      disabled={Boolean(goalkeeperPlayers[player.id])}
-                      onChange={(event) => updateParticipantRole(`player:${player.id}`, event.target.value)}
-                      value={substituteIds.has(`player:${player.id}`) ? substituteAssignments[`player:${player.id}`] ?? "substitute" : "starter"}
-                    >
-                      <option value="starter">Titular</option>
-                      <option value="substitute">Suplente · sin equipo</option>
-                      <option value="A">Suplente · primer equipo</option>
-                      <option value="B">Suplente · segundo equipo</option>
-                    </Select>
-                  ) : null}
                 </span>
               </div>
             );
@@ -556,17 +543,6 @@ export function NewMatchForm({
                 <Button onClick={() => removeGuest(guest.key)} type="button" variant="danger">
                   Quitar
                 </Button>
-                {supportsSubstitutes ? <Select
-                  aria-label={`Rol de ${guest.name.trim() || `invitado ${index + 1}`}`}
-                  className="md:col-span-3"
-                  onChange={(event) => updateParticipantRole(`guest:${guest.key}`, event.target.value)}
-                  value={Object.hasOwn(substituteAssignments, `guest:${guest.key}`) ? substituteAssignments[`guest:${guest.key}`] ?? "substitute" : "starter"}
-                >
-                  <option value="starter">Titular</option>
-                  <option value="substitute">Suplente · sin equipo</option>
-                  <option value="A">Suplente · primer equipo</option>
-                  <option value="B">Suplente · segundo equipo</option>
-                </Select> : null}
                 {showGuestError ? <p className="text-sm text-danger md:col-span-3" id={guestErrorId} role="alert">Completá el nombre y el nivel del invitado {index + 1}, o quitá la fila.</p> : null}
               </div>
               );
@@ -576,6 +552,54 @@ export function NewMatchForm({
           <p className="mt-3 text-sm text-slate-400">Aun no agregaste invitados.</p>
         )}
       </div>
+
+      {showSubstitutePicker ? (
+        <section aria-labelledby={`${formId}-substitutes-title`} className="rounded-xl border border-amber-500/30 bg-slate-900 p-3">
+          <h3 className="text-sm font-semibold text-amber-100" id={`${formId}-substitutes-title`}>Elegí los suplentes</h3>
+          <p className="mt-1 text-xs text-slate-300">
+            Hay {totalCurrent} convocados para {expected} titulares. Elegí quiénes quedan como suplentes y, si ya lo sabés, su equipo.
+          </p>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {selectedRosterPlayers.map((player) => {
+              const participantId = `player:${player.id}`;
+              return (
+                <div className="grid min-w-0 gap-2 rounded-lg border border-slate-700 bg-slate-950 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,auto)] sm:items-center" key={participantId}>
+                  <span className="min-w-0 break-words text-sm font-medium text-slate-100">{player.full_name}</span>
+                  <Select
+                    aria-label={`Rol de ${player.full_name}`}
+                    disabled={Boolean(goalkeeperPlayers[player.id])}
+                    onChange={(event) => updateParticipantRole(participantId, event.target.value)}
+                    value={substituteIds.has(participantId) ? substituteAssignments[participantId] ?? "substitute" : "starter"}
+                  >
+                    <option value="starter">Titular</option>
+                    <option value="substitute">Suplente · sin equipo</option>
+                    <option value="A">Suplente · primer equipo</option>
+                    <option value="B">Suplente · segundo equipo</option>
+                  </Select>
+                </div>
+              );
+            })}
+            {validGuests.map((guest) => {
+              const participantId = `guest:${guest.key}`;
+              return (
+                <div className="grid min-w-0 gap-2 rounded-lg border border-slate-700 bg-slate-950 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,auto)] sm:items-center" key={participantId}>
+                  <span className="min-w-0 break-words text-sm font-medium text-slate-100">{guest.name} · invitado</span>
+                  <Select
+                    aria-label={`Rol de ${guest.name}`}
+                    onChange={(event) => updateParticipantRole(participantId, event.target.value)}
+                    value={substituteIds.has(participantId) ? substituteAssignments[participantId] ?? "substitute" : "starter"}
+                  >
+                    <option value="starter">Titular</option>
+                    <option value="substitute">Suplente · sin equipo</option>
+                    <option value="A">Suplente · primer equipo</option>
+                    <option value="B">Suplente · segundo equipo</option>
+                  </Select>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       {showManualBuilder ? (
         <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">

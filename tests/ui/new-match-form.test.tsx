@@ -35,6 +35,34 @@ function getCheckbox(container: HTMLElement, name: string, value: string) {
 }
 
 describe("NewMatchForm", () => {
+  it("deja a los nuevos convocados como titulares y pide elegir suplentes debajo al superar el cupo", async () => {
+    const user = userEvent.setup();
+    const players = buildPlayers(22);
+    const { container } = render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={players}
+      initialValues={{ modality: "10v10", playerIds: players.slice(0, 20).map((player) => player.id), goalkeeperPlayerIds: [], guests: [] }} />);
+
+    expect(screen.queryByRole("heading", { name: "Elegí los suplentes" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 21" }));
+    await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 22" }));
+
+    const picker = screen.getByRole("region", { name: "Elegí los suplentes" });
+    expect(picker).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Rol de Jugador 21" })).toHaveValue("starter");
+    expect(screen.getByRole("combobox", { name: "Rol de Jugador 22" })).toHaveValue("starter");
+    expect(screen.getByRole("button", { name: "Crear partido y generar equipos" })).toBeDisabled();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Rol de Jugador 21" }), "substitute");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Rol de Jugador 22" }), "A");
+
+    expect(screen.getByRole("button", { name: "Crear partido y generar equipos" })).toBeEnabled();
+    expect(JSON.parse(String(new FormData(container.querySelector("form")!).get("substituteAssignmentsPayload")))).toEqual([
+      { participantId: "player:player-21", team: null },
+      { participantId: "player:player-22", team: "A" }
+    ]);
+    await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 21" }));
+    await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 22" }));
+    expect(screen.queryByRole("heading", { name: "Elegí los suplentes" })).not.toBeInTheDocument();
+  });
+
   it("permite suplentes sin equipo, conserva todos los convocados y excluye suplentes del armado manual", async () => {
     const user = userEvent.setup();
     const players = buildPlayers(21);
