@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { getPastPendingResultMatch } from "@/lib/admin-pending-match";
+import { getNextConfirmedMatch, getPastPendingResultMatch } from "@/lib/admin-pending-match";
 import { formatMatchModality } from "@/lib/constants";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
@@ -31,6 +31,7 @@ export function AdminMatchOverview({
   organizationSlug: string;
 }) {
   const pendingResult = getPastPendingResultMatch(matches);
+  const nextMatch = getNextConfirmedMatch(matches);
 
   return (
     <Card className="rounded-2xl p-5 sm:p-6">
@@ -53,6 +54,11 @@ export function AdminMatchOverview({
           <span className="shrink-0 text-sm font-semibold text-amber-200">Cargar resultado →</span>
         </Link>
       ) : null}
+
+      {nextMatch ? <Link className="mt-4 flex flex-col gap-2 rounded-xl border border-emerald-400/25 bg-emerald-500/10 p-4" href={withOrgQuery(`/admin/matches/${nextMatch.id}`, organizationSlug)}>
+        <span className="text-sm font-semibold text-emerald-100">Próximo partido confirmado</span>
+        <span className="text-xs text-emerald-100/75">{formatMatchDateTime(nextMatch.scheduled_at)} · {formatMatchModality(nextMatch.modality)} · Revisá y compartí los equipos; cargá el resultado después de jugar.</span>
+      </Link> : null}
 
       <div className="mt-6 flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-slate-200">Partidos recientes</h3>

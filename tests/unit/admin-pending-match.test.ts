@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getPastPendingResultMatch } from "@/lib/admin-pending-match";
+import { getNextConfirmedMatch, getPastPendingResultMatch } from "@/lib/admin-pending-match";
 
 describe("pending result", () => {
   it("elige el pendiente pasado más antiguo e ignora futuros, borradores y finalizados", () => {
@@ -13,5 +13,7 @@ describe("pending result", () => {
     expect(getPastPendingResultMatch(matches, "2026-09-14T12:00:00Z")?.id).toBe("older");
     expect(getPastPendingResultMatch(matches.slice(0, 3), "2026-09-14T12:00:00Z")).toBeNull();
     expect(matches[0].id).toBe("future");
+    expect(getNextConfirmedMatch(matches, "2026-09-14T12:00:00Z")?.id).toBe("future");
+    expect(getNextConfirmedMatch(matches, "2026-09-16T12:00:00Z")).toBeNull();
   });
 });

@@ -1,6 +1,9 @@
 import type { MatchHistoryItem, OrganizationMatchesResponse } from "@/lib/query/types";
 import type { PlayerComputedStats } from "@/types/domain";
 import { rankPlayers } from "@/lib/domain/player-ranking";
+import { isPlayerAbsent } from "@/lib/domain/player-activity";
+
+export const ORGANIZATION_PUBLIC_SNAPSHOT_TTL_MS = 10 * 60 * 1000;
 
 export type OrganizationPublicSummary = {
   totalPlayers: number;
@@ -31,6 +34,7 @@ export type OrganizationPublicSnapshotPayload = {
 
 type QueryError = {
   message: string;
+  code?: string;
 };
 
 type SnapshotRow = {
@@ -38,25 +42,20 @@ type SnapshotRow = {
   standings?: unknown;
   match_history?: unknown;
   refreshed_at?: string | null;
+  source_revision?: unknown;
+  sporting_revision?: unknown;
 };
 
+type SnapshotReadQuery = {
+  eq(column: string, value: unknown): SnapshotReadQuery;
+  is(column: string, value: null): SnapshotReadQuery;
+  maybeSingle(): Promise<{ data: SnapshotRow | null; error: QueryError | null }>;
+};
 type SnapshotDbClient = {
   from(table: string): {
-    select(columns?: string): {
-      eq(column: string, value: unknown): {
-        maybeSingle(): Promise<{
-          data: SnapshotRow | null;
-          error: QueryError | null;
-        }>;
-      };
-    };
-    upsert(
-      value: Record<string, unknown>,
-      options?: { onConflict?: string }
-    ): Promise<{
-      error: QueryError | null;
-    }>;
+    select(columns?: string): SnapshotReadQuery;
   };
+  rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: QueryError | null }>;
 };
 
 function normalizeArray<T>(value: unknown): T[] {
@@ -80,13 +79,37 @@ function normalizeSummary(value: unknown): OrganizationPublicSummary | null {
 }
 
 export function isOrganizationSnapshotSchemaMissing(error: QueryError | null | undefined) {
-  return Boolean(error?.message && /organization_public_snapshots|summary|standings|match_history/i.test(error.message));
+  if (!error || !/organization_public_snapshots|write_group_public_snapshot|sporting_revision|source_revision|summary|standings|match_history/i.test(error.message)) return false;
+  if (error.code) return ["42P01", "42703", "PGRST205", "PGRST202"].includes(error.code);
+  return /(?:relation|column|function)\b.*\bdoes not exist\b|could not find\b.*\bschema cache\b/i.test(error.message);
+}
+
+function normalizeRevision(value: unknown): number | null {
+  if (typeof value !== "number" && (typeof value !== "string" || !/^\d+$/.test(value))) return null;
+  const revision = Number(value);
+  return Number.isSafeInteger(revision) && revision >= 0 ? revision : null;
+}
+
+function publicStandings(value: unknown) {
+  return rankPlayers(normalizeArray<PlayerComputedStats>(value).map((player) => ({
+    ...player,
+    isInjured: false,
+    isAbsent: isPlayerAbsent({ isInjured: false, matchesSinceLastPlayed: player.matchesSinceLastPlayed ?? 0, lastPlayedAt: player.lastPlayedAt ?? null })
+  })));
+}
+
+export async function readOrganizationSportingRevision(supabase: unknown, organizationId: string): Promise<number | null> {
+  const { data, error } = await (supabase as SnapshotDbClient).from("organizations")
+    .select("sporting_revision").eq("id", organizationId).eq("is_public", true).is("archived_at", null).maybeSingle();
+  if (isOrganizationSnapshotSchemaMissing(error)) return null;
+  if (error) throw new Error(error.message);
+  return data ? normalizeRevision(data.sporting_revision) : null;
 }
 
 export function buildOrganizationPublicSnapshotPayload(params: OrganizationPublicSnapshotPayload) {
   return {
     summary: params.summary,
-    standings: rankPlayers(params.standings),
+    standings: publicStandings(params.standings),
     matchHistory: params.matchHistory
   } satisfies OrganizationPublicSnapshotPayload;
 }
@@ -99,13 +122,19 @@ async function readSnapshotRow(
   const client = supabase as SnapshotDbClient;
   const { data, error } = await client
     .from("organization_public_snapshots")
-    .select(columns)
+    .select(`${columns}, source_revision, refreshed_at`)
     .eq("organization_id", organizationId)
     .maybeSingle();
 
   if (isOrganizationSnapshotSchemaMissing(error)) return null;
   if (error) throw new Error(error.message);
-  return data;
+  if (!data) return null;
+  const refreshedAt = Date.parse(data.refreshed_at ?? "");
+  const age = Date.now() - refreshedAt;
+  if (!Number.isFinite(age) || age < 0 || age >= ORGANIZATION_PUBLIC_SNAPSHOT_TTL_MS) return null;
+  // Read the live revision after the snapshot: a mutation during its read invalidates it.
+  const revision = await readOrganizationSportingRevision(supabase, organizationId);
+  return revision !== null && normalizeRevision(data.source_revision) === revision ? data : null;
 }
 
 export async function readOrganizationPublicSummarySnapshot(
@@ -121,7 +150,7 @@ export async function readOrganizationPublicStandingsSnapshot(
   organizationId: string
 ): Promise<PlayerComputedStats[] | null> {
   const data = await readSnapshotRow(supabase, organizationId, "standings");
-  return data ? rankPlayers(normalizeArray<PlayerComputedStats>(data.standings)) : null;
+  return data && Array.isArray(data.standings) ? publicStandings(data.standings) : null;
 }
 
 export async function readOrganizationPublicMatchHistorySnapshot(
@@ -129,21 +158,21 @@ export async function readOrganizationPublicMatchHistorySnapshot(
   organizationId: string
 ): Promise<MatchHistoryItem[] | null> {
   const data = await readSnapshotRow(supabase, organizationId, "match_history");
-  return data ? normalizeArray<MatchHistoryItem>(data.match_history) : null;
+  return data && Array.isArray(data.match_history) ? normalizeArray<MatchHistoryItem>(data.match_history) : null;
 }
 
 export async function readOrganizationPublicSnapshot(
   supabase: unknown,
   organizationId: string
 ): Promise<OrganizationPublicSnapshotPayload | null> {
-  const data = await readSnapshotRow(supabase, organizationId, "summary, standings, match_history, refreshed_at");
+  const data = await readSnapshotRow(supabase, organizationId, "summary, standings, match_history");
   if (!data) return null;
   const summary = normalizeSummary(data.summary);
   if (!summary) return null;
 
   return {
     summary,
-    standings: rankPlayers(normalizeArray<PlayerComputedStats>(data.standings)),
+    standings: publicStandings(data.standings),
     matchHistory: normalizeArray<MatchHistoryItem>(data.match_history)
   };
 }
@@ -151,24 +180,20 @@ export async function readOrganizationPublicSnapshot(
 export async function writeOrganizationPublicSnapshot(
   supabase: unknown,
   organizationId: string,
-  payload: OrganizationPublicSnapshotPayload
+  payload: OrganizationPublicSnapshotPayload,
+  expectedRevision: number
 ) {
+  if (normalizeRevision(expectedRevision) === null) return false;
   const client = supabase as SnapshotDbClient;
-  const { error } = await client.from("organization_public_snapshots").upsert(
-    {
-      organization_id: organizationId,
-      summary: payload.summary,
-      standings: rankPlayers(payload.standings),
-      match_history: payload.matchHistory,
-      match_history_total_count: payload.matchHistory.length,
-      refreshed_at: new Date().toISOString()
-    },
-    { onConflict: "organization_id" }
-  );
+  const { data, error } = await client.rpc("write_group_public_snapshot", {
+    p_organization_id: organizationId,
+    p_expected_revision: expectedRevision,
+    p_payload: buildOrganizationPublicSnapshotPayload(payload)
+  });
 
   if (isOrganizationSnapshotSchemaMissing(error)) return false;
   if (error) throw new Error(error.message);
-  return true;
+  return data === true;
 }
 
 export function buildSnapshotMatchHistoryPage(params: {

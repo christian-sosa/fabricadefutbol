@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 
 import { getPublicApiErrorMessage, logPublicApiError } from "@/lib/api-errors";
 import { getPlayersWithStats } from "@/lib/queries/public";
+import { logInfo } from "@/lib/observability/log";
 
-const PUBLIC_CACHE_HEADER = "public, s-maxage=60, stale-while-revalidate=300";
+const PUBLIC_CACHE_HEADER = "private, no-store";
 
 export async function GET(
   request: Request,
@@ -17,16 +18,21 @@ export async function GET(
   }
 
   try {
+    const startedAt = performance.now();
     const { searchParams } = new URL(request.url);
     const standings = await getPlayersWithStats(organizationId, {
       season: searchParams.get("season") ?? "current"
     });
+    const durationMs = Number((performance.now() - startedAt).toFixed(1));
+    logInfo("public.standings.read", { durationMs, rowCount: standings.length,
+      seasonMode: searchParams.get("season") === "all" ? "all" : "season" });
     return NextResponse.json({
       organizationId,
       standings
     }, {
       headers: {
-        "Cache-Control": PUBLIC_CACHE_HEADER
+        "Cache-Control": PUBLIC_CACHE_HEADER,
+        "Server-Timing": `group-query;dur=${durationMs}`
       }
     });
   } catch (error) {

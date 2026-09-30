@@ -21,6 +21,7 @@ import type { SubstituteAssignment } from "@/types/domain";
 
 const schema = z.object({
   organizationId: z.string().uuid(),
+  requestId: z.string().uuid().optional(),
   scheduledDate: z.string().optional(),
   scheduledTime: z.string().min(1, "La hora es obligatoria."),
   modality: z.enum(MATCH_MODALITIES),
@@ -161,6 +162,7 @@ export async function createMatchAction(formData: FormData) {
   try {
     const parsed = schema.safeParse({
       organizationId: formData.get("organizationId"),
+      requestId: formData.get("requestId") || undefined,
       scheduledDate: String(formData.get("scheduledDate") ?? ""),
       scheduledTime: String(formData.get("scheduledTime") ?? ""),
       modality: formData.get("modality"),
@@ -264,6 +266,7 @@ export async function createMatchAction(formData: FormData) {
       supabase,
       adminId: admin.userId,
       organizationId: parsed.data.organizationId,
+      requestId: parsed.data.requestId,
       scheduledAt: matchDateAndTimeToIso(parsed.data.scheduledDate, parsed.data.scheduledTime),
       modality: parsed.data.modality,
       location: parsed.data.location ?? "",

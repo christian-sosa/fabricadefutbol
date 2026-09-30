@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { withPublicQuery } from "@/lib/org";
 
-const LAST_UPDATED = "2 de mayo de 2026";
+const LAST_UPDATED = "30 de septiembre de 2026";
 
 function LegalSection({ children, title }: { children: ReactNode; title: string }) {
   return (
@@ -43,7 +43,7 @@ export default async function TermsPage({
         <CardTitle className="mt-2 text-3xl">Terminos y condiciones</CardTitle>
         <CardDescription className="mt-3 text-base">
           Estos terminos regulan el uso de Fabrica de Futbol, incluyendo la administracion de grupos, jugadores,
-          partidos, rankings, historial, contenido publico, fotos y publicidad del servicio.
+          partidos, rankings, historial, contenido público, fotos y solicitudes de ayuda por Contacto.
         </CardDescription>
         <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
           Ultima actualizacion: {LAST_UPDATED}
@@ -53,7 +53,7 @@ export default async function TermsPage({
       <section className="grid gap-4 lg:grid-cols-2">
         <LegalSection title="1. Aceptacion">
           <p>
-            Al navegar el sitio, crear una cuenta, administrar un grupo, cargar informacion o contratar un plan, aceptas
+            Al navegar el sitio, crear una cuenta, administrar un grupo o cargar información, aceptás
             estos terminos. Si usas el servicio en nombre de un grupo u organizacion, declaras tener
             autorizacion suficiente para hacerlo.
           </p>
@@ -69,7 +69,7 @@ export default async function TermsPage({
             equipos, resultados, rankings, historial, proximas fechas y vistas publicas del grupo.
           </p>
           <p>
-            El foco publico actual del servicio esta en Grupos: jugadores, partidos, rankings, historial y vistas publicas del grupo.
+            El servicio contiene únicamente Grupos y es gratis. Los jugadores no necesitan una cuenta. No ofrecemos suscripciones, checkout, publicidad ni sponsors.
           </p>
         </LegalSection>
 
@@ -133,7 +133,7 @@ export default async function TermsPage({
 
         <LegalSection title="8. Grupos gratis, limites y continuidad">
           <p>
-            Grupos es gratis en esta etapa. Para cuidar costos y evitar abuso, las altas adicionales pueden requerir
+            Grupos es gratis. Para cuidar costos y evitar abuso, las altas adicionales pueden requerir
             aprobación manual. Si necesitás administrar más grupos, podés escribirnos para habilitarlo.
           </p>
           <p>
@@ -141,7 +141,7 @@ export default async function TermsPage({
             invitaciones o automatizaciones cuando sea necesario para sostener el servicio gratis.
           </p>
           <p>
-            Si mas adelante se habilitan nuevos modulos publicos con contratacion, tendran reglas propias informadas antes de aceptarlos.
+            La ayuda para la carga inicial y las solicitudes de varios grupos se evalúan manualmente desde Contacto. El alcance, los archivos necesarios y cualquier presupuesto se acuerdan antes de realizar el servicio; enviar una consulta no genera cobros ni una suscripción.
           </p>
         </LegalSection>
 

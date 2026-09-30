@@ -19,6 +19,7 @@ describe("resumen operativo de partidos", () => {
     expect(screen.getByRole("link", { name: /Hay un resultado por cargar/ })).toHaveAttribute("href", "/admin/matches/pending/result?org=la-banda");
     expect(screen.getByRole("link", { name: /Finalizado/ })).toHaveAttribute("href", "/admin/matches/finished?org=la-banda");
     expect(screen.getByRole("link", { name: /Nuevo partido/ })).toHaveAttribute("href", "/admin/matches/new?org=la-banda");
+    expect(screen.getByRole("link", { name: /Próximo partido confirmado/ })).toHaveAttribute("href", "/admin/matches/future?org=la-banda");
   });
 
   it("mantiene accesos de consulta sin acciones de escritura para solo lectura", () => {

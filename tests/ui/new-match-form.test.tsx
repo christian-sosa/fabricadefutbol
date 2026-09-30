@@ -35,6 +35,22 @@ function getCheckbox(container: HTMLElement, name: string, value: string) {
 }
 
 describe("NewMatchForm", () => {
+  it("mantiene el identificador de creación al editar y reintentar un fallo", async () => {
+    vi.mocked(createMatchFormAction).mockResolvedValueOnce({ error: "Intentá nuevamente." }).mockResolvedValueOnce({ error: null });
+    const user = userEvent.setup();
+    const players = buildPlayers(10);
+    const requestId = "11111111-1111-4111-8111-111111111111";
+    const { container } = render(<NewMatchForm requestId={requestId} defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={players} initialValues={{ modality: "5v5", scheduledTime: "21:00", playerIds: players.map((player) => player.id), goalkeeperPlayerIds: [], guests: [] }} />);
+    const button = screen.getByRole("button", { name: "Crear partido y generar equipos" });
+    await user.click(button);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Intentá nuevamente."));
+    expect(container.querySelector('input[name="requestId"]')).toHaveValue(requestId);
+    await user.click(button);
+    await waitFor(() => expect(vi.mocked(createMatchFormAction)).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(createMatchFormAction).mock.calls[0][0].get("requestId")).toBe(requestId);
+    expect(vi.mocked(createMatchFormAction).mock.calls[1][0].get("requestId")).toBe(requestId);
+    vi.mocked(createMatchFormAction).mockClear();
+  });
   it("deja a los nuevos convocados como titulares y pide elegir suplentes debajo al superar el cupo", async () => {
     const user = userEvent.setup();
     const players = buildPlayers(22);

@@ -37,7 +37,7 @@ describe("public routes for crawlers", () => {
     expect(urls).not.toContain("https://fabricadefutbol.com.ar/pricing");
   });
 
-  it("mantiene suficientes guias originales para AdSense", () => {
+  it("mantiene guías originales para ayudar a organizar el grupo", () => {
     expect(GUIDES.length).toBeGreaterThanOrEqual(8);
 
     for (const guide of GUIDES) {

@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
+import { randomUUID } from "node:crypto";
 
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { NewMatchForm, type NewMatchDefaults } from "@/components/admin/new-match-form";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
-import { getCurrentMatchDateInput, matchIsoToTimeInput } from "@/lib/match-datetime";
+import { getCurrentMatchDateInput, getCurrentMatchDateTimeIso, matchIsoToTimeInput } from "@/lib/match-datetime";
+import { getNextWeeklyMatchDate } from "@/lib/repeat-match";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { MatchModality, SubstituteAssignment } from "@/types/domain";
@@ -28,12 +30,14 @@ export default async function NewMatchPage({
   const defaultModality = resolvedSearchParams.modality && Object.hasOwn(TEAM_SIZE_BY_MODALITY, resolvedSearchParams.modality)
     ? resolvedSearchParams.modality as MatchModality : "6v6";
   let initialValues: NewMatchDefaults | undefined;
+  let defaultScheduledDate = getCurrentMatchDateInput();
   if (resolvedSearchParams.repeat) {
     const supabase = await createSupabaseServerClient();
     let repeatId = resolvedSearchParams.repeat;
     if (repeatId === "last") {
       const { data, error: templateError } = await supabase.from("matches").select("id")
         .eq("organization_id", selectedOrganization.id).in("status", ["confirmed", "finished"])
+        .lte("scheduled_at", getCurrentMatchDateTimeIso())
         .order("scheduled_at", { ascending: false }).limit(1).maybeSingle();
       if (templateError) throw new Error(templateError.message);
       repeatId = data?.id ?? "";
@@ -42,6 +46,7 @@ export default async function NewMatchPage({
       const template = await getAdminMatchDetails(repeatId, selectedOrganization.id);
       const option = template?.options.find((row) => row.is_confirmed);
       if (template && option) {
+        defaultScheduledDate = getNextWeeklyMatchDate(template.match.scheduled_at);
         const members = [...option.teamA, ...option.teamB];
         const activePlayerIds = new Set(players.map((player) => player.id));
         const [{ data: guests, error: guestError }, { data: roster, error: rosterError }] = await Promise.all([
@@ -73,7 +78,6 @@ export default async function NewMatchPage({
     }
   }
   const error = resolvedSearchParams.error;
-  const defaultScheduledDate = getCurrentMatchDateInput();
 
   return (
     <div className="space-y-4">
@@ -86,9 +90,10 @@ export default async function NewMatchPage({
           arma equipos manuales.
         </CardDescription>
 
-        {initialValues ? <p className="mt-3 text-sm text-emerald-300">Copiamos convocados, invitados, cancha y hora. Revisa la nueva fecha y ajusta quienes juegan.</p> : null}
+        {initialValues ? <p className="mt-3 text-sm text-emerald-300">Copiamos convocados, invitados, cancha y hora. Proponemos la próxima fecha semanal futura; revisala y ajustá quiénes juegan. Los equipos y el resultado se cargan de nuevo.</p> : null}
 
         <NewMatchForm
+          requestId={randomUUID()}
           defaultScheduledDate={defaultScheduledDate}
           defaultModality={defaultModality}
           initialValues={initialValues}

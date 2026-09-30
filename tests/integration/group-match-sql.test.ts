@@ -25,10 +25,10 @@ describe.skipIf(!privateSqlAvailable(sqlPath))("group match transactions (real P
       create table public.organizations (id uuid primary key, created_by uuid);
       create function public.is_org_admin(p_id uuid) returns boolean language sql stable as $$ select exists(select 1 from public.organizations where id = p_id and created_by = auth.uid()) $$;
       create function public.can_write_org(p_id uuid) returns boolean language sql stable as $$ select public.is_org_admin(p_id) $$;
-      create table public.players (id uuid primary key, organization_id uuid references public.organizations, full_name text not null, current_rating numeric not null default 1000, active boolean default true);
+      create table public.players (id uuid primary key, organization_id uuid references public.organizations, full_name text not null, current_rating numeric not null default 1000 check(current_rating > 0), active boolean default true);
       create table public.organization_seasons (id uuid primary key default gen_random_uuid(), organization_id uuid references public.organizations, label text, duration_months int, starts_at date, ends_at date, status text, created_by uuid, closed_at timestamptz);
       create unique index seasons_one_active on public.organization_seasons(organization_id) where status = 'active';
-      create table public.organization_season_player_ratings (organization_id uuid references public.organizations, season_id uuid references public.organization_seasons, player_id uuid references public.players, current_rating numeric default 1000, unique(season_id, player_id));
+      create table public.organization_season_player_ratings (organization_id uuid references public.organizations, season_id uuid references public.organization_seasons, player_id uuid references public.players, current_rating numeric default 1000 check(current_rating > 0), unique(season_id, player_id));
       create table public.matches (id uuid primary key, organization_id uuid references public.organizations, status public.match_status, confirmed_option_id uuid, modality text default '5v5', scheduled_at timestamptz, team_a_label text, team_b_label text, season_id uuid references public.organization_seasons, finished_at timestamptz);
       create table public.team_options (id uuid primary key default gen_random_uuid(), match_id uuid references public.matches, is_confirmed boolean, option_number int, rating_sum_a numeric, rating_sum_b numeric, rating_diff numeric, created_by uuid);
       create table public.match_players (match_id uuid references public.matches, player_id uuid references public.players, unique(match_id, player_id));
@@ -252,6 +252,41 @@ describe.skipIf(!privateSqlAvailable(sqlPath))("group match transactions (real P
     expect(await seasonRatings()).toEqual(beforeSeasonRatings);
     expect((await db.query("select * from public.rating_history order by id")).rows).toEqual(beforeHistory);
   });
+  it("preserves an old capped absence when correcting the score or the other players' outcome", async () => {
+    await db.query("update public.players set current_rating=10 where id=$1", [player(2)]);
+    const lineup = { assignments: assignments.map((a, i) => i === 1 ? {...a, team: "OUT"} : a), absencePenaltyParticipantIds: [`player:${player(2)}`] };
+    await save({scoreA:1,scoreB:0,lineup});
+    await db.query("update public.players set current_rating=current_rating+10 where id=$1", [player(2)]);
+    await db.query("update public.organization_season_player_ratings set current_rating=current_rating+10 where player_id=$1", [player(2)]);
+    const oldHistory = (await db.query<{player_id:string}>("select * from public.rating_history where match_id=$1 order by id", [match])).rows;
+    await save({scoreA:2,scoreB:0},1);
+    expect(await ratings()).toEqual([1010,11,990,990,1000]);
+    expect((await db.query("select * from public.rating_history where match_id=$1 order by id", [match])).rows).toEqual(oldHistory);
+    const absence = oldHistory.find((row) => row.player_id === player(2));
+    await save({scoreA:0,scoreB:1},2);
+    expect(await ratings()).toEqual([990,11,1010,1010,1000]);
+    expect((await db.query("select * from public.rating_history where player_id=$1", [player(2)])).rows).toEqual([absence]);
+  });
+  it("floors ordinary losses and records global and seasonal actual deltas independently", async () => {
+    await db.query("update public.players set current_rating=5 where id=$1", [player(3)]);
+    const season = id(90);
+    await db.query("insert into public.organization_seasons(id,organization_id,label,starts_at,ends_at,status) values ($1,$2,'Temporada 2026','2026-01-01','2026-12-31','active')", [season,org]);
+    await db.query("insert into public.organization_season_player_ratings values ($1,$2,$3,8)", [org,season,player(3)]);
+    await save({scoreA:1,scoreB:0});
+    expect(await ratings()).toEqual([1010,1010,1,990,1000]);
+    expect((await db.query("select delta,season_delta,rating_after,season_rating_after from public.rating_history where player_id=$1", [player(3)])).rows).toEqual([{delta:"-4",season_delta:"-7",rating_after:"1",season_rating_after:"1"}]);
+    await save({scoreA:0,scoreB:1},1);
+    expect(await ratings()).toEqual([990,990,15,1010,1000]);
+    expect((await db.query("select current_rating from public.organization_season_player_ratings where player_id=$1", [player(3)])).rows).toEqual([{current_rating:"18"}]);
+  });
+  it("replaces an old victory at the floor without an invalid intermediate balance", async () => {
+    await save({scoreA:1,scoreB:0});
+    await db.query("update public.players set current_rating=1 where id=$1", [player(1)]);
+    await db.query("update public.organization_season_player_ratings set current_rating=1 where player_id=$1", [player(1)]);
+    await save({scoreA:0,scoreB:1},1);
+    expect((await db.query("select current_rating from public.players where id=$1", [player(1)])).rows).toEqual([{current_rating:"1"}]);
+    expect((await db.query("select delta,season_delta from public.rating_history where player_id=$1", [player(1)])).rows).toEqual([{delta:"10",season_delta:"10"}]);
+  });
   it("closes an expired active season and preserves the stored match's local calendar date", async () => {
     await db.exec(`insert into public.organization_seasons(organization_id, label, starts_at, ends_at, status) values ('${org}', 'Temporada 2020', '2020-01-01', '2020-12-31', 'active');
       update public.matches set scheduled_at = '2025-01-01T01:00:00Z';`);
@@ -328,6 +363,25 @@ describe.skipIf(!privateSqlAvailable(sqlPath))("group match transactions (real P
     await db.exec(`select set_config('test.admin', '${id(999)}', false)`);
     await expect(save({ scoreA: 1, scoreB: 0 })).rejects.toThrow("No autorizado");
     expect(await history()).toEqual([]);
+  });
+  it.each([
+    `select public.ensure_group_current_season('${org}')`,
+    `select public.confirm_group_match_option('${match}','${org}','${option}')`,
+    `select public.replace_group_match_options('${match}','${org}',0,'[]')`,
+    `select public.save_group_match_formation('${match}','${org}',0,'{}')`,
+    `select public.save_group_match_result('${match}','${org}',0,'{"scoreA":1,"scoreB":0}')`
+  ])("reauthorizes after the group lock: %s", async (statement) => {
+    await db.exec(`select set_config('test.auth_checks','0',false);
+      create or replace function public.can_write_org(p_id uuid) returns boolean language plpgsql volatile as $$
+      declare n integer := current_setting('test.auth_checks')::integer;
+      begin perform set_config('test.auth_checks',(n+1)::text,false); return n=0 and public.is_org_admin(p_id); end $$;`);
+    try {
+      await expect(db.exec(statement)).rejects.toThrow("No autorizado");
+      expect(await history()).toEqual([]);
+      expect(await ratings()).toEqual([1000,1000,1000,1000,1000]);
+    } finally {
+      await db.exec("create or replace function public.can_write_org(p_id uuid) returns boolean language sql stable as $$ select public.is_org_admin(p_id) $$");
+    }
   });
   it("rejects a forged confirmed option pointer without touching another group's lineup", async () => {
     const foreignOrg = id(60), foreignMatch = id(61), foreignOption = id(62), foreignPlayer = id(63);

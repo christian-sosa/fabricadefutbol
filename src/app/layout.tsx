@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Suspense } from "react";
 import { PrivateTelemetry } from "@/components/analytics/private-telemetry";
 
@@ -8,7 +7,7 @@ import { GrowthEventTracker } from "@/components/analytics/growth-event-tracker"
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ReactQueryProvider } from "@/components/providers/react-query-provider";
-import { getAdsenseClientId, shouldRenderAds, shouldRenderSpeedInsights } from "@/lib/env";
+import { shouldRenderSpeedInsights } from "@/lib/env";
 import { getPublicAppUrl } from "@/lib/public-url";
 
 const APP_URL = getPublicAppUrl();
@@ -66,23 +65,12 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const adsenseClientId = getAdsenseClientId();
-  const adsEnabled = shouldRenderAds() && Boolean(adsenseClientId);
   const speedInsightsEnabled = shouldRenderSpeedInsights();
 
   return (
     <html lang="es">
       <body>
         <ReactQueryProvider>
-          {adsEnabled && adsenseClientId ? (
-            <Script
-              async
-              crossOrigin="anonymous"
-              id="adsense-loader"
-              src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`}
-              strategy="beforeInteractive"
-            />
-          ) : null}
           <a className="skip-link" href="#contenido-principal">
             Saltar al contenido
           </a>

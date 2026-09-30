@@ -1,23 +1,23 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { getSupabaseAnonKey, getSupabaseDbSchema, getSupabaseUrl } from "@/lib/env";
+import type { Database } from "@/types/database";
 
-let publicClient: ReturnType<typeof createClient> | null = null;
+let publicClient: SupabaseClient<Database> | null = null;
 
 export function createSupabasePublicClient() {
   if (!publicClient) {
-    const options = {
+    publicClient = createClient<Database>(getSupabaseUrl(), getSupabaseAnonKey(), {
       auth: {
         autoRefreshToken: false,
         detectSessionInUrl: false,
         persistSession: false
       },
       db: {
-        schema: getSupabaseDbSchema()
+        // Both isolated schemas share the generated public-shaped TypeScript contract.
+        schema: getSupabaseDbSchema() as "public"
       }
-    } as unknown as Parameters<typeof createClient>[2];
-
-    publicClient = createClient(getSupabaseUrl(), getSupabaseAnonKey(), options);
+    });
   }
 
   return publicClient;

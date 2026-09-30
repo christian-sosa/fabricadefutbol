@@ -45,7 +45,6 @@ vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: createSupabaseServerClientMock
 }));
 vi.mock("@/lib/env", () => ({ getPlayerPhotosBucket: () => "player-photos", getSupabaseDbSchema: () => "app_dev" }));
-vi.mock("@/lib/player-photo-upload-limits", () => ({ assertPlayerPhotoUploadAllowed: vi.fn(), registerPlayerPhotoUploadEvent: vi.fn() }));
 vi.mock("@/lib/domain/media-cleanup", () => ({ enqueueMediaCleanup: vi.fn() }));
 vi.mock("@/lib/player-photos", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/player-photos")>(),
@@ -71,6 +70,37 @@ describe("admin players actions", () => {
     form.set("playerId", id);
     if (value !== null) form.set("isInjured", value);
     return form;
+  }
+
+  function photoForm() {
+    const form = new FormData();
+    form.set("organizationId", organizationId); form.set("playerId", playerId);
+    form.set("photo", new File(["image"], "ana.webp", { type: "image/webp" }));
+    return form;
+  }
+
+  function photoClient(fake: ReturnType<typeof createFakeSupabase>, upload: ReturnType<typeof vi.fn>, failure?: "reserve" | "finalize" | "cancel") {
+    const reservations = new Map<string, { path: string; playerId: string }>();
+    const rpc = vi.fn(async (name: string, args: Record<string, string>) => {
+      if (name === `reserve_group_player_photo` && failure === "reserve") return { data: null, error: { message: "Ya alcanzaste el limite de 2 reemplazos para este jugador." } };
+      if (name === "reserve_group_player_photo") {
+        const path = `app_dev/${args.p_organization_id}/${args.p_player_id}/${args.p_revision}.webp`;
+        reservations.set(args.p_revision, { path, playerId: args.p_player_id });
+        return { data: { path, reservation_id: args.p_revision, expires_at: "2026-10-01T00:00:00Z" }, error: null };
+      }
+      if (name === "finalize_group_player_photo") {
+        if (failure === "finalize") return { data: null, error: { message: "El jugador cambió mientras subías." } };
+        const reservation = reservations.get(args.p_reservation_id)!;
+        const previous = fake.find("players", (row) => row.id === reservation.playerId)?.photo_path ?? null;
+        await fake.client.from("players").update({ photo_path: reservation.path, photo_updated_at: "2026-09-30T00:00:00Z" }).eq("id", reservation.playerId);
+        return { data: { path: reservation.path, updated_at: "2026-09-30T00:00:00Z", previous_path: previous }, error: null };
+      }
+      if (name === "cancel_group_player_photo") return { data: true, error: failure === "cancel" ? { message: "Cancellation unavailable" } : null };
+      return fake.client.rpc(name, args);
+    });
+    const client = { ...fake.client, rpc, storage: { from: () => ({ upload }) } };
+    createSupabaseServerClientMock.mockResolvedValue(client);
+    return rpc;
   }
 
   it("guarda y recupera una lesión de forma idempotente sin cambiar puntos ni otros jugadores", async () => {
@@ -139,7 +169,7 @@ describe("admin players actions", () => {
     const organizationId = "00000000-0000-4000-8000-000000000001";
     const fake = createFakeSupabase({ players: [] });
     const upload = vi.fn().mockResolvedValueOnce({ error: { message: "Storage unavailable" } }).mockResolvedValue({ error: null });
-    createSupabaseServerClientMock.mockResolvedValue({ ...fake.client, storage: { from: () => ({ upload }) } });
+    const rpc = photoClient(fake, upload);
     const photo = new File(["image"], "ana.webp", { type: "image/webp" });
     const form = new FormData();
     form.set("organizationId", organizationId); form.set("fullName", "Ana Pérez"); form.set("skillLevel", "4"); form.set("photo", photo);
@@ -160,6 +190,63 @@ describe("admin players actions", () => {
     expect(fake.table("players")).toHaveLength(1);
     expect(fake.find("players", (row) => row.id === created.id)?.photo_path).toContain(`/${created.id}/`);
     expect(upload).toHaveBeenCalledTimes(2);
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual(["reserve_group_player_photo", "cancel_group_player_photo", "reserve_group_player_photo", "finalize_group_player_photo"]);
+  });
+
+  it("reserva antes de subir una revisión inmutable y finaliza sin escrituras directas del acta de foto", async () => {
+    const fake = createFakeSupabase({ players: [{ id: playerId, organization_id: organizationId, photo_path: "previous.webp" }] });
+    const upload = vi.fn().mockResolvedValue({ error: null });
+    const rpc = photoClient(fake, upload);
+    await expect(uploadPlayerPhotoAction(photoForm())).rejects.toMatchObject({ digest: expect.stringContaining("success=") });
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual(["reserve_group_player_photo", "finalize_group_player_photo"]);
+    expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(upload.mock.invocationCallOrder[0]);
+    expect(upload.mock.invocationCallOrder[0]).toBeLessThan(rpc.mock.invocationCallOrder[1]);
+    expect(upload).toHaveBeenCalledWith(expect.stringContaining(`app_dev/${organizationId}/${playerId}/`), expect.any(Buffer), expect.objectContaining({ upsert: false, contentType: "image/webp" }));
+    expect(fake.table("player_photo_upload_events")).toEqual([]);
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/api/player-photo/${playerId}`);
+  });
+
+  it("rechaza cuota agotada antes de llamar Storage", async () => {
+    const fake = createFakeSupabase({ players: [{ id: playerId, organization_id: organizationId, photo_path: "previous.webp" }] });
+    const upload = vi.fn();
+    const rpc = photoClient(fake, upload, "reserve");
+    await expect(uploadPlayerPhotoAction(photoForm())).rejects.toMatchObject({ digest: expect.stringContaining("error=") });
+    expect(upload).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(fake.find("players", (row) => row.id === playerId)?.photo_path).toBe("previous.webp");
+  });
+
+  it("cancela la reserva ante conflicto final sin reemplazar la foto vigente", async () => {
+    const fake = createFakeSupabase({ players: [{ id: playerId, organization_id: organizationId, photo_path: "newer.webp" }] });
+    const upload = vi.fn().mockResolvedValue({ error: null });
+    const rpc = photoClient(fake, upload, "finalize");
+    await expect(uploadPlayerPhotoAction(photoForm())).rejects.toMatchObject({ digest: expect.stringContaining("error=") });
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual(["reserve_group_player_photo", "finalize_group_player_photo", "cancel_group_player_photo"]);
+    expect(fake.find("players", (row) => row.id === playerId)?.photo_path).toBe("newer.webp");
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("conserva el fallo de Storage aun si cancelar no está disponible", async () => {
+    const fake = createFakeSupabase({ players: [{ id: playerId, organization_id: organizationId, photo_path: "previous.webp" }] });
+    const upload = vi.fn().mockRejectedValue(new Error("Storage request failed"));
+    const rpc = photoClient(fake, upload, "cancel");
+    await expect(uploadPlayerPhotoAction(photoForm())).rejects.toMatchObject({ digest: expect.stringContaining(encodeURIComponent("Storage request failed")) });
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual(["reserve_group_player_photo", "cancel_group_player_photo"]);
+    expect(fake.find("players", (row) => row.id === playerId)?.photo_path).toBe("previous.webp");
+  });
+
+  it("cancela una reserva cuya ruta no corresponde al jugador sin subir bytes", async () => {
+    const fake = createFakeSupabase({ players: [{ id: playerId, organization_id: organizationId, photo_path: "previous.webp" }] });
+    const upload = vi.fn();
+    const reservationId = "00000000-0000-4000-8000-000000000090";
+    const rpc = vi.fn(async (name: string) => name === "reserve_group_player_photo"
+      ? { data: { path: `app_dev/${otherOrganizationId}/${playerId}/${reservationId}.webp`, reservation_id: reservationId, expires_at: "2026-10-01T00:00:00Z" }, error: null }
+      : { data: true, error: null });
+    createSupabaseServerClientMock.mockResolvedValue({ ...fake.client, rpc, storage: { from: () => ({ upload }) } });
+    await expect(uploadPlayerPhotoAction(photoForm())).rejects.toMatchObject({ digest: expect.stringContaining("error=") });
+    expect(upload).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenLastCalledWith("cancel_group_player_photo", { p_organization_id: organizationId, p_player_id: playerId, p_reservation_id: reservationId });
+    expect(fake.find("players", (row) => row.id === playerId)?.photo_path).toBe("previous.webp");
   });
   it("carga una lista sin duplicar jugadores existentes ni cambiar su nivel", async () => {
     const organizationId = "00000000-0000-4000-8000-000000000001";

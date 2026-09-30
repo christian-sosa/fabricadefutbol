@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Database } from "@/types/database";
 import type { MatchHistoryItem } from "@/lib/query/types";
 
-const { serverClient } = vi.hoisted(() => ({ serverClient: vi.fn() }));
+const { serverClient, publicClient } = vi.hoisted(() => ({ serverClient: vi.fn(), publicClient: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: serverClient }));
+vi.mock("@/lib/supabase/public", () => ({ createSupabasePublicClient: publicClient }));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 vi.mock("next/cache", () => ({ unstable_noStore: vi.fn() }));
 import { getMatchHistoryCardsPage } from "@/lib/queries/public";
@@ -24,8 +25,9 @@ function setup(options: { count?: number | null; rangeCode?: string; countFails?
       starts_at: "2026-01-01", ends_at: "2027-01-01", status: "active"
     }]);
     if (url.pathname.endsWith("/organization_public_snapshots")) return Response.json(options.snapshot
-      ? [{ organization_id: ORG, match_history: options.snapshot }]
+      ? [{ organization_id: ORG, match_history: options.snapshot, source_revision: 7, refreshed_at: new Date().toISOString() }]
       : []);
+    if (url.pathname.endsWith("/organizations")) return Response.json([{ id: ORG, sporting_revision: 7, is_public: true, archived_at: null }]);
     if (url.pathname.endsWith("/match_result")) return Response.json([]);
     if (url.pathname.endsWith("/matches")) {
       if (method === "HEAD") {
@@ -42,11 +44,11 @@ function setup(options: { count?: number | null; rangeCode?: string; countFails?
   const client = createClient<Database>("https://fixture.supabase.co", "test-public-key", {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }, global: { fetch: fetcher }
   });
-  serverClient.mockResolvedValue(client);
+  publicClient.mockReturnValue(client);
   return requests;
 }
 
-beforeEach(() => { serverClient.mockReset(); });
+beforeEach(() => { serverClient.mockReset(); publicClient.mockReset(); });
 
 describe("public history outside the available range", () => {
   it.each([0, 2])("returns page two with the exact total %i and identical group/season filters", async (count) => {
@@ -113,7 +115,7 @@ describe("public history outside the available range", () => {
     const response = await getMatchHistoryCardsPage(ORG, { page, pageSize: 2, season: "all" });
     expect(response.matches.map(({ id }) => id)).toEqual(expectedIds);
     expect(response.pagination).toEqual({ page, pageSize: 2, totalCount: total, totalPages: Math.max(1, Math.ceil(total / 2)), hasPreviousPage: true, hasNextPage: false });
-    expect(requests).toHaveLength(1);
+    expect(requests).toHaveLength(2);
     expect(requests[0].url.pathname).toBe("/rest/v1/organization_public_snapshots");
     expect(requests[0].url.searchParams.get("organization_id")).toBe(`eq.${ORG}`);
   });

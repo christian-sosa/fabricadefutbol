@@ -62,16 +62,18 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     expect(await rows("select id,current_rating,active,created_at from APP.players order by id")).toEqual(before);
     expect(await rows("select * from APP.organization_season_player_ratings")).toEqual(seasonBefore);
     expect(await rows("select * from APP.rating_history")).toEqual([]);
-    await sql(`insert into APP.organization_public_snapshots(organization_id) values('${id(10)}');
+    await sql(`select APP.write_group_public_snapshot('${id(10)}',(select sporting_revision from APP.organizations where id='${id(10)}'),'{"summary":{},"standings":[],"matchHistory":[]}');
       update APP.players set is_injured=false where id='${id(100)}';`);
     expect(await snapshots()).toEqual([{ organization_id: id(11) }]);
     expect(await rows(`select is_injured from APP.players where id='${id(100)}'`)).toEqual([{ is_injured: false }]);
   });
 
-  it("does not invalidate snapshots for unchanged status or unrelated profile updates", async () => {
+  it("preserves snapshots for a no-op and invalidates them when the visible name changes", async () => {
     await login();
-    await sql(`update APP.players set is_injured=false, full_name='Updated' where id='${id(100)}';`);
+    await sql(`update APP.players set is_injured=false where id='${id(100)}';`);
     expect(await snapshots()).toEqual([{ organization_id: id(10) }, { organization_id: id(11) }]);
+    await sql(`update APP.players set full_name='Updated' where id='${id(100)}';`);
+    expect(await snapshots()).toEqual([{ organization_id: id(11) }]);
   });
 
   it("rolls snapshot invalidation back with a failed player transaction", async () => {
@@ -90,9 +92,10 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     expect(await snapshots()).toEqual([{ organization_id: id(10) }, { organization_id: id(11) }]);
   });
 
-  it("allows public injury badges while denying anonymous writes and hiding archived groups", async () => {
-    await sql(`update APP.players set is_injured=true where id='${id(100)}'; update APP.organizations set archived_at=now() where id='${id(11)}'; set role anon;`);
-    expect(await rows("select id,is_injured from APP.players")).toEqual([{ id: id(100), is_injured: true }]);
+  it("keeps injury private after activation while public players hide archived groups", async () => {
+    await sql(`update APP.players set is_injured=true where id='${id(100)}'; update APP.organizations set archived_at=now() where id='${id(11)}'; select APP_private.activate_group_security_controls(); set role anon;`);
+    await expect(rows("select id,is_injured from APP.players")).rejects.toMatchObject({code:"42501"});
+    expect(await rows("select id,is_injured from APP.public_players")).toEqual([{ id: id(100), is_injured: false }]);
     await expect(sql(`update APP.players set is_injured=false where id='${id(100)}'`)).rejects.toMatchObject({ code: "42501" });
   });
 
@@ -101,6 +104,7 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     await login();
     expect(await rows(`update APP.players set is_injured=true where id='${id(100)}' returning id`)).toEqual([]);
     await sql(`reset role; update APP.organizations set archived_at=null where id='${id(10)}';`);
+    await sql(`insert into APP.organization_public_snapshots(organization_id) values('${id(10)}');`);
     await login();
     await expect(sql(`update APP.players set is_injured=null where id='${id(100)}'`)).rejects.toMatchObject({ code: "23502" });
     expect(await snapshots()).toEqual([{ organization_id: id(10) }, { organization_id: id(11) }]);

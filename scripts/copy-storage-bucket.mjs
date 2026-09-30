@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { pathToFileURL } from "node:url";
 
 const SOURCE_URL = process.env.SUPABASE_COPY_SOURCE_URL;
 const SOURCE_KEY = process.env.SUPABASE_COPY_SOURCE_SERVICE_ROLE_KEY;
@@ -41,10 +42,10 @@ function mapTargetObjectName(sourceObjectName, sourcePrefixRaw, targetPrefixRaw)
   return `${targetPrefix}${relativeName}`;
 }
 
-async function ensureTargetBucket(targetClient, bucketName) {
+export async function ensureTargetBucket(targetClient, bucketName) {
   const { error: createError } = await targetClient.storage.createBucket(bucketName, {
-    public: true,
-    fileSizeLimit: 10 * 1024 * 1024,
+    public: false,
+    fileSizeLimit: 5 * 1024 * 1024,
     allowedMimeTypes: ["image/webp"]
   });
 
@@ -53,8 +54,8 @@ async function ensureTargetBucket(targetClient, bucketName) {
   }
 
   const { error: updateError } = await targetClient.storage.updateBucket(bucketName, {
-    public: true,
-    fileSizeLimit: 10 * 1024 * 1024,
+    public: false,
+    fileSizeLimit: 5 * 1024 * 1024,
     allowedMimeTypes: ["image/webp"]
   });
 
@@ -148,6 +149,8 @@ async function main() {
   console.log(`[copy-storage-bucket] Copia finalizada. Copiados: ${copied}. Omitidos: ${skipped}.`);
 }
 
-main().catch((error) => {
-  fail(error instanceof Error ? error.message : "Error inesperado.");
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    fail(error instanceof Error ? error.message : "Error inesperado.");
+  });
+}

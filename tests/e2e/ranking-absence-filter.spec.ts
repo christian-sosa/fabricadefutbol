@@ -31,7 +31,7 @@ const standings: PlayerComputedStats[] = [
   },
   {
     playerId: "00000000-0000-4000-8000-202609180002",
-    playerName: "Lesionado de prueba",
+    playerName: "Segundo activo de prueba",
     currentRating: 1100,
     initialRank: 2,
     currentRank: 2,
@@ -47,9 +47,9 @@ const standings: PlayerComputedStats[] = [
     mvpCount: 2,
     photoPath: null,
     isAbsent: false,
-    isInjured: true,
-    matchesSinceLastPlayed: 8,
-    lastPlayedAt: "2026-07-10T01:00:00.000Z"
+    isInjured: false,
+    matchesSinceLastPlayed: 1,
+    lastPlayedAt: "2026-09-16T21:00:00.000Z"
   },
   {
     playerId: "00000000-0000-4000-8000-202609180003",
@@ -119,7 +119,7 @@ const standings: PlayerComputedStats[] = [
   }
 ];
 
-test("ranking filtra inactivos, conserva lesionados y puestos a 320 px y escritorio", async ({ page, context }, testInfo) => {
+test("ranking filtra inactivos y conserva puestos sin mostrar lesiones a 320 px y escritorio", async ({ page, context }, testInfo) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 320, height: 850 });
   // The mocked activity corresponds to this date in Buenos Aires.
@@ -153,24 +153,24 @@ test("ranking filtra inactivos, conserva lesionados y puestos a 320 px y escrito
     await page.setViewportSize(viewport);
     await expect(checkbox).not.toBeChecked();
     await expect(page.getByText("Inactivo", { exact: true }).filter({ visible: true })).toHaveCount(3);
-    await expect(page.getByText("Lesionado", { exact: true }).filter({ visible: true })).toBeVisible();
-    await expect(page.getByText("8 partidos sin jugar", { exact: true }).filter({ visible: true })).toHaveCount(2);
+    await expect(page.getByText("Lesionado", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("8 partidos sin jugar", { exact: true }).filter({ visible: true })).toHaveCount(1);
     await expect(page.getByText("Inactivo por mes", { exact: true }).filter({ visible: true })).toBeVisible();
     await expect(page.getByText("Jugador sin debut", { exact: true }).filter({ visible: true })).toBeVisible();
     await expect(page.getByText("Sin debut", { exact: true }).filter({ visible: true })).toBeVisible();
     await expect(checkbox).toHaveAccessibleDescription(/8 partidos finalizados seguidos sin jugar o 1 mes calendario desde el último partido\. Sin debut, se considera inactivo\./);
-    await expect(page.getByText("10/07/2026", { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByText("16/09/2026", { exact: true }).filter({ visible: true })).toBeVisible();
 
     await checkbox.check();
     await expect(page.getByText("Inactivo de prueba", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Inactivo por mes", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Jugador sin debut", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("Lesionado de prueba", { exact: true }).filter({ visible: true })).toBeVisible();
-    await expect(page.getByText("Lesionado", { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByText("Segundo activo de prueba", { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByText("Lesionado", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Mostrando 2 de 5 jugadores · Se conservan los puestos", { exact: true })).toBeVisible();
 
     if (viewport.width === 320) {
-      await expect(page.getByLabel(/^Estadísticas de Lesionado de prueba: puesto 2,/)).toBeVisible();
+      await expect(page.getByLabel(/^Estadísticas de Segundo activo de prueba: puesto 2,/)).toBeVisible();
       await expect(page.getByLabel(/^Estadísticas de Activo de prueba: puesto 3,/)).toBeVisible();
     } else {
       const rows = page.getByRole("table").getByRole("row");

@@ -121,6 +121,7 @@ export default async function AdminPlayersPage({
             Modifica la planilla y guarda una sola vez. La lista se ordena por nivel despues de guardar, de Nivel 1 a Nivel 7.
             La foto se actualiza en la fila de cada jugador.
           </CardDescription>
+          <p className="mt-2 text-sm text-slate-400">La habilidad la elegís vos y puede repetirse: Nivel 1 es Estrella y Nivel 7 es Principiante. Los puntos cambian con los resultados; ajustar la habilidad no reinicia esos puntos. El nivel “Figura” es una categoría de habilidad, distinta de la figura del partido.</p>
           <p className="mt-2 text-sm text-slate-400" id="player-injury-help">
             Las lesiones se guardan al instante. Los lesionados siguen en el ranking y no se cuentan como inactivos.
           </p>

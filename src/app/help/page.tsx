@@ -73,7 +73,7 @@ const rankingDetails: HelpSectionItem[] = [
   {
     title: "Nivel",
     description:
-      "Lo define el admin para representar que tan bueno es un jugador de base. No cambia solo por ganar o perder."
+      "La habilidad la define el admin y puede repetirse entre jugadores: Nivel 1 es Estrella y Nivel 7 es Principiante. No cambia por ganar o perder; editarla no reinicia los puntos. El nivel Figura no es la figura del partido."
   },
   {
     title: "Rendimiento",
@@ -81,14 +81,19 @@ const rankingDetails: HelpSectionItem[] = [
       "Sube o baja segun los resultados. Ayuda a reflejar quien viene jugando mejor dentro del grupo."
   },
   {
+    title: "Ejemplo de puntos",
+    description:
+      "Con 1000 puntos, una victoria deja 1010, una derrota 990 y un empate 1000. Una ausencia penalizada por el admin deja 980. Si el equipo con menos jugadores tiene desventaja registrada y gana, suma 20 y el rival resta 20; si pierde, conserva sus puntos y el rival suma 10. El piso es 1 punto. La figura del partido no agrega puntos."
+  },
+  {
     title: "Ranking",
     description:
-      "Ordena por puntos de rendimiento y, si están empatados, por más MVP en la temporada elegida. Podés consultar años anteriores o el historial completo."
+      "Ordena por puntos de rendimiento y, si están empatados, por más figuras en la temporada elegida. Al elegir Todo, usa el conteo histórico de figuras."
   },
   {
     title: "Figura del partido (MVP)",
     description:
-      "Es un reconocimiento opcional y no suma puntos. Las figuras de cada jugador se cuentan por temporada y sirven para desempatar el ranking. Un invitado también puede ser figura y queda registrado en el historial."
+      "Es un reconocimiento opcional y simbólico: no suma puntos. Sirve para desempatar a igualdad de puntos según la temporada elegida; Todo usa el conteo histórico. Un invitado también puede ser figura y queda registrado en el acta."
   },
   {
     title: "Armado de equipos",

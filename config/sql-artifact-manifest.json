@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
-  "revision": "substitutes-private-scorers-20260925",
-  "sha256": "06445373beef58ca8dfe1102b5ff8f46183a92a187716ee43d6390f0805a1f6b",
+  "revision": "groups-audit-20260930",
+  "sha256": "113da6edb5d97586c3a93f0bf3532b4e490af2a794e7a4a7734fdd77c426bb45",
   "bucket": "groups-sql-artifacts",
-  "object": "06445373beef58ca8dfe1102b5ff8f46183a92a187716ee43d6390f0805a1f6b.json.gz"
+  "object": "113da6edb5d97586c3a93f0bf3532b4e490af2a794e7a4a7734fdd77c426bb45.json.gz"
 }

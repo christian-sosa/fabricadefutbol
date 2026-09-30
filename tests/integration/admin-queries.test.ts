@@ -7,8 +7,9 @@ const { createSupabaseServerClientMock } = vi.hoisted(() => ({
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: createSupabaseServerClientMock
 }));
+vi.mock("@/lib/supabase/admin", () => ({ createSupabaseAdminClient: () => null }));
 
-import { getAdminDashboardData, getAdminMatchDetails, getAdminPlayers, getSelectablePlayers } from "@/lib/queries/admin";
+import { getAdminDashboardData, getAdminMatchDetails, getAdminMatches, getAdminPlayers, getOrganizationAdminData, getSelectablePlayers } from "@/lib/queries/admin";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 const ORG_ID = "org-1";
@@ -201,5 +202,86 @@ describe("admin player queries", () => {
     expect(teamA.find((player: { id: string }) => player.id === "guest-elite")).toMatchObject({
       skill_level: 0.5
     });
+  });
+
+  it("pagina partidos aun cuando el servidor limita cada página a menos de 500 filas", async () => {
+    const ids = Array.from({ length: 1105 }, (_, index) => `match-${String(index).padStart(4, "0")}`);
+    const fake = createFakeSupabase({ matches: ids.map((id) => ({ id, organization_id: ORG_ID, status: "finished", scheduled_at: "2026-09-25T21:00:00Z" })) });
+    const originalFrom = fake.client.from.bind(fake.client);
+    const ranges: number[] = [];
+    vi.spyOn(fake.client, "from").mockImplementation((table) => {
+      const query = originalFrom(table);
+      const originalRange = query.range.bind(query);
+      vi.spyOn(query, "range").mockImplementation((from, to) => {
+        ranges.push(from);
+        return originalRange(from, Math.min(to, from + 72));
+      });
+      return query;
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    const matches = await getAdminMatches(ORG_ID);
+    expect(matches.map((match) => match.id)).toEqual([...ids].reverse());
+    expect(new Set(matches.map((match) => match.id)).size).toBe(1105);
+    expect(ranges.slice(0, 3)).toEqual([0, 73, 146]);
+  });
+
+  it("pagina plantel y convocables con desempate estable por id sin incluir otro grupo", async () => {
+    const ids = Array.from({ length: 1105 }, (_, index) => `player-${String(index).padStart(4, "0")}`);
+    const fake = createFakeSupabase({ players: [
+      ...[...ids].reverse().map((id) => ({ id, organization_id: ORG_ID, full_name: "Mismo nombre", skill_level: 3, display_order: 1, active: true })),
+      { id: "other", organization_id: "other-group", full_name: "Mismo nombre", active: true },
+      { id: "inactive", organization_id: ORG_ID, full_name: "Mismo nombre", skill_level: 3, display_order: 1, active: false }
+    ] });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    expect((await getSelectablePlayers(ORG_ID)).map((player) => player.id)).toEqual(ids);
+    expect((await getAdminPlayers(ORG_ID)).map((player) => player.id)).toEqual(["inactive", ...ids]);
+  });
+
+  it("obtiene todas las membresías de administradores y no sólo las primeras 1000", async () => {
+    const fake = createFakeSupabase({ organization_admins: Array.from({ length: 1105 }, (_, index) => ({
+      id: `membership-${String(index).padStart(4, "0")}`, organization_id: ORG_ID, admin_id: `admin-${index}`, created_at: "2026-09-01T00:00:00Z"
+    })) });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    expect((await getOrganizationAdminData(ORG_ID)).admins).toHaveLength(1105);
+  });
+
+  it("pagina participantes del detalle y divide los ids de jugadores en lotes", async () => {
+    const ids = Array.from({ length: 1105 }, (_, index) => `player-${String(index).padStart(4, "0")}`);
+    const fake = createFakeSupabase({
+      matches: [{ id: "match-1", organization_id: ORG_ID, scheduled_at: "2026-09-25T21:00:00Z" }],
+      team_options: [{ id: "option-1", match_id: "match-1", option_number: 1 }],
+      team_option_players: ids.map((id) => ({ team_option_id: "option-1", player_id: id, team: "A" })),
+      players: ids.map((id) => ({ id, organization_id: ORG_ID, full_name: "Jugador", skill_level: 3 }))
+    });
+    const originalFrom = fake.client.from.bind(fake.client);
+    const batches: number[] = [];
+    vi.spyOn(fake.client, "from").mockImplementation((table) => {
+      const query = originalFrom(table);
+      const originalIn = query.in.bind(query);
+      vi.spyOn(query, "in").mockImplementation((column, values) => {
+        if (table === "players") batches.push(values.length);
+        return originalIn(column, values);
+      });
+      return query;
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    expect((await getAdminMatchDetails("match-1", ORG_ID))?.options[0]?.teamA).toHaveLength(1105);
+    expect(batches).toEqual([200, 200, 200, 200, 200, 105]);
+  });
+
+  it("propaga un fallo posterior sin devolver una lista parcial como si fuera completa", async () => {
+    const fake = createFakeSupabase({ matches: Array.from({ length: 501 }, (_, index) => ({ id: `match-${index}`, organization_id: ORG_ID, scheduled_at: "2026-09-25T21:00:00Z" })) });
+    const originalFrom = fake.client.from.bind(fake.client);
+    vi.spyOn(fake.client, "from").mockImplementation((table) => {
+      const query = originalFrom(table);
+      const originalRange = query.range.bind(query);
+      vi.spyOn(query, "range").mockImplementation((from, to) => {
+        if (from === 500) throw new Error("Falló la segunda página.");
+        return originalRange(from, to);
+      });
+      return query;
+    });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    await expect(getAdminMatches(ORG_ID)).rejects.toThrow("Falló la segunda página.");
   });
 });

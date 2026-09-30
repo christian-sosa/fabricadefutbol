@@ -26,7 +26,8 @@
     "sql:build-schema": "node scripts/build-schema-sql.mjs",
     "sql:package": "node scripts/package-sql-artifact.mjs",
     "sql:publish-artifact": "node scripts/publish-sql-artifact.mjs",
-    "storage:copy": "node scripts/copy-storage-bucket.mjs"
+    "storage:copy": "node scripts/copy-storage-bucket.mjs",
+    "ops:groups": "node scripts/report-groups-operations.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

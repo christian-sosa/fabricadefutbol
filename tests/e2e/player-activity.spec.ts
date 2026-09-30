@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 import { E2E_ORGANIZATION_ID, E2E_PLAYER_IDS } from "./test-data";
 
@@ -6,8 +6,8 @@ const ORG_SLUG = process.env.E2E_ORG_SLUG ?? "e2e-fabrica";
 const PLAYER_ID = E2E_PLAYER_IDS[0];
 type Standing = { playerId: string; currentRating: number; isInjured: boolean; isAbsent: boolean };
 
-async function standingsFor(page: Page) {
-  const response = await page.request.get(`/api/organizations/${E2E_ORGANIZATION_ID}/standings?season=current`);
+async function standingsFor(request: APIRequestContext) {
+  const response = await request.get(`/api/organizations/${E2E_ORGANIZATION_ID}/standings?season=current`);
   expect(response.ok()).toBe(true);
   return (await response.json() as { standings: Standing[] }).standings;
 }
@@ -25,7 +25,7 @@ async function followNavigationLink(page: Page, label: string) {
   await link.click();
 }
 
-test("la lesión se guarda desde admin y permanece visible al excluir inactivos sin cambiar puntos", async ({ page, isMobile }, testInfo) => {
+test("la lesión se guarda sólo para admin y no altera puntos ni ausencia pública", async ({ page, request: anonymousRequest, isMobile }, testInfo) => {
   test.setTimeout(120_000);
   const adminPath = `/admin/players?org=${ORG_SLUG}`;
   await page.goto(`/admin/login?next=${encodeURIComponent(adminPath)}`);
@@ -38,11 +38,18 @@ test("la lesión se guarda desde admin y permanece visible al excluir inactivos 
 
   const playerRow = page.locator(`#player-${PLAYER_ID}`);
   const playerName = await playerRow.locator('input[name="fullName"]').inputValue();
-  const initial = await standingsFor(page);
-  expect(initial.find((player) => player.playerId === PLAYER_ID)?.isInjured).toBe(false);
+  const initial = await standingsFor(page.request);
+  const initialPlayer = initial.find((player) => player.playerId === PLAYER_ID);
+  expect(initialPlayer).toBeDefined();
+  if (!initialPlayer) throw new Error("No se encontró al jugador del fixture en el ranking.");
+  expect(initialPlayer.isInjured).toBe(false);
+  // The standalone request fixture has no browser/admin cookies.
+  expect((await anonymousRequest.storageState()).cookies.length).toBe(0);
+  const initialAnonymous = await standingsFor(anonymousRequest);
+  expect(initialAnonymous.find((player) => player.playerId === PLAYER_ID)).toMatchObject({ isInjured: false, isAbsent: initialPlayer.isAbsent });
 
-  // Keep the same client QueryClient through all navigation: a recent cached
-  // ranking must update after the mutation, even before its 60s stale time.
+  // Keep client navigation and its recent cached ranking through the admin
+  // mutation; health data must remain absent from every public view.
   await followNavigationLink(page, "Grupos");
   await followNavigationLink(page, "Ranking");
   const rankingRow = (isMobile ? page.locator("article") : page.locator("tbody tr"))
@@ -60,24 +67,29 @@ test("la lesión se guarda desde admin y permanece visible al excluir inactivos 
     await playerRow.getByRole("button", { name: `Marcar lesionado a ${playerName}`, exact: true }).click();
     await expect(playerRow.getByRole("button", { name: `Marcar recuperado a ${playerName}`, exact: true })).toBeVisible();
     await expect(playerRow.getByText("Lesionado", { exact: true })).toBeVisible();
-    const injured = await standingsFor(page);
-    expect(injured.find((player) => player.playerId === PLAYER_ID)).toMatchObject({ isInjured: true, isAbsent: false });
+    const injured = await standingsFor(page.request);
+    expect(injured.find((player) => player.playerId === PLAYER_ID)).toMatchObject({ isInjured: false, isAbsent: initialPlayer.isAbsent });
     expect(points(injured)).toEqual(points(initial));
+    const injuredAnonymous = await standingsFor(anonymousRequest);
+    expect(injuredAnonymous.find((player) => player.playerId === PLAYER_ID)).toMatchObject({ isInjured: false, isAbsent: initialPlayer.isAbsent });
+    expect(points(injuredAnonymous)).toEqual(points(initialAnonymous));
 
     await followNavigationLink(page, "Grupos");
     await followNavigationLink(page, "Ranking");
-    await expect(rankingRow.getByText("Lesionado", { exact: true })).toBeVisible();
+    await expect(rankingRow).toBeVisible();
+    await expect(rankingRow.getByText("Lesionado", { exact: true })).toHaveCount(0);
+    await expect(rankingRow.getByText("Inactivo", { exact: true })).toHaveCount(initialPlayer.isAbsent ? 1 : 0);
     const excludeAbsent = page.getByRole("checkbox", { name: "Excluir inactivos", exact: true });
     await excludeAbsent.check();
     await expect(excludeAbsent).toBeChecked();
-    await expect(rankingRow).toBeVisible();
-    await expect(rankingRow.getByText("Lesionado", { exact: true })).toBeVisible();
-    await expect(rankingRow.getByText("Inactivo", { exact: true })).toHaveCount(0);
+    if (initialPlayer.isAbsent) await expect(rankingRow).toHaveCount(0);
+    else await expect(rankingRow).toBeVisible();
+    await expect(page.getByText("Lesionado", { exact: true })).toHaveCount(0);
     const size = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: window.innerWidth }));
     expect(size.width).toBeLessThanOrEqual(size.viewport + 1);
-    const screenshot = testInfo.outputPath("ranking-lesionado.png");
+    const screenshot = testInfo.outputPath("ranking-lesion-privada.png");
     await page.screenshot({ path: screenshot, animations: "disabled" });
-    await testInfo.attach("ranking-lesionado", { path: screenshot, contentType: "image/png" });
+    await testInfo.attach("ranking-lesion-privada", { path: screenshot, contentType: "image/png" });
   } finally {
     // This state belongs only to the accredited disposable fixture in app_dev.
     await page.goto(adminPath);
@@ -89,7 +101,10 @@ test("la lesión se guarda desde admin y permanece visible al excluir inactivos 
     await expect(playerRow.getByRole("button", { name: `Marcar lesionado a ${playerName}`, exact: true })).toBeVisible();
   }
 
-  const recovered = await standingsFor(page);
-  expect(recovered.find((player) => player.playerId === PLAYER_ID)?.isInjured).toBe(false);
+  const recovered = await standingsFor(page.request);
+  expect(recovered.find((player) => player.playerId === PLAYER_ID)).toMatchObject({ isInjured: false, isAbsent: initialPlayer.isAbsent });
   expect(points(recovered)).toEqual(points(initial));
+  const recoveredAnonymous = await standingsFor(anonymousRequest);
+  expect(recoveredAnonymous.find((player) => player.playerId === PLAYER_ID)).toMatchObject({ isInjured: false, isAbsent: initialPlayer.isAbsent });
+  expect(points(recoveredAnonymous)).toEqual(points(initialAnonymous));
 });

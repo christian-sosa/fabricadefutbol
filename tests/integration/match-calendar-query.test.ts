@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createSupabaseServerClientMock } = vi.hoisted(() => ({
-  createSupabaseServerClientMock: vi.fn()
+const { createSupabaseServerClientMock, createSupabasePublicClientMock } = vi.hoisted(() => ({
+  createSupabaseServerClientMock: vi.fn(), createSupabasePublicClientMock: vi.fn()
 }));
+vi.mock("@/lib/supabase/public", () => ({ createSupabasePublicClient: createSupabasePublicClientMock }));
 
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: createSupabaseServerClientMock
@@ -45,7 +46,9 @@ function match(id: string, overrides: Record<string, unknown> = {}) {
 }
 
 describe("getMatchCalendarActivity", () => {
-  beforeEach(() => createSupabaseServerClientMock.mockReset());
+  beforeEach(() => { vi.useFakeTimers(); createSupabaseServerClientMock.mockReset(); createSupabasePublicClientMock.mockReset(); vi.setSystemTime(new Date("2026-09-30T12:00:00Z")); });
+
+  afterEach(() => vi.useRealTimers());
 
   it("no consulta datos sin un grupo seleccionado", async () => {
     await expect(getMatchCalendarActivity(null)).resolves.toEqual({ matches: [], season: null });
@@ -67,6 +70,7 @@ describe("getMatchCalendarActivity", () => {
       ]
     });
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
 
     const result = await getMatchCalendarActivity(ORG_ID, currentSeason.id);
 
@@ -95,6 +99,7 @@ describe("getMatchCalendarActivity", () => {
       matches: [match("current"), match("previous", { season_id: previousSeason.id })]
     });
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
 
     const result = await getMatchCalendarActivity(ORG_ID);
 
@@ -113,6 +118,7 @@ describe("getMatchCalendarActivity", () => {
       ]
     });
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
 
     const result = await getMatchCalendarActivity(ORG_ID, "all");
 
@@ -137,6 +143,7 @@ describe("getMatchCalendarActivity", () => {
       }
     };
     createSupabaseServerClientMock.mockResolvedValue(client);
+    createSupabasePublicClientMock.mockReturnValue(client);
 
     const result = await getMatchCalendarActivity(ORG_ID, "all");
 
@@ -150,6 +157,7 @@ describe("getMatchCalendarActivity", () => {
   ] as const)("propaga los errores de %s", async (table, season) => {
     const fake = createFakeSupabase({ queryFailures: { [table]: { select: "Consulta no disponible" } } });
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
 
     await expect(getMatchCalendarActivity(ORG_ID, season)).rejects.toThrow("Consulta no disponible");
   });

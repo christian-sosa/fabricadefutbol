@@ -1,0 +1,46 @@
+import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/app/feedback/actions", () => ({ submitFeedbackAction: vi.fn() }));
+import { submitFeedbackAction } from "@/app/feedback/actions";
+import { FeedbackForm } from "@/app/feedback/feedback-form";
+import type { FeedbackState } from "@/app/feedback/feedback-state";
+
+describe("formulario de Contacto", () => {
+  beforeEach(() => vi.clearAllMocks());
+  it("conserva la consulta durante envío, fallo de conexión y reintento", async () => {
+    let rejectRequest!: (reason: Error) => void;
+    vi.mocked(submitFeedbackAction).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectRequest = reject; }));
+    const user = userEvent.setup();
+    render(<FeedbackForm intent="setup_help" organization="viernes" />);
+    await user.type(screen.getByLabelText("Nombre"), "Ana Pérez");
+    await user.type(screen.getByLabelText("Email"), "ana@example.test");
+    await user.type(screen.getByLabelText("Mensaje"), "Necesito cargar veinte jugadores.");
+    await user.click(screen.getByRole("button", { name: "Enviar mensaje" }));
+    expect(screen.getByRole("button", { name: "Enviando…" })).toBeDisabled();
+    expect(screen.getByLabelText("Mensaje")).toHaveValue("Necesito cargar veinte jugadores.");
+    await act(async () => rejectRequest(new Error("network")));
+    expect(screen.getByRole("alert")).toHaveTextContent("Tu mensaje sigue acá");
+    expect(screen.getByLabelText("Nombre")).toHaveValue("Ana Pérez");
+    expect(screen.getByLabelText("Email")).toHaveValue("ana@example.test");
+    vi.mocked(submitFeedbackAction).mockImplementationOnce(async (previous) => ({ ...previous, status: "success", message: "Recibimos tu mensaje.", errors: {} }));
+    await user.click(screen.getByRole("button", { name: "Reintentar envío" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Recibimos tu mensaje"));
+    expect(screen.getByLabelText("Mensaje")).toHaveValue("Necesito cargar veinte jugadores.");
+    const sent = vi.mocked(submitFeedbackAction).mock.calls[1][1];
+    expect(sent.get("message")).toBe("Necesito cargar veinte jugadores.");
+  });
+  it("asocia el error del servidor al campo y permite corregirlo", async () => {
+    vi.mocked(submitFeedbackAction).mockImplementationOnce(async (previous): Promise<FeedbackState> => ({ ...previous, status: "error", message: "Revisá el nombre.", errors: { fullName: "Usá al menos dos caracteres." } }));
+    const user = userEvent.setup();
+    render(<FeedbackForm />);
+    await user.type(screen.getByLabelText("Nombre"), "A");
+    await user.type(screen.getByLabelText("Email"), "ana@example.test");
+    await user.type(screen.getByLabelText("Mensaje"), "Quiero hacer una consulta.");
+    await user.click(screen.getByRole("button", { name: "Enviar mensaje" }));
+    await waitFor(() => expect(screen.getByLabelText("Nombre")).toHaveAttribute("aria-invalid", "true"));
+    expect(screen.getByLabelText("Nombre")).toHaveAccessibleDescription("Usá al menos dos caracteres.");
+    await user.type(screen.getByLabelText("Nombre"), "na");
+    expect(screen.getByLabelText("Nombre")).toHaveValue("Ana");
+  });
+});

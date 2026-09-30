@@ -9,6 +9,7 @@ type TableName =
   | "organization_season_player_ratings"
   | "player_photo_upload_events"
   | "players"
+  | "public_players"
   | "matches"
   | "match_players"
   | "match_guests"
@@ -61,6 +62,7 @@ function createEmptyDatabase(): FakeDatabase {
     organization_season_player_ratings: [],
     player_photo_upload_events: [],
     players: [],
+    public_players: [],
     matches: [],
     match_players: [],
     match_guests: [],
@@ -98,6 +100,8 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!("player_photos_purge_at" in normalized)) normalized.player_photos_purge_at = null;
       if (!("player_photos_purged_at" in normalized)) normalized.player_photos_purged_at = null;
       if (!("is_public" in normalized)) normalized.is_public = true;
+      if (!("is_listed" in normalized)) normalized.is_listed = true;
+      if (!("sporting_revision" in normalized)) normalized.sporting_revision = 0;
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "analytics_events":
@@ -157,6 +161,7 @@ function applyDefaults(table: TableName, row: Row, nextId: () => string): Row {
       if (!normalized.updated_at) normalized.updated_at = now;
       break;
     case "organization_public_snapshots":
+      if (!("source_revision" in normalized)) normalized.source_revision = 0;
       if (!("summary" in normalized)) normalized.summary = {};
       if (!("standings" in normalized)) normalized.standings = [];
       if (!("match_history" in normalized)) normalized.match_history = [];
@@ -186,6 +191,7 @@ class FakeSupabaseState {
   private idCounter = 1;
   private authUser: SeedInput["authUser"] = null;
   private queryFailures: SeedInput["queryFailures"] = {};
+  private draftRequests = new Map<string, string>();
 
   constructor(seed: SeedInput = {}) {
     this.db = createEmptyDatabase();
@@ -208,11 +214,13 @@ class FakeSupabaseState {
     return this.authUser;
   }
 
-  getTable(table: TableName) {
+  getTable(table: TableName): Row[] {
+    if (table === "public_players") return this.db.players.map((row) => ({...cloneRow(row),is_injured:false}));
     return this.db[table];
   }
 
   getQueryFailure(table: TableName, mode: QueryMode) {
+    if (table === "public_players") return this.queryFailures?.public_players?.[mode] ?? this.queryFailures?.players?.[mode] ?? null;
     return this.queryFailures?.[table]?.[mode] ?? null;
   }
 
@@ -240,6 +248,64 @@ class FakeSupabaseState {
 
   async runRpc(name: string, args: Record<string, unknown>) {
     if (name === "is_super_admin") return { data: false, error: null };
+    if (name === "create_group_match_draft") {
+      const input = args.p_input as {
+        scheduledAt: string; modality: string; location: string | null; selectedPlayerIds: string[];
+        invitedGuests: Array<{key:string;name:string;rating:number}>;
+        substituteAssignments: Array<{participantId:string;team:string|null}>; goalkeeperPlayerIds:string[];
+        teamALabel:string|null;teamBLabel:string|null;teamCreationMode:string;
+        options:Array<{teamA:Array<{id:string}>;teamB:Array<{id:string}>;ratingSumA:number;ratingSumB:number;ratingDiff:number}>;
+      };
+      const requestId = String(args.p_request_id);
+      const { options, ...intent } = input;
+      const fingerprint = JSON.stringify({...intent, ...(input.teamCreationMode === "manual" ? {
+        manualTeams: options.map((option) => ({A:option.teamA.map((m) => m.id).sort(), B:option.teamB.map((m) => m.id).sort()}))
+      } : {})});
+      const previous = this.draftRequests.get(requestId);
+      if (previous) {
+        if (previous !== fingerprint) return {data:null,error:{message:"La solicitud ya existe con otros datos."}};
+        const match = this.db.matches.find((row) => row.id === requestId);
+        return {data:{match_id:requestId,result_version:match?.result_version,reused:true},error:null};
+      }
+      const before = cloneRow(this.db);
+      try {
+        const insert = (table:TableName,row:Row) => {
+          const failure = this.getQueryFailure(table,"insert");
+          if (failure) throw new Error(failure);
+          return this.insertRow(table,row);
+        };
+        insert("matches", {id:requestId,organization_id:args.p_organization_id,scheduled_at:input.scheduledAt,
+          modality:input.modality,location:input.location,goalkeeper_player_ids:input.goalkeeperPlayerIds,
+          team_a_label:input.teamALabel,team_b_label:input.teamBLabel,result_version:0});
+        const bench = new Map(input.substituteAssignments.map((a) => [a.participantId,a.team]));
+        for (const playerId of input.selectedPlayerIds) insert("match_players",{match_id:requestId,player_id:playerId,
+          is_substitute:bench.has(`player:${playerId}`),substitute_team:bench.get(`player:${playerId}`)??null});
+        const aliases = new Map<string,string>();
+        for (const guest of input.invitedGuests) {
+          const row = insert("match_guests",{match_id:requestId,guest_name:guest.name,guest_rating:guest.rating,
+            is_substitute:bench.has(`guest:${guest.key}`),substitute_team:bench.get(`guest:${guest.key}`)??null});
+          aliases.set(`guest:${guest.key}`,`guest:${row.id}`);
+        }
+        const mappedOptions = options.map((option) => ({...option,
+          teamA:option.teamA.map((m) => ({...m,id:aliases.get(m.id)??m.id})),
+          teamB:option.teamB.map((m) => ({...m,id:aliases.get(m.id)??m.id}))}));
+        for (const table of ["team_options","team_option_players","team_option_guests"] as const) {
+          const failure = this.getQueryFailure(table,"insert"); if (failure) throw new Error(failure);
+        }
+        const replaced = await this.runRpc("replace_group_match_options",{p_match_id:requestId,p_organization_id:args.p_organization_id,p_expected_version:0,p_options:mappedOptions});
+        if (replaced.error) throw new Error(replaced.error.message);
+        if (input.teamCreationMode === "manual") {
+          const option = this.db.team_options.find((row) => row.match_id===requestId && row.option_number===1);
+          const confirmed = await this.runRpc("confirm_group_match_option",{p_match_id:requestId,p_organization_id:args.p_organization_id,p_option_id:option?.id,p_team_a_label:input.teamALabel,p_team_b_label:input.teamBLabel});
+          if (confirmed.error) throw new Error(confirmed.error.message);
+        }
+        this.draftRequests.set(requestId,fingerprint);
+        return {data:{match_id:requestId,result_version:this.db.matches.find((row) => row.id===requestId)?.result_version,reused:false},error:null};
+      } catch (error) {
+        Object.assign(this.db,before);
+        return {data:null,error:{message:error instanceof Error?error.message:String(error)}};
+      }
+    }
     if (name === "replace_group_match_options") {
       const match = this.db.matches.find((row) => row.id === args.p_match_id && row.organization_id === args.p_organization_id);
       if (!match || match.status !== "draft") return { data: null, error: { message: "Solo se pueden regenerar opciones en borrador." } };
@@ -573,6 +639,7 @@ class FakeQuery {
   }
 
   private execute(cardinality: Cardinality): QueryResult<unknown> {
+    if (this.table === "public_players" && this.mode !== "select") return Promise.resolve({data:null,error:{message:"Public player view is read-only."}});
     const forcedMessage = this.state.getQueryFailure(this.table, this.mode);
     if (forcedMessage) {
       return Promise.resolve({

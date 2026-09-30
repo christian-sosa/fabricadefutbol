@@ -40,6 +40,11 @@ import { REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL } from "@/lib/storage-image-resp
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+const organizationListingSchema = z.object({
+  organizationId: z.string().uuid(),
+  isListed: z.boolean()
+});
+
 const createOrganizationSchema = z.object({
   organizationId: z.string().uuid("El formulario venció. Recargá la página e intentá nuevamente."),
   name: z
@@ -87,6 +92,34 @@ function buildAdminAdminsPath(organizationKey?: string, error?: string) {
   if (!error) return basePath;
   const separator = basePath.includes("?") ? "&" : "?";
   return `${basePath}${separator}error=${encodeURIComponent(error)}`;
+}
+
+export async function setOrganizationListedAction(formData: FormData) {
+  const parsed = organizationListingSchema.safeParse({
+    organizationId: formData.get("organizationId"),
+    isListed: formData.get("isListed") === "on"
+  });
+  if (!parsed.success) redirect(buildAdminPath(undefined, "El grupo indicado no es válido."));
+  const organizationKey = parsed.data.organizationId;
+  try {
+    await assertOrganizationAdminAction(organizationKey);
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("organizations")
+      .update({ is_listed: parsed.data.isListed })
+      .eq("id", organizationKey)
+      .select("id")
+      .maybeSingle();
+    if (error || !data) throw new Error("No se pudo guardar la visibilidad del grupo.");
+    revalidatePath("/organizations");
+    revalidatePath("/groups");
+    revalidatePath("/admin");
+    const slug = await getOrganizationQueryKeyById(organizationKey);
+    redirect(`${buildAdminPath(slug)}&success=${encodeURIComponent("Visibilidad del catálogo actualizada. Los enlaces del grupo siguen funcionando.")}`);
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect(buildAdminPath(organizationKey, toUserMessage(error, "No se pudo guardar la visibilidad. Intentá nuevamente.")));
+  }
 }
 
 async function organizationAlreadyHasAdminWithEmail(params: {

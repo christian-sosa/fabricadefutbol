@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ client: vi.fn(), sign: vi.fn() }));
+const mocks = vi.hoisted(() => ({ client: vi.fn(), publicClient: vi.fn(), sign: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: mocks.client }));
+vi.mock("@/lib/supabase/public", () => ({ createSupabasePublicClient: mocks.publicClient }));
 vi.mock("@/lib/env", () => ({ getSupabaseDbSchema: () => "app_dev", getPlayerPhotosBucket: () => "player-photos-dev" }));
 vi.mock("@/lib/storage-image-responses", () => ({ createSignedStorageRedirect: mocks.sign }));
 import { GET } from "@/app/api/player-photo/[id]/route";
@@ -40,5 +41,18 @@ describe("player photo route", () => {
     setup("app_dev/org-1/another-player.webp");
     await get();
     expect(mocks.sign).not.toHaveBeenCalled();
+  });
+  it("permite ver una foto pública de otro grupo aunque la sesión no lea su tabla privada", async () => {
+    const path = `app_dev/org-1/${ID}/20000000-0000-4000-8000-000000000002.webp`;
+    const { single } = setup(null);
+    single.mockResolvedValue({ data: null, error: null });
+    const publicRead = vi.fn().mockResolvedValue({ data: { organization_id: "org-1", photo_path: path }, error: null });
+    const publicClient = { from: vi.fn(() => ({ select: () => ({ eq: () => ({ maybeSingle: publicRead }) }) })) };
+    mocks.publicClient.mockReturnValue(publicClient);
+    mocks.sign.mockResolvedValue(new Response(null, { status: 307, headers: { location: "https://storage.test/signed" } }));
+    const response = await get();
+    expect(publicClient.from).toHaveBeenCalledWith("public_players");
+    expect(mocks.sign).toHaveBeenCalledWith(expect.objectContaining({ supabase: publicClient, objectPath: path }));
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
 });

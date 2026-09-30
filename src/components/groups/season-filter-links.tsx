@@ -47,9 +47,10 @@ export function SeasonFilterLinks({
   return (
     <nav aria-label="Filtrar temporada" className="flex flex-wrap gap-2">
       {items.map((item) => {
-        const active = currentSeason === item.key || (currentSeason === "current" && item.key === activeSeason?.id);
+        const active = currentSeason === item.key || (item.key === "current" && currentSeason === activeSeason?.id);
         return (
           <Link
+            aria-current={active ? "page" : undefined}
             className={cn(
               "inline-flex min-h-9 shrink-0 items-center rounded-md border px-3 py-1.5 text-sm font-semibold transition",
               active
