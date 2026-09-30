@@ -65,4 +65,17 @@ describe("server authorization behavior", () => {
     clientFor({groups: [group, {...group, id: "archived", archived_at: "2026-01-01"}], superadmin: true});
     expect((await getAdminOrganizations({...session, isSuperAdmin: true})).map((item) => item.id)).toEqual([group.id]);
   });
+  it("reads every authorized group beyond the database page limit with stable ordering", async () => {
+    const groups = Array.from({ length: 1105 }, (_, index) => ({ ...group,
+      id: `group-${String(index).padStart(4, "0")}`, slug: `group-${index}`, name: `Group ${String(index).padStart(4, "0")}`,
+      is_listed: index % 2 === 0
+    }));
+    clientFor({ groups, superadmin: true });
+    const organizations = await getAdminOrganizations({ ...session, isSuperAdmin: true });
+    expect(organizations).toHaveLength(1105);
+    expect(new Set(organizations.map((organization) => organization.id)).size).toBe(1105);
+    expect(organizations[1104]).toMatchObject({ id: "group-1104", is_listed: true });
+    clientFor({ groups });
+    expect(await getAdminOrganizations(session)).toHaveLength(1105);
+  });
 });

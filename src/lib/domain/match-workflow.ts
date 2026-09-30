@@ -38,6 +38,7 @@ type ManualTeamAssignmentInput = {
 };
 
 type CreateDraftInput = {
+  requestId?: string;
   supabase: DbClient;
   adminId: string;
   organizationId: string;
@@ -140,22 +141,6 @@ function toPlayerParticipantId(playerId: string) {
 
 function toGuestParticipantId(guestId: string) {
   return `${GUEST_PREFIX}${guestId}`;
-}
-
-function parseParticipantId(participantId: string): { source: "player" | "guest"; entityId: string } {
-  if (participantId.startsWith(PLAYER_PREFIX)) {
-    return {
-      source: "player",
-      entityId: participantId.slice(PLAYER_PREFIX.length)
-    };
-  }
-  if (participantId.startsWith(GUEST_PREFIX)) {
-    return {
-      source: "guest",
-      entityId: participantId.slice(GUEST_PREFIX.length)
-    };
-  }
-  throw new Error("Participante invalido dentro de la opcion de equipos.");
 }
 
 function resolveManualParticipantId(
@@ -314,152 +299,9 @@ function buildManualTeamOption(params: {
   };
 }
 
-async function insertTeamOptions(
-  supabase: DbClient,
-  adminId: string,
-  matchId: string,
-  options: ReturnType<typeof generateBalancedTeamOptions>
-): Promise<Array<{ id: string; option_number: number }>> {
-  const optionRows = options.map((option, index) => ({
-    match_id: matchId,
-    option_number: index + 1,
-    rating_sum_a: option.ratingSumA,
-    rating_sum_b: option.ratingSumB,
-    rating_diff: option.ratingDiff,
-    created_by: adminId
-  }));
-
-  const { data: insertedOptions, error: insertOptionError } = await supabase
-    .from("team_options")
-    .insert(optionRows)
-    .select("id, option_number");
-
-  if (insertOptionError) {
-    throw new Error(`No se pudieron guardar opciones de equipos: ${insertOptionError.message}`);
-  }
-
-  const playerRows:
-    | Array<{
-        team_option_id: string;
-        player_id: string;
-        team: "A" | "B";
-      }>
-    = [];
-  const guestRows:
-    | Array<{
-        team_option_id: string;
-        guest_id: string;
-        team: "A" | "B";
-      }>
-    = [];
-
-  for (const insertedOption of insertedOptions ?? []) {
-    const option = options[insertedOption.option_number - 1];
-
-    for (const member of option.teamA) {
-      const parsed = parseParticipantId(member.id);
-      if (parsed.source === "player") {
-        playerRows.push({
-          team_option_id: insertedOption.id,
-          player_id: parsed.entityId,
-          team: "A"
-        });
-      } else {
-        guestRows.push({
-          team_option_id: insertedOption.id,
-          guest_id: parsed.entityId,
-          team: "A"
-        });
-      }
-    }
-
-    for (const member of option.teamB) {
-      const parsed = parseParticipantId(member.id);
-      if (parsed.source === "player") {
-        playerRows.push({
-          team_option_id: insertedOption.id,
-          player_id: parsed.entityId,
-          team: "B"
-        });
-      } else {
-        guestRows.push({
-          team_option_id: insertedOption.id,
-          guest_id: parsed.entityId,
-          team: "B"
-        });
-      }
-    }
-  }
-
-  if (!playerRows.length && !guestRows.length) {
-    throw new Error("No se pudieron construir los jugadores de las opciones.");
-  }
-
-  if (playerRows.length) {
-    const { error: insertPlayersError } = await supabase.from("team_option_players").insert(playerRows);
-    if (insertPlayersError) {
-      throw new Error(`No se pudieron guardar jugadores registrados en opciones: ${insertPlayersError.message}`);
-    }
-  }
-
-  if (guestRows.length) {
-    const { error: insertGuestsError } = await supabase.from("team_option_guests").insert(guestRows);
-    if (insertGuestsError) {
-      if (isGuestSchemaMissing(insertGuestsError.message)) {
-        throw new Error(buildGuestSchemaErrorMessage("No se pudieron guardar invitados en opciones."));
-      }
-      throw new Error(`No se pudieron guardar invitados en opciones: ${insertGuestsError.message}`);
-    }
-  }
-
-  return insertedOptions ?? [];
-}
-
-async function insertDraftGuests(params: {
-  supabase: DbClient;
-  matchId: string;
-  invitedGuests: DraftGuestInput[];
-  substitutesById: Map<string, TeamSide | null>;
-}) {
-  const { supabase, matchId, invitedGuests, substitutesById } = params;
-  if (!invitedGuests.length) return [] as Array<{ key: string; id: string; guest_name: string; guest_rating: number }>;
-
-  const insertedGuests: Array<{ key: string; id: string; guest_name: string; guest_rating: number }> = [];
-  for (const guest of invitedGuests) {
-    const { data, error } = await supabase
-      .from("match_guests")
-      .insert({
-        match_id: matchId,
-        guest_name: guest.name,
-        guest_rating: guest.rating,
-        is_substitute: substitutesById.has(toGuestParticipantId(guest.key)),
-        substitute_team: substitutesById.get(toGuestParticipantId(guest.key)) ?? null
-      })
-      .select("id, guest_name, guest_rating")
-      .single();
-
-    if (error || !data) {
-      if (error && isGuestSchemaMissing(error.message)) {
-        throw new Error(buildGuestSchemaErrorMessage("No se pudieron guardar invitados del partido."));
-      }
-      throw new Error(`No se pudieron guardar invitados del partido: ${error?.message ?? "sin detalle"}`);
-    }
-
-    insertedGuests.push({
-      key: guest.key,
-      id: data.id,
-      guest_name: data.guest_name,
-      guest_rating: Number(data.guest_rating)
-    });
-  }
-
-  return insertedGuests;
-}
-
 export async function createDraftMatchWithOptions(input: CreateDraftInput) {
   const {
     supabase,
-    adminId,
     organizationId,
     scheduledAt,
     modality,
@@ -486,98 +328,44 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
 
   const players = await fetchSelectedPlayers(supabase, organizationId, selectedPlayerIds);
 
-  const { data: match, error: createMatchError } = await supabase
-    .from("matches")
-    .insert({
-      organization_id: organizationId,
-      scheduled_at: scheduledAt,
-      modality,
-      status: "draft",
-      location: location || null,
-      team_a_label: normalizeTeamLabel(teamALabel),
-      team_b_label: normalizeTeamLabel(teamBLabel),
-      created_by: adminId,
-      goalkeeper_player_ids: goalkeeperPlayerIds
-    })
-    .select("id")
-    .single();
-
-  if (createMatchError || !match) {
-    throw new Error(`No se pudo crear el partido: ${createMatchError?.message ?? "sin detalle"}`);
-  }
-
-  if (selectedPlayerIds.length) {
-    const matchPlayersRows = selectedPlayerIds.map((playerId) => ({
-      match_id: match.id,
-      player_id: playerId,
-      is_substitute: substitutesById.has(toPlayerParticipantId(playerId)),
-      substitute_team: substitutesById.get(toPlayerParticipantId(playerId)) ?? null
-    }));
-    const { error: matchPlayersError } = await supabase.from("match_players").insert(matchPlayersRows);
-    if (matchPlayersError) {
-      throw new Error(`No se pudieron asociar jugadores al partido: ${matchPlayersError.message}`);
-    }
-  }
-
-  const insertedGuests = await insertDraftGuests({
-    supabase,
-    matchId: match.id,
-    invitedGuests,
-    substitutesById
-  });
+  const guests = invitedGuests.map((guest) => ({
+    key: guest.key, id: guest.key, guest_name: guest.name, guest_rating: guest.rating
+  }));
   const participants = toBalancePlayers(
     players.filter((player) => !substitutesById.has(toPlayerParticipantId(player.id))),
-    insertedGuests.filter((guest) => !substitutesById.has(toGuestParticipantId(guest.key)))
+    guests.filter((guest) => !substitutesById.has(toGuestParticipantId(guest.key)))
   );
 
-  if (teamCreationMode === "manual") {
-    if (!manualTeamAssignments?.length) {
-      throw new Error("Falta el armado manual de equipos.");
+  const options = teamCreationMode === "manual"
+    ? [buildManualTeamOption({
+        participants,
+        assignments: manualTeamAssignments ?? [],
+        teamSize: TEAM_SIZE_BY_MODALITY[modality],
+        guestParticipantIdByKey: new Map(guests.map((guest) => [guest.key, toGuestParticipantId(guest.id)])),
+        goalkeeperPlayerIds
+      })]
+    : generateBalancedTeamOptions({
+        players: participants,
+        modality,
+        requestedOptions: 3,
+        requiredSeparatedPairs: goalkeeperPlayerIds.length === 2
+          ? [[toPlayerParticipantId(goalkeeperPlayerIds[0]), toPlayerParticipantId(goalkeeperPlayerIds[1])] as [string, string]]
+          : undefined
+      });
+  const { data, error } = await supabase.rpc("create_group_match_draft", {
+    p_organization_id: organizationId,
+    p_request_id: input.requestId ?? crypto.randomUUID(),
+    p_input: {
+      scheduledAt, modality, location: location || null,
+      selectedPlayerIds, invitedGuests, substituteAssignments, goalkeeperPlayerIds,
+      teamALabel: normalizeTeamLabel(teamALabel), teamBLabel: normalizeTeamLabel(teamBLabel),
+      teamCreationMode, options
     }
-
-    const guestParticipantIdByKey = new Map(
-      insertedGuests.map((guest) => [guest.key, toGuestParticipantId(guest.id)])
-    );
-    const manualOption = buildManualTeamOption({
-      participants,
-      assignments: manualTeamAssignments,
-      teamSize: TEAM_SIZE_BY_MODALITY[modality],
-      guestParticipantIdByKey,
-      goalkeeperPlayerIds
-    });
-
-    const insertedOptions = await insertTeamOptions(supabase, adminId, match.id, [manualOption]);
-    const optionIdToConfirm = insertedOptions.find((option) => option.option_number === 1)?.id;
-    if (!optionIdToConfirm) {
-      throw new Error("No se pudo confirmar la opcion manual de equipos.");
-    }
-
-    await confirmTeamOption({
-      supabase,
-      matchId: match.id,
-      optionId: optionIdToConfirm,
-      organizationId,
-      teamALabel,
-      teamBLabel
-    });
-    return match.id;
-  }
-
-  const requiredSeparatedPairs =
-    goalkeeperPlayerIds.length === 2
-      ? [[toPlayerParticipantId(goalkeeperPlayerIds[0]), toPlayerParticipantId(goalkeeperPlayerIds[1])] as [string, string]]
-      : undefined;
-
-  const options = generateBalancedTeamOptions({
-    players: participants,
-    modality,
-    requestedOptions: 3,
-    requiredSeparatedPairs
   });
-
-  await insertTeamOptions(supabase, adminId, match.id, options);
-
-  return match.id;
+  if (error || !data || typeof data !== "object" || !("match_id" in data) || typeof data.match_id !== "string") {
+    throw new Error(`No se pudo crear el partido: ${error?.message ?? "respuesta invalida"}`);
+  }
+  return data.match_id;
 }
 
 export async function regenerateDraftTeamOptions(params: {

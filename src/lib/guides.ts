@@ -23,6 +23,7 @@ export const GUIDES: Guide[] = [
         title: "Partí de niveles claros",
         body: [
           "La forma más sana de ordenar un grupo amateur es separar nivel real de amistad o antigüedad. Usá categorías amplias, revisalas cada pocas semanas y evitá ajustar por un solo partido bueno o malo.",
+          "En Fábrica de Fútbol, la habilidad es una categoría que define el admin: Nivel 1 es Estrella y Nivel 7 es Principiante. Varios jugadores pueden compartir nivel. Los puntos deportivos cambian con los resultados; editar la habilidad no reinicia esos puntos. La categoría Figura es distinta de la figura del partido.",
           "Si hay arqueros fijos, tratá ese rol como una variable propia. Un equipo con mejor arquero suele necesitar menos ventaja de campo que uno con jugadores de campo más fuertes."
         ]
       },
@@ -209,7 +210,7 @@ export const GUIDES: Guide[] = [
       {
         title: "No lo uses para castigar",
         body: [
-          "En Fábrica de Fútbol, el MVP es opcional y no suma puntos. Se cuenta por temporada; cuando dos jugadores tienen los mismos puntos de rendimiento, queda primero quien tiene más MVP en ese período.",
+          "En Fábrica de Fútbol, la figura del partido (MVP) es opcional y simbólica: no suma puntos. Cuando dos jugadores tienen los mismos puntos, desempata la cantidad de figuras de la temporada elegida. La opción Todo usa el conteo histórico. Cambiar solamente la figura no altera los puntos globales ni de temporada.",
           "El MVP funciona mejor como memoria positiva que como herramienta para señalar errores ajenos.",
           "Si el partido fue muy desparejo, podés dejarlo sin MVP o elegir una mención de esfuerzo. Forzar una figura no siempre agrega valor."
         ]

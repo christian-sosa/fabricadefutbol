@@ -1,6 +1,6 @@
 "use server";
 
-import { createOrganizationAction, uploadOrganizationImageAction } from "./actions";
+import { createOrganizationAction, setOrganizationListedAction, uploadOrganizationImageAction } from "./actions";
 import { bulkUpdatePlayersAction, createPlayerAction, setPlayerInjuryAction, uploadPlayerPhotoAction } from "./players/actions";
 import { createMatchAction } from "./matches/new/actions";
 import { formActionResult } from "@/lib/form-action-result";
@@ -12,3 +12,4 @@ export async function setPlayerInjuryFormAction(data: FormData) { return formAct
 export async function createMatchFormAction(data: FormData) { return formActionResult(createMatchAction, data, "/admin/matches/new"); }
 export async function uploadOrganizationImageFormAction(data: FormData) { return formActionResult(uploadOrganizationImageAction, data, "/admin"); }
 export async function createOrganizationFormAction(data: FormData) { return formActionResult(createOrganizationAction, data, "/admin"); }
+export async function setOrganizationListedFormAction(data: FormData) { return formActionResult(setOrganizationListedAction, data, "/admin"); }

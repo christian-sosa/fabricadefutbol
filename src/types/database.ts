@@ -74,6 +74,8 @@ export type Database = {
           id: string;
           image_path: string | null;
           is_public: boolean;
+          is_listed?: boolean;
+          sporting_revision?: number;
           name: string;
           slug: string;
           updated_at: string;
@@ -85,6 +87,8 @@ export type Database = {
           id?: string;
           image_path?: string | null;
           is_public?: boolean;
+          is_listed?: boolean;
+          sporting_revision?: number;
           name: string;
           slug: string;
           updated_at?: string;
@@ -96,6 +100,8 @@ export type Database = {
           id?: string;
           image_path?: string | null;
           is_public?: boolean;
+          is_listed?: boolean;
+          sporting_revision?: number;
           name?: string;
           slug?: string;
           updated_at?: string;
@@ -593,6 +599,43 @@ export type Database = {
       };
     };
     Views: {
+      public_players: {
+        Row: Omit<Database["public"]["Tables"]["players"]["Row"], "is_injured"> & { is_injured: false };
+        Relationships: [];
+      };
+      organization_public_snapshots: {
+        Row: {
+          organization_id: string;
+          source_revision: number | null;
+          summary: Json;
+          standings: Json;
+          match_history: Json;
+          match_history_total_count: number;
+          refreshed_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          organization_id: string;
+          source_revision?: number | null;
+          summary?: Json;
+          standings?: Json;
+          match_history?: Json;
+          match_history_total_count?: number;
+          refreshed_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          source_revision?: number | null;
+          summary?: Json;
+          standings?: Json;
+          match_history?: Json;
+          match_history_total_count?: number;
+          refreshed_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       public_match_cards: {
         Row: {
           id: string | null;
@@ -637,6 +680,11 @@ export type Database = {
       };
     };
     Functions: {
+      write_group_public_snapshot: { Args: { p_organization_id: string; p_expected_revision: number; p_payload: Json }; Returns: boolean };
+      create_group_match_draft: { Args: { p_organization_id: string; p_request_id: string; p_input: Json }; Returns: Json };
+      reserve_group_player_photo: { Args: { p_organization_id: string; p_player_id: string; p_revision: string }; Returns: Json };
+      finalize_group_player_photo: { Args: { p_organization_id: string; p_player_id: string; p_reservation_id: string }; Returns: Json };
+      cancel_group_player_photo: { Args: { p_organization_id: string; p_player_id: string; p_reservation_id: string }; Returns: boolean };
       create_group_organization: { Args: { p_organization_id: string; p_name: string; p_slug: string }; Returns: Json };
       set_group_archived: { Args: { p_organization_id: string; p_archived: boolean }; Returns: Json };
       purge_group: { Args: { p_organization_id: string }; Returns: Json };

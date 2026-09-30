@@ -6,7 +6,7 @@ import {
   archiveOrganizationAction,
   restoreOrganizationAction
 } from "@/app/admin/(panel)/actions";
-import { createOrganizationFormAction, uploadOrganizationImageFormAction } from "@/app/admin/(panel)/form-actions";
+import { createOrganizationFormAction, setOrganizationListedFormAction, uploadOrganizationImageFormAction } from "@/app/admin/(panel)/form-actions";
 import { OrganizationImageInput } from "@/components/admin/organization-image-input";
 import { ActionForm } from "@/components/ui/action-form";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
@@ -39,6 +39,7 @@ type OrganizationEntry = {
   name: string;
   slug: string;
   is_public: boolean;
+  is_listed?: boolean;
   created_at: string;
 };
 
@@ -161,7 +162,11 @@ function AdminOnboardingCard({
   ];
 
   const nextStep = steps.find((step) => !step.done);
-  if (!nextStep) return null;
+  if (!nextStep) return <Card className="border-emerald-400/20 bg-emerald-500/10">
+    <CardTitle>Prepará la próxima fecha</CardTitle>
+    <CardDescription className="mt-2">Ya cerraste el primer partido. Repetí la convocatoria con una nueva fecha semanal, revisá quiénes juegan y compartí los nuevos equipos por WhatsApp.</CardDescription>
+    {canWrite ? <TrackedLink className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground" eventName={GROWTH_EVENTS.ctaClicked} eventProperties={{ cta: "Repetir último partido", source: "admin_onboarding" }} href={withOrgQuery("/admin/matches/new?repeat=last", organizationSlug)}>Repetir último partido</TrackedLink> : null}
+  </Card>;
 
   return (
     <section className="rounded-3xl border border-emerald-400/20 bg-emerald-500/10 p-5 shadow-[0_20px_46px_-36px_rgba(16,185,129,0.8)]">
@@ -308,6 +313,16 @@ export default async function AdminDashboardPage({
         seasonRange={activeSeason ? formatOrganizationSeasonDates(activeSeason) : undefined}
         totalMatches={dashboardData.draftsCount + dashboardData.confirmedCount + dashboardData.finishedCount}
       />
+
+      <details className="rounded-2xl border border-slate-800 p-4">
+        <summary className="flex min-h-11 cursor-pointer items-center font-semibold">Visibilidad del grupo</summary>
+        <ActionForm action={setOrganizationListedFormAction} className="mt-4 space-y-3">
+          <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+          <label className="flex items-center gap-3 text-sm font-semibold"><input defaultChecked={selectedOrganization.is_listed ?? true} disabled={!canWriteSelectedOrganization} name="isListed" type="checkbox" />Aparecer en el catálogo público</label>
+          <p className="text-sm text-slate-400">Ocultarlo del catálogo no lo vuelve privado: quien tenga el enlace podrá ver el grupo, el ranking y los partidos. Podés seguir compartiendo por WhatsApp.</p>
+          <FormSubmitButton disabled={!canWriteSelectedOrganization} pendingLabel="Guardando…">Guardar visibilidad</FormSubmitButton>
+        </ActionForm>
+      </details>
 
       <details className="rounded-2xl border border-slate-800 p-4">
         <summary className="flex min-h-11 cursor-pointer items-center font-semibold">Personalizar foto de portada</summary>

@@ -1,7 +1,5 @@
 "use server";
 
-import { enqueueMediaCleanup } from "@/lib/domain/media-cleanup";
-
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -13,8 +11,9 @@ import { isNextRedirectError } from "@/lib/next-redirect";
 import { logError, logInfo } from "@/lib/observability/log";
 import { withOrgQuery } from "@/lib/org";
 import {
-  assertPlayerPhotoUploadAllowed,
-  registerPlayerPhotoUploadEvent
+  cancelPlayerPhotoUpload,
+  finalizePlayerPhotoUpload,
+  reservePlayerPhotoUpload
 } from "@/lib/player-photo-upload-limits";
 import { DEFAULT_SKILL_LEVEL, MAX_SKILL_LEVEL, MIN_SKILL_LEVEL, normalizeSkillLevel } from "@/lib/domain/skill-level";
 import { parsePlayerNameList } from "@/lib/domain/player-name-list";
@@ -95,7 +94,6 @@ function validatePlayerPhotoFile(file: File, organizationQueryKey: string) {
 
 async function savePlayerPhotoForAdmin({
   supabase,
-  adminUserId,
   organizationId,
   organizationQueryKey,
   playerId,
@@ -103,7 +101,6 @@ async function savePlayerPhotoForAdmin({
   validatePlayer = true
 }: {
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
-  adminUserId: string;
   organizationId: string;
   organizationQueryKey: string;
   playerId: string;
@@ -111,12 +108,10 @@ async function savePlayerPhotoForAdmin({
   validatePlayer?: boolean;
 }) {
   validatePlayerPhotoFile(file, organizationQueryKey);
-  let previousPhotoPath: string | null = null;
-
   if (validatePlayer) {
     const { data: player, error: playerError } = await supabase
       .from("players")
-      .select("id, photo_path")
+      .select("id")
       .eq("id", playerId)
       .eq("organization_id", organizationId)
       .maybeSingle();
@@ -124,59 +119,35 @@ async function savePlayerPhotoForAdmin({
     if (playerError || !player) {
       redirect(withMessage(organizationQueryKey, "No se encontro el jugador en el grupo seleccionado."));
     }
-    previousPhotoPath = player.photo_path ?? null;
   }
 
-  await assertPlayerPhotoUploadAllowed({
-    supabase: supabase as never,
-    uploaderId: adminUserId,
-    uploaderRole: "organization_admin",
-    targetPlayerId: playerId,
-    targetType: "organization_player"
-  });
-
   const optimizedBuffer = await optimizePlayerAvatarImage(file);
-  const objectPath = getOrganizationPlayerPhotoObjectPath(getSupabaseDbSchema(), organizationId, playerId, crypto.randomUUID());
+  const revision = crypto.randomUUID();
+  const reservation = await reservePlayerPhotoUpload(supabase, organizationId, playerId, revision);
   const bucketName = getPlayerPhotosBucket();
-  // Reserve cleanup before Storage: a crash before metadata linking leaves a durable retry.
-  await enqueueMediaCleanup(bucketName, objectPath, true);
-  const { error: uploadError } = await supabase.storage
-    .from(bucketName)
-    .upload(objectPath, optimizedBuffer, {
-      upsert: true,
+  try {
+    const expectedPath = getOrganizationPlayerPhotoObjectPath(getSupabaseDbSchema(), organizationId.toLowerCase(), playerId.toLowerCase(), revision);
+    if (reservation.path !== expectedPath) throw new Error("No se pudo validar la reserva de la foto.");
+    // The reservation commits quota and durable orphan cleanup before Storage accepts bytes.
+    const { error: uploadError } = await supabase.storage.from(bucketName).upload(reservation.path, optimizedBuffer, {
+      upsert: false,
       contentType: "image/webp",
       cacheControl: REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL
     });
-
-  if (uploadError) {
-    logError("players.photo.upload.failed", uploadError, {
-      organizationId,
-      playerId
-    });
-    redirect(withMessage(organizationQueryKey, "No se pudo guardar la foto en Storage. Intenta nuevamente."));
+    if (uploadError) throw new Error("No se pudo guardar la foto en Storage. Intenta nuevamente.");
+    await finalizePlayerPhotoUpload(supabase, organizationId, playerId, reservation.reservation_id);
+  } catch (error) {
+    try {
+      await cancelPlayerPhotoUpload(supabase, organizationId, playerId, reservation.reservation_id);
+    } catch (cancelError) {
+      // The reservation's cleanup remains durable even if cancellation is unavailable.
+      logError("players.photo.cancel.failed", cancelError, { organizationId, playerId });
+    }
+    throw error;
   }
-
-  const metadataUpdate = supabase.from("players")
-    .update({ photo_path: objectPath, photo_updated_at: new Date().toISOString() })
-    .eq("id", playerId).eq("organization_id", organizationId);
-  const { data: updatedPlayers, error: photoMetadataError } = await (previousPhotoPath
-    ? metadataUpdate.eq("photo_path", previousPhotoPath)
-    : metadataUpdate.is("photo_path", null)).select("id");
-  if (photoMetadataError || !updatedPlayers?.length) {
-    await enqueueMediaCleanup(bucketName, objectPath);
-    redirect(withMessage(organizationQueryKey, "No se pudo asociar la foto o el jugador cambió mientras subías. Recargá e intentá nuevamente."));
-  }
-  // The metadata trigger has already queued the previous version atomically.
+  // Finalization links metadata with compare-and-swap and queues the previous revision atomically.
   const { error: snapshotError } = await supabase.from("organization_public_snapshots").delete().eq("organization_id", organizationId);
   if (snapshotError) logError("players.photo.snapshot_invalidation.failed", snapshotError, { organizationId, playerId });
-
-  await registerPlayerPhotoUploadEvent({
-    supabase: supabase as never,
-    uploaderId: adminUserId,
-    uploaderRole: "organization_admin",
-    targetPlayerId: playerId,
-    targetType: "organization_player"
-  });
 }
 
 export async function createPlayerAction(formData: FormData) {
@@ -196,7 +167,7 @@ export async function createPlayerAction(formData: FormData) {
       );
     }
 
-    const admin = await assertOrganizationAdminAction(parsed.data.organizationId);
+    await assertOrganizationAdminAction(parsed.data.organizationId);
     const organizationQueryKey = await getOrganizationQueryKeyById(parsed.data.organizationId);
     const photoFile = getOptionalPhotoFile(formData);
     if (photoFile) {
@@ -243,7 +214,6 @@ export async function createPlayerAction(formData: FormData) {
       try {
         await savePlayerPhotoForAdmin({
           supabase,
-          adminUserId: admin.userId,
           organizationId: parsed.data.organizationId,
           organizationQueryKey,
           playerId: createdPlayer.id,
@@ -540,7 +510,6 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
     const supabase = await createSupabaseServerClient();
     await savePlayerPhotoForAdmin({
       supabase,
-      adminUserId: admin.userId,
       organizationId: parsed.data.organizationId,
       organizationQueryKey,
       playerId: parsed.data.playerId,

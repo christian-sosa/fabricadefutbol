@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 
 import { readAllRows, readRowsByIds } from "@/lib/supabase/pagination";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
 import { getSessionIsSuperAdmin } from "@/lib/auth/super-admin";
 import {
@@ -11,6 +12,7 @@ import {
   readOrganizationPublicMatchHistorySnapshot,
   readOrganizationPublicStandingsSnapshot,
   readOrganizationPublicSummarySnapshot,
+  readOrganizationSportingRevision,
   writeOrganizationPublicSnapshot,
   type OrganizationPublicSummary
 } from "@/lib/domain/organization-public-snapshot";
@@ -24,6 +26,7 @@ import type { MatchHistoryItem, OrganizationMatchesResponse, OrganizationSeasonO
 import type { Database } from "@/types/database";
 import type { PlayerComputedStats, TeamSide } from "@/types/domain";
 import { supportsMatchExtras } from "@/lib/domain/match-scorers";
+import { getAnnualOrganizationSeasonStartDate, getAnnualOrganizationSeasonEndDate } from "@/lib/domain/organization-seasons";
 
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
@@ -41,6 +44,7 @@ type PublicOrganization = {
 type SeasonFilterInput = string | null | undefined;
 type ResolvedSeasonFilter =
   | { mode: "all"; season: null }
+  | { mode: "empty"; season: null }
   | { mode: "season"; season: OrganizationSeasonOption };
 
 function findOrganizationByKey(organizations: PublicOrganization[], organizationKey?: string | null) {
@@ -99,6 +103,15 @@ function isGuestSchemaMissing(error: { message: string } | null) {
   return /match_guests|team_option_guests/i.test(error.message);
 }
 
+async function readOptionalGuestRows<T>(read: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await read();
+  } catch (error) {
+    if (error instanceof Error && isGuestSchemaMissing(error)) return [];
+    throw error;
+  }
+}
+
 type MatchParticipantDisplay = {
   id: string;
   full_name: string;
@@ -123,7 +136,7 @@ async function fetchPublicMatchSubstitutes(
     readRowsByIds(matchIds, (ids, from, to) => supabase.from("match_guests")
       .select("id, match_id, guest_name, guest_rating, substitute_team").in("match_id", ids).eq("is_substitute", true).order("id").range(from, to))
   ]);
-  const players = await readRowsByIds(roster.map((row) => row.player_id), (ids, from, to) => supabase.from("players")
+  const players = await readRowsByIds(roster.map((row) => row.player_id), (ids, from, to) => supabase.from("public_players")
     .select("id, full_name, current_rating, photo_path, photo_updated_at").eq("organization_id", organizationId).in("id", ids).order("id").range(from, to));
   const playersById = indexBy(players);
   for (const row of roster) {
@@ -198,21 +211,16 @@ function getDefaultOrganizationIndex(organizations: PublicOrganization[], contex
 export async function getPublicOrganizations(): Promise<PublicOrganization[]> {
   let supabase: SupabaseServerClient;
   try {
-    supabase = await createSupabaseServerClient();
+    supabase = createSupabasePublicClient();
   } catch (error) {
     if (isMissingSupabaseConfigurationError(error)) return [];
     throw error;
   }
 
-  const { data, error } = await supabase
-    .from("organizations")
+  return readAllRows((from, to) => supabase.from("organizations")
     .select("id, name, slug, is_public, created_at")
-    .eq("is_public", true)
-    .is("archived_at", null)
-    .order("name", { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return data ?? [];
+    .eq("is_public", true).eq("is_listed", true).is("archived_at", null)
+    .order("name", { ascending: true }).order("id").range(from, to));
 }
 
 export async function getOrganizationSeasons(organizationId: string | null): Promise<OrganizationSeasonOption[]> {
@@ -220,20 +228,20 @@ export async function getOrganizationSeasons(organizationId: string | null): Pro
 
   let supabase: SupabaseServerClient;
   try {
-    supabase = await createSupabaseServerClient();
+    supabase = createSupabasePublicClient();
   } catch (error) {
     if (isMissingSupabaseConfigurationError(error)) return [];
     throw error;
   }
 
-  const { data, error } = await supabase
-    .from("organization_seasons")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .order("starts_at", { ascending: false });
-
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(normalizeSeasonOption);
+  const rows = await readAllRows((from, to) => supabase.from("organization_seasons")
+    .select("*").eq("organization_id", organizationId).order("starts_at", { ascending: false }).order("id").range(from, to));
+  const currentStart = getAnnualOrganizationSeasonStartDate();
+  const seasons = rows.map((row) => ({ ...normalizeSeasonOption(row), status: row.starts_at === currentStart ? "active" as const : "closed" as const }));
+  if (!seasons.some((season) => season.startsAt === currentStart)) {
+    seasons.unshift({ id: "current", label: `Temporada ${currentStart.slice(0, 4)}`, durationMonths: 12, startsAt: currentStart, endsAt: getAnnualOrganizationSeasonEndDate(), status: "active" });
+  }
+  return seasons;
 }
 
 async function resolveSeasonFilter(
@@ -256,13 +264,13 @@ async function resolveSeasonFilter(
 
   const { data, error } =
     filter === "current"
-      ? await query.eq("status", "active").order("starts_at", { ascending: false }).limit(1).maybeSingle()
+      ? await query.eq("starts_at", getAnnualOrganizationSeasonStartDate()).maybeSingle()
       : await query.eq("id", filter).maybeSingle();
 
   if (error) throw new Error(error.message);
   if (!data) {
     return {
-      mode: "all",
+      mode: "empty",
       season: null
     };
   }
@@ -289,22 +297,12 @@ export async function getViewerAdminOrganizations(): Promise<PublicOrganization[
   if (!user?.id || !user.email) return [];
 
   if (await getSessionIsSuperAdmin(supabase)) {
-    const { data, error } = await supabase
-      .from("organizations")
-      .select("id, name, slug, is_public, created_at")
-      .is("archived_at", null)
-      .order("name", { ascending: true });
-
-    if (error) throw new Error(error.message);
-    return data ?? [];
+    return readAllRows((from, to) => supabase.from("organizations").select("id, name, slug, is_public, created_at")
+      .is("archived_at", null).order("name", { ascending: true }).order("id").range(from, to));
   }
 
-  const { data, error } = await supabase
-    .from("organization_admins")
-    .select("organizations(id, name, slug, is_public, created_at, archived_at)")
-    .eq("admin_id", user.id);
-
-  if (error) throw new Error(error.message);
+  const data = await readAllRows((from, to) => supabase.from("organization_admins")
+    .select("organizations(id, name, slug, is_public, created_at, archived_at)").eq("admin_id", user.id).order("id").range(from, to));
 
   const organizations = (data ?? [])
     .map((row) => {
@@ -339,8 +337,9 @@ export async function resolvePublicOrganization(
 ) {
   const organizations = await getPublicOrganizations();
   // Orden de prioridad: query param -> cookie -> default contextual.
-  const fromQuery = findOrganizationByKey(organizations, preferredOrganizationKey);
-  const fromCookie = fromQuery ? null : findOrganizationByKey(organizations, await readActiveOrgCookieSafe());
+  const fromQuery = findOrganizationByKey(organizations, preferredOrganizationKey) ?? await findActivePublicOrganization(preferredOrganizationKey);
+  const cookieKey = fromQuery ? null : await readActiveOrgCookieSafe();
+  const fromCookie = fromQuery ? null : findOrganizationByKey(organizations, cookieKey) ?? await findActivePublicOrganization(cookieKey);
   const selectedOrganization =
     fromQuery ??
     fromCookie ??
@@ -354,8 +353,19 @@ export async function resolvePublicOrganization(
 }
 
 async function resolvePublicOrganizationId(organizationKey?: string | null) {
-  const organizations = await getPublicOrganizations();
-  return findOrganizationByKey(organizations, organizationKey)?.id ?? null;
+  return (await findActivePublicOrganization(organizationKey))?.id ?? null;
+}
+
+async function findActivePublicOrganization(organizationKey?: string | null): Promise<PublicOrganization | null> {
+  const key = organizationKey?.trim().toLowerCase();
+  if (!key) return null;
+  const client = createSupabasePublicClient();
+  let query = client.from("organizations").select("id, name, slug, is_public, created_at")
+    .eq("is_public", true).is("archived_at", null);
+  query = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(key) ? query.eq("id", key) : query.eq("slug", key);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 async function getConfirmedMatchSummariesLive(
@@ -381,13 +391,13 @@ async function getConfirmedMatchSummariesLive(
   );
 }
 
-async function fetchMatchTeams(matchIds: string[]) {
+async function fetchMatchTeams(matchIds: string[], existingMatches?: MatchRow[]) {
   if (!matchIds.length) return [] as MatchWithTeams[];
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
 
   const [matches, results, confirmedOptions] = await Promise.all([
-    readRowsByIds(matchIds, (ids, from, to) => supabase.from("matches").select("*").in("id", ids).order("id").range(from, to)),
+    existingMatches ? Promise.resolve(existingMatches) : readRowsByIds(matchIds, (ids, from, to) => supabase.from("matches").select("*").in("id", ids).order("id").range(from, to)),
     readRowsByIds(matchIds, (ids, from, to) => supabase.from("match_result").select("*").in("match_id", ids).order("id").range(from, to)),
     readRowsByIds(matchIds, (ids, from, to) => supabase.from("team_options").select("id, match_id").in("match_id", ids).eq("is_confirmed", true).order("id").range(from, to))
   ]);
@@ -437,11 +447,11 @@ async function getHomeSummaryBaseLive(organizationId: string | null): Promise<Ho
     };
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
 
   const [playersRes, upcomingMatches, finishedRes] = await Promise.all([
     supabase
-      .from("players")
+      .from("public_players")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .eq("active", true),
@@ -488,30 +498,28 @@ export async function getHomeSummary(organizationId: string | null) {
   noStore();
   if (!organizationId) return getHomeSummaryLive(null);
 
-  const supabase = await createSupabaseServerClient();
-  const [summary, currentStandings, snapshotStandings] = await Promise.all([
+  const supabase = createSupabasePublicClient();
+  const [summary, currentStandings] = await Promise.all([
     readOrganizationPublicSummarySnapshot(supabase, organizationId),
-    getPlayersWithStatsLive(organizationId, { season: "current" }),
-    readOrganizationPublicStandingsSnapshot(supabase, organizationId)
+    getPlayersWithStatsLive(organizationId, { season: "current" })
   ]);
   if (summary) {
-    const topStandings = currentStandings.length ? currentStandings : snapshotStandings ?? [];
     return {
       ...summary,
-      topPlayers: topStandings.length ? buildTopPlayersFromStandings(topStandings) : summary.topPlayers,
+      topPlayers: buildTopPlayersFromStandings(currentStandings),
       upcomingMatches: await getConfirmedMatchSummariesLive(supabase, organizationId)
     };
   }
 
-  return getHomeSummaryLive(organizationId);
+  return { ...await getHomeSummaryBaseLive(organizationId), topPlayers: buildTopPlayersFromStandings(currentStandings) };
 }
 
 export async function getRankingPlayers(organizationId: string | null) {
   if (!organizationId) return [];
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
   const [players, standings] = await Promise.all([
-    readAllRows((from, to) => supabase.from("players")
+    readAllRows((from, to) => supabase.from("public_players")
       .select("id, full_name, current_rating, initial_rank, skill_level, display_order, photo_path, photo_updated_at")
       .eq("organization_id", organizationId).eq("active", true).order("id").range(from, to)),
     getPlayersWithStatsLive(organizationId)
@@ -531,11 +539,17 @@ async function getPlayersWithStatsLive(
 ) {
   if (!organizationId) return [];
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
   const seasonFilter = await resolveSeasonFilter(supabase, organizationId, options?.season);
-  const players = await readAllRows((from, to) => supabase.from("players").select("*")
+  const players = await readAllRows((from, to) => supabase.from("public_players").select("*")
     .eq("organization_id", organizationId).eq("active", true).order("current_rating", { ascending: false })
     .order("skill_level").order("display_order").order("full_name").order("id").range(from, to));
+
+  if (seasonFilter.mode === "empty") {
+    const activity = calculatePlayerActivity(players, []);
+    return calculatePlayerStats({ players: players.map((player) => ({ ...player, current_rating: 1000 })), finishedMatches: [] })
+      .map((stats) => ({ ...stats, ...activity.get(stats.playerId) }));
+  }
 
   const matchesQuery = supabase
     .from("matches")
@@ -544,7 +558,7 @@ async function getPlayersWithStatsLive(
     .eq("status", "finished")
     .order("scheduled_at", { ascending: true }).order("id");
   const finishedMatches = await readAllRows((from, to) => matchesQuery.range(from, to));
-  const allFinishedWithTeams = await fetchMatchTeams(finishedMatches.map((match) => match.id));
+  const allFinishedWithTeams = await fetchMatchTeams(finishedMatches.map((match) => match.id), finishedMatches);
   const activityByPlayer = calculatePlayerActivity(players, allFinishedWithTeams);
   const finishedWithTeams = seasonFilter.mode === "season"
     ? allFinishedWithTeams.filter((item) => item.match.season_id === seasonFilter.season.id)
@@ -582,20 +596,19 @@ export async function getPlayersWithStats(
   if (!organizationId) return [];
 
   if (normalizeSeasonFilter(options?.season) === "all") {
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabasePublicClient();
     const standings = await readOrganizationPublicStandingsSnapshot(supabase, organizationId);
     if (standings && hasCurrentStandingsData(standings)) {
-      // Injury and calendar absence are current state, even when the snapshot
-      // predates an admin change or the player reaching one month without playing.
-      const players = await readAllRows((from, to) => supabase.from("players")
+      // Calendar absence can change even while the sporting revision is unchanged.
+      const players = await readAllRows((from, to) => supabase.from("public_players")
         .select("id, is_injured").eq("organization_id", organizationId).eq("active", true).order("id").range(from, to));
       const currentPlayers = new Map(players.map((player) => [player.id, player]));
       const now = new Date();
       return standings.filter((player) => currentPlayers.has(player.playerId)).map((player) => ({
         ...player,
-        isInjured: currentPlayers.get(player.playerId)!.is_injured === true,
+        isInjured: false,
         isAbsent: isPlayerAbsent({
-          isInjured: currentPlayers.get(player.playerId)!.is_injured === true,
+          isInjured: false,
           matchesSinceLastPlayed: player.matchesSinceLastPlayed ?? 0,
           lastPlayedAt: player.lastPlayedAt ?? null
         }, now)
@@ -607,8 +620,8 @@ export async function getPlayersWithStats(
 }
 
 export async function getPlayerDetails(playerId: string, organizationKey?: string | null) {
-  const supabase = await createSupabaseServerClient();
-  let query = supabase.from("players").select("*").eq("id", playerId);
+  const supabase = createSupabasePublicClient();
+  let query = supabase.from("public_players").select("*").eq("id", playerId);
 
   if (organizationKey) {
     const organizationId = await resolvePublicOrganizationId(organizationKey);
@@ -664,7 +677,7 @@ async function fetchMatchResultsByIds(matchIds: string[]) {
     return new Map<string, Database["public"]["Tables"]["match_result"]["Row"]>();
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
   const data = await readRowsByIds(matchIds, (ids, from, to) => supabase.from("match_result").select("*")
     .in("match_id", ids).order("id").range(from, to));
   return new Map(data.map((result) => [result.match_id, result]));
@@ -673,7 +686,7 @@ async function fetchMatchResultsByIds(matchIds: string[]) {
 async function getMatchHistoryCardsForSnapshot(organizationId: string | null): Promise<MatchHistoryItem[]> {
   if (!organizationId) return [];
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
   const finishedMatches = await readAllRows((from, to) => supabase.from("matches")
     .select("id, scheduled_at, modality, status, season_id, team_a_label, team_b_label").eq("organization_id", organizationId)
     .in("status", ["finished", "cancelled"]).order("scheduled_at", { ascending: false }).order("id").range(from, to));
@@ -703,8 +716,9 @@ async function getMatchHistoryCardsPageLive(
     });
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
   const seasonFilter = await resolveSeasonFilter(supabase, organizationId, params?.season);
+  if (seasonFilter.mode === "empty") return buildSnapshotMatchHistoryPage({ organizationId, matchHistory: [], page, pageSize });
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const historyQuery = (head = false) => {
@@ -775,7 +789,7 @@ export async function getMatchHistoryCardsPage(
   }
 
   if (normalizeSeasonFilter(params?.season) === "all") {
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabasePublicClient();
     const matchHistory = await readOrganizationPublicMatchHistorySnapshot(supabase, organizationId);
     // Older snapshots predate team labels. Read live until the next snapshot refresh
     // rather than presenting default names for teams that may have custom names.
@@ -801,8 +815,9 @@ export async function getMatchCalendarActivity(
 }> {
   if (!organizationId) return { matches: [], season: null };
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
   const seasonFilter = await resolveSeasonFilter(supabase, organizationId, season);
+  if (seasonFilter.mode === "empty") return { matches: [], season: null };
   const matches = await readAllRows((from, to) => {
     let query = supabase
       .from("matches")
@@ -832,6 +847,9 @@ export async function getMatchHistoryCards(organizationId: string | null) {
 }
 
 export async function refreshOrganizationPublicSnapshot(organizationId: string) {
+  const publicClient = createSupabasePublicClient();
+  const expectedRevision = await readOrganizationSportingRevision(publicClient, organizationId);
+  if (expectedRevision === null) return null;
   const [summaryBase, currentStandings, allTimeStandings, matchHistory] = await Promise.all([
     getHomeSummaryBaseLive(organizationId),
     getPlayersWithStatsLive(organizationId, { season: "current" }),
@@ -840,16 +858,16 @@ export async function refreshOrganizationPublicSnapshot(organizationId: string) 
   ]);
   const summary = {
     ...summaryBase,
-    topPlayers: buildTopPlayersFromStandings(currentStandings.length ? currentStandings : allTimeStandings)
+    topPlayers: buildTopPlayersFromStandings(currentStandings)
   };
   const payload = buildOrganizationPublicSnapshotPayload({
     summary,
     standings: allTimeStandings,
     matchHistory
   });
-  const supabase = await createSupabaseServerClient();
-  await writeOrganizationPublicSnapshot(supabase, organizationId, payload);
-  return payload;
+  const writer = await createSupabaseServerClient();
+  const persisted = await writeOrganizationPublicSnapshot(writer, organizationId, payload, expectedRevision);
+  return persisted ? payload : null;
 }
 
 export async function refreshOrganizationPublicSnapshotSafe(organizationId: string | null | undefined) {
@@ -869,49 +887,29 @@ export async function getUpcomingConfirmedMatches(organizationId: string | null)
   noStore();
   if (!organizationId) return [];
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
   const now = getCurrentMatchDateTimeIso();
-  const { data, error } = await supabase
-    .from("matches")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .eq("status", "confirmed")
-    .gt("scheduled_at", now)
-    .order("scheduled_at", { ascending: true });
-  if (error) throw new Error(error.message);
+  const data = await readAllRows((from, to) => supabase.from("matches").select("*")
+    .eq("organization_id", organizationId).eq("status", "confirmed").gt("scheduled_at", now)
+    .order("scheduled_at", { ascending: true }).order("id").range(from, to));
 
   const ids = (data ?? []).map((match) => match.id);
   const [matchesWithTeams, substitutesByMatch] = await Promise.all([
-    fetchMatchTeams(ids),
+    fetchMatchTeams(ids, data),
     fetchPublicMatchSubstitutes(supabase, (data ?? []).filter((match) => supportsMatchExtras(match.modality)).map((match) => match.id), organizationId)
   ]);
   const playerIds = matchesWithTeams.flatMap((match) => [...match.teamAPlayerIds, ...match.teamBPlayerIds]);
   const optionIds = matchesWithTeams.map((match) => match.match.confirmed_option_id).filter(notNull);
 
-  const { data: players, error: playersError } = playerIds.length
-    ? await supabase
-        .from("players")
-        .select("id, full_name, current_rating, photo_path, photo_updated_at")
-        .eq("organization_id", organizationId)
-        .in("id", playerIds)
-    : { data: [], error: null };
-  if (playersError) throw new Error(playersError.message);
-
-  const { data: optionGuests, error: optionGuestsError } = optionIds.length
-    ? await supabase
-        .from("team_option_guests")
-        .select("team_option_id, guest_id, team")
-        .in("team_option_id", optionIds)
-    : { data: [], error: null };
-  if (optionGuestsError && !isGuestSchemaMissing(optionGuestsError)) throw new Error(optionGuestsError.message);
-
-  const safeOptionGuests = optionGuestsError && isGuestSchemaMissing(optionGuestsError) ? [] : optionGuests ?? [];
+  const [players, safeOptionGuests] = await Promise.all([
+    readRowsByIds(playerIds, (ids, from, to) => supabase.from("public_players")
+      .select("id, full_name, current_rating, photo_path, photo_updated_at").eq("organization_id", organizationId).in("id", ids).order("id").range(from, to)),
+    readOptionalGuestRows(() => readRowsByIds(optionIds, (ids, from, to) => supabase.from("team_option_guests")
+      .select("team_option_id, guest_id, team").in("team_option_id", ids).order("id").range(from, to)))
+  ]);
   const guestIds = safeOptionGuests.map((guest) => guest.guest_id);
-  const { data: guests, error: guestsError } = guestIds.length
-    ? await supabase.from("match_guests").select("id, guest_name, guest_rating").in("id", guestIds)
-    : { data: [], error: null };
-  if (guestsError && !isGuestSchemaMissing(guestsError)) throw new Error(guestsError.message);
-  const safeGuests = guestsError && isGuestSchemaMissing(guestsError) ? [] : guests ?? [];
+  const safeGuests = await readOptionalGuestRows(() => readRowsByIds(guestIds, (ids, from, to) => supabase.from("match_guests")
+    .select("id, guest_name, guest_rating").in("id", ids).order("id").range(from, to)));
 
   const playersById = new Map(
     (players ?? []).map((player) => [
@@ -963,7 +961,7 @@ export async function getUpcomingConfirmedMatches(organizationId: string | null)
 }
 
 export async function getMatchDetails(matchId: string, organizationKey?: string | null) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
   let query = supabase.from("matches").select("*").eq("id", matchId);
 
   if (organizationKey) {
@@ -977,7 +975,7 @@ export async function getMatchDetails(matchId: string, organizationKey?: string 
   if (!match) return null;
 
   const [withTeams, substitutesByMatch] = await Promise.all([
-    fetchMatchTeams([matchId]),
+    fetchMatchTeams([matchId], [match]),
     fetchPublicMatchSubstitutes(supabase, supportsMatchExtras(match.modality) ? [matchId] : [], match.organization_id)
   ]);
   const details = withTeams[0];
@@ -992,30 +990,15 @@ export async function getMatchDetails(matchId: string, organizationKey?: string 
   }
 
   const playerIds = [...details.teamAPlayerIds, ...details.teamBPlayerIds];
-  const { data: players, error: playersError } = playerIds.length
-    ? await supabase
-        .from("players")
-        .select("id, full_name, current_rating, photo_path, photo_updated_at")
-        .eq("organization_id", match.organization_id)
-        .in("id", playerIds)
-    : { data: [], error: null };
-  if (playersError) throw new Error(playersError.message);
-
-  const { data: optionGuests, error: optionGuestsError } = details.match.confirmed_option_id
-    ? await supabase
-        .from("team_option_guests")
-        .select("team_option_id, guest_id, team")
-        .eq("team_option_id", details.match.confirmed_option_id)
-    : { data: [], error: null };
-  if (optionGuestsError && !isGuestSchemaMissing(optionGuestsError)) throw new Error(optionGuestsError.message);
-
-  const safeOptionGuests = optionGuestsError && isGuestSchemaMissing(optionGuestsError) ? [] : optionGuests ?? [];
+  const [players, safeOptionGuests] = await Promise.all([
+    readRowsByIds(playerIds, (ids, from, to) => supabase.from("public_players")
+      .select("id, full_name, current_rating, photo_path, photo_updated_at").eq("organization_id", match.organization_id).in("id", ids).order("id").range(from, to)),
+    readOptionalGuestRows(() => readRowsByIds(details.match.confirmed_option_id ? [details.match.confirmed_option_id] : [], (ids, from, to) => supabase.from("team_option_guests")
+      .select("team_option_id, guest_id, team").in("team_option_id", ids).order("id").range(from, to)))
+  ]);
   const guestIds = safeOptionGuests.map((guest) => guest.guest_id);
-  const { data: guests, error: guestsError } = guestIds.length
-    ? await supabase.from("match_guests").select("id, guest_name, guest_rating").in("id", guestIds)
-    : { data: [], error: null };
-  if (guestsError && !isGuestSchemaMissing(guestsError)) throw new Error(guestsError.message);
-  const safeGuests = guestsError && isGuestSchemaMissing(guestsError) ? [] : guests ?? [];
+  const safeGuests = await readOptionalGuestRows(() => readRowsByIds(guestIds, (ids, from, to) => supabase.from("match_guests")
+    .select("id, guest_name, guest_rating").in("id", ids).order("id").range(from, to)));
 
   const playersById = new Map(
     (players ?? []).map((player) => [

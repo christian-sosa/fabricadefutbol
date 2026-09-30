@@ -66,6 +66,7 @@ export type NewMatchDefaults = {
 };
 
 export function NewMatchForm({
+  requestId,
   defaultScheduledDate,
   organizationId,
   players,
@@ -73,6 +74,7 @@ export function NewMatchForm({
   defaultModality = "6v6",
   error
 }: {
+  requestId?: string;
   defaultScheduledDate: string;
   organizationId: string;
   players: SelectablePlayer[];
@@ -80,6 +82,7 @@ export function NewMatchForm({
   initialValues?: NewMatchDefaults;
   error?: string;
 }) {
+  const [draftRequestId] = useState(() => requestId ?? crypto.randomUUID());
   const [modality, setModality] = useState<MatchModality>(initialValues?.modality ?? defaultModality);
   const [selectedPlayers, setSelectedPlayers] = useState<Record<string, boolean>>(() => Object.fromEntries((initialValues?.playerIds ?? []).map((id) => [id, true])));
   const [goalkeeperPlayers, setGoalkeeperPlayers] = useState<Record<string, boolean>>(() => Object.fromEntries((initialValues?.goalkeeperPlayerIds ?? []).map((id) => [id, true])));
@@ -328,6 +331,7 @@ export function NewMatchForm({
       event.currentTarget.querySelector<HTMLElement>(`[data-guest-key="${incompleteGuest.key}"] [data-guest-field="${field}"]`)?.focus();
     }}>
       <input name="organizationId" type="hidden" value={organizationId} />
+      <input name="requestId" type="hidden" value={draftRequestId} />
       <input name="manualAssignmentsPayload" type="hidden" value={manualAssignmentsPayload} />
       <input name="substituteAssignmentsPayload" type="hidden" value={JSON.stringify(activeSubstituteAssignments)} />
       <div className="grid gap-3 md:grid-cols-3">

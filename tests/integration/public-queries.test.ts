@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createSupabaseServerClientMock, cookiesMock, noStoreMock } = vi.hoisted(() => ({
+const { createSupabaseServerClientMock, createSupabasePublicClientMock, cookiesMock, noStoreMock } = vi.hoisted(() => ({
   createSupabaseServerClientMock: vi.fn(),
+  createSupabasePublicClientMock: vi.fn(),
   cookiesMock: vi.fn(),
   noStoreMock: vi.fn()
 }));
+vi.mock("@/lib/supabase/public", () => ({ createSupabasePublicClient: createSupabasePublicClientMock }));
 
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: createSupabaseServerClientMock
@@ -80,8 +82,8 @@ function buildPlayers() {
 
 function buildOrganizations() {
   return [
-    { id: "org-1", name: "Liga A", slug: "liga-a", is_public: true, created_at: "2026-04-01T00:00:00.000Z" },
-    { id: "org-2", name: "Liga B", slug: "liga-b", is_public: true, created_at: "2026-04-02T00:00:00.000Z" }
+    { id: "org-1", name: "Liga A", slug: "liga-a", is_public: true, is_listed: true, created_at: "2026-04-01T00:00:00.000Z" },
+    { id: "org-2", name: "Liga B", slug: "liga-b", is_public: true, is_listed: true, created_at: "2026-04-02T00:00:00.000Z" }
   ];
 }
 
@@ -90,6 +92,7 @@ describe("resolvePublicOrganization", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-19T12:00:00.000Z"));
     createSupabaseServerClientMock.mockReset();
+    createSupabasePublicClientMock.mockReset();
     cookiesMock.mockReset();
     noStoreMock.mockReset();
   });
@@ -104,6 +107,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({
       get(name: string) {
         if (name === ACTIVE_ORG_COOKIE) {
@@ -124,6 +128,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({
       get(name: string) {
         if (name === ACTIVE_ORG_COOKIE) {
@@ -140,10 +145,11 @@ describe("resolvePublicOrganization", () => {
 
   it("cae en un default contextual seguro si no hay seleccion previa", async () => {
     const fake = createFakeSupabase({
-      organizations: [{ id: "org-1", name: "Liga A", slug: "liga-a", is_public: true, created_at: "2026-04-01T00:00:00.000Z" }]
+      organizations: [{ id: "org-1", name: "Liga A", slug: "liga-a", is_public: true, is_listed: true, created_at: "2026-04-01T00:00:00.000Z" }]
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({
       get() {
         return undefined;
@@ -162,9 +168,9 @@ describe("resolvePublicOrganization", () => {
         email: "admin@example.com"
       },
       organizations: [
-        { id: "org-z", name: "Zulu", slug: "zulu", is_public: true, created_at: "2026-04-01T00:00:00.000Z" },
-        { id: "org-a", name: "Alpha", slug: "alpha", is_public: true, created_at: "2026-04-02T00:00:00.000Z" },
-        { id: "org-b", name: "Beta", slug: "beta", is_public: true, created_at: "2026-04-03T00:00:00.000Z" }
+        { id: "org-z", name: "Zulu", slug: "zulu", is_public: true, is_listed: true, created_at: "2026-04-01T00:00:00.000Z" },
+        { id: "org-a", name: "Alpha", slug: "alpha", is_public: true, is_listed: true, created_at: "2026-04-02T00:00:00.000Z" },
+        { id: "org-b", name: "Beta", slug: "beta", is_public: true, is_listed: true, created_at: "2026-04-03T00:00:00.000Z" }
       ],
       organization_admins: [
         { organization_id: "org-z", admin_id: "admin-1", created_by: "admin-1" },
@@ -174,6 +180,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     const organizations = await getViewerAdminOrganizations();
@@ -189,6 +196,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     await expect(getViewerAdminOrganizations()).resolves.toEqual([]);
@@ -223,6 +231,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     const summary = await getHomeSummary(ORG_ID);
@@ -237,16 +246,18 @@ describe("resolvePublicOrganization", () => {
         })
       ],
       topPlayers: [
-        expect.objectContaining({ id: "player-1", current_rating: 1200 }),
-        expect.objectContaining({ id: "player-2", current_rating: 1140 }),
-        expect.objectContaining({ id: "player-3", current_rating: 1090 }),
-        expect.objectContaining({ id: "player-4", current_rating: 1040 })
+        expect.objectContaining({ id: "player-1", current_rating: 1000 }),
+        expect.objectContaining({ id: "player-2", current_rating: 1000 }),
+        expect.objectContaining({ id: "player-3", current_rating: 1000 }),
+        expect.objectContaining({ id: "player-4", current_rating: 1000 })
       ]
     });
   });
 
   it("ordena el top del grupo con los mismos desempates que ranking", async () => {
     const fake = createFakeSupabase({
+      organization_seasons: [{ id: "annual", organization_id: ORG_ID, starts_at: "2026-01-01", ends_at: "2026-12-31", label: "2026" }],
+      organization_season_player_ratings: [{ season_id: "annual", player_id: "player-lucas", current_rating: 1030 }, { season_id: "annual", player_id: "player-gonza", current_rating: 1030 }],
       players: [
         {
           id: "player-lucas",
@@ -275,7 +286,7 @@ describe("resolvePublicOrganization", () => {
           organization_id: ORG_ID,
           scheduled_at: "2026-04-18T20:00:00.000Z",
           modality: "5v5",
-          status: "finished"
+          status: "finished", season_id: "annual"
         }
       ],
       team_options: [
@@ -298,6 +309,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     const summary = await getHomeSummary(ORG_ID);
@@ -305,8 +317,10 @@ describe("resolvePublicOrganization", () => {
     expect(summary.topPlayers.map((player) => player.id)).toEqual(["player-gonza", "player-lucas"]);
   });
 
-  it("corrige el top del snapshot usando el orden cacheado de standings", async () => {
+  it("rebuilds the current-year top instead of reusing historical snapshot standings", async () => {
     const fake = createFakeSupabase({
+      organizations: buildOrganizations(),
+      players: [{ id: "player-lucas", organization_id: ORG_ID, full_name: "LucasDias", skill_level: 1, current_rating: 1030 }, { id: "player-gonza", organization_id: ORG_ID, full_name: "GonzaMastro", skill_level: 3, current_rating: 1030 }],
       organization_public_snapshots: [
         {
           organization_id: ORG_ID,
@@ -369,11 +383,13 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     const summary = await getHomeSummary(ORG_ID);
 
-    expect(summary.topPlayers.map((player) => player.id)).toEqual(["player-lucas", "player-gonza"]);
+    expect(summary.totalPlayers).toBe(2);
+    expect(summary.topPlayers.map((player) => [player.id, player.current_rating])).toEqual([["player-lucas", 1000], ["player-gonza", 1000]]);
   });
 
   it("recalcula el acumulado cuando el snapshot todavia no tiene la forma reciente", async () => {
@@ -438,6 +454,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     const standings = await getPlayersWithStats(ORG_ID, { season: "all" });
@@ -448,8 +465,9 @@ describe("resolvePublicOrganization", () => {
     expect(standings.find((player) => player.playerId === "player-2")?.recentResults).toEqual(["D"]);
   });
 
-  it("uses current injury state even when a concurrent refresh persisted an older snapshot", async () => {
+  it("masks private injury state even when an older snapshot contains it", async () => {
     const fake = createFakeSupabase({
+      organizations: buildOrganizations(),
       players: buildPlayers().map((player) => ({ ...player, is_injured: player.id === "player-1" })),
       organization_public_snapshots: [{ organization_id: ORG_ID, standings: [
         { playerId: "player-1", playerName: "Arquero", currentRank: 1, currentRating: 1200, matchesPlayed: 1,
@@ -459,8 +477,9 @@ describe("resolvePublicOrganization", () => {
       ] }]
     });
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     const standings = await getPlayersWithStats(ORG_ID, { season: "all" });
-    expect(standings[0]).toMatchObject({ playerId: "player-1", isInjured: true, isAbsent: false, currentRating: 1200 });
+    expect(standings[0]).toMatchObject({ playerId: "player-1", isInjured: false, isAbsent: true, currentRating: 1200 });
     expect(standings[1]).toMatchObject({ playerId: "player-2", isInjured: false, isAbsent: true, currentRating: 1140 });
   });
 
@@ -470,7 +489,9 @@ describe("resolvePublicOrganization", () => {
       created_at: "2026-04-19T02:00:00Z", // A player without a debut is inactive from the day of registration.
       is_injured: player.id === "player-4"
     }));
+    vi.setSystemTime(new Date("2026-04-19T02:59:59Z"));
     const fake = createFakeSupabase({
+      organizations: buildOrganizations(),
       players,
       organization_public_snapshots: [{ organization_id: ORG_ID, standings: players.filter((player) => player.active).map((player) => ({
         playerId: player.id, playerName: player.full_name, currentRating: player.current_rating,
@@ -482,13 +503,14 @@ describe("resolvePublicOrganization", () => {
       })) }]
     });
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     vi.setSystemTime(new Date("2026-04-19T02:59:59Z"));
     const before = await getPlayersWithStats(ORG_ID, { season: "all" });
     expect(before.map((player) => player.isAbsent)).toEqual([false, true, false, false]);
 
     vi.setSystemTime(new Date("2026-04-19T03:00:00Z"));
     const after = await getPlayersWithStats(ORG_ID, { season: "all" });
-    expect(after.map((player) => player.isAbsent)).toEqual([true, true, false, false]);
+    expect(after.map((player) => player.isAbsent)).toEqual([true, true, false, true]);
     expect(after.map((player) => player.currentRating)).toEqual(before.map((player) => player.currentRating));
   });
 
@@ -514,6 +536,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     const summary = await getHomeSummary(ORG_ID);
@@ -542,6 +565,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     const matches = await getUpcomingConfirmedMatches(ORG_ID);
@@ -616,10 +640,11 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
-    const firstPage = await getMatchHistoryCardsPage(ORG_ID, { page: 1, pageSize: 2 });
-    const secondPage = await getMatchHistoryCardsPage(ORG_ID, { page: 2, pageSize: 2 });
+    const firstPage = await getMatchHistoryCardsPage(ORG_ID, { page: 1, pageSize: 2, season: "all" });
+    const secondPage = await getMatchHistoryCardsPage(ORG_ID, { page: 2, pageSize: 2, season: "all" });
 
     expect(firstPage.matches).toEqual([
       expect.objectContaining({
@@ -771,6 +796,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     const standings = await getPlayersWithStats(ORG_ID, { season: "season-current" });
@@ -847,6 +873,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     const matches = await getUpcomingConfirmedMatches(ORG_ID);
@@ -909,6 +936,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     const matches = await getUpcomingConfirmedMatches(ORG_ID);
@@ -958,6 +986,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     const details = await getMatchDetails("match-1", "liga-a");
@@ -995,6 +1024,7 @@ describe("resolvePublicOrganization", () => {
       team_option_guests: [{ team_option_id: "option-bench", guest_id: "guest-on-team", team: "B" }]
     });
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     const details = await getMatchDetails("match-bench", "liga-a");
     expect(details?.teamAPlayers.map((player) => player.id)).toEqual(["player-1"]);
     expect(details?.teamBPlayers.map((player) => player.full_name)).toEqual(["Ya jugó"]);
@@ -1072,9 +1102,10 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
-    const stats = await getPlayersWithStats(ORG_ID);
+    const stats = await getPlayersWithStats(ORG_ID, { season: "all" });
 
     expect(stats[0]).toEqual(
       expect.objectContaining({
@@ -1110,6 +1141,8 @@ describe("resolvePublicOrganization", () => {
 
   it("resuelve el detalle publico de un jugador con stats e historial de rating", async () => {
     const fake = createFakeSupabase({
+      organization_seasons: [{ id: "annual", organization_id: ORG_ID, starts_at: "2026-01-01", ends_at: "2026-12-31", label: "2026" }],
+      organization_season_player_ratings: [{ season_id: "annual", player_id: "player-1", current_rating: 1200 }],
       players: buildPlayers(),
       matches: [
         {
@@ -1117,7 +1150,7 @@ describe("resolvePublicOrganization", () => {
           organization_id: ORG_ID,
           scheduled_at: "2026-04-10T21:00:00.000Z",
           modality: "5v5",
-          status: "finished"
+          status: "finished", season_id: "annual"
         }
       ],
       team_options: [
@@ -1163,6 +1196,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     const details = await getPlayerDetails("player-1");
@@ -1189,6 +1223,7 @@ describe("resolvePublicOrganization", () => {
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    createSupabasePublicClientMock.mockReturnValue(fake.client);
     cookiesMock.mockResolvedValue({ get: () => undefined });
 
     await expect(getPlayerDetails("player-1", "liga-b")).resolves.toBeNull();
@@ -1219,6 +1254,7 @@ describe("large group history", () => {
       return query;
     } };
     createSupabaseServerClientMock.mockResolvedValue(cappedClient);
+    createSupabasePublicClientMock.mockReturnValue(cappedClient);
     const standings = await getPlayersWithStats(ORG_ID, { season: "all" });
     expect(standings.find((p) => p.playerId === "player-1")).toMatchObject({ matchesPlayed: count, wins: count, goals: count, mvpCount: count });
     expect(standings.find((p) => p.playerId === "player-2")).toMatchObject({ matchesPlayed: count, losses: count });

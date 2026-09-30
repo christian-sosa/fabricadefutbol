@@ -7,6 +7,7 @@ import { maskEmail, maskUserId } from "@/lib/log-pii";
 import { normalizeEmail } from "@/lib/org";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { readAllRows } from "@/lib/supabase/pagination";
 
 export type AdminSession = {
   userId: string;
@@ -21,6 +22,7 @@ export type AdminOrganization = {
   name: string;
   slug: string;
   is_public: boolean;
+  is_listed?: boolean;
   created_at: string;
 };
 
@@ -203,30 +205,24 @@ export async function getAdminOrganizations(admin: AdminSession): Promise<AdminO
   const supabase = await createSupabaseServerClient();
 
   if (admin.isSuperAdmin) {
-    const { data, error } = await supabase
+    return readAllRows<AdminOrganization>((from, to) => supabase
       .from("organizations")
-      .select("id, name, slug, is_public, created_at")
+      .select("id, name, slug, is_public, is_listed, created_at")
       .is("archived_at", null)
-      .order("name", { ascending: true });
-
-    if (error) throw new Error(error.message);
-    return data ?? [];
+      .order("name", { ascending: true }).order("id", { ascending: true }).range(from, to));
   }
 
-  const [{ data: createdOrganizations, error: createdOrganizationsError }, { data, error }] = await Promise.all([
-    supabase
+  const [createdOrganizations, data] = await Promise.all([
+    readAllRows<AdminOrganization>((from, to) => supabase
       .from("organizations")
-      .select("id, name, slug, is_public, created_at")
+      .select("id, name, slug, is_public, is_listed, created_at")
       .is("archived_at", null)
-      .eq("created_by", admin.userId),
-    supabase
+      .eq("created_by", admin.userId).order("id", { ascending: true }).range(from, to)),
+    readAllRows<{ organizations: (AdminOrganization & { archived_at: string | null }) | (AdminOrganization & { archived_at: string | null })[] | null }>((from, to) => supabase
       .from("organization_admins")
-      .select("organizations(id, name, slug, is_public, created_at, archived_at)")
-      .eq("admin_id", admin.userId)
+      .select("organizations(id, name, slug, is_public, is_listed, created_at, archived_at)")
+      .eq("admin_id", admin.userId).order("id", { ascending: true }).range(from, to))
   ]);
-
-  if (createdOrganizationsError) throw new Error(createdOrganizationsError.message);
-  if (error) throw new Error(error.message);
 
   const organizationsById = new Map<string, AdminOrganization>();
   for (const organization of createdOrganizations ?? []) {
@@ -259,11 +255,10 @@ export async function getOrganizationQueryKeyById(organizationId: string) {
 export async function getArchivedAdminOrganizations(admin: AdminSession): Promise<Array<AdminOrganization & { archived_at: string }>> {
   if (!admin.isSuperAdmin) return [];
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.from("organizations")
-    .select("id, name, slug, is_public, created_at, archived_at")
-    .not("archived_at", "is", null).order("archived_at", { ascending: false });
-  if (error) throw new Error("No se pudieron leer los grupos archivados.");
-  return data ?? [];
+  return readAllRows<AdminOrganization & { archived_at: string }>((from, to) => supabase.from("organizations")
+    .select("id, name, slug, is_public, is_listed, created_at, archived_at")
+    .not("archived_at", "is", null).order("archived_at", { ascending: false })
+    .order("id", { ascending: true }).range(from, to));
 }
 
 export async function getAdminOrganizationContext(preferredOrganizationKey?: string | null) {

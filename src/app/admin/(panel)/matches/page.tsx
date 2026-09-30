@@ -4,7 +4,7 @@ import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-ca
 import { MatchStatusBadge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getAdminMatchListActions } from "@/lib/admin-match-actions";
-import { getPastPendingResultMatch } from "@/lib/admin-pending-match";
+import { getNextConfirmedMatch, getPastPendingResultMatch } from "@/lib/admin-pending-match";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
@@ -21,6 +21,7 @@ export default async function AdminMatchesPage({
   const matches = await getAdminMatches(selectedOrganization.id);
   const createHref = withOrgQuery("/admin/matches/new", selectedOrganization.slug);
   const pendingResultMatch = getPastPendingResultMatch(matches);
+  const nextConfirmedMatch = getNextConfirmedMatch(matches);
   const pendingResultHref = pendingResultMatch
     ? withOrgQuery(`/admin/matches/${pendingResultMatch.id}/result`, selectedOrganization.slug)
     : null;
@@ -84,10 +85,12 @@ export default async function AdminMatchesPage({
 
         {pendingResultMatch ? (
           <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
-            <span className="font-semibold">Pendiente de resultado:</span>{" "}
+            <span className="font-semibold">Fecha pasada con resultado pendiente:</span>{" "}
             {formatMatchDateTime(pendingResultMatch.scheduled_at)} - {pendingResultMatch.modality}
           </div>
         ) : null}
+
+        {nextConfirmedMatch ? <p className="mt-4 rounded-xl border border-slate-700 p-3 text-sm text-slate-300"><span className="font-semibold">Próximo partido confirmado:</span> {formatMatchDateTime(nextConfirmedMatch.scheduled_at)}. Compartí los equipos y cargá el resultado después de jugar.</p> : null}
 
         {resolvedSearchParams.success ? (
           <div className="mt-4 rounded-md border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100" role="status">

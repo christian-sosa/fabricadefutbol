@@ -30,6 +30,28 @@ function buildPlayers(count: number, organizationId = ORG_ID) {
 }
 
 describe("match workflow", () => {
+  it("reutiliza el requestId sin duplicar el borrador ni invitados", async () => {
+    const players = buildPlayers(9);
+    const fake = createFakeSupabase({ players });
+    const input = { supabase:fake.client as never,adminId:ADMIN_ID,organizationId:ORG_ID,
+      requestId:"00000000-0000-4000-8000-000000009999",scheduledAt:SCHEDULED_AT,modality:"5v5" as const,
+      selectedPlayerIds:players.map((p) => p.id),invitedGuests:[{key:"guest1",name:"Invitado",rating:5}] };
+    expect(await createDraftMatchWithOptions(input)).toBe(input.requestId);
+    expect(await createDraftMatchWithOptions(input)).toBe(input.requestId);
+    expect(fake.table("matches")).toHaveLength(1);
+    expect(fake.table("match_guests")).toHaveLength(1);
+    expect(fake.table("team_options")).toHaveLength(3);
+  });
+  it("revierte todo el borrador si falla el guardado final de participantes de opciones", async () => {
+    const players = buildPlayers(9);
+    const fake = createFakeSupabase({ players,queryFailures:{team_option_players:{insert:"fallo al guardar opciones"}} });
+    await expect(createDraftMatchWithOptions({supabase:fake.client as never,adminId:ADMIN_ID,organizationId:ORG_ID,
+      scheduledAt:SCHEDULED_AT,modality:"5v5",selectedPlayerIds:players.map((p) => p.id),
+      invitedGuests:[{key:"guest1",name:"Invitado",rating:5}]})).rejects.toThrow("fallo al guardar opciones");
+    for (const table of ["matches","match_guests","match_players","team_options","team_option_players","team_option_guests"] as const) {
+      expect(fake.table(table)).toEqual([]);
+    }
+  });
   it.each(["9v9", "10v10", "11v11"] as const)("conserva suplentes de %s fuera del balance al crear y regenerar", async (modality) => {
     const starterCount = Number(modality.split("v")[0]) * 2;
     const players = buildPlayers(starterCount + 1);

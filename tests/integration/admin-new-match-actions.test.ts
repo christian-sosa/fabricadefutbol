@@ -105,6 +105,19 @@ describe("admin new match actions", () => {
     createSupabaseServerClientMock.mockReset();
   });
 
+  it("conserva el identificador del formulario al reintentar sin duplicar el partido", async () => {
+    const players=buildPlayers(10);
+    const fake=createFakeSupabase({players});
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    const form=buildManualMatchForm(players.map((p) => p.id));
+    const requestId="00000000-0000-4000-8000-000000009999";
+    form.set("requestId",requestId);
+    for (let attempt=0;attempt<2;attempt+=1) await expect(createMatchAction(form)).rejects.toMatchObject({digest:expect.stringContaining("NEXT_REDIRECT")});
+    expect(fake.table("matches")).toHaveLength(1);
+    expect(fake.table("matches")[0]?.id).toBe(requestId);
+    expect(redirectMock.mock.calls[0]?.[0]).toBe(redirectMock.mock.calls[1]?.[0]);
+  });
+
   it.each(["5v5", "10v10"] as const)("crea un partido manual %s con nombres de equipos y redirige a la pagina publica", async (modality) => {
     const players = buildPlayers(modality === "10v10" ? 20 : 10);
     const fake = createFakeSupabase({

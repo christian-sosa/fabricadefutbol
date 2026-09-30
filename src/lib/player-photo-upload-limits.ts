@@ -1,5 +1,35 @@
 import { addMonths, formatDistanceStrict } from "date-fns";
 import { es } from "date-fns/locale";
+import { z } from "zod";
+
+import type { createSupabaseServerClient } from "@/lib/supabase/server";
+
+type PhotoUploadClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+const reservationSchema = z.object({ path: z.string().min(1), reservation_id: z.string().uuid(), expires_at: z.string().min(1) });
+const finalizedPhotoSchema = z.object({ path: z.string().min(1), updated_at: z.string().min(1), previous_path: z.string().nullable() });
+
+export async function reservePlayerPhotoUpload(supabase: PhotoUploadClient, organizationId: string, playerId: string, revision: string) {
+  const { data, error } = await supabase.rpc("reserve_group_player_photo", {
+    p_organization_id: organizationId, p_player_id: playerId, p_revision: revision
+  });
+  if (error) throw new Error(error.message);
+  return reservationSchema.parse(data);
+}
+
+export async function finalizePlayerPhotoUpload(supabase: PhotoUploadClient, organizationId: string, playerId: string, reservationId: string) {
+  const { data, error } = await supabase.rpc("finalize_group_player_photo", {
+    p_organization_id: organizationId, p_player_id: playerId, p_reservation_id: reservationId
+  });
+  if (error) throw new Error(error.message);
+  return finalizedPhotoSchema.parse(data);
+}
+
+export async function cancelPlayerPhotoUpload(supabase: PhotoUploadClient, organizationId: string, playerId: string, reservationId: string) {
+  const { error } = await supabase.rpc("cancel_group_player_photo", {
+    p_organization_id: organizationId, p_player_id: playerId, p_reservation_id: reservationId
+  });
+  if (error) throw new Error(error.message);
+}
 
 export const PLAYER_PHOTO_UPLOAD_COOLDOWN_MONTHS = 3;
 export const PLAYER_PHOTO_TARGET_LIMIT = 2;

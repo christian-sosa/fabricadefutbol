@@ -1,6 +1,7 @@
 import { calculateReferralFunnel } from "@/lib/analytics/referral-funnel";
 import { calculateGroupActivation } from "@/lib/analytics/group-activation";
 import { readAllRows } from "@/lib/queries/read-all-rows";
+import { readRowsByIds } from "@/lib/supabase/pagination";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { calculateGuestDisplayRating, parseGuestSkillLevelValue } from "@/lib/domain/skill-level";
@@ -64,6 +65,7 @@ export async function getAdminDashboardData(organizationId: string) {
       .select("id, scheduled_at, modality, status")
       .eq("organization_id", organizationId)
       .order("scheduled_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(8)
   ]);
 
@@ -84,11 +86,13 @@ export async function getAdminDashboardData(organizationId: string) {
 
 export async function getAdminMatches(organizationId: string) {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
+  const { data, error } = await readAllRows((from, to) => supabase
     .from("matches")
-    .select("id, scheduled_at, modality, status, location")
+    .select("id, scheduled_at, modality, status, location", { count: "exact" })
     .eq("organization_id", organizationId)
-    .order("scheduled_at", { ascending: false });
+    .order("scheduled_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to));
 
   if (error) throw new Error(error.message);
 
@@ -99,11 +103,13 @@ export async function getOrganizationAdminData(organizationId: string) {
   const supabase = await createSupabaseServerClient();
 
   const [{ data: adminsData, error: adminsError }, invitesData] = await Promise.all([
-    supabase
+    readAllRows((from, to) => supabase
       .from("organization_admins")
-      .select("id, admin_id, created_at, admins!organization_admins_admin_id_fkey(id, display_name)")
+      .select("id, admin_id, created_at, admins!organization_admins_admin_id_fkey(id, display_name)", { count: "exact" })
       .eq("organization_id", organizationId)
-      .order("created_at", { ascending: true }),
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to)),
     fetchPendingInvitesForOrganization(supabase, organizationId)
   ]);
 
@@ -160,27 +166,31 @@ export async function getOrganizationAdminData(organizationId: string) {
 export async function getAdminPlayers(organizationId: string) {
   noStore();
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
+  const { data, error } = await readAllRows((from, to) => supabase
     .from("players")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("organization_id", organizationId)
     .order("skill_level", { ascending: true })
     .order("display_order", { ascending: true })
-    .order("full_name", { ascending: true });
+    .order("full_name", { ascending: true })
+    .order("id", { ascending: true })
+    .range(from, to));
   if (error) throw new Error(error.message);
   return data ?? [];
 }
 
 export async function getSelectablePlayers(organizationId: string) {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
+  const { data, error } = await readAllRows((from, to) => supabase
     .from("players")
-    .select("id, full_name, current_rating, initial_rank, skill_level, display_order, photo_path, photo_updated_at")
+    .select("id, full_name, current_rating, initial_rank, skill_level, display_order, photo_path, photo_updated_at", { count: "exact" })
     .eq("organization_id", organizationId)
     .eq("active", true)
     .order("skill_level", { ascending: true })
     .order("display_order", { ascending: true })
-    .order("full_name", { ascending: true });
+    .order("full_name", { ascending: true })
+    .order("id", { ascending: true })
+    .range(from, to));
   if (error) throw new Error(error.message);
   return data ?? [];
 }
@@ -197,50 +207,49 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
   if (matchError) throw new Error(matchError.message);
   if (!match) return null;
 
-  const { data: options, error: optionsError } = await supabase
+  const { data: options, error: optionsError } = await readAllRows((from, to) => supabase
     .from("team_options")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("match_id", matchId)
-    .order("option_number", { ascending: true });
+    .order("option_number", { ascending: true })
+    .order("id", { ascending: true })
+    .range(from, to));
   if (optionsError) throw new Error(optionsError.message);
 
   const optionIds = (options ?? []).map((option) => option.id);
-  const [{ data: optionPlayers, error: optionPlayersError }, { data: optionGuests, error: optionGuestsError }] =
-    optionIds.length
-      ? await Promise.all([
-          supabase
-            .from("team_option_players")
-            .select("team_option_id, player_id, team")
-            .in("team_option_id", optionIds),
-          supabase
-            .from("team_option_guests")
-            .select("team_option_id, guest_id, team")
-            .in("team_option_id", optionIds)
-        ])
-      : [{ data: [], error: null }, { data: [], error: null }];
-  if (optionPlayersError) throw new Error(optionPlayersError.message);
-  if (optionGuestsError && !isGuestSchemaMissing(optionGuestsError)) throw new Error(optionGuestsError.message);
-  const safeOptionGuests = optionGuestsError && isGuestSchemaMissing(optionGuestsError) ? [] : optionGuests ?? [];
+  const [optionPlayers, safeOptionGuests] = await Promise.all([
+    readRowsByIds(optionIds, (batch, from, to) => supabase
+      .from("team_option_players")
+      .select("team_option_id, player_id, team", { count: "exact" })
+      .in("team_option_id", batch).order("id").range(from, to)),
+    readRowsByIds(optionIds, (batch, from, to) => supabase
+      .from("team_option_guests")
+      .select("team_option_id, guest_id, team", { count: "exact" })
+      .in("team_option_id", batch).order("id").range(from, to))
+      .catch((error: unknown) => {
+        if (error instanceof Error && isGuestSchemaMissing(error)) return [];
+        throw error;
+      })
+  ]);
   const playerIds = Array.from(new Set((optionPlayers ?? []).map((row) => row.player_id)));
   const guestIds = Array.from(new Set(safeOptionGuests.map((row) => row.guest_id)));
 
-  const { data: players, error: playersError } = playerIds.length
-    ? await supabase
+  const [players, safeGuests] = await Promise.all([
+    readRowsByIds(playerIds, (batch, from, to) => supabase
         .from("players")
-        .select("id, full_name, current_rating, skill_level, photo_path, photo_updated_at")
+        .select("id, full_name, current_rating, skill_level, photo_path, photo_updated_at", { count: "exact" })
         .eq("organization_id", organizationId)
-        .in("id", playerIds)
-    : { data: [], error: null };
-  if (playersError) throw new Error(playersError.message);
-
-  const { data: guests, error: guestsError } = guestIds.length
-    ? await supabase
+        .in("id", batch).order("id").range(from, to)),
+    readRowsByIds(guestIds, (batch, from, to) => supabase
         .from("match_guests")
-        .select("id, guest_name, guest_rating")
-        .in("id", guestIds)
-    : { data: [], error: null };
-  if (guestsError && !isGuestSchemaMissing(guestsError)) throw new Error(guestsError.message);
-  const safeGuests = guestsError && isGuestSchemaMissing(guestsError) ? [] : guests ?? [];
+        .select("id, guest_name, guest_rating", { count: "exact" })
+        .eq("match_id", matchId)
+        .in("id", batch).order("id").range(from, to))
+      .catch((error: unknown) => {
+        if (error instanceof Error && isGuestSchemaMissing(error)) return [];
+        throw error;
+      })
+  ]);
 
   const playersById = new Map((players ?? []).map((player) => [player.id, player]));
   const guestsById = new Map(safeGuests.map((guest) => [guest.id, guest]));
@@ -434,6 +443,7 @@ export async function getSuperAdminDashboardMetrics(): Promise<SuperAdminDashboa
       .from("organization_audit_events")
       .select("id, organization_id, event_type, actor_admin_id, actor_email, target_admin_id, target_email, entity_type, entity_id, details, created_at")
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(20),
     countPendingInvitesByOrganization(supabase),
     supabase.from("admins").select("id", { count: "exact", head: true }),
