@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
-  "revision": "groups-audit-20260930",
-  "sha256": "113da6edb5d97586c3a93f0bf3532b4e490af2a794e7a4a7734fdd77c426bb45",
+  "revision": "restore-injury-ranking-20261002",
+  "sha256": "6cdc3998e1f6a00d96140ccfb8c5d7383b03444ec8101879711842ed9096e145",
   "bucket": "groups-sql-artifacts",
-  "object": "113da6edb5d97586c3a93f0bf3532b4e490af2a794e7a4a7734fdd77c426bb45.json.gz"
+  "object": "6cdc3998e1f6a00d96140ccfb8c5d7383b03444ec8101879711842ed9096e145.json.gz"
 }

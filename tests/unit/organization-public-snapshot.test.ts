@@ -161,8 +161,19 @@ describe("organization public snapshot helpers", () => {
     await expect(readOrganizationPublicSnapshot(fake.client, "org-1")).resolves.toBeNull();
   });
 
-  it("masks health fields from older persisted standings", async () => {
-    const fake = snapshotFixture({ standings: [{ ...payload.standings[0], isInjured: true, isAbsent: false, lastPlayedAt: null }] });
+  it("preserves injury state and recalculates its inactivity exemption when writing and reading snapshots", async () => {
+    const injuryPayload = { ...payload, standings: [{ ...payload.standings[0], isInjured: true, isAbsent: true, lastPlayedAt: null, matchesSinceLastPlayed: 8 }] };
+    const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
+    await expect(writeOrganizationPublicSnapshot({ rpc }, "org-1", injuryPayload, 7)).resolves.toBe(true);
+    const written = rpc.mock.calls[0][1].p_payload;
+    expect(written.standings[0]).toMatchObject({ isInjured: true, isAbsent: false, currentRating: 1140, matchesPlayed: 2, matchesSinceLastPlayed: 8 });
+    const fake = snapshotFixture({ standings: written.standings });
+    const snapshot = await readOrganizationPublicSnapshot(fake.client, "org-1");
+    expect(snapshot?.standings[0]).toMatchObject({ isInjured: true, isAbsent: false, currentRating: 1140, matchesPlayed: 2, lastPlayedAt: null });
+  });
+
+  it("recalculates inactivity from the current clock when reading persisted standings", async () => {
+    const fake = snapshotFixture({ standings: [{ ...payload.standings[0], isInjured: false, isAbsent: false, lastPlayedAt: "2026-08-30T21:00:00Z", matchesSinceLastPlayed: 0 }] });
     const snapshot = await readOrganizationPublicSnapshot(fake.client, "org-1");
     expect(snapshot?.standings[0]).toMatchObject({ isInjured: false, isAbsent: true });
   });

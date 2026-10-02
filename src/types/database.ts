@@ -600,7 +600,7 @@ export type Database = {
     };
     Views: {
       public_players: {
-        Row: Omit<Database["public"]["Tables"]["players"]["Row"], "is_injured"> & { is_injured: false };
+        Row: Omit<Database["public"]["Tables"]["players"]["Row"], "is_injured"> & { is_injured: boolean };
         Relationships: [];
       };
       organization_public_snapshots: {

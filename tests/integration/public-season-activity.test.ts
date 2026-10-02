@@ -126,4 +126,23 @@ describe("player activity when the selected season is missing", () => {
     expectEmptySeasonStats(unknownSeason);
     expect(activityByPlayer(unknownSeason)).toEqual(activityByPlayer(existingSeason));
   });
+
+  it("keeps injured players exempt from inactivity across historical, current and missing seasons", async () => {
+    const fake = activityFixture();
+    await fake.client.from("players").update({ is_injured: true }).in("id", ["player-one", "player-new"]);
+    publicClient.mockReturnValue(fake.client);
+    vi.setSystemTime(new Date("2026-11-02T15:00:00Z"));
+
+    const standings = await Promise.all(["all", "current", SEASON_ID, "missing-season"].map((season) => getPlayersWithStats(ORG_ID, { season })));
+    for (const players of standings) {
+      expect(players.find((player) => player.playerId === "player-one")).toMatchObject({
+        isInjured: true, isAbsent: false, lastPlayedAt: "2026-09-30T21:00:00Z", matchesSinceLastPlayed: 1
+      });
+      expect(players.find((player) => player.playerId === "player-new")).toMatchObject({ isInjured: true, isAbsent: false, lastPlayedAt: null });
+      expect(players.find((player) => player.playerId === "player-two")).toMatchObject({ isInjured: false, isAbsent: true });
+    }
+    expect(standings[0].find((player) => player.playerId === "player-one")).toMatchObject({ currentRating: 1230, matchesPlayed: 1, mvpCount: 1 });
+    expect(standings[1].find((player) => player.playerId === "player-one")).toMatchObject({ currentRating: 1100, matchesPlayed: 1, mvpCount: 1 });
+    expectEmptySeasonStats(standings[3]);
+  });
 });

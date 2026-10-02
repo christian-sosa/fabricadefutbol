@@ -6,7 +6,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS } from "@/lib/constants";
 import { withPublicQuery } from "@/lib/org";
 
-const LAST_UPDATED = "30 de septiembre de 2026";
+const LAST_UPDATED = "2 de octubre de 2026";
 
 function PrivacySection({ children, title }: { children: ReactNode; title: string }) {
   return (
@@ -72,7 +72,7 @@ export default async function PrivacyPage({
             items={[
               "Datos de cuenta y acceso: email, identificadores de usuario, sesiones, rol de administrador y fechas de alta.",
               "Datos de grupos: nombre, slug, configuracion, administradores, actividad e informacion publica asociada.",
-              "Datos de jugadores: nombre, orden, nivel de habilidad, puntos, estadísticas, asistencia, resultados y fotos si fueron cargadas. El estado de lesión se usa en la administración del grupo; no cargues diagnósticos ni detalles de salud.",
+              "Datos de jugadores: nombre, orden, nivel de habilidad, puntos, estadísticas, asistencia, resultados y fotos si fueron cargadas. El administrador puede marcar a un jugador como lesionado y esa marca simple se muestra en el ranking público; no cargues diagnósticos ni detalles de salud.",
               "Datos de soporte: nombre, email, tema, mensaje, grupo referido y comunicaciones posteriores.",
               "Datos técnicos y de navegación: dirección IP, información del navegador, sesiones, preferencias y eventos de uso para proteger y mejorar el servicio."
             ]}
@@ -107,7 +107,7 @@ export default async function PrivacyPage({
         <PrivacySection title="5. Paginas publicas y visibilidad">
           <p>
             Algunas secciones son publicas por naturaleza. Por ejemplo, ranking, historial, proximos partidos y paginas
-            del grupo pueden mostrar nombres, puntos, estadísticas, actividad o ausencias calculadas a partir de los partidos y fechas, y fotos de jugadores. El estado de lesión se consulta sólo en la administración del grupo y no explica motivos de salud en las vistas públicas. No cargues información médica ni otros datos sensibles en nombres, notas o mensajes.
+            del grupo pueden mostrar nombres, puntos, estadísticas, actividad o ausencias calculadas a partir de los partidos y fechas, y fotos de jugadores. El ranking público también muestra la marca simple «Lesionado» cuando el administrador la activa. Esa marca no incluye diagnósticos ni detalles de salud y evita que el jugador se considere inactivo mientras esté lesionado. No cargues información médica ni otros datos sensibles en nombres, notas o mensajes.
           </p>
           <p>
             Si no queres que tu nombre, foto o informacion deportiva aparezca en una vista publica, podes pedirle al
