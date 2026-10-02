@@ -465,7 +465,7 @@ describe("resolvePublicOrganization", () => {
     expect(standings.find((player) => player.playerId === "player-2")?.recentResults).toEqual(["D"]);
   });
 
-  it("masks private injury state even when an older snapshot contains it", async () => {
+  it("uses current injury state when the cached snapshot has outdated injury flags", async () => {
     const fake = createFakeSupabase({
       organizations: buildOrganizations(),
       players: buildPlayers().map((player) => ({ ...player, is_injured: player.id === "player-1" })),
@@ -479,7 +479,7 @@ describe("resolvePublicOrganization", () => {
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
     createSupabasePublicClientMock.mockReturnValue(fake.client);
     const standings = await getPlayersWithStats(ORG_ID, { season: "all" });
-    expect(standings[0]).toMatchObject({ playerId: "player-1", isInjured: false, isAbsent: true, currentRating: 1200 });
+    expect(standings[0]).toMatchObject({ playerId: "player-1", isInjured: true, isAbsent: false, currentRating: 1200, matchesPlayed: 1 });
     expect(standings[1]).toMatchObject({ playerId: "player-2", isInjured: false, isAbsent: true, currentRating: 1140 });
   });
 
@@ -510,8 +510,14 @@ describe("resolvePublicOrganization", () => {
 
     vi.setSystemTime(new Date("2026-04-19T03:00:00Z"));
     const after = await getPlayersWithStats(ORG_ID, { season: "all" });
-    expect(after.map((player) => player.isAbsent)).toEqual([true, true, false, true]);
+    expect(after.map((player) => player.isAbsent)).toEqual([true, true, false, false]);
+    expect(after.find((player) => player.playerId === "player-4")).toMatchObject({ isInjured: true, isAbsent: false });
     expect(after.map((player) => player.currentRating)).toEqual(before.map((player) => player.currentRating));
+
+    await fake.client.from("players").update({ is_injured: false }).eq("id", "player-4");
+    const recovered = await getPlayersWithStats(ORG_ID, { season: "all" });
+    expect(recovered.find((player) => player.playerId === "player-4")).toMatchObject({ isInjured: false, isAbsent: true });
+    expect(recovered.map((player) => player.currentRating)).toEqual(before.map((player) => player.currentRating));
   });
 
   it("excluye confirmados vencidos usando la hora de cancha, no UTC del servidor", async () => {

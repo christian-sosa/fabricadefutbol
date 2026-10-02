@@ -91,11 +91,14 @@ function normalizeRevision(value: unknown): number | null {
 }
 
 function publicStandings(value: unknown) {
-  return rankPlayers(normalizeArray<PlayerComputedStats>(value).map((player) => ({
-    ...player,
-    isInjured: false,
-    isAbsent: isPlayerAbsent({ isInjured: false, matchesSinceLastPlayed: player.matchesSinceLastPlayed ?? 0, lastPlayedAt: player.lastPlayedAt ?? null })
-  })));
+  return rankPlayers(normalizeArray<PlayerComputedStats>(value).map((player) => {
+    const isInjured = player.isInjured === true;
+    return {
+      ...player,
+      isInjured,
+      isAbsent: isPlayerAbsent({ isInjured, matchesSinceLastPlayed: player.matchesSinceLastPlayed ?? 0, lastPlayedAt: player.lastPlayedAt ?? null })
+    };
+  }));
 }
 
 export async function readOrganizationSportingRevision(supabase: unknown, organizationId: string): Promise<number | null> {

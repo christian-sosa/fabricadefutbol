@@ -76,7 +76,7 @@ describe("public query boundaries", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("keeps every public entry point and nested helper on the anonymous client and health-masked view", async () => {
+  it("keeps every public entry point and nested helper on the anonymous client and public player view", async () => {
     const reads = observePublicReads(annualData().client);
     publicClient.mockReturnValue(reads.client);
     await getPublicOrganizations(); await resolvePublicOrganization("visible"); await getOrganizationSeasons(ORG_ID);
@@ -90,9 +90,9 @@ describe("public query boundaries", () => {
     expect(authenticatedClient).not.toHaveBeenCalled();
     expect(reads.tables).not.toContain("players");
     expect(reads.tables).toContain("public_players");
-    expect(standings[0]).toMatchObject({ isInjured: false, matchesPlayed: 1 });
-    expect(details?.player.is_injured).toBe(false);
-    expect(details?.playerStats?.isInjured).toBe(false);
+    expect(standings[0]).toMatchObject({ isInjured: true, isAbsent: false, matchesPlayed: 1 });
+    expect(details?.player.is_injured).toBe(true);
+    expect(details?.playerStats).toMatchObject({ isInjured: true, isAbsent: false });
   });
 
   it("excludes unlisted groups from the directory while supporting explicit slug, UUID and cookie selection", async () => {
@@ -181,7 +181,7 @@ describe("public query boundaries", () => {
     expect(rpc).toHaveBeenCalledExactlyOnceWith("write_group_public_snapshot", expect.objectContaining({ p_organization_id: ORG_ID, p_expected_revision: 7 }));
     const candidate = rpc.mock.calls[0][1].p_payload;
     expect(candidate.summary.topPlayers[0].current_rating).toBe(1080);
-    expect(candidate.standings[0]).toMatchObject({ currentRating: 1250, isInjured: false, matchesPlayed: 2 });
+    expect(candidate.standings[0]).toMatchObject({ currentRating: 1250, isInjured: true, isAbsent: false, matchesPlayed: 2 });
   });
 
   it("does not rebuild or write snapshots of inaccessible groups", async () => {

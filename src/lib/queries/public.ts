@@ -604,20 +604,23 @@ export async function getPlayersWithStats(
     const supabase = createSupabasePublicClient();
     const standings = await readOrganizationPublicStandingsSnapshot(supabase, organizationId);
     if (standings && hasCurrentStandingsData(standings)) {
-      // Calendar absence can change even while the sporting revision is unchanged.
+      // Current injury and calendar absence must not depend on cached activity.
       const players = await readAllRows((from, to) => supabase.from("public_players")
         .select("id, is_injured").eq("organization_id", organizationId).eq("active", true).order("id").range(from, to));
       const currentPlayers = new Map(players.map((player) => [player.id, player]));
       const now = new Date();
-      return standings.filter((player) => currentPlayers.has(player.playerId)).map((player) => ({
-        ...player,
-        isInjured: false,
-        isAbsent: isPlayerAbsent({
-          isInjured: false,
-          matchesSinceLastPlayed: player.matchesSinceLastPlayed ?? 0,
-          lastPlayedAt: player.lastPlayedAt ?? null
-        }, now)
-      }));
+      return standings.filter((player) => currentPlayers.has(player.playerId)).map((player) => {
+        const isInjured = currentPlayers.get(player.playerId)?.is_injured === true;
+        return {
+          ...player,
+          isInjured,
+          isAbsent: isPlayerAbsent({
+            isInjured,
+            matchesSinceLastPlayed: player.matchesSinceLastPlayed ?? 0,
+            lastPlayedAt: player.lastPlayedAt ?? null
+          }, now)
+        };
+      });
     }
   }
 

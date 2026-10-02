@@ -46,9 +46,10 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
 
   it("defaults new and preexisting players to healthy when the column is introduced", async () => {
     expect(await rows("select is_injured from APP.players")).toEqual([{ is_injured: false }, { is_injured: false }]);
-    await sql("drop trigger invalidate_player_injury_snapshot on APP.players; alter table APP.players drop column is_injured;");
+    await sql("drop view APP.public_players; drop trigger invalidate_player_injury_snapshot on APP.players; alter table APP.players drop column is_injured;");
     const source = readFileSync(`supabase/generated/schema.${schema}.sql`, "utf8").replace("create extension if not exists pgcrypto;", "");
     await executePrivateSql(db, source, `schema.${schema}.sql upgrading existing players`);
+    await executePrivateSql(db, readFileSync(`supabase/generated/policies.${schema}.sql`, "utf8"), `policies.${schema}.sql restoring recreated view grants`);
     expect(await rows("select is_injured from APP.players")).toEqual([{ is_injured: false }, { is_injured: false }]);
   });
 
@@ -92,10 +93,10 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     expect(await snapshots()).toEqual([{ organization_id: id(10) }, { organization_id: id(11) }]);
   });
 
-  it("keeps injury private after activation while public players hide archived groups", async () => {
+  it("exposes injury status after activation while public players hide archived groups and reject anonymous edits", async () => {
     await sql(`update APP.players set is_injured=true where id='${id(100)}'; update APP.organizations set archived_at=now() where id='${id(11)}'; select APP_private.activate_group_security_controls(); set role anon;`);
-    await expect(rows("select id,is_injured from APP.players")).rejects.toMatchObject({code:"42501"});
-    expect(await rows("select id,is_injured from APP.public_players")).toEqual([{ id: id(100), is_injured: false }]);
+    expect(await rows("select id,is_injured from APP.players")).toEqual([{ id: id(100), is_injured: true }]);
+    expect(await rows("select id,is_injured from APP.public_players")).toEqual([{ id: id(100), is_injured: true }]);
     await expect(sql(`update APP.players set is_injured=false where id='${id(100)}'`)).rejects.toMatchObject({ code: "42501" });
   });
 

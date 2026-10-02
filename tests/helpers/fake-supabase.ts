@@ -215,7 +215,7 @@ class FakeSupabaseState {
   }
 
   getTable(table: TableName): Row[] {
-    if (table === "public_players") return this.db.players.map((row) => ({...cloneRow(row),is_injured:false}));
+    if (table === "public_players") return this.db.players.map((row) => ({...cloneRow(row),is_injured:row.is_injured === true}));
     return this.db[table];
   }
 

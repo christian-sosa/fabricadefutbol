@@ -158,14 +158,21 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     await reserve(93); await expect(reserve(94)).rejects.toThrow(/2 fotos/);
     await cancel(second);
   });
-  it('keeps injury truth private while public data and legacy photo reads remain available', async () => {
+  it('exposes injury status for public active players without granting injury edits or access to hidden groups', async () => {
     await sql(`update APP.players set is_injured=true where id='${id(20)}'`); await activate();
     expect(await rows(`select is_injured from APP.players where id='${id(20)}'`)).toEqual([{is_injured:true}]);
     await login(2); expect(await rows(`select is_injured from APP.players where id='${id(20)}'`)).toEqual([]);
     await sql("reset role; select set_config('test.uid','',false); set role anon");
-    await expect(rows(`select is_injured from APP.players`)).rejects.toThrow(/permission denied/);
-    expect(await rows(`select full_name,is_injured from APP.public_players where id='${id(20)}'`)).toEqual([{full_name:'Player 0',is_injured:false}]);
+    expect(await rows(`select is_injured from APP.players where id='${id(20)}'`)).toEqual([{is_injured:true}]);
+    expect(await rows(`select full_name,is_injured from APP.public_players where id='${id(20)}'`)).toEqual([{full_name:'Player 0',is_injured:true}]);
+    await expect(sql(`update APP.players set is_injured=false where id='${id(20)}'`)).rejects.toMatchObject({code:'42501'});
     expect(await rows(`select public.can_read_player_photo_object('${schema}/${id(10)}/${id(20)}.webp') result`)).toEqual([{result:true}]);
+    await sql(`reset role; update APP.players set active=false where id='${id(20)}'; set role anon`);
+    expect(await rows(`select is_injured from APP.public_players where id='${id(20)}'`)).toEqual([]);
+    await expect(sql(`reset role; update APP.organizations set is_public=false where id='${id(10)}'`)).rejects.toMatchObject({code:'23514'});
+    await sql(`reset role; update APP.players set active=true where id='${id(20)}'`);
+    await sql(`reset role; update APP.organizations set is_public=true,archived_at=clock_timestamp() where id='${id(10)}'; set role anon`);
+    expect(await rows(`select is_injured from APP.public_players where id='${id(20)}'`)).toEqual([]);
   });
   it('allows trusted service copies and platform metadata maintenance without granting user overwrites', async () => {
     await activate();
@@ -179,12 +186,12 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     await login(); expect((await finalize(reserved)).path).toBe(reserved.path);
     expect(await rows('select count(*)::int count from APP.player_photo_upload_events')).toEqual([{count:1}]);
   });
-  it('sanitizes injury flags in raw snapshot RPC payloads and preserves public match cards', async () => {
+  it('preserves only boolean injury flags in raw snapshot RPC payloads and recomputes public absence', async () => {
     await activate();
     await sql(`select APP.confirm_group_match_option('${id(40)}','${id(10)}','${id(50)}');
-      select APP.write_group_public_snapshot('${id(10)}',(select sporting_revision from APP.organizations where id='${id(10)}'),'{"summary":{"nested":{"is_injured":true}},"standings":[{"isInjured":true,"isAbsent":false}],"matchHistory":[]}');`);
+      select APP.write_group_public_snapshot('${id(10)}',(select sporting_revision from APP.organizations where id='${id(10)}'),'{"summary":{"nested":{"is_injured":true}},"standings":[{"isInjured":true,"isAbsent":false},{"isInjured":false},{"isInjured":"invalid","is_absent":true},{"is_injured":{"invalid":true}},{"isInjured":null}],"matchHistory":[]}');`);
     await sql("reset role; select set_config('test.uid','',false); set role anon");
-    expect(await rows('select summary,standings from APP.organization_public_snapshots')).toEqual([{summary:{nested:{is_injured:false}},standings:[{isInjured:false}]}]);
+    expect(await rows('select summary,standings from APP.organization_public_snapshots')).toEqual([{summary:{nested:{is_injured:true}},standings:[{isInjured:true},{isInjured:false},{isInjured:false},{is_injured:false},{isInjured:false}]}]);
     expect(await rows('select team_a_players,team_b_players from APP.public_match_cards')).toHaveLength(1);
   });
   it('hides inactive photo objects from public readers and preserves own-admin previews', async () => {
