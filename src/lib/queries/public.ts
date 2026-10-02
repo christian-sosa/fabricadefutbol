@@ -20,7 +20,7 @@ import { calculateGuestDisplayRating } from "@/lib/domain/skill-level";
 import { calculatePlayerStats, type MatchWithTeams } from "@/lib/domain/stats";
 import { rankPlayers } from "@/lib/domain/player-ranking";
 import { calculatePlayerActivity, isPlayerAbsent } from "@/lib/domain/player-activity";
-import { getCurrentMatchDateTimeIso } from "@/lib/match-datetime";
+import { getCurrentMatchDateInput, getCurrentMatchDateTimeIso } from "@/lib/match-datetime";
 import { isMissingSupabaseConfigurationError } from "@/lib/env";
 import type { MatchHistoryItem, OrganizationMatchesResponse, OrganizationSeasonOption } from "@/lib/query/types";
 import type { Database } from "@/types/database";
@@ -236,9 +236,12 @@ export async function getOrganizationSeasons(organizationId: string | null): Pro
 
   const rows = await readAllRows((from, to) => supabase.from("organization_seasons")
     .select("*").eq("organization_id", organizationId).order("starts_at", { ascending: false }).order("id").range(from, to));
-  const currentStart = getAnnualOrganizationSeasonStartDate();
-  const seasons = rows.map((row) => ({ ...normalizeSeasonOption(row), status: row.starts_at === currentStart ? "active" as const : "closed" as const }));
-  if (!seasons.some((season) => season.startsAt === currentStart)) {
+  const today = getCurrentMatchDateInput();
+  // Match the sporting workflow: legacy seasons can start after January 1.
+  const currentSeason = rows.find((row) => row.starts_at <= today && row.ends_at >= today);
+  const seasons = rows.map((row) => ({ ...normalizeSeasonOption(row), status: row.id === currentSeason?.id ? "active" as const : "closed" as const }));
+  if (!currentSeason) {
+    const currentStart = getAnnualOrganizationSeasonStartDate();
     seasons.unshift({ id: "current", label: `Temporada ${currentStart.slice(0, 4)}`, durationMonths: 12, startsAt: currentStart, endsAt: getAnnualOrganizationSeasonEndDate(), status: "active" });
   }
   return seasons;
@@ -262,9 +265,11 @@ async function resolveSeasonFilter(
     .select("*")
     .eq("organization_id", organizationId);
 
+  const today = getCurrentMatchDateInput();
   const { data, error } =
     filter === "current"
-      ? await query.eq("starts_at", getAnnualOrganizationSeasonStartDate()).maybeSingle()
+      ? await query.lte("starts_at", today).gte("ends_at", today)
+          .order("starts_at", { ascending: false }).order("id").limit(1).maybeSingle()
       : await query.eq("id", filter).maybeSingle();
 
   if (error) throw new Error(error.message);
@@ -545,12 +550,6 @@ async function getPlayersWithStatsLive(
     .eq("organization_id", organizationId).eq("active", true).order("current_rating", { ascending: false })
     .order("skill_level").order("display_order").order("full_name").order("id").range(from, to));
 
-  if (seasonFilter.mode === "empty") {
-    const activity = calculatePlayerActivity(players, []);
-    return calculatePlayerStats({ players: players.map((player) => ({ ...player, current_rating: 1000 })), finishedMatches: [] })
-      .map((stats) => ({ ...stats, ...activity.get(stats.playerId) }));
-  }
-
   const matchesQuery = supabase
     .from("matches")
     .select("*")
@@ -560,6 +559,12 @@ async function getPlayersWithStatsLive(
   const finishedMatches = await readAllRows((from, to) => matchesQuery.range(from, to));
   const allFinishedWithTeams = await fetchMatchTeams(finishedMatches.map((match) => match.id), finishedMatches);
   const activityByPlayer = calculatePlayerActivity(players, allFinishedWithTeams);
+
+  if (seasonFilter.mode === "empty") {
+    return calculatePlayerStats({ players: players.map((player) => ({ ...player, current_rating: 1000 })), finishedMatches: [] })
+      .map((stats) => ({ ...stats, ...activityByPlayer.get(stats.playerId) }));
+  }
+
   const finishedWithTeams = seasonFilter.mode === "season"
     ? allFinishedWithTeams.filter((item) => item.match.season_id === seasonFilter.season.id)
     : allFinishedWithTeams;
