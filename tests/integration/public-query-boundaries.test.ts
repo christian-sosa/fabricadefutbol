@@ -148,6 +148,8 @@ describe("public query boundaries", () => {
     expect((await getMatchCalendarActivity(ORG_ID)).season?.id).toBe(annual.id);
     vi.setSystemTime(new Date("2027-01-01T03:00:00Z")); reads.tables.length = 0;
     expect((await getPlayersWithStats(ORG_ID))[0]).toMatchObject({ currentRating: 1000, matchesPlayed: 0, mvpCount: 0, goals: 0, assists: 0 });
+    expect(reads.tables).toContain("matches"); // Current activity still needs historical appearances.
+    reads.tables.length = 0;
     expect((await getMatchHistoryCardsPage(ORG_ID)).matches).toEqual([]);
     await expect(getMatchCalendarActivity(ORG_ID)).resolves.toEqual({ matches: [], season: null });
     expect(reads.tables).not.toContain("matches");
