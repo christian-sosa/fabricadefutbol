@@ -25,11 +25,23 @@ describe("site metadata", () => {
       type: "article",
       url: "https://fabricadefutbol.com.ar/guides/equipos-parejos",
       title: "Cómo armar equipos parejos — Fábrica de Fútbol",
-      description: result.description
+      description: result.description,
+      images: [{
+        url: "https://fabricadefutbol.com.ar/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: expect.stringContaining("Fábrica de Fútbol")
+      }]
     });
     expect(result.twitter).toMatchObject({
       description: result.description,
-      title: "Cómo armar equipos parejos — Fábrica de Fútbol"
+      title: "Cómo armar equipos parejos — Fábrica de Fútbol",
+      images: [{
+        url: "https://fabricadefutbol.com.ar/twitter-image",
+        width: 1200,
+        height: 630,
+        alt: expect.stringContaining("Fábrica de Fútbol")
+      }]
     });
     expect(result.alternates?.canonical).toBe("https://fabricadefutbol.com.ar/guides/equipos-parejos");
   });

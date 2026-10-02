@@ -7,6 +7,12 @@ export const HOME_TITLE = "Armá equipos de fútbol parejos gratis";
 export const HOME_DESCRIPTION =
   "Organizá fútbol entre amigos gratis: armá equipos parejos, compartí por WhatsApp y guardá resultados y ranking. Los jugadores no necesitan registrarse.";
 
+const SOCIAL_IMAGE_DETAILS = {
+  width: 1200,
+  height: 630,
+  alt: "Fábrica de Fútbol: grupos gratis, equipos parejos y jugadores sin registro"
+};
+
 export const ACCESS_ROBOTS: Metadata["robots"] = {
   index: false,
   follow: false,
@@ -43,12 +49,14 @@ export function buildPublicMetadata({
       url,
       siteName: SITE_NAME,
       title: socialTitle,
-      description
+      description,
+      images: [{ url: buildAbsolutePublicUrl("/opengraph-image"), ...SOCIAL_IMAGE_DETAILS }]
     },
     twitter: {
       card: "summary_large_image",
       title: socialTitle,
-      description
+      description,
+      images: [{ url: buildAbsolutePublicUrl("/twitter-image"), ...SOCIAL_IMAGE_DETAILS }]
     }
   };
 }
