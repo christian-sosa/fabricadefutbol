@@ -8,6 +8,7 @@ import {
   buildGuideBreadcrumbJsonLd
 } from "@/lib/guide-structured-data";
 import { getGuideBySlug, GUIDES } from "@/lib/guides";
+import { buildPublicMetadata } from "@/lib/seo";
 
 type GuidePageProps = {
   params: Promise<{ slug: string }>;
@@ -22,10 +23,12 @@ export async function generateMetadata({ params }: GuidePageProps): Promise<Meta
   const guide = getGuideBySlug(slug);
   if (!guide) return {};
 
-  return {
+  return buildPublicMetadata({
     title: guide.title,
-    description: guide.description
-  };
+    description: guide.description,
+    path: `/guides/${guide.slug}`,
+    article: true
+  });
 }
 
 export default async function GuidePage({ params }: GuidePageProps) {

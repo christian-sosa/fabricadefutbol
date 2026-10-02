@@ -10,6 +10,14 @@ import { buildMatchHistoryHref, parseMatchHistorySeason } from "@/lib/match-hist
 import { getUpcomingConfirmedMatches, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
 import { resolveMatchTeamLabels } from "@/lib/team-labels";
 import { formatRendimiento } from "@/lib/utils";
+import { buildPublicMetadata } from "@/lib/seo";
+
+export const metadata = buildPublicMetadata({
+  title: "Próximos partidos de tu grupo",
+  description:
+    "Consultá cuándo y dónde juega tu grupo de fútbol, los equipos confirmados y los convocados. Compartí el próximo partido con tus amigos.",
+  path: "/upcoming"
+});
 
 export default async function UpcomingPage({
   searchParams

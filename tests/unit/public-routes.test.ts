@@ -13,10 +13,11 @@ describe("public routes for crawlers", () => {
     expect(robots()).toMatchObject({
       rules: {
         userAgent: "*",
-        allow: "/",
+        allow: ["/", "/admin/login", "/admin/forgot-password"],
         disallow: [
           "/admin",
           "/api",
+          "/auth",
           "/invite",
         ]
       }

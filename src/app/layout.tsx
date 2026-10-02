@@ -9,17 +9,17 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { ReactQueryProvider } from "@/components/providers/react-query-provider";
 import { shouldRenderSpeedInsights } from "@/lib/env";
 import { getPublicAppUrl } from "@/lib/public-url";
+import { HOME_DESCRIPTION, HOME_TITLE, SITE_NAME } from "@/lib/seo";
 
 const APP_URL = getPublicAppUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: "Fábrica de Fútbol",
-    template: "%s — Fábrica de Fútbol"
+    default: `${HOME_TITLE} — ${SITE_NAME}`,
+    template: `%s — ${SITE_NAME}`
   },
-  description:
-    "Organizá partidos de fútbol entre amigos: equipos parejos, rendimiento, ranking, historial y próximas fechas.",
+  description: HOME_DESCRIPTION,
   applicationName: "Fábrica de Fútbol",
   keywords: [
     "fútbol",
@@ -43,15 +43,13 @@ export const metadata: Metadata = {
     locale: "es_AR",
     url: APP_URL,
     siteName: "Fábrica de Fútbol",
-    title: "Fábrica de Fútbol",
-    description:
-      "Organizá partidos de fútbol entre amigos: equipos parejos, rendimiento, ranking, historial y próximas fechas."
+    title: `${HOME_TITLE} — ${SITE_NAME}`,
+    description: HOME_DESCRIPTION
   },
   twitter: {
     card: "summary_large_image",
-    title: "Fábrica de Fútbol",
-    description:
-      "Organizá partidos de fútbol entre amigos: equipos parejos, rendimiento, ranking, historial y próximas fechas."
+    title: `${HOME_TITLE} — ${SITE_NAME}`,
+    description: HOME_DESCRIPTION
   },
   icons: {
     icon: [

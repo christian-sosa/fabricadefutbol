@@ -4,6 +4,14 @@ import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { withPublicQuery } from "@/lib/org";
+import { buildPublicMetadata } from "@/lib/seo";
+
+export const metadata = buildPublicMetadata({
+  title: "Términos y condiciones",
+  description:
+    "Consultá las condiciones para usar Fábrica de Fútbol: crear grupos gratis, administrar jugadores y partidos, compartir resultados y solicitar soporte.",
+  path: "/terms"
+});
 
 const LAST_UPDATED = "30 de septiembre de 2026";
 
@@ -40,7 +48,7 @@ export default async function TermsPage({
     <div className="space-y-5">
       <Card className="rounded-[2rem] p-6">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">Terminos</p>
-        <CardTitle className="mt-2 text-3xl">Terminos y condiciones</CardTitle>
+        <h1 className="mt-2 text-3xl font-semibold text-slate-100">Términos y condiciones</h1>
         <CardDescription className="mt-3 text-base">
           Estos terminos regulan el uso de Fabrica de Futbol, incluyendo la administracion de grupos, jugadores,
           partidos, rankings, historial, contenido público, fotos y solicitudes de ayuda por Contacto.

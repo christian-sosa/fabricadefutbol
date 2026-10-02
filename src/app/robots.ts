@@ -6,10 +6,12 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
-      allow: "/",
+      // Las pantallas públicas de acceso se pueden rastrear para leer su noindex.
+      allow: ["/", "/admin/login", "/admin/forgot-password"],
       disallow: [
         "/admin",
         "/api",
+        "/auth",
         "/invite",
       ]
     },

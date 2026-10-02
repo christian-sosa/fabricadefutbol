@@ -1,4 +1,7 @@
 import { getAnalyticsAttribution } from "@/lib/analytics/attribution";
+import { cookies } from "next/headers";
+import { getGoogleAnalyticsMeasurementId } from "@/lib/env";
+import { GOOGLE_OUTCOME_COOKIE } from "@/lib/analytics/google-outcome";
 import { isAnalyticsEventName, sanitizeAnalyticsPath, sanitizeAnalyticsProperties, type AnalyticsEventName } from "@/lib/analytics/events";
 import { logWarn } from "@/lib/observability/log";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -99,7 +102,14 @@ export async function recordAnalyticsEvent(input: AnalyticsEventInput) {
       };
     }
 
-    return await insertAnalyticsEvent(supabaseAdmin, { ...input, properties: { ...await getAnalyticsAttribution(), ...input.properties } });
+    const result = await insertAnalyticsEvent(supabaseAdmin, { ...input, properties: { ...await getAnalyticsAttribution(), ...input.properties } });
+    if (result.recorded && input.eventName === "group_created" && getGoogleAnalyticsMeasurementId()) {
+      try {
+        // Only a name and a fresh nonce cross the server redirect; entity ids stay private.
+        (await cookies()).set(GOOGLE_OUTCOME_COOKIE, `group_created:${crypto.randomUUID()}`, { path: "/", sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 120 });
+      } catch { /* Google measurement must never affect the completed business operation. */ }
+    }
+    return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logWarn("analytics.event.skipped", {

@@ -21,6 +21,7 @@ function collectAllowedDevOrigins() {
 const allowedDevOrigins = collectAllowedDevOrigins();
 
 function buildSecurityHeaders() {
+  const googleAnalyticsEnabled = /^G-[A-Z0-9]{4,20}$/.test(process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() ?? "");
   const headers = [
     {
       key: "X-Content-Type-Options",
@@ -44,11 +45,11 @@ function buildSecurityHeaders() {
         "default-src 'self'",
         "base-uri 'self'",
         "object-src 'none'",
-        "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://vercel.live",
+        `script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://vercel.live${googleAnalyticsEnabled ? " https://www.googletagmanager.com" : ""}`,
         "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: blob: https://*.supabase.co",
+        `img-src 'self' data: blob: https://*.supabase.co${googleAnalyticsEnabled ? " https://www.googletagmanager.com https://*.google-analytics.com" : ""}`,
         "font-src 'self'",
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://vitals.vercel-insights.com https://va.vercel-scripts.com https://vercel.live",
+        `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://vitals.vercel-insights.com https://va.vercel-scripts.com https://vercel.live${googleAnalyticsEnabled ? " https://www.googletagmanager.com https://*.google-analytics.com https://*.google.com" : ""}`,
         "frame-src https://vercel.live",
         "form-action 'self' https://*.supabase.co",
         "report-uri /api/security/csp-report"

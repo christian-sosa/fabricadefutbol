@@ -2,6 +2,14 @@ import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { withPublicQuery } from "@/lib/org";
+import { buildPublicMetadata } from "@/lib/seo";
+
+export const metadata = buildPublicMetadata({
+  title: "Sobre nosotros",
+  description:
+    "Conocé Fábrica de Fútbol: una herramienta gratuita para organizar fútbol entre amigos, armar equipos parejos y guardar el ranking y el historial del grupo.",
+  path: "/about"
+});
 
 export default async function AboutPage({
   searchParams
@@ -15,7 +23,7 @@ export default async function AboutPage({
     <div className="space-y-4">
       <Card className="rounded-[2rem] p-6">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Sobre nosotros</p>
-        <CardTitle className="mt-2 text-3xl">Fabrica de Futbol</CardTitle>
+        <h1 className="mt-2 text-3xl font-semibold text-slate-100">Fábrica de Fútbol</h1>
         <CardDescription className="mt-3 text-base">
           Construimos herramientas para que los grupos de futbol amateur puedan ordenar su juego, bajar discusiones y tener datos reales despues de cada partido.
         </CardDescription>

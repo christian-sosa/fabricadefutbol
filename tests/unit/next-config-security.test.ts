@@ -64,4 +64,15 @@ describe("next config security", () => {
       }
     ]);
   });
+
+  it("habilita origins de Google sólo con un ID GA4 válido", async () => {
+    for (const [value, enabled] of [["", false], ["G-<script>", false], ["G-TEST12345", true]] as const) {
+      vi.stubEnv("NEXT_PUBLIC_GA_MEASUREMENT_ID", value);
+      const config = await loadNextConfig(`google-${value}`);
+      const headers = await config.headers();
+      const policy = headers[0].headers.find((header: { key: string }) => header.key === "Content-Security-Policy-Report-Only").value;
+      expect(policy.includes("https://www.googletagmanager.com")).toBe(enabled);
+      expect(policy.includes("https://*.google-analytics.com")).toBe(enabled);
+    }
+  });
 });

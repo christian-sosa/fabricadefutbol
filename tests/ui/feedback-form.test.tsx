@@ -2,9 +2,11 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/app/feedback/actions", () => ({ submitFeedbackAction: vi.fn() }));
+vi.mock("@/lib/analytics/google", () => ({ trackGoogleAnalyticsEvent: vi.fn() }));
 import { submitFeedbackAction } from "@/app/feedback/actions";
 import { FeedbackForm } from "@/app/feedback/feedback-form";
 import type { FeedbackState } from "@/app/feedback/feedback-state";
+import { trackGoogleAnalyticsEvent } from "@/lib/analytics/google";
 
 describe("formulario de Contacto", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -29,6 +31,20 @@ describe("formulario de Contacto", () => {
     expect(screen.getByLabelText("Mensaje")).toHaveValue("Necesito cargar veinte jugadores.");
     const sent = vi.mocked(submitFeedbackAction).mock.calls[1][1];
     expect(sent.get("message")).toBe("Necesito cargar veinte jugadores.");
+    expect(trackGoogleAnalyticsEvent).not.toHaveBeenCalled();
+  });
+  it("mide sólo el envío confirmado y comunica categoría sin datos del formulario", async () => {
+    const outcomeId = "c0000000-0000-4000-8000-000000000001";
+    vi.mocked(submitFeedbackAction).mockImplementationOnce(async (previous) => ({ ...previous, status: "success", message: "Recibimos tu mensaje.", trackingEventId: outcomeId }));
+    const user = userEvent.setup();
+    render(<FeedbackForm intent="setup_help" organization="viernes" />);
+    await user.type(screen.getByLabelText("Nombre"), "Ana Pérez");
+    await user.type(screen.getByLabelText("Email"), "ana@example.test");
+    await user.type(screen.getByLabelText("Mensaje"), "Necesito cargar veinte jugadores.");
+    await user.click(screen.getByRole("button", { name: "Enviar mensaje" }));
+    await waitFor(() => expect(trackGoogleAnalyticsEvent).toHaveBeenCalledWith("generate_lead", { contact_category: "setup_help" }, outcomeId));
+    expect(trackGoogleAnalyticsEvent).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(vi.mocked(trackGoogleAnalyticsEvent).mock.calls)).not.toMatch(/Ana Pérez|ana@example|viernes|veinte jugadores/);
   });
   it("asocia el error del servidor al campo y permite corregirlo", async () => {
     vi.mocked(submitFeedbackAction).mockImplementationOnce(async (previous): Promise<FeedbackState> => ({ ...previous, status: "error", message: "Revisá el nombre.", errors: { fullName: "Usá al menos dos caracteres." } }));

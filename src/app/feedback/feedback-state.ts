@@ -13,4 +13,5 @@ export type FeedbackState = {
   message: string | null;
   errors: Partial<Record<keyof FeedbackValues, string>>;
   values: FeedbackValues;
+  trackingEventId?: string;
 };
