@@ -1,6 +1,7 @@
 "use client";
 
 import { track } from "@vercel/analytics";
+import { trackGoogleAnalyticsEvent } from "@/lib/analytics/google";
 
 import { isClientAnalyticsEventName, sanitizeAnalyticsPath, sanitizeAnalyticsProperties, type ClientAnalyticsEventName, type AnalyticsProperties } from "@/lib/analytics/events";
 
@@ -21,6 +22,7 @@ export function trackAnalyticsEvent(
   if (!isClientAnalyticsEventName(eventName)) return;
   const safeProperties = sanitizeAnalyticsProperties(properties);
   track(eventName, safeProperties);
+  trackGoogleAnalyticsEvent(eventName, safeProperties);
 
   if (typeof window === "undefined") return;
 

@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 
 export default async function OrganizationsPage({
   searchParams
@@ -17,5 +17,5 @@ export default async function OrganizationsPage({
   }
 
   const queryString = query.toString();
-  redirect(queryString ? `/groups?${queryString}` : "/groups");
+  permanentRedirect(queryString ? `/groups?${queryString}` : "/groups");
 }

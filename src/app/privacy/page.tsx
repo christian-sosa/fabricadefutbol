@@ -5,6 +5,14 @@ import Link from "next/link";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ORGANIZATION_PLAYER_PHOTO_RETENTION_DAYS } from "@/lib/constants";
 import { withPublicQuery } from "@/lib/org";
+import { buildPublicMetadata } from "@/lib/seo";
+
+export const metadata = buildPublicMetadata({
+  title: "Política de privacidad",
+  description:
+    "Conocé cómo Fábrica de Fútbol trata los datos de administradores, jugadores y visitantes, las fotos del grupo y tus consultas de soporte.",
+  path: "/privacy"
+});
 
 const LAST_UPDATED = "2 de octubre de 2026";
 
@@ -41,7 +49,7 @@ export default async function PrivacyPage({
     <div className="space-y-5">
       <Card className="rounded-[2rem] p-6">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Privacidad</p>
-        <CardTitle className="mt-2 text-3xl">Politica de privacidad</CardTitle>
+        <h1 className="mt-2 text-3xl font-semibold text-slate-100">Política de privacidad</h1>
         <CardDescription className="mt-3 text-base">
           Esta politica explica como Fabrica de Futbol trata informacion de administradores, jugadores, visitantes,
           grupos, fotos, mensajes de contacto y datos técnicos necesarios para operar Grupos, que es gratis.
@@ -160,6 +168,21 @@ export default async function PrivacyPage({
             El sitio puede usar cookies o tecnologias similares para mantener sesiones, recordar preferencias tecnicas,
             proteger accesos y medir uso agregado del producto. Tambien puede usar analitica de Vercel u otra herramienta
             equivalente para entender rendimiento, errores y navegacion general.
+          </p>
+          <p>
+            Cuando la medición opcional con Google Analytics esté habilitada, podés aceptarla o rechazarla desde el aviso
+            del sitio. La herramienta se carga sólo si la aceptás y usa cookies para medir visitas y acciones como crear
+            un grupo o enviar una consulta. No enviamos nombres, emails, mensajes, datos deportivos ni enlaces de acceso;
+            quitamos los parámetros y los identificadores de las páginas que medimos. La personalización publicitaria
+            y Google Signals permanecen desactivados.
+          </p>
+          <p>
+            Guardamos tu elección en este navegador. Podés cambiarla desde el control de medición opcional o borrar los
+            datos locales del sitio. Google puede procesar los datos de medición fuera de Argentina; consultá{" "}
+            <a className="font-semibold text-emerald-300 transition hover:underline" href="https://policies.google.com/technologies/partner-sites">
+              cómo Google usa la información de sitios que utilizan sus servicios
+            </a>
+            .
           </p>
           <p>
             No vendemos información personal ni usamos los datos deportivos para publicidad o sponsors.

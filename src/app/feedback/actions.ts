@@ -40,5 +40,5 @@ export async function submitFeedbackAction(_previous: FeedbackState, formData: F
   } catch {
     return { status: "error", message: "No se pudo enviar el mensaje. Conservamos lo que escribiste para que puedas reintentar o escribir a info@fabricadefutbol.com.ar.", errors: {}, values };
   }
-  return success;
+  return { ...success, trackingEventId: crypto.randomUUID() };
 }

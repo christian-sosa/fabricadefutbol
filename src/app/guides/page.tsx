@@ -1,15 +1,16 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { buildGuidesItemListJsonLd } from "@/lib/guide-structured-data";
 import { GUIDES } from "@/lib/guides";
+import { buildPublicMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildPublicMetadata({
   title: "Guías para fútbol amateur",
   description:
-    "Ideas prácticas para organizar grupos de fútbol amateur: equipos parejos, ranking, historial y administración semanal."
-};
+    "Guías para organizar fútbol entre amigos: armá equipos parejos, gestioná ausencias y resultados, y mantené el ranking y el historial de tu grupo.",
+  path: "/guides"
+});
 
 export default function GuidesPage() {
   const jsonLd = buildGuidesItemListJsonLd(GUIDES);

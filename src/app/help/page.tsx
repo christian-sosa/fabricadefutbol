@@ -2,6 +2,14 @@ import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { withPublicQuery } from "@/lib/org";
+import { buildPublicMetadata } from "@/lib/seo";
+
+export const metadata = buildPublicMetadata({
+  title: "Cómo organizar tu grupo de fútbol",
+  description:
+    "Aprendé a crear tu grupo gratis, cargar jugadores, armar equipos parejos y compartir el partido por WhatsApp. Ayuda sobre resultados, ranking y temporadas.",
+  path: "/help"
+});
 
 type HelpSectionItem = {
   title: string;

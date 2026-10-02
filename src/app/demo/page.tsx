@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { DemoGroup } from "./demo-group";
+import { buildPublicMetadata } from "@/lib/seo";
 
-export const metadata = { title: "Grupo de ejemplo", robots: { index: false, follow: true } };
+export const metadata = {
+  ...buildPublicMetadata({
+    title: "Probá un grupo de fútbol de ejemplo",
+    description:
+      "Probá el armado de equipos y el ranking con un grupo ficticio. Explorá Fábrica de Fútbol sin crear una cuenta y después organizá tu propio grupo gratis.",
+    path: "/demo"
+  }),
+  robots: { index: false, follow: true }
+};
 
 export default function DemoPage() {
   return (

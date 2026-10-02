@@ -15,6 +15,14 @@ import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
 import { formatRendimiento } from "@/lib/utils";
+import { buildPublicMetadata } from "@/lib/seo";
+
+export const metadata = buildPublicMetadata({
+  title: "Grupos de fútbol entre amigos",
+  description:
+    "Encontrá tu grupo de fútbol para consultar el ranking, los resultados y el próximo partido. Creá un grupo gratis y compartilo con tus amigos.",
+  path: "/groups"
+});
 
 export default async function GroupsPage({ searchParams }: {
   searchParams: Promise<{ org?: string; season?: string }>;

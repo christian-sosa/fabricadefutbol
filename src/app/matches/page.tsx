@@ -16,6 +16,14 @@ import {
   getViewerAdminOrganizations,
   resolvePublicOrganization
 } from "@/lib/queries/public";
+import { buildPublicMetadata } from "@/lib/seo";
+
+export const metadata = buildPublicMetadata({
+  title: "Historial de partidos de fútbol",
+  description:
+    "Revisá los resultados, equipos y fechas de los partidos de tu grupo de fútbol. Consultá el historial por temporada y volvé a compartir cada partido.",
+  path: "/matches"
+});
 
 export default async function MatchesPage({
   searchParams

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { trackGoogleAnalyticsEvent } from "@/lib/analytics/google";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -15,6 +16,11 @@ export function FeedbackForm({ organization = "", intent = null }: { organizatio
     try { return await submitFeedbackAction(previous, data); }
     catch { return { status: "error", message: "No pudimos conectar. Tu mensaje sigue acá; volvé a intentar.", errors: {}, values }; }
   }, { status: "idle", message: null, errors: {}, values: initialValues });
+  useEffect(() => {
+    if (state.status === "success" && state.trackingEventId) {
+      trackGoogleAnalyticsEvent("generate_lead", { contact_category: state.values.category }, state.trackingEventId);
+    }
+  }, [state]);
   const update = (field: keyof FeedbackValues, value: string) => setValues((current) => ({ ...current, [field]: value }));
   const fieldError = (field: keyof FeedbackValues) => state.errors[field] ? <p className="mt-1 text-sm text-danger" id={`feedback-${field}-error`}>{state.errors[field]}</p> : null;
   const errorProps = (field: keyof FeedbackValues) => ({ "aria-invalid": Boolean(state.errors[field]), "aria-describedby": state.errors[field] ? `feedback-${field}-error` : undefined });

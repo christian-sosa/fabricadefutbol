@@ -8,6 +8,13 @@ import { formatMatchDateTime } from "@/lib/match-datetime";
 import { withOrgQuery, withPublicQuery } from "@/lib/org";
 import { getHomeSummary, getViewerAdminOrganizations, resolvePublicOrganization } from "@/lib/queries/public";
 import { formatRendimiento } from "@/lib/utils";
+import { buildPublicMetadata, buildSiteJsonLd, HOME_DESCRIPTION, HOME_TITLE } from "@/lib/seo";
+
+export const metadata = buildPublicMetadata({
+  title: HOME_TITLE,
+  description: HOME_DESCRIPTION,
+  path: "/"
+});
 
 const workflowCards = [
   {
@@ -48,6 +55,10 @@ export default async function HomePage({
 
   return (
     <div className="space-y-10 md:space-y-14">
+      <script
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(buildSiteJsonLd()).replace(/</g, "\\u003c") }}
+        type="application/ld+json"
+      />
       <section className="grid gap-8 py-3 md:py-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-12">
         <div>
           <p className="text-sm font-semibold text-accent">Grupos gratis</p>

@@ -25,13 +25,16 @@ describe("Contacto", () => {
     mocks.send.mockRejectedValueOnce(new Error("provider unavailable"));
     const failed = await submitFeedbackAction(initial, form());
     expect(failed).toMatchObject({ status: "error", values: { category: "setup_help", message: "Necesito cargar veinte jugadores." } });
-    expect(await submitFeedbackAction(failed, form())).toMatchObject({ status: "success" });
+    expect(failed.trackingEventId).toBeUndefined();
+    expect(await submitFeedbackAction(failed, form())).toMatchObject({ status: "success", trackingEventId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
     expect(mocks.send).toHaveBeenCalledTimes(2);
   });
   it("no envía al alcanzar el límite ni cuando se completa el honeypot", async () => {
     mocks.limit.mockResolvedValue({ allowed: false });
     expect(await submitFeedbackAction(initial, form())).toMatchObject({ status: "error", values: { message: "Necesito cargar veinte jugadores." } });
-    expect(await submitFeedbackAction(initial, form({ website: "bot" }))).toMatchObject({ status: "success" });
+    const honeypot = await submitFeedbackAction(initial, form({ website: "bot" }));
+    expect(honeypot).toMatchObject({ status: "success" });
+    expect(honeypot.trackingEventId).toBeUndefined();
     expect(mocks.send).not.toHaveBeenCalled();
   });
 });

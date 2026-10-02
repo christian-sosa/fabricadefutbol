@@ -35,7 +35,8 @@ const NEXT_PUBLIC_ENV = {
   NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD:
     process.env.NEXT_PUBLIC_SUPABASE_ORGANIZATION_IMAGES_BUCKET_PROD,
   NEXT_PUBLIC_SPEED_INSIGHTS_ENABLED:
-    process.env.NEXT_PUBLIC_SPEED_INSIGHTS_ENABLED
+    process.env.NEXT_PUBLIC_SPEED_INSIGHTS_ENABLED,
+  NEXT_PUBLIC_GA_MEASUREMENT_ID: process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
 } as const;
 
 function getEnv(name: string) {
@@ -85,6 +86,11 @@ function parseBooleanEnv(value: string | null, fallback = false) {
 
 export function shouldRenderSpeedInsights() {
   return parseBooleanEnv(getEnv("NEXT_PUBLIC_SPEED_INSIGHTS_ENABLED"), false);
+}
+
+export function getGoogleAnalyticsMeasurementId() {
+  const value = getEnv("NEXT_PUBLIC_GA_MEASUREMENT_ID");
+  return value && /^G-[A-Z0-9]{4,20}$/.test(value) ? value : null;
 }
 
 export function getSupabaseTargetEnv(): SupabaseTargetEnv {

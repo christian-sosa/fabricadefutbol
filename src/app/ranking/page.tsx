@@ -13,6 +13,14 @@ import {
   getViewerAdminOrganizations,
   resolvePublicOrganization
 } from "@/lib/queries/public";
+import { buildPublicMetadata } from "@/lib/seo";
+
+export const metadata = buildPublicMetadata({
+  title: "Ranking de tu grupo de fútbol",
+  description:
+    "Consultá los puntos, partidos jugados y figuras de tu grupo de fútbol. Compará el ranking de la temporada actual con el historial del grupo.",
+  path: "/ranking"
+});
 
 export default async function RankingPage({
   searchParams

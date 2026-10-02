@@ -20,6 +20,7 @@ import { resolveMatchTeamLabels } from "@/lib/team-labels";
 import { formatRendimiento } from "@/lib/utils";
 import { FormationPitch } from "@/components/matches/formation-pitch";
 import { readMatchFormation, toFormationPlayers } from "@/lib/domain/match-formation";
+import { buildPublicMetadata } from "@/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -33,13 +34,12 @@ export async function generateMetadata({
     const details = await getMatchDetails(id, resolvedSearchParams.org);
     if (!details) return { title: "Partido no encontrado" };
     const title = `Partido ${formatMatchDateTime(details.match.scheduled_at)}`;
-    const description = `Detalle del partido ${details.match.modality} en Fabrica de Futbol.`;
-    return {
+    const description = `Detalle del partido ${details.match.modality} en Fábrica de Fútbol.`;
+    return buildPublicMetadata({
       title,
       description,
-      openGraph: { title, description },
-      twitter: { title, description }
-    };
+      path: `/matches/${id}`
+    });
   } catch {
     return { title: "Partido" };
   }

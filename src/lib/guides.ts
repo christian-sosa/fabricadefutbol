@@ -16,15 +16,30 @@ export const GUIDES: Guide[] = [
     slug: "armar-equipos-parejos-futbol-amateur",
     title: "Cómo armar equipos parejos en fútbol amateur",
     description:
-      "Un método simple para mezclar nivel, roles, asistencia y contexto sin transformar el partido en una discusión eterna.",
-    readingTime: "5 min",
+      "Armá equipos parejos de fútbol 5, 7 u 11 con una referencia de nivel, arqueros y convocados. Incluye un ejemplo práctico y cómo repetir el proceso gratis.",
+    readingTime: "4 min",
     sections: [
+      {
+        title: "Confirmá cuántos juegan y quiénes van al arco",
+        body: [
+          "Antes de sortear equipos, cerrá la lista de convocados y la modalidad. Para un fútbol 5 necesitás diez participantes; si hay dos arqueros fijos, quedan ocho jugadores de campo para repartir. Si todos rotan al arco, acordá esa rotación antes de empezar.",
+          "El armado depende de las personas que realmente van a jugar. Una baja después del sorteo puede cambiar tanto el nivel como los roles: revisá el reemplazo y volvé a compartir la formación si hace falta."
+        ]
+      },
       {
         title: "Partí de niveles claros",
         body: [
           "La forma más sana de ordenar un grupo amateur es separar nivel real de amistad o antigüedad. Usá categorías amplias, revisalas cada pocas semanas y evitá ajustar por un solo partido bueno o malo.",
           "En Fábrica de Fútbol, la habilidad es una categoría que define el admin: Nivel 1 es Estrella y Nivel 7 es Principiante. Varios jugadores pueden compartir nivel. Los puntos deportivos cambian con los resultados; editar la habilidad no reinicia esos puntos. La categoría Figura es distinta de la figura del partido.",
           "Si hay arqueros fijos, tratá ese rol como una variable propia. Un equipo con mejor arquero suele necesitar menos ventaja de campo que uno con jugadores de campo más fuertes."
+        ]
+      },
+      {
+        title: "Ejemplo para repartir diez jugadores",
+        body: [
+          "Tomemos un ejemplo ficticio: dos arqueros de nivel similar y ocho jugadores de campo, dos de nivel 2, dos de nivel 3, dos de nivel 4 y dos de nivel 5. Un punto de partida es poner un arquero y un jugador de cada nivel en cada equipo. Así evitás juntar a los dos jugadores más fuertes de entrada.",
+          "Después revisá los roles. Si ambos defensores quedaron del mismo lado, intercambiá jugadores de nivel parecido para que cada equipo tenga alguien que cubra atrás. Hacé lo mismo con quienes suelen atacar. Compartir una categoría no significa jugar de la misma manera.",
+          "Este ejemplo es un criterio inicial, no una garantía de empate ni una descripción del algoritmo de la app. La química, el estado físico y lo que pasa durante el partido también influyen."
         ]
       },
       {
@@ -40,6 +55,13 @@ export const GUIDES: Guide[] = [
           "Evitá que siempre queden juntos los mismos dos o tres jugadores fuertes. Rotar sociedades hace que el ranking sea más justo y que el partido no dependa de una dupla fija.",
           "Cuando hay invitados, cargalos con una referencia honesta. Si no conocés el nivel, ponelos en una zona media y ajustá después del primer partido."
         ]
+      },
+      {
+        title: "Armá y compartí los equipos en Fábrica de Fútbol",
+        body: [
+          "Creá tu grupo gratis, cargá los jugadores y definí su habilidad inicial. Los jugadores no necesitan registrarse. Al preparar el partido, elegí a los convocados y arqueros para que la app proponga opciones de equipos.",
+          "Revisá la opción elegida y compartila por WhatsApp. Después del partido, guardá el marcador y la formación que realmente jugó: el ranking y el historial te dan contexto para la próxima fecha. La figura del partido es opcional y no agrega puntos."
+        ]
       }
     ]
   },
@@ -47,21 +69,35 @@ export const GUIDES: Guide[] = [
     slug: "ranking-amateur-justo",
     title: "Cómo hacer un ranking amateur justo",
     description:
-      "Ideas para que el ranking motive al grupo sin castigar de más al que falta, juega lesionado o cae en un equipo desbalanceado.",
-    readingTime: "4 min",
+      "Cómo interpretar el ranking de tu grupo de fútbol: puntos por resultados, partidos jugados, habilidad inicial y figuras sin puntos extra.",
+    readingTime: "3 min",
     sections: [
       {
-        title: "Medí continuidad y resultado",
+        title: "Separá habilidad de puntos deportivos",
         body: [
-          "Un ranking útil no debería mirar solo victorias. También conviene mirar partidos jugados, tendencia de rendimiento y participación real.",
-          "Si alguien juega poco, su posición debería moverse con más cuidado. Pocos datos exageran cualquier resultado."
+          "En Fábrica de Fútbol, la habilidad es una referencia que define el admin para cada jugador: va de Nivel 1, Estrella, a Nivel 7, Principiante. Los puntos deportivos se actualizan con los resultados. Cambiar la categoría de habilidad no reinicia esos puntos.",
+          "Por ejemplo, un invitado puede tener mucha habilidad y poco historial en el grupo. Otro jugador puede acumular muchos partidos y una racha reciente floja. Mirar ambas referencias ayuda a interpretar la tabla sin convertir una posición en un juicio definitivo sobre cómo juega alguien."
         ]
       },
       {
-        title: "Evitá premios imposibles",
+        title: "Medí continuidad y resultado",
         body: [
-          "Los sistemas que premian demasiado las goleadas o rachas cortas suelen romper el incentivo. En fútbol amateur, el objetivo es que el ranking cuente una historia razonable del grupo.",
-          "Mostrá historial y evolución, no solo una tabla fría. Eso baja discusiones porque todos pueden ver de dónde sale cada cambio."
+          "Para leer un ranking, mirá los puntos junto con los partidos jugados y el historial. Dos jugadores en posiciones cercanas pueden haber participado en cantidades muy distintas de encuentros.",
+          "Si alguien acaba de entrar al grupo, hay menos información para sacar conclusiones. Antes de cambiar su referencia de habilidad, observá varios partidos y tené en cuenta su rol, lesiones o una vuelta después de mucho tiempo."
+        ]
+      },
+      {
+        title: "La figura reconoce el partido sin sumar puntos",
+        body: [
+          "La figura del partido, también llamada MVP, es opcional y simbólica: no agrega puntos al ranking. Si dos jugadores tienen los mismos puntos, desempata la cantidad de figuras de la temporada seleccionada; la opción Todo usa el conteo histórico.",
+          "Elegir una figura o corregir esa distinción después no modifica los puntos globales ni de temporada. Separá esa decisión del marcador para que el grupo entienda qué representa cada dato. La categoría de habilidad llamada Figura también es distinta de esta distinción."
+        ]
+      },
+      {
+        title: "Guardá lo que pasó en cancha",
+        body: [
+          "Al cargar el resultado, verificá el marcador y quiénes jugaron en cada equipo. Si hubo una ausencia, un invitado o un reemplazo, ajustá la formación final antes de guardar el acta. Un historial que refleja el partido real es la base para interpretar la evolución de los puntos.",
+          "Una ausencia no debería resolverse por intuición a la semana siguiente. Acordá la regla del grupo y registrá cada caso con criterio consistente. También podés agregar una nota para recordar contexto que la tabla sola no explica."
         ]
       },
       {
@@ -70,6 +106,13 @@ export const GUIDES: Guide[] = [
           "El ranking ayuda a armar equipos y recordar temporadas, pero el admin siempre puede aplicar criterio cuando falta contexto.",
           "Una buena práctica es revisar manualmente casos raros: lesiones largas, jugadores nuevos, invitados frecuentes o cambios de posición."
         ]
+      },
+      {
+        title: "Compará la temporada y el historial completo",
+        body: [
+          "Usá la temporada seleccionada cuando quieras ver cómo viene el grupo durante ese año deportivo. Consultá Todo para el recorrido histórico. Antes de comparar dos posiciones, asegurate de que estás mirando el mismo período.",
+          "Compartí el link del grupo para que los jugadores puedan consultar resultados y ranking sin registrarse. Mostrar de dónde salen los datos ayuda a conversar sobre un partido concreto en lugar de discutir desde la memoria."
+        ]
       }
     ]
   },
@@ -77,14 +120,21 @@ export const GUIDES: Guide[] = [
     slug: "organizar-futbol-semanal",
     title: "Guía para organizar fútbol semanal sin caos",
     description:
-      "Checklist para pasar de mensajes sueltos a una rutina clara: convocatoria, confirmados, equipos, resultado e historial.",
-    readingTime: "6 min",
+      "Organizá el fútbol semanal con amigos: horarios de confirmación, suplentes, equipos parejos y un mensaje de WhatsApp de ejemplo para compartir el partido.",
+    readingTime: "3 min",
     sections: [
       {
         title: "Definí una cadencia",
         body: [
           "Elegí un día fijo para abrir convocatoria y otro momento para cerrar confirmados. La previsibilidad reduce cambios de último minuto.",
           "Si el grupo tiene cupos limitados, dejá claro cómo entran suplentes e invitados. Lo peor para un admin es decidir eso a las apuradas."
+        ]
+      },
+      {
+        title: "Una rutina concreta para el partido del jueves",
+        body: [
+          "Como ejemplo de organización, podés abrir la lista el lunes, cerrar confirmados el miércoles a las 20 y compartir los equipos el jueves cuando el cupo esté completo. Son horarios de ejemplo: elegí los que sirvan para tu cancha y tu grupo.",
+          "Definí quién confirma la reserva, quién organiza la lista y quién carga el resultado. Si todo queda en una sola persona, acordá un reemplazo para los días en que no pueda ocuparse. No hace falta sumar tareas: alcanza con que cada paso tenga un responsable."
         ]
       },
       {
@@ -95,10 +145,24 @@ export const GUIDES: Guide[] = [
         ]
       },
       {
+        title: "Compartí un mensaje de WhatsApp fácil de encontrar",
+        body: [
+          "Un ejemplo ficticio para copiar y adaptar: «Fútbol 5 · jueves a las 21 · Cancha del barrio. Confirmados: 10. Suplentes: Nico y Agus. Equipos: ver link del grupo. Si te bajás, avisá antes de las 18 y etiquetá al admin». Completá la dirección real y el costo de la cancha si corresponde.",
+          "Usá un mensaje final con fecha, hora, lugar y link, y fijalo en el chat si el grupo lo necesita. En Fábrica de Fútbol podés compartir el armado por WhatsApp y dejar el ranking y el historial disponibles en el link público del grupo; los jugadores no tienen que crear una cuenta."
+        ]
+      },
+      {
         title: "Cerrá el resultado el mismo día",
         body: [
-          "Cargar el resultado apenas termina el partido mantiene vivo el ranking y evita depender de la memoria.",
-          "Si no tenés estadísticas completas, cerrá igual el marcador. El historial básico vale más que esperar una carga perfecta que nunca llega."
+          "Cargar el resultado apenas termina el partido mantiene vivo el ranking y evita depender de la memoria. Antes de guardarlo, verificá el marcador y la formación final, especialmente si hubo bajas, invitados o cambios de equipo.",
+          "No necesitás elegir una figura para completar el partido: esa distinción es opcional y no suma puntos. Si querés recordar una lesión, un cambio de arquero o una situación particular, agregá una nota en el acta."
+        ]
+      },
+      {
+        title: "Repetí el proceso sin empezar de cero",
+        body: [
+          "Creá tu grupo gratis una vez y cargá a los jugadores habituales con su habilidad inicial. Para cada fecha, trabajá con los convocados de ese partido, revisá arqueros y elegí una propuesta de equipos. La lista estable te evita volver a describir a cada jugador en el chat.",
+          "Después de varias fechas, revisá si los horarios de corte funcionan y si siempre faltan suplentes o arqueros. Ajustá esa rutina con el grupo. El objetivo es llegar a la cancha con la organización resuelta y conservar el resultado para la próxima semana."
         ]
       }
     ]
@@ -108,7 +172,7 @@ export const GUIDES: Guide[] = [
     title: "Por qué conviene guardar el historial de partidos",
     description:
       "El historial evita discusiones, mejora el armado de equipos y le da identidad al grupo con datos propios.",
-    readingTime: "4 min",
+    readingTime: "1 min",
     sections: [
       {
         title: "La memoria del grupo falla",
@@ -138,7 +202,7 @@ export const GUIDES: Guide[] = [
     title: "Buenas prácticas para admins de fútbol amateur",
     description:
       "Criterios concretos para administrar un grupo sin quemarse: reglas claras, cambios comunicados a tiempo y decisiones consistentes.",
-    readingTime: "5 min",
+    readingTime: "1 min",
     sections: [
       {
         title: "Escribí pocas reglas, pero útiles",
@@ -168,7 +232,7 @@ export const GUIDES: Guide[] = [
     title: "Cómo manejar ausencias y suplentes",
     description:
       "Una guía para resolver bajas de último momento sin romper el balance del partido ni castigar de más a quienes avisan bien.",
-    readingTime: "4 min",
+    readingTime: "1 min",
     sections: [
       {
         title: "Definí horarios de corte",
@@ -195,16 +259,24 @@ export const GUIDES: Guide[] = [
   },
   {
     slug: "usar-mvp-sin-discutir",
-    title: "Cómo elegir MVP sin discutir cada partido",
+    title: "Cómo elegir la figura del partido o MVP entre amigos",
     description:
-      "Ideas para que la elección del jugador destacado sea divertida, consistente y útil para recordar el partido sin volverse una pelea.",
-    readingTime: "4 min",
+      "Elegí la figura del partido con un criterio claro y un ejemplo práctico. En Fábrica de Fútbol el MVP es opcional, no suma puntos y sirve para desempatar.",
+    readingTime: "2 min",
     sections: [
       {
         title: "Acordá qué significa MVP",
         body: [
           "Para algunos grupos el MVP es quien jugó mejor; para otros, quien fue decisivo. Si no se aclara, cada voto mide algo distinto.",
           "Una definición simple alcanza: impacto en el resultado, regularidad durante el partido y aporte al equipo."
+        ]
+      },
+      {
+        title: "Elegí con un criterio que todos conozcan",
+        body: [
+          "Una opción es que el grupo proponga candidatos al terminar y que el admin registre la elección acordada en el acta. Otra es dejar la decisión en una persona que haya visto todo el partido. Lo importante es definir el método antes de conocer a los candidatos.",
+          "Por ejemplo, en un partido ficticio alguien hizo dos goles y el arquero evitó varias situaciones claras. Si el criterio es aporte al equipo durante todo el encuentro, ambos pueden ser candidatos: mirá también las asistencias, la recuperación de la pelota y la regularidad, en vez de decidir sólo por el último gol.",
+          "Esto es una propuesta para conversar entre amigos, no una votación automática de la app. Fábrica de Fútbol permite al admin guardar la figura elegida; la decisión sigue siendo del grupo."
         ]
       },
       {
@@ -228,14 +300,14 @@ export const GUIDES: Guide[] = [
     slug: "temporadas-futbol-amateur",
     title: "Cómo cerrar temporadas en un grupo amateur",
     description:
-      "Una forma simple de ordenar meses de partidos, reconocer constancia y reiniciar objetivos sin perder el historial construido por el grupo.",
-    readingTime: "5 min",
+      "Ordená el año deportivo de tu grupo, compará el ranking por temporada y reconocé constancia sin perder el historial de partidos.",
+    readingTime: "2 min",
     sections: [
       {
-        title: "Elegí cortes naturales",
+        title: "Usá el año deportivo como referencia",
         body: [
-          "Una temporada puede durar tres meses, seis meses o todo el año. Lo importante es que el corte tenga sentido para la frecuencia real del grupo.",
-          "Si juegan todas las semanas, un trimestre suele dar suficientes datos sin volver eterno el ranking."
+          "En Fábrica de Fútbol, las temporadas siguen el año deportivo de cada partido y el cambio anual toma la hora de Buenos Aires. Seleccioná una temporada para consultar ese período o elegí Todo para ver el historial completo.",
+          "El grupo puede hacer balances mensuales o a mitad de año como una costumbre propia. Esos encuentros no cambian el corte anual de las temporadas de la app: sirven para conversar sobre cómo viene el grupo."
         ]
       },
       {
@@ -248,45 +320,45 @@ export const GUIDES: Guide[] = [
       {
         title: "Reiniciá sin borrar memoria",
         body: [
-          "Cerrar una temporada no implica perder datos. El historial viejo sirve para comparar etapas y ver cómo cambió el grupo.",
-          "Antes de arrancar otra etapa, revisá niveles iniciales, jugadores inactivos e invitados que ya merecen una referencia propia."
+          "Empezar un nuevo año deportivo no implica borrar los partidos anteriores. El historial viejo sigue sirviendo para comparar etapas y ver cómo cambió el grupo; los puntos históricos se consultan con Todo.",
+          "Antes de arrancar otra etapa, revisá la habilidad de los jugadores, quiénes ya no participan e invitados que necesitan una referencia propia. Editar la habilidad no reinicia los puntos deportivos."
         ]
       }
     ]
   },
   {
     slug: "cargar-resultados-ausencias-reemplazos",
-    title: "Como cargar resultados, ausencias y reemplazos",
+    title: "Cómo cargar resultados, ausencias y reemplazos",
     description:
-      "Una guia practica para cerrar el partido sin ensuciar el ranking: marcador, formacion final, invitados, reemplazos y ausencias con criterio.",
-    readingTime: "4 min",
+      "Una guía práctica para cerrar el partido sin ensuciar el ranking: marcador, formación final, invitados, reemplazos y ausencias con criterio.",
+    readingTime: "2 min",
     sections: [
       {
-        title: "Empeza por el marcador",
+        title: "Empezá por el marcador",
         body: [
-          "Carga los goles mirando siempre el enfrentamiento equipo vs equipo. Esto evita invertir el resultado cuando los nombres del equipo cambiaron despues del armado.",
-          "Si el partido ya estaba confirmado, revisa primero que la opcion elegida sea la que finalmente se jugo."
+          "Cargá los goles mirando siempre el enfrentamiento equipo vs equipo. Esto evita invertir el resultado cuando los nombres del equipo cambiaron después del armado.",
+          "Si el partido ya estaba confirmado, revisá primero que la opción elegida sea la que finalmente se jugó."
         ]
       },
       {
-        title: "Ajusta la formacion final",
+        title: "Ajustá la formación final",
         body: [
-          "La formacion final sirve para corregir lo que paso en cancha: jugadores que cambiaron de equipo, jugadores que no asistieron, reemplazos del pool e invitados.",
-          "No hace falta mirar todo el listado cada vez. Abrilo solo cuando hubo cambios contra el armado confirmado."
+          "La formación final sirve para corregir lo que pasó en cancha: jugadores que cambiaron de equipo, jugadores que no asistieron, reemplazos del grupo e invitados.",
+          "No hace falta mirar todo el listado cada vez. Abrilo sólo cuando hubo cambios contra el armado confirmado."
         ]
       },
       {
-        title: "Penaliza ausencias solo si corresponde",
+        title: "Penalizá ausencias sólo si corresponde",
         body: [
-          "Marcar a alguien como no asistio no descuenta rendimiento por si solo. El admin decide si aplica -20 cuando hubo ausencia sin aviso o una regla interna del grupo.",
-          "Usa esa penalizacion como criterio claro y consistente. Si el jugador aviso bien o el reemplazo quedo resuelto, puede quedar sin descuento."
+          "Marcar a alguien como no asistió no descuenta rendimiento por sí solo. El admin decide si aplica -20 cuando hubo ausencia sin aviso o una regla interna del grupo.",
+          "Usá esa penalización como criterio claro y consistente. Si el jugador avisó bien o el reemplazo quedó resuelto, puede quedar sin descuento."
         ]
       },
       {
-        title: "Usa la desventaja numerica con cuidado",
+        title: "Usá la desventaja numérica con cuidado",
         body: [
-          "La regla de desventaja aplica cuando un equipo jugo con menos participantes. Si ese equipo gana, el ajuste se duplica; si pierde, no se lo castiga extra.",
-          "No la uses para diferencias de nivel: para eso ya esta el rendimiento y el armado de equipos."
+          "La regla de desventaja aplica cuando un equipo jugó con menos participantes. Si ese equipo gana, el ajuste se duplica; si pierde, no se lo castiga extra.",
+          "No la uses para diferencias de nivel: para eso ya está el rendimiento y el armado de equipos."
         ]
       }
     ]

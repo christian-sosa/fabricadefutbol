@@ -3,6 +3,14 @@ import Link from "next/link";
 import { TrackedLink } from "@/components/analytics/tracked-link";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { GROWTH_EVENTS } from "@/lib/growth";
+import { buildPublicMetadata } from "@/lib/seo";
+
+export const metadata = buildPublicMetadata({
+  title: "Grupos gratis para organizar fútbol",
+  description:
+    "Crear y administrar tu grupo de fútbol es gratis, sin suscripción. Armá equipos parejos, compartí partidos y consultá el ranking y el historial.",
+  path: "/pricing"
+});
 
 export default async function PricingPage() {
   const groupPlan = {

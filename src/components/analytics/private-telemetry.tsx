@@ -1,7 +1,9 @@
 "use client";
+import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { sanitizeAnalyticsPath } from "@/lib/analytics/events";
+import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 
 function beforeSend<T extends { url: string }>(event: T): T | null {
   const path = sanitizeAnalyticsPath(event.url);
@@ -12,5 +14,5 @@ function beforeSend<T extends { url: string }>(event: T): T | null {
 }
 
 export function PrivateTelemetry({ speedInsightsEnabled }: { speedInsightsEnabled: boolean }) {
-  return <><Analytics beforeSend={beforeSend} />{speedInsightsEnabled ? <SpeedInsights beforeSend={beforeSend} /> : null}</>;
+  return <><Analytics beforeSend={beforeSend} />{speedInsightsEnabled ? <SpeedInsights beforeSend={beforeSend} /> : null}<Suspense fallback={null}><GoogleAnalytics /></Suspense></>;
 }
