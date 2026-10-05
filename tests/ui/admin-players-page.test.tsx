@@ -136,7 +136,7 @@ describe("planilla de jugadores", () => {
     expect(level).toBeDisabled();
     expect(screen.getByRole("button", { name: "Descartar cambios" })).toBeDisabled();
     for (const input of screen.getAllByLabelText("Foto del jugador")) expect(input).toBeDisabled();
-    for (const button of screen.getAllByRole("button", { name: "Eliminar" })) expect(button).toBeDisabled();
+    for (const button of screen.getAllByRole("button", { name: "Quitar del plantel" })) expect(button).toBeDisabled();
     await user.type(name, " segunda edición");
     await user.click(screen.getByRole("button", { name: "Descartar cambios" }));
     expect(name).toHaveValue("Ana nueva");
@@ -191,7 +191,7 @@ describe("planilla de jugadores", () => {
     await user.clear(name); await user.type(name, "Ana Pérez nueva");
     await user.selectOptions(screen.getByRole("combobox", { name: "Nivel de habilidad de Ana Pérez" }), "6");
     for (const input of screen.getAllByLabelText("Foto del jugador")) expect(input).not.toBeVisible();
-    for (const button of screen.getAllByRole("button", { name: "Eliminar" })) expect(button).not.toBeVisible();
+    for (const button of screen.getAllByRole("button", { name: "Quitar del plantel" })) expect(button).not.toBeVisible();
     await user.click(screen.getByRole("button", { name: "Guardar toda la planilla" }));
     const data = mocks.update.mock.calls[0][0] as FormData;
     expect(data.getAll("playerId")).toEqual(["player-1", "player-2"]);

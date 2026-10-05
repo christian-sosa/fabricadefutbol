@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
-  "revision": "restore-injury-ranking-20261002",
-  "sha256": "6cdc3998e1f6a00d96140ccfb8c5d7383b03444ec8101879711842ed9096e145",
+  "revision": "personal-group-capacity-roster-removal-20261005",
+  "sha256": "90ec52cdcdb1a83c4fb698b164d35f59ea11fe19057ab0cb0b5462d7e975781e",
   "bucket": "groups-sql-artifacts",
-  "object": "6cdc3998e1f6a00d96140ccfb8c5d7383b03444ec8101879711842ed9096e145.json.gz"
+  "object": "90ec52cdcdb1a83c4fb698b164d35f59ea11fe19057ab0cb0b5462d7e975781e.json.gz"
 }

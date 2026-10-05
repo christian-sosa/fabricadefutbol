@@ -205,8 +205,8 @@ export default async function AdminPlayersPage({
                   <input name="deletePlayerId" type="hidden" value={player.id} />
                   <ConfirmSubmitButton
                     className="px-3 text-xs"
-                    confirmMessage={`Estas seguro de eliminar a ${player.full_name}?`}
-                    label="Eliminar"
+                    confirmMessage={`¿Querés quitar a ${player.full_name} del plantel? Sus partidos y estadísticas se conservarán si tiene historial.`}
+                    label="Quitar del plantel"
                     variant="danger"
                   />
                 </form>

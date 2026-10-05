@@ -16,7 +16,7 @@ import {
   writeOrganizationPublicSnapshot,
   type OrganizationPublicSummary
 } from "@/lib/domain/organization-public-snapshot";
-import { calculateGuestDisplayRating } from "@/lib/domain/skill-level";
+import { BASE_RATING, calculateGuestDisplayRating } from "@/lib/domain/skill-level";
 import { calculatePlayerStats, type MatchWithTeams } from "@/lib/domain/stats";
 import { rankPlayers } from "@/lib/domain/player-ranking";
 import { calculatePlayerActivity, isPlayerAbsent } from "@/lib/domain/player-activity";
@@ -123,10 +123,35 @@ type MatchParticipantDisplay = {
 
 export type PublicMatchSubstitute = MatchParticipantDisplay & { team: TeamSide | null };
 
+function readHistoricalMatchPlayers(match: MatchRow) {
+  const players = new Map<string, MatchParticipantDisplay & { team: TeamSide | "OUT"; photo_path: null; photo_updated_at: null }>();
+  if (match.status !== "finished" || !Array.isArray(match.lineup_snapshot)) return players;
+  const duplicateIds = new Set<string>();
+  for (const member of match.lineup_snapshot) {
+    if (!member || typeof member !== "object" || Array.isArray(member)
+      || member.source !== "player" || typeof member.participantId !== "string"
+      || !member.participantId.startsWith("player:") || !member.participantId.slice(7)
+      || typeof member.fullName !== "string" || !member.fullName.trim()
+      || (member.team !== "A" && member.team !== "B" && member.team !== "OUT")) continue;
+    const id = member.participantId.slice(7);
+    if (players.has(id) || duplicateIds.has(id)) {
+      players.delete(id);
+      duplicateIds.add(id);
+      continue;
+    }
+    // Retired players remain in the acta, while their profile and photos stay private.
+    // Historical snapshots do not contain a current sporting rating.
+    players.set(id, { id, full_name: member.fullName, current_rating: BASE_RATING,
+      is_guest: false, photo_path: null, photo_updated_at: null, team: member.team });
+  }
+  return players;
+}
+
 async function fetchPublicMatchSubstitutes(
   supabase: SupabaseServerClient,
   matchIds: string[],
-  organizationId: string
+  organizationId: string,
+  matches: MatchRow[] = []
 ) {
   const result = new Map<string, PublicMatchSubstitute[]>();
   if (!matchIds.length) return result;
@@ -139,8 +164,9 @@ async function fetchPublicMatchSubstitutes(
   const players = await readRowsByIds(roster.map((row) => row.player_id), (ids, from, to) => supabase.from("public_players")
     .select("id, full_name, current_rating, photo_path, photo_updated_at").eq("organization_id", organizationId).in("id", ids).order("id").range(from, to));
   const playersById = indexBy(players);
+  const historicalPlayersByMatch = new Map(matches.map((match) => [match.id, readHistoricalMatchPlayers(match)]));
   for (const row of roster) {
-    const player = playersById.get(row.player_id);
+    const player = playersById.get(row.player_id) ?? historicalPlayersByMatch.get(row.match_id)?.get(row.player_id);
     if (!player) continue;
     const current = result.get(row.match_id) ?? [];
     current.push({ ...player, is_guest: false, team: row.substitute_team });
@@ -984,7 +1010,7 @@ export async function getMatchDetails(matchId: string, organizationKey?: string 
 
   const [withTeams, substitutesByMatch] = await Promise.all([
     fetchMatchTeams([matchId], [match]),
-    fetchPublicMatchSubstitutes(supabase, supportsMatchExtras(match.modality) ? [matchId] : [], match.organization_id)
+    fetchPublicMatchSubstitutes(supabase, supportsMatchExtras(match.modality) ? [matchId] : [], match.organization_id, [match])
   ]);
   const details = withTeams[0];
   if (!details) {
@@ -1017,6 +1043,13 @@ export async function getMatchDetails(matchId: string, organizationKey?: string 
       }
     ])
   );
+  const historicalPlayers = readHistoricalMatchPlayers(details.match);
+  for (const [team, ids] of [["A", details.teamAPlayerIds], ["B", details.teamBPlayerIds]] as const) {
+    for (const id of ids) {
+      const player = historicalPlayers.get(id);
+      if (!playersById.has(id) && player?.team === team) playersById.set(id, player);
+    }
+  }
   const guestsById = new Map(
     safeGuests.map((guest) => [
       guest.id,

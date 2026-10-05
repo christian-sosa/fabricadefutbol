@@ -254,14 +254,117 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     expect(await rows("select id from APP.players")).toHaveLength(10);
     expect(await rows("select id from APP_PRIVATE.media_cleanup_jobs")).toHaveLength(0);
   });
-  it("protects player history and atomically queues deletion of an unused player's photo", async () => {
+  it("retires a player with sporting history without changing points, seasons, lineups or media", async () => {
     await finish();
-    await expect(sql(`select APP.delete_group_player('${id(20)}','${id(10)}')`)).rejects.toThrow(/historial/);
+    await sql(`reset role; update APP.players set photo_path='${photo}' where id='${id(20)}'`);
+    await login();
+    await sql(`select APP.write_group_public_snapshot('${id(10)}',(select sporting_revision from APP.organizations where id='${id(10)}'),'{"summary":{},"standings":[],"matchHistory":[]}')`);
+    expect(await rows("select organization_id from APP.organization_public_snapshots")).toHaveLength(1);
+    const history = await rows("select * from APP.rating_history order by id");
+    const seasons = await rows("select * from APP.organization_season_player_ratings order by id");
+    const matches = await rows("select * from APP.matches order by id");
+    const options = await rows("select * from APP.team_option_players order by id");
+    const result = (await rows(`select APP.delete_group_player('${id(20)}','${id(10)}') result`))[0].result;
+    expect(result).toMatchObject({ playerId: id(20), disposition: "archived", alreadyRemoved: false });
+    expect(await rows(`select active,current_rating,photo_path from APP.players where id='${id(20)}'`))
+      .toEqual([{ active: false, current_rating: "1010.00", photo_path: photo }]);
+    expect(await rows("select * from APP.rating_history order by id")).toEqual(history);
+    expect(await rows("select * from APP.organization_season_player_ratings order by id")).toEqual(seasons);
+    expect(await rows("select * from APP.matches order by id")).toEqual(matches);
+    expect(await rows("select * from APP.team_option_players order by id")).toEqual(options);
+    expect(await rows("select organization_id from APP.organization_public_snapshots")).toEqual([]);
+    const removed = await rows(`select * from APP.players where id='${id(20)}'`);
+    expect((await rows(`select APP.delete_group_player('${id(20)}','${id(10)}') result`))[0].result)
+      .toMatchObject({ disposition: "archived", alreadyRemoved: true });
+    expect(await rows(`select * from APP.players where id='${id(20)}'`)).toEqual(removed);
+    await sql("reset role");
+    expect(await rows("select * from APP_PRIVATE.media_cleanup_jobs")).toEqual([]);
+  });
+  it("atomically deletes an unused player and queues the exact photo once across retries", async () => {
     await sql(`reset role; insert into APP.players(id,organization_id,full_name,initial_rank,photo_path) values('${id(70)}','${id(10)}','Unused',11,'${schema}/${id(10)}/${id(70)}/${id(90)}.webp')`);
     await login();
-    await sql(`select APP.delete_group_player('${id(70)}','${id(10)}'); reset role`);
+    expect((await rows(`select APP.delete_group_player('${id(70)}','${id(10)}') result`))[0].result)
+      .toMatchObject({ playerId: id(70), disposition: "removed", alreadyRemoved: false });
+    expect((await rows(`select APP.delete_group_player('${id(70)}','${id(10)}') result`))[0].result)
+      .toMatchObject({ disposition: "removed", alreadyRemoved: true });
+    await sql("reset role");
     expect(await rows(`select id from APP.players where id='${id(70)}'`)).toEqual([]);
     expect(await rows(`select id from APP_PRIVATE.media_cleanup_jobs where object_path='${schema}/${id(10)}/${id(70)}/${id(90)}.webp'`)).toHaveLength(1);
+  });
+  it.each(["draft", "confirmed"])("requires resolving an outstanding %s call-up before removing a player", async (status) => {
+    if (status === "confirmed") await confirm(); else await login();
+    const player = await rows(`select * from APP.players where id='${id(20)}'`);
+    const matches = await rows("select * from APP.matches order by id");
+    const callUps = await rows("select * from APP.match_players order by id");
+    const options = await rows("select * from APP.team_option_players order by id");
+    await expect(sql(`select APP.delete_group_player('${id(20)}','${id(10)}')`)).rejects.toMatchObject({ code: "PT409", message: expect.stringMatching(/convocatoria.*partido/) });
+    expect(await rows(`select * from APP.players where id='${id(20)}'`)).toEqual(player);
+    expect(await rows("select * from APP.matches order by id")).toEqual(matches);
+    expect(await rows("select * from APP.match_players order by id")).toEqual(callUps);
+    expect(await rows("select * from APP.team_option_players order by id")).toEqual(options);
+    await sql(`reset role; update APP.matches set status='cancelled' where id='${id(40)}'`);
+    await login();
+    expect((await rows(`select APP.delete_group_player('${id(20)}','${id(10)}') result`))[0].result)
+      .toMatchObject({ disposition: "archived" });
+    expect(await rows("select * from APP.match_players order by id")).toEqual(callUps);
+    expect(await rows("select * from APP.team_option_players order by id")).toEqual(options);
+  });
+  it("archives a participant without rating history when only a cancelled lineup refers to the player", async () => {
+    await sql(`update APP.matches set status='cancelled',lineup_snapshot='[{"participantId":"player:${id(20)}","fullName":"Player 0","source":"player","team":"A","penalized":false}]';
+      delete from APP.team_option_players; delete from APP.match_players;`);
+    await login();
+    expect((await rows(`select APP.delete_group_player('${id(20)}','${id(10)}') result`))[0].result)
+      .toMatchObject({ disposition: "archived" });
+    expect(await rows(`select active from APP.players where id='${id(20)}'`)).toEqual([{ active: false }]);
+    expect(await rows("select lineup_snapshot from APP.matches")).toEqual([{ lineup_snapshot: [
+      { participantId: `player:${id(20)}`, fullName: "Player 0", source: "player", team: "A", penalized: false }
+    ] }]);
+  });
+  it("does not retire another group's player or accept another admin or anonymous caller", async () => {
+    await sql(`insert into APP.players(id,organization_id,full_name,initial_rank) values('${id(70)}','${id(11)}','Other player',1)`);
+    await login();
+    await expect(sql(`select APP.delete_group_player('${id(70)}','${id(10)}')`)).rejects.toThrow(/jugador.*grupo/);
+    await expect(sql(`select APP.delete_group_player('${id(70)}','${id(11)}')`)).rejects.toMatchObject({ code: "42501" });
+    await login(2);
+    await expect(sql(`select APP.delete_group_player('${id(20)}','${id(10)}')`)).rejects.toMatchObject({ code: "42501" });
+    await sql("reset role; select set_config('test.uid','',false); set role anon");
+    await expect(sql(`select APP.delete_group_player('${id(20)}','${id(10)}')`)).rejects.toMatchObject({ code: "42501" });
+    await sql("reset role");
+    expect(await rows(`select id,active from APP.players where id in ('${id(20)}','${id(70)}') order by id`))
+      .toEqual([{ id: id(20), active: true }, { id: id(70), active: true }]);
+  });
+  it("corrects a retired player's earlier result without reactivating them or changing later contributions", async () => {
+    await finish();
+    await seedSecondMatch("2026-10-01");
+    const later = await rows(`select * from APP.rating_history where match_id='${id(41)}' order by player_id`);
+    await sql(`select APP.delete_group_player('${id(20)}','${id(10)}');
+      select APP.save_group_match_result('${id(40)}','${id(10)}',2,'{"scoreA":0,"scoreB":1}')`);
+    expect(await rows(`select active,current_rating from APP.players where id='${id(20)}'`))
+      .toEqual([{ active: false, current_rating: "1000.00" }]);
+    expect(await rows(`select * from APP.rating_history where match_id='${id(41)}' order by player_id`)).toEqual(later);
+    const ledger = await rows("select * from APP.rating_history order by id");
+    await sql(`select APP.save_group_match_result('${id(40)}','${id(10)}',3,'{"scoreA":0,"scoreB":1,"notes":"Nota corregida","mvpParticipantId":"player:${id(20)}"}')`);
+    expect(await rows("select * from APP.rating_history order by id")).toEqual(ledger);
+    expect(await rows(`select mvp_player_id from APP.match_result where match_id='${id(40)}'`)).toEqual([{ mvp_player_id: id(20) }]);
+    await login(2);
+    await expect(sql(`select APP.save_group_match_result('${id(40)}','${id(10)}',4,'{"scoreA":2,"scoreB":0}')`)).rejects.toMatchObject({ code: "42501" });
+  });
+  it("keeps a retired figure's name and teams in public history while hiding the current roster row", async () => {
+    await finish();
+    await sql(`select APP.save_group_match_result('${id(40)}','${id(10)}',2,'{"scoreA":2,"scoreB":1,"mvpParticipantId":"player:${id(20)}"}');
+      select APP.delete_group_player('${id(20)}','${id(10)}'); reset role; begin;`);
+    try {
+      // Roll the migration-only rollout back so other tests keep their baseline controls.
+      await sql(`select APP_PRIVATE.activate_group_security_controls(); select set_config('test.uid','',false); set role anon;`);
+      expect(await rows(`select id from APP.public_players where id='${id(20)}'`)).toEqual([]);
+      const cards = await rows(`select team_a_players,team_b_players from APP.public_match_cards where id='${id(40)}'`);
+      expect(cards).toHaveLength(1);
+      expect(cards[0].team_a_players).toEqual(expect.arrayContaining(["Player 0"]));
+      expect(await rows(`select mvp_display_name from APP.match_result where match_id='${id(40)}'`))
+        .toEqual([{ mvp_display_name: "Player 0" }]);
+    } finally {
+      await sql("reset role; rollback");
+    }
   });
   it("reserves orphan cleanup before upload and refuses reattachment after retirement", async () => {
     await sql(`set role service_role; select APP.enqueue_media_cleanup('${bucket}','${photo}',true); reset role;`);
