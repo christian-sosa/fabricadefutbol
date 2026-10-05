@@ -331,7 +331,8 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
     const { data: currentPlayers, error: currentPlayersError } = await supabase
       .from("players")
       .select("id")
-      .eq("organization_id", organizationId);
+      .eq("organization_id", organizationId)
+      .eq("active", true);
 
     if (currentPlayersError) {
       redirect(withMessage(organizationQueryKey, currentPlayersError.message));
@@ -449,36 +450,44 @@ export async function deletePlayerAction(formData: FormData) {
       .eq("organization_id", parsed.data.organizationId)
       .maybeSingle();
 
-    if (playerError || !playerToDelete) {
-      redirect(withMessage(organizationQueryKey, "No se encontro el jugador seleccionado."));
+    if (playerError) {
+      redirect(withMessage(organizationQueryKey, "No se pudo consultar el jugador seleccionado. Intentá de nuevo."));
     }
 
-    const { error: deleteError } = await supabase.rpc("delete_group_player", {
+    const { data: removal, error: deleteError } = await supabase.rpc("delete_group_player", {
       p_player_id: parsed.data.deletePlayerId,
       p_organization_id: parsed.data.organizationId
     });
 
     if (deleteError) {
-      const cannotDeleteDueToHistory = deleteError.code === "23503";
       redirect(
         withMessage(
           organizationQueryKey,
-          cannotDeleteDueToHistory
-            ? "No se puede eliminar este jugador porque esta vinculado a partidos ya registrados."
-            : toUserMessage(deleteError, "No se pudo eliminar el jugador.")
+          deleteError.code === "PT409"
+            ? "El jugador está convocado a un partido pendiente. Quitalo de la convocatoria o resolvé ese partido antes de quitarlo del plantel."
+            : toUserMessage(deleteError, "No se pudo quitar el jugador del plantel.")
         )
       );
     }
 
     await refreshOrganizationPublicSnapshotSafe(parsed.data.organizationId);
+    revalidatePath("/admin");
     revalidatePath("/admin/players");
+    revalidatePath("/admin/matches/new");
     revalidatePath("/players");
     revalidatePath("/ranking");
+    revalidatePath(`/players/${parsed.data.deletePlayerId}`);
+    revalidatePath("/matches", "layout");
     revalidatePath("/");
-    redirect(withSuccess(organizationQueryKey, `Jugador ${playerToDelete.full_name} eliminado.`));
+    const message = !playerToDelete
+      ? "El jugador ya no está en el plantel."
+      : removal?.disposition === "archived"
+        ? `${playerToDelete.full_name} fue quitado del plantel. Sus partidos y estadísticas se conservaron.`
+        : `${playerToDelete.full_name} fue quitado del plantel.`;
+    redirect(`${withSuccess(organizationQueryKey, message)}&view=edit`);
   } catch (error) {
     if (isNextRedirectError(error)) throw error;
-    redirect(withMessage(String(formData.get("organizationId") ?? ""), toUserMessage(error, "No se pudo eliminar el jugador.")));
+    redirect(withMessage(String(formData.get("organizationId") ?? ""), toUserMessage(error, "No se pudo quitar el jugador del plantel.")));
   }
 }
 

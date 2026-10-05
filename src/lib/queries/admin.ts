@@ -170,6 +170,7 @@ export async function getAdminPlayers(organizationId: string) {
     .from("players")
     .select("*", { count: "exact" })
     .eq("organization_id", organizationId)
+    .eq("active", true)
     .order("skill_level", { ascending: true })
     .order("display_order", { ascending: true })
     .order("full_name", { ascending: true })

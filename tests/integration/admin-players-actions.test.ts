@@ -51,7 +51,7 @@ vi.mock("@/lib/player-photos", async (importOriginal) => ({
   optimizePlayerAvatarImage: vi.fn(async () => Buffer.from("webp"))
 }));
 
-import { bulkCreatePlayersAction, bulkUpdatePlayersAction, createPlayerAction, setPlayerInjuryAction, uploadPlayerPhotoAction } from "@/app/admin/(panel)/players/actions";
+import { bulkCreatePlayersAction, bulkUpdatePlayersAction, createPlayerAction, deletePlayerAction, setPlayerInjuryAction, uploadPlayerPhotoAction } from "@/app/admin/(panel)/players/actions";
 import { assertOrganizationAdminAction } from "@/lib/auth/admin";
 import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { createFakeSupabase } from "../helpers/fake-supabase";
@@ -63,6 +63,51 @@ describe("admin players actions", () => {
   const playerId = "00000000-0000-4000-8000-000000000002";
   const otherPlayerId = "00000000-0000-4000-8000-000000000003";
   const otherOrganizationId = "00000000-0000-4000-8000-000000000004";
+
+  function removalForm() {
+    const form = new FormData();
+    form.set("organizationId", organizationId);
+    form.set("deletePlayerId", playerId);
+    return form;
+  }
+
+  it.each(["archived", "removed"])("informa la baja %s y refresca plantel, ranking e historial", async (disposition) => {
+    const fake = createFakeSupabase({ players: [{ id: playerId, organization_id: organizationId, full_name: "Ana Pérez", active: true }] });
+    const rpc = vi.fn().mockResolvedValue({ data: { disposition }, error: null });
+    createSupabaseServerClientMock.mockResolvedValue({ ...fake.client, rpc });
+    await expect(deletePlayerAction(removalForm())).rejects.toMatchObject({ digest: expect.stringContaining("NEXT_REDIRECT") });
+    expect(rpc).toHaveBeenCalledWith("delete_group_player", { p_player_id: playerId, p_organization_id: organizationId });
+    const destination = new URL(redirectMock.mock.calls.at(-1)![0], "https://local.invalid");
+    expect(destination.searchParams.get("success")).toContain("Ana Pérez fue quitado del plantel.");
+    expect(destination.searchParams.get("success")?.includes("estadísticas se conservaron")).toBe(disposition === "archived");
+    expect(destination.searchParams.get("view")).toBe("edit");
+    expect(refreshOrganizationPublicSnapshotSafe).toHaveBeenCalledWith(organizationId);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/admin/matches/new");
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/players/${playerId}`);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/matches", "layout");
+  });
+
+  it("explica cómo resolver una convocatoria pendiente sin anunciar una baja", async () => {
+    const fake = createFakeSupabase({ players: [{ id: playerId, organization_id: organizationId, full_name: "Ana Pérez" }] });
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "PT409", message: "Partido pendiente" } });
+    createSupabaseServerClientMock.mockResolvedValue({ ...fake.client, rpc });
+    await expect(deletePlayerAction(removalForm())).rejects.toMatchObject({ digest: expect.stringContaining("error=") });
+    const destination = new URL(redirectMock.mock.calls.at(-1)![0], "https://local.invalid");
+    expect(destination.searchParams.get("error")).toContain("Quitalo de la convocatoria");
+    expect(destination.searchParams.has("success")).toBe(false);
+    expect(refreshOrganizationPublicSnapshotSafe).not.toHaveBeenCalled();
+  });
+
+  it("reintenta una baja completada consultando la RPC autorizada", async () => {
+    const fake = createFakeSupabase({ players: [] });
+    const rpc = vi.fn().mockResolvedValue({ data: { disposition: "removed", alreadyRemoved: true }, error: null });
+    createSupabaseServerClientMock.mockResolvedValue({ ...fake.client, rpc });
+    await expect(deletePlayerAction(removalForm())).rejects.toMatchObject({ digest: expect.stringContaining("NEXT_REDIRECT") });
+    const destination = new URL(redirectMock.mock.calls.at(-1)![0], "https://local.invalid");
+    expect(destination.searchParams.get("success")).toBe("El jugador ya no está en el plantel.");
+    expect(assertOrganizationAdminAction).toHaveBeenCalledWith(organizationId);
+    expect(rpc).toHaveBeenCalledOnce();
+  });
 
   function injuryForm(value: string | null = "true", id = playerId) {
     const form = new FormData();
@@ -250,7 +295,7 @@ describe("admin players actions", () => {
   });
   it("carga una lista sin duplicar jugadores existentes ni cambiar su nivel", async () => {
     const organizationId = "00000000-0000-4000-8000-000000000001";
-    const fake = createFakeSupabase({ players: [{ id: "existing", organization_id: organizationId, full_name: "Juan Pérez", initial_rank: 3, display_order: 4, skill_level: 2 }] });
+    const fake = createFakeSupabase({ players: [{ id: "existing", organization_id: organizationId, full_name: "Juan Pérez", active: true, initial_rank: 3, display_order: 4, skill_level: 2 }] });
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
     const form = new FormData();
     form.set("organizationId", organizationId);
@@ -278,6 +323,7 @@ describe("admin players actions", () => {
           id: playerId,
           organization_id: organizationId,
           full_name: "Juan Perez",
+          active: true,
           initial_rank: 1,
           skill_level: 3,
           current_rating: 1175,

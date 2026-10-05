@@ -35,8 +35,13 @@ export function mapSupabaseError(error: unknown, fallback = "Ocurrio un error in
       return "No se puede completar la operacion por una dependencia entre tablas.";
     case "23502":
       return "Falta completar un campo obligatorio.";
-    case "23514":
+    case "23514": {
+      const capacity = /^Cada grupo admite un maximo de ([1-9]\d*) jugadores activos\.$/.exec(rawMessage);
+      if (capacity) {
+        return `Este grupo admite hasta ${capacity[1]} jugadores activos. Quitá a alguien del plantel para liberar un lugar; sus partidos y estadísticas se conservan.`;
+      }
       return "Los datos enviados no cumplen una regla de validacion.";
+    }
     case "42501":
     case "PGRST301":
       return "No tenes permisos para realizar esta accion.";

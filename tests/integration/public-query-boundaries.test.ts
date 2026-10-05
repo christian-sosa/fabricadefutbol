@@ -212,4 +212,71 @@ describe("public query boundaries", () => {
     expect(reads.tables.filter((table) => table === "matches")).toHaveLength(1);
     expect(authenticatedClient).not.toHaveBeenCalled();
   });
+
+  it("keeps retired players in the finished acta without reading their private profile or photo", async () => {
+    const retired = { ...player, active: false, full_name: "Nombre privado actual", photo_path: "private/retired.webp", photo_updated_at: "2026-12-31T00:00:00Z" };
+    const fake = createFakeSupabase({ organizations: [organization], players: [retired, { ...player, id: "active", full_name: "Actual" }, { ...retired, id: "bench" }],
+      matches: [match("finished", annual.id, { modality: "9v9", confirmed_option_id: "option", lineup_snapshot: [
+        { participantId: `player:${player.id}`, source: "player", fullName: "Nombre en el acta", team: "A", penalized: false },
+        { participantId: "player:active", source: "player", fullName: "Nombre anterior", team: "B", penalized: false },
+        { participantId: "player:bench", source: "player", fullName: "Suplente retirado", team: "OUT", penalized: false }
+      ] })],
+      team_options: [{ id: "option", match_id: "finished", is_confirmed: true }],
+      team_option_players: [{ team_option_id: "option", player_id: player.id, team: "A" }, { team_option_id: "option", player_id: "active", team: "B" }],
+      match_players: [{ match_id: "finished", player_id: "bench", is_substitute: true, substitute_team: null }],
+      match_result: [{ match_id: "finished", score_a: 2, score_b: 1, winner_team: "A" }]
+    });
+    // Mimic anonymous RLS: historical memberships are readable, retired player rows are not.
+    const reads = observePublicReads({ ...fake.client, from(table: Parameters<FakeClient["from"]>[0]) {
+      const query = fake.client.from(table);
+      return table === "public_players" ? query.eq("active", true) : query;
+    } });
+    publicClient.mockReturnValue(reads.client);
+    const details = await getMatchDetails("finished", "visible");
+    expect(details?.teamAPlayers).toEqual([{ id: player.id, full_name: "Nombre en el acta", is_guest: false, current_rating: 1000,
+      photo_path: null, photo_updated_at: null, team: "A" }]);
+    expect(details?.teamBPlayers).toEqual([expect.objectContaining({ id: "active", full_name: "Actual" })]);
+    expect(details?.substitutes).toEqual([{ id: "bench", full_name: "Suplente retirado", is_guest: false, current_rating: 1000,
+      photo_path: null, photo_updated_at: null, team: null }]);
+    expect(details?.result).toMatchObject({ score_a: 2, score_b: 1, winner_team: "A" });
+    expect(reads.tables).not.toContain("players");
+    expect(authenticatedClient).not.toHaveBeenCalled();
+    await expect(getPlayerDetails(player.id, "visible")).resolves.toBeNull();
+  });
+
+  it.each(["confirmed", "cancelled"])("does not restore hidden players from a %s match snapshot", async (status) => {
+    const fake = createFakeSupabase({ organizations: [organization], matches: [match("pending", annual.id, {
+      status, modality: "9v9", confirmed_option_id: "option", lineup_snapshot: [
+        { participantId: `player:${player.id}`, source: "player", fullName: "Retirado", team: "A" },
+        { participantId: "player:bench", source: "player", fullName: "Banco retirado", team: "OUT" }
+      ]
+    })], team_options: [{ id: "option", match_id: "pending", is_confirmed: true }],
+    team_option_players: [{ team_option_id: "option", player_id: player.id, team: "A" }],
+    match_players: [{ match_id: "pending", player_id: "bench", is_substitute: true }]
+    });
+    publicClient.mockReturnValue(observePublicReads(fake.client).client);
+    const details = await getMatchDetails("pending", "visible");
+    expect(details?.teamAPlayers).toEqual([]);
+    expect(details?.substitutes).toEqual([]);
+  });
+
+  it("uses only unambiguous player snapshots consistent with the final team memberships", async () => {
+    const fake = createFakeSupabase({ organizations: [organization], matches: [match("finished", annual.id, {
+      confirmed_option_id: "option", lineup_snapshot: [null, "malformed",
+        { participantId: "player:wrong-source", source: "guest", fullName: "Invitado", team: "A" },
+        { participantId: "player:wrong-team", source: "player", fullName: "Equipo incorrecto", team: "B" },
+        { participantId: "player:duplicate", source: "player", fullName: "Primero", team: "A" },
+        { participantId: "player:duplicate", source: "player", fullName: "Segundo", team: "A" },
+        { participantId: "player:empty-name", source: "player", fullName: "  ", team: "A" },
+        { participantId: "player:unrelated", source: "player", fullName: "Sin pertenencia", team: "A" }
+      ]
+    })], team_options: [{ id: "option", match_id: "finished", is_confirmed: true }],
+    team_option_players: ["wrong-source", "wrong-team", "duplicate", "empty-name"].map((id) => ({ team_option_id: "option", player_id: id, team: "A" }))
+    });
+    publicClient.mockReturnValue(observePublicReads(fake.client).client);
+    const details = await getMatchDetails("finished", "visible");
+    expect(details?.teamAPlayers).toEqual([]);
+    expect(details?.teamBPlayers).toEqual([]);
+    expect(authenticatedClient).not.toHaveBeenCalled();
+  });
 });

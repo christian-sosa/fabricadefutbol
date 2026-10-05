@@ -26,6 +26,7 @@ describe("admin player queries", () => {
           id: "player-level-3",
           organization_id: ORG_ID,
           full_name: "Nivel Tres",
+          active: true,
           initial_rank: 1,
           skill_level: 3,
           display_order: 1
@@ -34,6 +35,7 @@ describe("admin player queries", () => {
           id: "player-level-2",
           organization_id: ORG_ID,
           full_name: "Nivel Dos",
+          active: true,
           initial_rank: 2,
           skill_level: 2,
           display_order: 9
@@ -42,6 +44,7 @@ describe("admin player queries", () => {
           id: "player-level-1",
           organization_id: ORG_ID,
           full_name: "Nivel Uno",
+          active: true,
           initial_rank: 3,
           skill_level: 1,
           display_order: 8
@@ -234,7 +237,7 @@ describe("admin player queries", () => {
     ] });
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
     expect((await getSelectablePlayers(ORG_ID)).map((player) => player.id)).toEqual(ids);
-    expect((await getAdminPlayers(ORG_ID)).map((player) => player.id)).toEqual(["inactive", ...ids]);
+    expect((await getAdminPlayers(ORG_ID)).map((player) => player.id)).toEqual([...ids]);
   });
 
   it("obtiene todas las membresías de administradores y no sólo las primeras 1000", async () => {
