@@ -39,7 +39,7 @@ test("guarda posiciones opcionales en la planilla sin cambiar puntos a 320px", a
   const row = page.locator(`[data-roster-player="${E2E_PLAYER_IDS[0]}"]`);
   await expect(row.locator('select[name="secondaryPosition"]')).toBeDisabled();
   await row.locator('select[name="preferredPosition"]').selectOption("DEF");
-  await expect(row.locator('select[name="secondaryPosition"] option[value="DEF"]')).toBeDisabled();
+  await expect(row.locator('select[name="secondaryPosition"] option[value="DEF"]')).toHaveAttribute("disabled", "");
   await row.locator('select[name="secondaryPosition"]').selectOption("MID");
   await row.locator('select[name="preferredPosition"]').selectOption("MID");
   await expect(row.locator('select[name="secondaryPosition"]')).toHaveValue("");
