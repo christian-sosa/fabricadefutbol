@@ -183,7 +183,7 @@ export async function getSelectablePlayers(organizationId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await readAllRows((from, to) => supabase
     .from("players")
-    .select("id, full_name, current_rating, initial_rank, skill_level, display_order, photo_path, photo_updated_at", { count: "exact" })
+    .select("id, full_name, current_rating, initial_rank, skill_level, display_order, photo_path, photo_updated_at, preferred_position, secondary_position", { count: "exact" })
     .eq("organization_id", organizationId)
     .eq("active", true)
     .order("skill_level", { ascending: true })

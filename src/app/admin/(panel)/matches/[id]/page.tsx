@@ -25,6 +25,7 @@ import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getAdminMatchDetails } from "@/lib/queries/admin";
 import { getAdminMatchSubstitutes } from "@/lib/queries/admin-match-extras";
 import { supportsMatchExtras } from "@/lib/domain/match-scorers";
+import { supportsPositionBalancing } from "@/lib/domain/player-positions";
 import { resolveMatchTeamLabels } from "@/lib/team-labels";
 
 export default async function AdminMatchDetailPage({
@@ -139,6 +140,7 @@ export default async function AdminMatchDetailPage({
         <TeamOptionsList confirmAction={details.match.status === "draft" ? confirmAction : undefined} options={visibleOptions.map((option) => ({
           isConfirmed: option.is_confirmed, optionId: option.id, optionNumber: option.option_number,
           ratingDiff: Number(option.rating_diff), ratingSumA: Number(option.rating_sum_a), ratingSumB: Number(option.rating_sum_b),
+          showPositions: supportsPositionBalancing(details.match.modality), goalkeeperPlayerIds: details.match.goalkeeper_player_ids,
           teamALabel: teamLabels.teamA, teamBLabel: teamLabels.teamB, teamA: option.teamA, teamB: option.teamB
         }))} />
       </Card>

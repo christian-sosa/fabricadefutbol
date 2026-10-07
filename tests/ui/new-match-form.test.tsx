@@ -1,6 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+
+const { router } = vi.hoisted(() => ({ router: { refresh: vi.fn() } }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 vi.mock("@/app/admin/(panel)/form-actions", () => ({
   createMatchFormAction: vi.fn(async () => ({ error: null }))
@@ -35,6 +38,97 @@ function getCheckbox(container: HTMLElement, name: string, value: string) {
 }
 
 describe("NewMatchForm", () => {
+  it("actualiza posiciones una vez al volver de Jugadores y conserva el borrador", async () => {
+    router.refresh.mockClear();
+    const user = userEvent.setup();
+    const players = buildPlayers(3).map((player) => ({ ...player, preferred_position: "DEF" as const }));
+    const props = {
+      defaultScheduledDate: DEFAULT_SCHEDULED_DATE, organizationId: "org-1", players, requestId: "original-request",
+      initialValues: { modality: "9v9" as const, playerIds: ["player-1", "player-2"], goalkeeperPlayerIds: [], guests: [],
+        substituteAssignments: [{ participantId: "player:player-2", team: null }] }
+    };
+    const { container, rerender, unmount } = render(<NewMatchForm {...props} />);
+    await user.selectOptions(screen.getByLabelText("Modalidad"), "10v10");
+    await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 3" }));
+    await user.click(screen.getByRole("checkbox", { name: "Arquero Jugador 1" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Rol de Jugador 2" }), "B");
+    await user.type(screen.getByLabelText("Ubicacion"), "Cancha nueva");
+    fireEvent.change(screen.getByLabelText("Fecha"), { target: { value: "2026-11-05" } });
+    fireEvent.change(screen.getByLabelText("Hora"), { target: { value: "21:30" } });
+    await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
+    await user.type(screen.getByPlaceholderText("Nombre invitado #1"), "Refuerzo");
+    await user.selectOptions(screen.getByLabelText("Nivel de Refuerzo"), "2");
+    const draftEntries = [...new FormData(container.querySelector("form")!).entries()];
+
+    fireEvent.focus(window);
+    expect(router.refresh).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("link", { name: "Editar posiciones en Jugadores (otra pestaña)" }));
+    expect(router.refresh).not.toHaveBeenCalled();
+    fireEvent.focus(window);
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+    fireEvent.focus(window);
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+
+    rerender(<NewMatchForm {...props} requestId="refreshed-request" defaultScheduledDate="2026-11-01"
+      players={players.map((player) => player.id === "player-3" ? { ...player, preferred_position: "MID", secondary_position: "FWD" } : player)} />);
+    expect(screen.getByText("Preferida: Mediocampista")).toBeInTheDocument();
+    expect(screen.getByText("Secundaria: Delantero")).toBeInTheDocument();
+    expect(screen.getByText("Preferida · Mediocampista: 1")).toBeInTheDocument();
+    expect([...new FormData(container.querySelector("form")!).entries()]).toEqual(draftEntries);
+
+    await user.click(screen.getByRole("link", { name: "Editar posiciones en Jugadores (otra pestaña)" }));
+    fireEvent.focus(window);
+    expect(router.refresh).toHaveBeenCalledTimes(2);
+    await user.click(screen.getByRole("link", { name: "Editar posiciones en Jugadores (otra pestaña)" }));
+    unmount();
+    fireEvent.focus(window);
+    expect(router.refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["9v9", "10v10", "11v11"] as const)("muestra preferencias y guía de posiciones antes de convocar en %s", (modality) => {
+    render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" defaultModality={modality}
+      players={[{ ...buildPlayers(1)[0], preferred_position: "DEF", secondary_position: "MID" }]} />);
+    expect(screen.getByText("Preferida: Defensor")).toBeInTheDocument();
+    expect(screen.getByText("Secundaria: Mediocampista")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Armá equipos con nivel y posiciones" })).toHaveTextContent("Si faltan perfiles, completa con los disponibles");
+    expect(screen.getByRole("link", { name: "Editar posiciones en Jugadores (otra pestaña)" })).toHaveAttribute("href", "/admin/players?org=org-1");
+    expect(screen.queryByText("Preferencias de los titulares")).not.toBeInTheDocument();
+  });
+
+  it.each(["5v5", "6v6", "7v7"] as const)("mantiene la convocatoria de %s sin información de posiciones", (modality) => {
+    render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" defaultModality={modality}
+      players={[{ ...buildPlayers(1)[0], preferred_position: "DEF", secondary_position: "MID" }]} />);
+    expect(screen.queryByText("Preferida: Defensor")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Armá equipos con nivel y posiciones" })).not.toBeInTheDocument();
+  });
+
+  it("resume titulares sin duplicar secundarias, invitados, suplentes o arqueros marcados", async () => {
+    const user = userEvent.setup();
+    const players = [
+      { ...buildPlayers(4)[0], preferred_position: "DEF" as const, secondary_position: "MID" as const },
+      { ...buildPlayers(4)[1], preferred_position: "FWD" as const },
+      { ...buildPlayers(4)[2], preferred_position: "MID" as const },
+      buildPlayers(4)[3]
+    ];
+    render(<NewMatchForm defaultScheduledDate={DEFAULT_SCHEDULED_DATE} organizationId="org-1" players={players}
+      initialValues={{ modality: "9v9", playerIds: players.map((player) => player.id), goalkeeperPlayerIds: ["player-2"],
+        guests: [{ name: "Invitado titular", rating: 2 }, { name: "Invitado suplente", rating: 3 }],
+        substituteAssignments: [{ participantId: "player:player-3", team: null }, { participantId: "guest:2", team: null }] }} />);
+    const guide = within(screen.getByRole("region", { name: "Armá equipos con nivel y posiciones" }));
+    expect(guide.getByText("Preferida · Defensor: 1")).toBeInTheDocument();
+    expect(guide.queryByText(/Preferida · Mediocampista|Preferida · Delantero/)).not.toBeInTheDocument();
+    expect(guide.getByText("Arqueros marcados: 1")).toBeInTheDocument();
+    expect(guide.getByText("Sin posición guardada: 2")).toBeInTheDocument();
+    expect(guide.getByText("Se muestran las preferidas de los titulares. Para armar los equipos también se consideran las secundarias.")).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Rol de Jugador 3" }), "starter");
+    expect(guide.getByText("Preferida · Mediocampista: 1")).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "Arquero Jugador 2" }));
+    expect(guide.getByText("Preferida · Delantero: 1")).toBeInTheDocument();
+    expect(guide.queryByText("Arqueros marcados: 1")).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Modalidad"), "7v7");
+    expect(screen.queryByText("Preferencias de los titulares")).not.toBeInTheDocument();
+  });
+
   it("mantiene el identificador de creación al editar y reintentar un fallo", async () => {
     vi.mocked(createMatchFormAction).mockResolvedValueOnce({ error: "Intentá nuevamente." }).mockResolvedValueOnce({ error: null });
     const user = userEvent.setup();

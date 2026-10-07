@@ -85,7 +85,9 @@ describe("admin player queries", () => {
           full_name: "Nivel Dos",
           initial_rank: 3,
           skill_level: 2,
-          display_order: 10
+          display_order: 10,
+          preferred_position: "DEF",
+          secondary_position: "MID"
         }
       ]
     });
@@ -94,6 +96,7 @@ describe("admin player queries", () => {
     const players = await getSelectablePlayers(ORG_ID);
 
     expect(players.map((player) => player.id)).toEqual(["player-level-2", "player-level-4"]);
+    expect(players[0]).toMatchObject({ preferred_position: "DEF", secondary_position: "MID" });
   });
 
   it("devuelve conteos de onboarding y partidos del dashboard admin", async () => {

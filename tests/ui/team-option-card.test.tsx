@@ -13,6 +13,28 @@ function buildGuests(team: string) {
 }
 
 describe("TeamOptionCard", () => {
+  it("muestra preferencias con niveles ocultos y prioriza al arquero elegido", () => {
+    const props = {
+      optionId: "positions-option", optionNumber: 1, ratingDiff: 0, ratingSumA: 2000, ratingSumB: 2000, isConfirmed: false,
+      teamA: [
+        { id: "defender", full_name: "Defensor", current_rating: 1000, skill_level: 2, preferred_position: "DEF" as const, secondary_position: "MID" as const },
+        { id: "keeper", full_name: "Arquero", current_rating: 1000, skill_level: 2, preferred_position: "FWD" as const }
+      ],
+      teamB: [{ id: "guest", full_name: "Refuerzo", current_rating: 1000, is_guest: true }]
+    };
+    const { rerender } = render(<TeamOptionCard {...props} hideLevels showPositions goalkeeperPlayerIds={["keeper"]} />);
+    expect(screen.getByText("Preferida: Defensor")).toBeInTheDocument();
+    expect(screen.getByText("Secundaria: Mediocampista")).toBeInTheDocument();
+    expect(screen.getByText("Arquero elegido para este partido")).toBeInTheDocument();
+    expect(screen.queryByText("Preferida: Delantero")).not.toBeInTheDocument();
+    expect(screen.getByText("Sin posición guardada")).toBeInTheDocument();
+    expect(screen.queryByText("Nivel 2 - Figura")).not.toBeInTheDocument();
+    rerender(<TeamOptionCard {...props} />);
+    expect(screen.queryByText("Preferida: Defensor")).not.toBeInTheDocument();
+    expect(screen.queryByText("Secundaria: Mediocampista")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sin posición guardada")).not.toBeInTheDocument();
+  });
+
   it("permite nombrar los equipos dentro de la opcion antes de confirmarla", () => {
     render(
       <TeamOptionCard

@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffe
 import { useFormStatus } from "react-dom";
 
 import { Button } from "@/components/ui/button";
+import { syncPlayerPositionFields } from "@/components/admin/player-position-fields";
 import type { PlayerPosition } from "@/types/domain";
 
 type Player = { id: string; full_name: string; skill_level: number; preferred_position?: PlayerPosition | null; secondary_position?: PlayerPosition | null };
@@ -95,6 +96,7 @@ export function PlayersRosterGuard({ children, formId, organizationId, players }
         }
       }
     } catch { /* A missing or invalid draft must not prevent editing. */ }
+    if (rootRef.current) syncPlayerPositionFields(rootRef.current);
     recordChanges();
   }, [fieldsFor, players, recordChanges, storageKey]);
 
@@ -131,10 +133,14 @@ export function PlayersRosterGuard({ children, formId, organizationId, players }
       if (preferredPosition) preferredPosition.value = player.preferred_position ?? "";
       if (secondaryPosition) secondaryPosition.value = player.secondary_position ?? "";
     }
+    if (rootRef.current) syncPlayerPositionFields(rootRef.current);
     recordChanges();
   };
 
-  return <RosterPendingContext.Provider value={setPending}><div ref={rootRef} onChange={recordChanges} onResetCapture={() => queueMicrotask(recordChanges)} onSubmitCapture={(event) => {
+  return <RosterPendingContext.Provider value={setPending}><div ref={rootRef} onChange={recordChanges} onResetCapture={() => queueMicrotask(() => {
+    if (rootRef.current) syncPlayerPositionFields(rootRef.current);
+    recordChanges();
+  })} onSubmitCapture={(event) => {
     if (pending) {
       event.preventDefault();
       event.stopPropagation();

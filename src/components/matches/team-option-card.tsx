@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
+import { PLAYER_POSITION_OPTIONS } from "@/lib/domain/player-positions";
+import type { PlayerPosition } from "@/types/domain";
 import {
   formatGuestSkillLevelLabel,
   formatRatingTrendBadgeLabel,
@@ -19,6 +21,8 @@ type OptionPlayer = {
   current_rating: number;
   skill_level?: number | null;
   is_guest?: boolean;
+  preferred_position?: PlayerPosition | null;
+  secondary_position?: PlayerPosition | null;
 };
 
 export type TeamOptionCardProps = {
@@ -33,6 +37,8 @@ export type TeamOptionCardProps = {
   teamBLabel?: string;
   isConfirmed: boolean;
   hideLevels?: boolean;
+  showPositions?: boolean;
+  goalkeeperPlayerIds?: string[];
   confirmAction?: (formData: FormData) => void;
 };
 
@@ -116,7 +122,7 @@ function getLevelLabel(player: OptionPlayer) {
   return player.is_guest ? formatGuestSkillLevelLabel(level) : formatSkillLevelLabel(level);
 }
 
-function PlayerRow({ player, hideLevels }: { player: OptionPlayer; hideLevels: boolean }) {
+function PlayerRow({ player, hideLevels, showPositions, isGoalkeeper }: { player: OptionPlayer; hideLevels: boolean; showPositions: boolean; isGoalkeeper: boolean }) {
   const levelLabel = getLevelLabel(player);
   const ratingTrendLabel = formatRatingTrendLabel(player.current_rating);
   const shouldShowRatingTrend = !player.is_guest && ratingTrendLabel !== "Parejo";
@@ -134,6 +140,16 @@ function PlayerRow({ player, hideLevels }: { player: OptionPlayer; hideLevels: b
               </span>
             ) : null}
           </span>
+          {showPositions ? (
+            <span className="mt-1 block text-[11px] text-emerald-200">
+              {isGoalkeeper ? "Arquero elegido para este partido" : (
+                <>
+                  <span>{player.preferred_position ? `Preferida: ${PLAYER_POSITION_OPTIONS.find((position) => position.value === player.preferred_position)?.label}` : "Sin posición guardada"}</span>
+                  {player.secondary_position ? <span className="mt-0.5 block text-slate-400">Secundaria: {PLAYER_POSITION_OPTIONS.find((position) => position.value === player.secondary_position)?.label}</span> : null}
+                </>
+              )}
+            </span>
+          ) : null}
           {!hideLevels ? (
             <span className="mt-1 flex flex-wrap gap-1.5">
               {levelLabel ? (
@@ -173,6 +189,8 @@ export function TeamOptionCard({
   teamBLabel = DEFAULT_TEAM_B_LABEL,
   isConfirmed,
   hideLevels = false,
+  showPositions = false,
+  goalkeeperPlayerIds = [],
   confirmAction
 }: TeamOptionCardProps) {
   const sortedTeamA = sortTeamPlayers(teamA, hideLevels);
@@ -214,12 +232,14 @@ export function TeamOptionCard({
         ) : null}
       </div>
 
+      {showPositions ? <p className="mb-3 text-xs text-slate-400">Las posiciones indican preferencias.{!isConfirmed ? " Después de confirmar, podés revisar y ajustar los puestos en la cancha." : " Los puestos para este partido se ven en la formación."}</p> : null}
+
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{teamALabel}</p>
           <ul className="space-y-2 text-sm text-slate-200">
             {sortedTeamA.map((player) => (
-              <PlayerRow hideLevels={hideLevels} key={player.id} player={player} />
+              <PlayerRow hideLevels={hideLevels} isGoalkeeper={goalkeeperPlayerIds.includes(player.id)} key={player.id} player={player} showPositions={showPositions} />
             ))}
           </ul>
         </div>
@@ -227,7 +247,7 @@ export function TeamOptionCard({
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{teamBLabel}</p>
           <ul className="space-y-2 text-sm text-slate-200">
             {sortedTeamB.map((player) => (
-              <PlayerRow hideLevels={hideLevels} key={player.id} player={player} />
+              <PlayerRow hideLevels={hideLevels} isGoalkeeper={goalkeeperPlayerIds.includes(player.id)} key={player.id} player={player} showPositions={showPositions} />
             ))}
           </ul>
         </div>
