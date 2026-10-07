@@ -6,19 +6,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import AdminPlayersPage from "@/app/admin/(panel)/players/page";
 import { organizationQueryKeys } from "@/lib/query/keys";
 
-const mocks = vi.hoisted(() => ({ update: vi.fn(), upload: vi.fn(), injury: vi.fn() }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), upload: vi.fn(), injury: vi.fn() }));
 vi.mock("@/app/admin/(panel)/players/actions", () => ({ deletePlayerAction: vi.fn(), bulkCreatePlayersAction: vi.fn() }));
-vi.mock("@/app/admin/(panel)/form-actions", () => ({ createPlayerFormAction: vi.fn(), updatePlayersFormAction: mocks.update, uploadPlayerPhotoFormAction: mocks.upload, setPlayerInjuryFormAction: mocks.injury }));
+vi.mock("@/app/admin/(panel)/form-actions", () => ({ createPlayerFormAction: mocks.create, updatePlayersFormAction: mocks.update, uploadPlayerPhotoFormAction: mocks.upload, setPlayerInjuryFormAction: mocks.injury }));
 vi.mock("@/components/admin/admin-current-group-card", () => ({ AdminCurrentGroupCard: () => <p>Grupo actual: Los viernes</p> }));
 vi.mock("@/lib/auth/admin", () => ({ requireAdminOrganization: async () => ({ admin: {}, selectedOrganization: { id: "org-1", slug: "viernes", name: "Los viernes" } }), getOrganizationWriteAccess: async () => ({ canWrite: true }) }));
 vi.mock("@/lib/queries/admin", () => ({ getAdminPlayers: async () => [
-  { id: "player-1", full_name: "Ana Pérez", skill_level: 3, photo_path: null, is_injured: false },
+  { id: "player-1", full_name: "Ana Pérez", skill_level: 3, photo_path: null, is_injured: false, preferred_position: "DEF", secondary_position: "MID" },
   { id: "player-2", full_name: "Luz Díaz", skill_level: 4, photo_path: null, is_injured: true }
 ] }));
 let queryClient: QueryClient;
 beforeEach(() => {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60_000 } } });
   window.sessionStorage.clear();
+  mocks.create.mockReset().mockResolvedValue({ error: null });
   mocks.update.mockReset().mockResolvedValue({ error: null }); mocks.upload.mockReset(); mocks.injury.mockReset().mockResolvedValue({ error: null });
 });
 
@@ -121,9 +122,13 @@ describe("planilla de jugadores", () => {
     render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
     const name = screen.getByRole("textbox", { name: "Nombre de Ana Pérez" });
     const level = screen.getByRole("combobox", { name: "Nivel de habilidad de Ana Pérez" });
+    const preferredPosition = screen.getByRole("combobox", { name: "Posición preferida de Ana Pérez" });
+    const secondaryPosition = screen.getByRole("combobox", { name: "Posición secundaria de Ana Pérez" });
     await user.clear(name);
     await user.type(name, "Ana nueva");
     await user.selectOptions(level, "6");
+    await user.selectOptions(preferredPosition, "GK");
+    await user.selectOptions(secondaryPosition, "DEF");
     await user.click(screen.getByText("Foto y acciones de Ana Pérez"));
     await user.click(screen.getByRole("button", { name: "Guardar toda la planilla" }));
 
@@ -132,8 +137,12 @@ describe("planilla de jugadores", () => {
     expect(submitted.getAll("playerId")).toEqual(["player-1", "player-2"]);
     expect(submitted.getAll("fullName")).toEqual(["Ana nueva", "Luz Díaz"]);
     expect(submitted.getAll("skillLevel")).toEqual(["6", "4"]);
+    expect(submitted.getAll("preferredPosition")).toEqual(["GK", ""]);
+    expect(submitted.getAll("secondaryPosition")).toEqual(["DEF", ""]);
     expect(name).toBeDisabled();
     expect(level).toBeDisabled();
+    expect(preferredPosition).toBeDisabled();
+    expect(secondaryPosition).toBeDisabled();
     expect(screen.getByRole("button", { name: "Descartar cambios" })).toBeDisabled();
     for (const input of screen.getAllByLabelText("Foto del jugador")) expect(input).toBeDisabled();
     for (const button of screen.getAllByRole("button", { name: "Eliminar" })) expect(button).toBeDisabled();
@@ -141,13 +150,19 @@ describe("planilla de jugadores", () => {
     await user.click(screen.getByRole("button", { name: "Descartar cambios" }));
     expect(name).toHaveValue("Ana nueva");
     expect(level).toHaveValue("6");
+    expect(preferredPosition).toHaveValue("GK");
+    expect(secondaryPosition).toHaveValue("DEF");
 
     await act(async () => { finishSave({ error: "No se pudo guardar la planilla." }); });
     expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo guardar la planilla.");
     expect(name).toBeEnabled();
     expect(level).toBeEnabled();
+    expect(preferredPosition).toBeEnabled();
+    expect(secondaryPosition).toBeEnabled();
     expect(name).toHaveValue("Ana nueva");
     expect(level).toHaveValue("6");
+    expect(preferredPosition).toHaveValue("GK");
+    expect(secondaryPosition).toHaveValue("DEF");
     expect(screen.getByRole("button", { name: "Descartar cambios" })).toBeEnabled();
     expect(window.sessionStorage.getItem("fdf:players-draft:v1:org-1")).toContain("Ana nueva");
     await user.type(name, " corregida");
@@ -211,5 +226,68 @@ describe("planilla de jugadores", () => {
     const form = within(details).getByRole("button", { name: "Subir foto" }).closest("form")!;
     expect(new FormData(form).get("playerId")).toBe("player-2");
     expect(screen.queryByRole("button", { name: "Crear jugador" })).not.toBeInTheDocument();
+  });
+
+  it("permite crear con posiciones opcionales y las envía junto con el nivel", async () => {
+    const user = userEvent.setup();
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "new" }) }));
+    await user.type(screen.getByRole("textbox", { name: "Nombre completo del jugador" }), "Ana nueva");
+    const preferred = screen.getByRole("combobox", { name: "Posición preferida" });
+    const secondary = screen.getByRole("combobox", { name: "Posición secundaria" });
+    expect(preferred).toHaveValue("");
+    expect(secondary).toHaveValue("");
+    expect(preferred).not.toBeRequired();
+    expect(secondary).not.toBeRequired();
+    await user.selectOptions(preferred, "FWD");
+    await user.selectOptions(secondary, "MID");
+    await user.click(screen.getByRole("button", { name: "Crear jugador" }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+    const submitted = mocks.create.mock.calls[0][0] as FormData;
+    expect(submitted.get("fullName")).toBe("Ana nueva");
+    expect(submitted.get("skillLevel")).toBe("5");
+    expect(submitted.get("preferredPosition")).toBe("FWD");
+    expect(submitted.get("secondaryPosition")).toBe("MID");
+  });
+
+  it("considera las posiciones como cambios, protege acciones y navegación, y restaura o descarta el borrador", async () => {
+    const user = userEvent.setup();
+    const view = render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    const preferred = screen.getByRole("combobox", { name: "Posición preferida de Ana Pérez" });
+    const secondary = screen.getByRole("combobox", { name: "Posición secundaria de Ana Pérez" });
+    expect(preferred).toHaveValue("DEF");
+    expect(secondary).toHaveValue("MID");
+    expect(preferred).toHaveAccessibleDescription(/si faltan posiciones/);
+    expect(screen.getByRole("combobox", { name: "Posición preferida de Luz Díaz" })).toHaveValue("");
+    await user.selectOptions(preferred, "GK");
+    await user.selectOptions(secondary, "FWD");
+    expect(screen.getByText("1 jugador con cambios sin guardar.")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Marcar lesionado a Ana Pérez" }));
+    expect(mocks.injury).not.toHaveBeenCalled();
+    const details = screen.getByText("Foto y acciones de Ana Pérez").closest("details")!;
+    fireEvent.submit(details.querySelector("form")!);
+    expect(mocks.upload).not.toHaveBeenCalled();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    await user.click(screen.getByRole("link", { name: "Alta de jugador" }));
+    expect(confirm).toHaveBeenCalledOnce();
+    view.unmount();
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    expect(screen.getByRole("combobox", { name: "Posición preferida de Ana Pérez" })).toHaveValue("GK");
+    expect(screen.getByRole("combobox", { name: "Posición secundaria de Ana Pérez" })).toHaveValue("FWD");
+    await user.click(screen.getByRole("button", { name: "Descartar cambios" }));
+    expect(screen.getByRole("combobox", { name: "Posición preferida de Ana Pérez" })).toHaveValue("DEF");
+    expect(screen.getByRole("combobox", { name: "Posición secundaria de Ana Pérez" })).toHaveValue("MID");
+    expect(window.sessionStorage.getItem("fdf:players-draft:v1:org-1")).toBeNull();
+  });
+
+  it("no restaura un borrador de posiciones encima de preferencias nuevas del servidor", async () => {
+    window.sessionStorage.setItem("fdf:players-draft:v1:org-1", JSON.stringify({ "player-1": {
+      name: "Ana nueva", level: "6", preferredPosition: "GK", secondaryPosition: "FWD",
+      originalName: "Ana Pérez", originalLevel: "3", originalPreferredPosition: "MID", originalSecondaryPosition: "DEF"
+    } }));
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    expect(screen.getByRole("textbox", { name: "Nombre de Ana Pérez" })).toHaveValue("Ana Pérez");
+    expect(screen.getByRole("combobox", { name: "Posición preferida de Ana Pérez" })).toHaveValue("DEF");
+    expect(screen.getByRole("combobox", { name: "Posición secundaria de Ana Pérez" })).toHaveValue("MID");
+    expect(screen.getByText("La planilla está guardada.")).toBeVisible();
   });
 });

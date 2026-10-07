@@ -31,13 +31,37 @@ async function currentPoints(page: Page) {
     .sort((a, b) => a.playerId.localeCompare(b.playerId));
 }
 
-async function placeTeamPlayers(region: Locator, teamLabel: string, expectedPlayers: number) {
+test("guarda posiciones opcionales en la planilla sin cambiar puntos a 320px", async ({ page }) => {
+  await login(page);
+  const pointsBefore = await currentPoints(page);
+  await page.setViewportSize({ width: 320, height: 900 });
+  await page.goto(`/admin/players?org=${ORG_SLUG}&view=edit`);
+  const row = page.locator(`[data-roster-player="${E2E_PLAYER_IDS[0]}"]`);
+  await row.locator('select[name="preferredPosition"]').selectOption("DEF");
+  await row.locator('select[name="secondaryPosition"]').selectOption("MID");
+  await page.getByRole("button", { name: "Guardar toda la planilla", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Se guardaron todos los cambios de la planilla." })).toBeVisible();
+  await page.reload();
+  await expect(row.locator('select[name="preferredPosition"]')).toHaveValue("DEF");
+  await expect(row.locator('select[name="secondaryPosition"]')).toHaveValue("MID");
+  await expectNoHorizontalOverflow(page);
+  expect(await currentPoints(page)).toEqual(pointsBefore);
+  await row.locator('select[name="secondaryPosition"]').selectOption("");
+  await row.locator('select[name="preferredPosition"]').selectOption("");
+  await page.getByRole("button", { name: "Guardar toda la planilla", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Se guardaron todos los cambios de la planilla." })).toBeVisible();
+  await page.reload();
+  await expect(row.locator('select[name="preferredPosition"]')).toHaveValue("");
+  await expect(row.locator('select[name="secondaryPosition"]')).toHaveValue("");
+});
+
+async function placeTeamPlayers(region: Locator, teamLabel: string, expectedPlayers: number, automaticallyFilled = false) {
   const pitch = region.getByRole("group", { name: `Cancha de ${teamLabel}`, exact: true });
   const emptySlots = pitch.getByRole("button", { name: /: Elegir jugador$/ });
-  await expect(emptySlots).toHaveCount(expectedPlayers - 1);
+  await expect(emptySlots).toHaveCount(automaticallyFilled ? 0 : expectedPlayers - 1);
   await expect(pitch.getByRole("button", { name: /^Arco: E2E Jugador / })).toHaveCount(1);
 
-  for (let index = 0; index < expectedPlayers - 1; index += 1) {
+  for (let index = 0; index < (automaticallyFilled ? 0 : expectedPlayers - 1); index += 1) {
     const empty = emptySlots.first();
     const position = (await empty.getAttribute("aria-label"))!.replace(": Elegir jugador", "");
     await empty.click();
@@ -124,14 +148,16 @@ for (const scenario of [
     await expect(page.getByRole("heading", { name: "Equipos confirmados", exact: true }).locator("..").getByRole("listitem")).toHaveCount(scenario.size * 2);
     await page.goto(`/admin/matches/${matchId}?org=${ORG_SLUG}`);
     await expect(page.getByRole("heading", { name: "Formaciones en cancha", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Guardar formaciones", exact: true })).toBeDisabled();
+    const automaticallyFilled = scenario.size >= 9;
+    if (automaticallyFilled) await expect(page.getByRole("button", { name: "Guardar formaciones", exact: true })).toBeEnabled();
+    else await expect(page.getByRole("button", { name: "Guardar formaciones", exact: true })).toBeDisabled();
     await page.getByRole("combobox", { name: `Esquema de ${teamA}`, exact: true }).selectOption(scenario.schemeA);
     await page.getByRole("combobox", { name: `Esquema de ${teamB}`, exact: true }).selectOption(scenario.schemeB);
 
     const regionA = page.getByRole("region", { name: `Formación de ${teamA}`, exact: true });
     const regionB = page.getByRole("region", { name: `Formación de ${teamB}`, exact: true });
-    const positionsA = await placeTeamPlayers(regionA, teamA, scenario.size);
-    const positionsB = await placeTeamPlayers(regionB, teamB, scenario.size);
+    const positionsA = await placeTeamPlayers(regionA, teamA, scenario.size, automaticallyFilled);
+    const positionsB = await placeTeamPlayers(regionB, teamB, scenario.size, automaticallyFilled);
     await expectNoHorizontalOverflow(page);
     await page.getByRole("button", { name: "Guardar formaciones", exact: true }).click();
     await expect(page.getByRole("status").filter({ hasText: "Formaciones guardadas. El enlace compartido ya muestra las canchas." })).toBeVisible();

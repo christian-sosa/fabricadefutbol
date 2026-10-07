@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { FORMATION_PRESETS, assignFormationPlayer, changeFormationPreset, createTeamFormation, getFormationPositions, readMatchFormation, supportsMatchFormation, toFormationPlayers, validateMatchFormation, type FormationModality, type FormationPlayer, type MatchFormation } from "@/lib/domain/match-formation";
+import { FORMATION_PRESETS, assignFormationPlayer, changeFormationPreset, createTeamFormation, getFormationPositions, getFormationSlotPosition, readMatchFormation, supportsMatchFormation, toFormationPlayers, validateMatchFormation, type FormationModality, type FormationPlayer, type MatchFormation } from "@/lib/domain/match-formation";
+import { getPlayerPositionFit } from "@/lib/domain/player-positions";
 import { MATCH_MODALITIES, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 
 const players = (team: string, size: number): FormationPlayer[] => Array.from({ length: size }, (_, i) => ({ participantId: `${i === size - 1 ? "guest" : "player"}:${team}-${i}`, name: `${team} ${i}`, isGoalkeeper: i === 0 }));
@@ -55,8 +56,64 @@ describe("match formation", () => {
   });
   const teams = { teamA: players("A", 9), teamB: players("B", 9) };
   const formation = (): MatchFormation => ({ teamA: complete("3-3-2", teams.teamA), teamB: complete("4-2-2", teams.teamB) });
-  it("preselects only the confirmed goalkeeper", () => {
-    expect(createTeamFormation("9v9", teams.teamA).slots.filter((slot) => slot.participantId)).toEqual([{ slotId: "gk", participantId: "player:A-0" }]);
+  it.each(["5v5", "6v6", "7v7"] as const)("preselects only the confirmed goalkeeper for %s", (modality) => {
+    expect(createTeamFormation(modality, players("A", TEAM_SIZE_BY_MODALITY[modality])).slots.filter((slot) => slot.participantId)).toEqual([{ slotId: "gk", participantId: "player:A-0" }]);
+  });
+  it.each([["9v9", "3-3-2"], ["10v10", "3-4-2"], ["11v11", "4-3-3"]] as const)("completes recommended %s %s without preferences or duplicate players", (modality, preset) => {
+    const roster = players("A", TEAM_SIZE_BY_MODALITY[modality]);
+    const created = createTeamFormation(modality, roster);
+    expect(created.formationId).toBe(preset);
+    expect(created.slots[0].participantId).toBe(roster[0].participantId);
+    expect(new Set(created.slots.map((slot) => slot.participantId))).toEqual(new Set(roster.map((player) => player.participantId)));
+    expect(createTeamFormation(modality, roster)).toEqual(created);
+  });
+  it("reserves the sole defender while using a secondary midfielder globally", () => {
+    const roster: FormationPlayer[] = players("A", 9).map((player, index) => ({ ...player,
+      preferredPosition: index <= 3 ? "DEF" : index <= 6 ? "MID" : "FWD",
+      ...(index === 1 ? { secondaryPosition: "MID" } : {})
+    }));
+    roster[4].preferredPosition = "DEF";
+    const created = createTeamFormation("9v9", roster);
+    for (const slot of created.slots) {
+      const player = roster.find((candidate) => candidate.participantId === slot.participantId)!;
+      expect(getPlayerPositionFit(player, getFormationSlotPosition(created.formationId, slot.slotId)!)).not.toBe("fallback");
+    }
+    expect(created.slots.filter((slot) => getFormationSlotPosition(created.formationId, slot.slotId) === "MID").map((slot) => slot.participantId)).toContain(roster[1].participantId);
+  });
+  it("completes an all-forward roster even when recommendations are infeasible", () => {
+    const roster: FormationPlayer[] = players("A", 11).map((player) => ({ ...player, preferredPosition: "FWD" }));
+    const created = createTeamFormation("11v11", roster);
+    expect(created.slots[0].participantId).toBe(roster[0].participantId);
+    expect(new Set(created.slots.map((slot) => slot.participantId))).toEqual(new Set(roster.map((player) => player.participantId)));
+    const teams = { teamA: roster, teamB: players("B", 11) };
+    expect(validateMatchFormation({ teamA: created, teamB: createTeamFormation("11v11", teams.teamB) }, "11v11", teams)).toBeTruthy();
+  });
+  it("uses confirmed starters before substitutes and keeps a selected goalkeeper", () => {
+    const roster: FormationPlayer[] = players("A", 11).map((player, index) => ({ ...player,
+      isGoalkeeper: index === 10,
+      preferredPosition: index < 9 ? "FWD" : "DEF"
+    }));
+    const created = createTeamFormation("9v9", roster);
+    expect(created.slots[0].participantId).toBe(roster[10].participantId);
+    const used = new Set(created.slots.map((slot) => slot.participantId));
+    expect(used).toEqual(new Set([...roster.slice(0, 8), roster[10]].map((player) => player.participantId)));
+    expect(used.has(roster[9].participantId)).toBe(false);
+  });
+  it("classifies formation roles including both midfield rows and unknown slots", () => {
+    expect(getFormationSlotPosition("4-2-3-1", "gk")).toBe("GK");
+    expect(getFormationSlotPosition("4-2-3-1", "line-0-1")).toBe("DEF");
+    expect(getFormationSlotPosition("4-2-3-1", "line-1-1")).toBe("MID");
+    expect(getFormationSlotPosition("4-2-3-1", "line-2-1")).toBe("MID");
+    expect(getFormationSlotPosition("4-2-3-1", "line-3-0")).toBe("FWD");
+    expect(getFormationSlotPosition("4-2-3-1", "unknown")).toBeNull();
+    expect(getFormationSlotPosition("unknown", "gk")).toBeNull();
+  });
+  it("maps optional preferred/secondary positions for admin and public players", () => {
+    expect(toFormationPlayers([{ id: "abc", full_name: "Flexible", preferred_position: "DEF", secondary_position: "MID" },
+      { id: "other", full_name: "Sin ficha", preferred_position: null, secondary_position: null }], ["abc"])).toEqual([
+      { participantId: "player:abc", name: "Flexible", isGoalkeeper: true, preferredPosition: "DEF", secondaryPosition: "MID" },
+      { participantId: "player:other", name: "Sin ficha", isGoalkeeper: false, preferredPosition: null, secondaryPosition: null }
+    ]);
   });
   it("retains every assignment and goalkeeper when changing shape", () => {
     const changed = changeFormationPreset(formation().teamA, "4-3-1");

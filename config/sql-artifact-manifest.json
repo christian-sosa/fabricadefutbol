@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
-  "revision": "restore-injury-ranking-20261002",
-  "sha256": "6cdc3998e1f6a00d96140ccfb8c5d7383b03444ec8101879711842ed9096e145",
+  "revision": "player-position-preferences-20261007",
+  "sha256": "7b52adf61d67e9e979c6a79d04871defafed2dd443dee4bed852f10491b5341e",
   "bucket": "groups-sql-artifacts",
-  "object": "6cdc3998e1f6a00d96140ccfb8c5d7383b03444ec8101879711842ed9096e145.json.gz"
+  "object": "7b52adf61d67e9e979c6a79d04871defafed2dd443dee4bed852f10491b5341e.json.gz"
 }

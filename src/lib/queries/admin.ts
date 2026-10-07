@@ -237,7 +237,7 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
   const [players, safeGuests] = await Promise.all([
     readRowsByIds(playerIds, (batch, from, to) => supabase
         .from("players")
-        .select("id, full_name, current_rating, skill_level, photo_path, photo_updated_at", { count: "exact" })
+        .select("id, full_name, current_rating, skill_level, photo_path, photo_updated_at, preferred_position, secondary_position", { count: "exact" })
         .eq("organization_id", organizationId)
         .in("id", batch).order("id").range(from, to)),
     readRowsByIds(guestIds, (batch, from, to) => supabase

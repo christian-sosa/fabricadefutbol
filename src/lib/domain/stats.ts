@@ -2,7 +2,7 @@ import type { Database } from "@/types/database";
 import type { PlayerComputedStats, PlayerRecentResult, TeamSide } from "@/types/domain";
 import { comparePlayerRanking } from "@/lib/domain/player-ranking";
 
-type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
+type PlayerRow = Omit<Database["public"]["Tables"]["players"]["Row"], "preferred_position" | "secondary_position">;
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
 type MatchResultRow = Database["public"]["Tables"]["match_result"]["Row"];
 type MatchPlayerStatsRow = Database["public"]["Tables"]["match_player_stats"]["Row"];

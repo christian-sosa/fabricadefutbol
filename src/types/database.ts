@@ -1,5 +1,7 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
+export type PlayerPosition = "GK" | "DEF" | "MID" | "FWD";
+
 export type Database = {
   public: {
     Tables: {
@@ -121,6 +123,8 @@ export type Database = {
           id: string;
           initial_rank: number;
           notes: string | null;
+          preferred_position: PlayerPosition | null;
+          secondary_position: PlayerPosition | null;
           organization_id: string;
           skill_level: number;
           updated_at: string;
@@ -137,6 +141,8 @@ export type Database = {
           id?: string;
           initial_rank: number;
           notes?: string | null;
+          preferred_position?: PlayerPosition | null;
+          secondary_position?: PlayerPosition | null;
           organization_id: string;
           skill_level?: number;
           updated_at?: string;
@@ -153,6 +159,8 @@ export type Database = {
           id?: string;
           initial_rank?: number;
           notes?: string | null;
+          preferred_position?: PlayerPosition | null;
+          secondary_position?: PlayerPosition | null;
           organization_id?: string;
           skill_level?: number;
           updated_at?: string;
@@ -600,7 +608,7 @@ export type Database = {
     };
     Views: {
       public_players: {
-        Row: Omit<Database["public"]["Tables"]["players"]["Row"], "is_injured"> & { is_injured: boolean };
+        Row: Omit<Database["public"]["Tables"]["players"]["Row"], "is_injured" | "preferred_position" | "secondary_position"> & { is_injured: boolean };
         Relationships: [];
       };
       organization_public_snapshots: {

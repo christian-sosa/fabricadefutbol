@@ -7,8 +7,10 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import {
   FORMATION_PRESETS, assignFormationPlayer, changeFormationPreset, createTeamFormation,
   getFormationPositions, validateMatchFormation,
+  getFormationSlotPosition,
   type FormationModality, type FormationPlayer, type FormationSaveResult, type MatchFormation, type TeamFormation
 } from "@/lib/domain/match-formation";
+import { getPlayerPositionFit, supportsPositionBalancing } from "@/lib/domain/player-positions";
 
 type Props = {
   modality: FormationModality;
@@ -81,6 +83,12 @@ export function MatchFormationEditor({ modality, teams, teamLabels, initialForma
   const [message, setMessage] = useState<string | null>(null);
   const inFlight = useRef(false);
   const id = useId();
+  const positionAware = supportsPositionBalancing(modality);
+  const fallbackCount = (key: "teamA" | "teamB") => formation[key].slots.filter((slot) => {
+    const player = teams[key].find((candidate) => candidate.participantId === slot.participantId);
+    const role = getFormationSlotPosition(formation[key].formationId, slot.slotId);
+    return player && role && getPlayerPositionFit(player, role) === "fallback";
+  }).length;
   const changeTeam = (key: "teamA" | "teamB", next: TeamFormation) => {
     setFormation((current) => ({ ...current, [key]: next }));
     setDirty(true); setMessage(null); setError(null);
@@ -104,7 +112,7 @@ export function MatchFormationEditor({ modality, teams, teamLabels, initialForma
   return (
     <Card>
       <CardTitle>Formaciones en cancha</CardTitle>
-      <CardDescription className="mt-1">Elegí un esquema para cada equipo. Tocá una remera y ubicá un jugador del grupo disponible. Se comparten sin números ni niveles.</CardDescription>
+      <CardDescription className="mt-1">{positionAware ? "Te proponemos una formación completa según las posiciones preferidas y secundarias. Si faltan opciones, completamos los puestos con los jugadores disponibles. Podés ajustar el esquema y cada posición antes de guardar." : "Elegí un esquema para cada equipo. Tocá una remera y ubicá un jugador del grupo disponible."} Se comparten sin números ni niveles.</CardDescription>
       <form className="mt-4 space-y-4" onSubmit={(event) => { event.preventDefault(); void save(); }}>
         <div className="grid min-w-0 gap-6 lg:grid-cols-2">
           {(["teamA", "teamB"] as const).map((key) => (
@@ -114,6 +122,7 @@ export function MatchFormationEditor({ modality, teams, teamLabels, initialForma
                 {FORMATION_PRESETS[modality].map((preset) => <option key={preset} value={preset}>{preset}</option>)}
               </select>
               <p className="text-xs text-slate-400">{formation[key].slots.filter((slot) => slot.participantId).length} de {teams[key].length} jugadores ubicados</p>
+              {positionAware && fallbackCount(key) > 0 ? <p className="text-sm text-amber-200" role="status">{fallbackCount(key)} {fallbackCount(key) === 1 ? "jugador queda" : "jugadores quedan"} fuera de sus posiciones preferidas. Revisá el armado si querés ajustar esos puestos.</p> : null}
               <TeamEditor disabled={pending || conflict} formation={formation[key]} label={teamLabels[key]} onChange={(next) => changeTeam(key, next)} players={teams[key]} side={key === "teamA" ? "A" : "B"} />
             </div>
           ))}

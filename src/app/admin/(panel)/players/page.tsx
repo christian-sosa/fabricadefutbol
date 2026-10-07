@@ -20,6 +20,7 @@ import { Select } from "@/components/ui/select";
 import { secondaryActionClass } from "@/components/ui/styles";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { DEFAULT_SKILL_LEVEL, formatSkillLevelLabel, SKILL_LEVEL_OPTIONS } from "@/lib/domain/skill-level";
+import { PLAYER_POSITION_OPTIONS } from "@/lib/domain/player-positions";
 import { getAdminPlayers } from "@/lib/queries/admin";
 import { withOrgQuery } from "@/lib/org";
 import { BulkCreatePlayersForm } from "./bulk-create-form";
@@ -95,8 +96,9 @@ export default async function AdminPlayersPage({
           <CardTitle>Alta de jugador</CardTitle>
           <CardDescription>
             Carga jugadores nuevos para el grupo seleccionado. El nivel manual se usa como base para ordenar la planilla.
+            Las posiciones son opcionales y ayudan a equilibrar los equipos de fútbol 9, 10 y 11.
           </CardDescription>
-          <ActionForm action={createPlayerFormAction} className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_220px_1.2fr_auto] lg:items-start">
+          <ActionForm action={createPlayerFormAction} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.1fr)_220px_minmax(0,1.2fr)] lg:items-start">
             <input name="organizationId" type="hidden" value={selectedOrganization.id} />
             <Input aria-label="Nombre completo del jugador" name="fullName" placeholder="Nombre completo" required />
             <Select aria-label="Nivel de habilidad" defaultValue={String(DEFAULT_SKILL_LEVEL)} name="skillLevel" required>
@@ -106,6 +108,23 @@ export default async function AdminPlayersPage({
                 </option>
               ))}
             </Select>
+            <div className="grid min-w-0 gap-3 sm:col-span-2 sm:grid-cols-2 lg:col-span-1 lg:grid-cols-1">
+              <label className="grid gap-1 text-sm text-slate-300">
+                Posición preferida
+                <Select defaultValue="" name="preferredPosition">
+                  <option value="">Sin preferencia</option>
+                  {PLAYER_POSITION_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                </Select>
+              </label>
+              <label className="grid gap-1 text-sm text-slate-300">
+                Posición secundaria
+                <Select defaultValue="" name="secondaryPosition">
+                  <option value="">Sin secundaria</option>
+                  {PLAYER_POSITION_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                </Select>
+              </label>
+              <p className="text-xs text-slate-400 sm:col-span-2 lg:col-span-1">La secundaria debe ser distinta de la preferida.</p>
+            </div>
             <PhotoUploadInput hint="Foto opcional. JPG, PNG o WEBP." required={false} />
             <FormSubmitButton className="lg:self-start" pendingLabel="Creando jugador…">
               Crear jugador
@@ -125,13 +144,16 @@ export default async function AdminPlayersPage({
           <p className="mt-2 text-sm text-slate-400" id="player-injury-help">
             Las lesiones se guardan al instante. Los lesionados siguen en el ranking y no se cuentan como inactivos.
           </p>
+          <p className="mt-2 text-sm text-slate-400" id="player-position-help">
+            Las posiciones son opcionales. Elegí una preferida y, si querés, una secundaria distinta. En fútbol 9, 10 y 11 se usan para equilibrar los equipos; si faltan posiciones, los equipos se completan con los jugadores disponibles.
+          </p>
 
-          <PlayersRosterGuard formId={bulkFormId} key={formRenderKey} organizationId={selectedOrganization.id} players={players.map(({ id, full_name, skill_level }) => ({ id, full_name, skill_level }))}>
+          <PlayersRosterGuard formId={bulkFormId} key={formRenderKey} organizationId={selectedOrganization.id} players={players.map(({ id, full_name, skill_level, preferred_position, secondary_position }) => ({ id, full_name, skill_level, preferred_position, secondary_position }))}>
           <ActionForm action={updatePlayersFormAction} className="sticky top-20 z-10 mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/95 p-3" id={bulkFormId}>
             <PlayersRosterPendingStatus />
             <input name="organizationId" type="hidden" value={selectedOrganization.id} />
             <FormSubmitButton pendingLabel="Guardando planilla…">Guardar toda la planilla</FormSubmitButton>
-            <span className="text-xs text-slate-400">Guardá los cambios de nombre y nivel juntos.</span>
+            <span className="text-xs text-slate-400">Guardá los cambios de nombre, nivel y posiciones juntos.</span>
           </ActionForm>
 
           <div className="mt-4 space-y-3">
@@ -139,7 +161,7 @@ export default async function AdminPlayersPage({
               className={`hidden ${playersRosterGridColumns} gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 lg:grid`}
             >
               <span>Jugador</span>
-              <span>Nivel</span>
+              <span>Nivel y posiciones</span>
               <span>Acciones</span>
             </div>
 
@@ -173,6 +195,7 @@ export default async function AdminPlayersPage({
                     </FormSubmitButton>
                   </PlayerInjuryForm>
                 </div>
+                <div className="grid min-w-0 gap-2">
                 <Select
                   aria-label={`Nivel de habilidad de ${player.full_name}`}
                   className="min-w-0"
@@ -187,6 +210,35 @@ export default async function AdminPlayersPage({
                     </option>
                   ))}
                 </Select>
+                  <label className="grid gap-1 text-xs text-slate-300">
+                    Posición preferida
+                    <Select
+                      aria-describedby="player-position-help"
+                      aria-label={`Posición preferida de ${player.full_name}`}
+                      className="min-w-0"
+                      defaultValue={player.preferred_position ?? ""}
+                      form={bulkFormId}
+                      name="preferredPosition"
+                    >
+                      <option value="">Sin preferencia</option>
+                      {PLAYER_POSITION_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                    </Select>
+                  </label>
+                  <label className="grid gap-1 text-xs text-slate-300">
+                    Posición secundaria
+                    <Select
+                      aria-describedby="player-position-help"
+                      aria-label={`Posición secundaria de ${player.full_name}`}
+                      className="min-w-0"
+                      defaultValue={player.secondary_position ?? ""}
+                      form={bulkFormId}
+                      name="secondaryPosition"
+                    >
+                      <option value="">Sin secundaria</option>
+                      {PLAYER_POSITION_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                    </Select>
+                  </label>
+                </div>
                 <details open={resolvedSearchParams.photoPlayer === player.id}>
                   <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-slate-300">Foto y acciones de {player.full_name}</summary>
                 <ActionForm

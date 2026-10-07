@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 import { supportsMatchExtras } from "@/lib/domain/match-scorers";
-import type { MatchModality } from "@/types/domain";
+import { assignPlayersToPositions, getDefaultPositionFormation, getFormationRoles, supportsPositionBalancing, type PositionPreferences } from "@/lib/domain/player-positions";
+import type { MatchModality, PlayerPosition } from "@/types/domain";
 
 export const FORMATION_PRESETS = {
   "5v5": ["2-2", "1-2-1", "2-1-1"],
@@ -13,7 +14,7 @@ export const FORMATION_PRESETS = {
 } as const satisfies Record<MatchModality, readonly string[]>;
 
 export type FormationModality = keyof typeof FORMATION_PRESETS;
-export type FormationPlayer = { participantId: string; name: string; isGoalkeeper?: boolean };
+export type FormationPlayer = { participantId: string; name: string } & PositionPreferences;
 export type FormationSlot = { slotId: string; participantId: string | null };
 export type TeamFormation = { formationId: string; slots: FormationSlot[] };
 export type MatchFormation = { teamA: TeamFormation; teamB: TeamFormation };
@@ -37,11 +38,30 @@ export function getFormationPositions(formationId: string) {
   ];
 }
 
-export function createTeamFormation(modality: FormationModality, players: FormationPlayer[], formationId: string = FORMATION_PRESETS[modality][0]): TeamFormation {
+export function getFormationSlotPosition(formationId: string, slotId: string): PlayerPosition | null {
+  const index = getFormationPositions(formationId).findIndex((position) => position.slotId === slotId);
+  return index < 0 ? null : getFormationRoles(formationId)[index] ?? null;
+}
+
+export function createTeamFormation(modality: FormationModality, players: FormationPlayer[], formationId: string = getDefaultPositionFormation(modality) ?? FORMATION_PRESETS[modality][0]): TeamFormation {
   const goalkeeper = players.find((player) => player.isGoalkeeper);
+  const positions = getFormationPositions(formationId);
+  if (supportsPositionBalancing(modality)) {
+    // Las listas confirmadas llevan titulares primero; no elegir suplentes por
+    // su ficha. El arquero confirmado siempre conserva su lugar en cancha.
+    const uniquePlayers = [...new Map(players.map((player) => [player.participantId, player])).values()];
+    const starters = uniquePlayers.slice(0, TEAM_SIZE_BY_MODALITY[modality]);
+    if (goalkeeper && !starters.some((player) => player.participantId === goalkeeper.participantId)) {
+      starters[starters.length - 1] = goalkeeper;
+    }
+    const { assignments } = assignPlayersToPositions(starters, getFormationRoles(formationId));
+    return { formationId, slots: positions.map(({ slotId }, index) => ({
+      slotId, participantId: assignments[index]?.participantId ?? null
+    })) };
+  }
   return {
     formationId,
-    slots: getFormationPositions(formationId).map(({ slotId }) => ({ slotId, participantId: slotId === "gk" ? goalkeeper?.participantId ?? null : null }))
+    slots: positions.map(({ slotId }) => ({ slotId, participantId: slotId === "gk" ? goalkeeper?.participantId ?? null : null }))
   };
 }
 
@@ -103,10 +123,12 @@ export function readMatchFormation(value: unknown, modality: string, teams: { te
   try { return validateMatchFormation(value, modality, teams); } catch { return null; }
 }
 
-export function toFormationPlayers(players: Array<{ id: string; full_name: string; is_guest?: boolean }>, goalkeeperIds: string[] = []): FormationPlayer[] {
+export function toFormationPlayers(players: Array<{ id: string; full_name: string; is_guest?: boolean; preferred_position?: PlayerPosition | null; secondary_position?: PlayerPosition | null }>, goalkeeperIds: string[] = []): FormationPlayer[] {
   return players.map((player) => ({
     participantId: player.is_guest ? `guest:${player.id.replace(/^guest-/, "")}` : `player:${player.id}`,
     name: player.full_name,
-    isGoalkeeper: !player.is_guest && goalkeeperIds.includes(player.id)
+    isGoalkeeper: !player.is_guest && goalkeeperIds.includes(player.id),
+    ...(player.preferred_position !== undefined ? { preferredPosition: player.preferred_position } : {}),
+    ...(player.secondary_position !== undefined ? { secondaryPosition: player.secondary_position } : {})
   }));
 }

@@ -9,6 +9,8 @@ const sharedCoverage = {
   reportsDirectory: "coverage",
   include: [
     "src/lib/domain/team-generator.ts",
+    "src/lib/domain/player-positions.ts",
+    "src/lib/domain/match-formation.ts",
     "src/lib/domain/rating.ts",
     "src/lib/rate-limit.ts",
     "src/lib/org.ts",

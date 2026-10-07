@@ -10,6 +10,7 @@ import {
   calculateGuestSkillScore,
   GUEST_FEATURED_SKILL_LEVEL
 } from "@/lib/domain/skill-level";
+import type { PlayerPosition } from "@/types/domain";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 const ORG_ID = "org-1";
@@ -28,6 +29,43 @@ function buildPlayers(count: number, organizationId = ORG_ID) {
     active: true
   }));
 }
+
+describe("position-aware match workflow", () => {
+  it("uses saved preferences in creation and regeneration, excluding substitutes", async () => {
+    const roles: PlayerPosition[] = ["GK", "GK", ...Array<PlayerPosition>(6).fill("DEF"), ...Array<PlayerPosition>(6).fill("MID"), ...Array<PlayerPosition>(4).fill("FWD"), "DEF"];
+    const players = buildPlayers(19).map((player, index) => ({
+      ...player, skill_level: 4, preferred_position: roles[index], secondary_position: null
+    }));
+    const fake = createFakeSupabase({ players });
+    const matchId = await createDraftMatchWithOptions({
+      supabase: fake.client as never, adminId: ADMIN_ID, organizationId: ORG_ID,
+      scheduledAt: SCHEDULED_AT, modality: "9v9", selectedPlayerIds: players.map((player) => player.id),
+      invitedGuests: [], goalkeeperPlayerIds: players.slice(0, 2).map((player) => player.id),
+      substituteAssignments: [{ participantId: `player:${players[18].id}`, team: null }]
+    });
+    const verify = () => {
+      expect(fake.table("team_options")).toHaveLength(3);
+      for (const option of fake.table("team_options")) {
+        for (const side of ["A", "B"]) {
+          const members = fake.table("team_option_players").filter((row) => row.team_option_id === option.id && row.team === side);
+          expect(members).toHaveLength(9);
+          expect(members.some((row) => row.player_id === players[18].id)).toBe(false);
+          const counts = Object.fromEntries((["GK", "DEF", "MID", "FWD"] as const).map((role) => [role, members.filter((row) => players.find((player) => player.id === row.player_id)?.preferred_position === role).length]));
+          expect(counts).toEqual({ GK: 1, DEF: 3, MID: 3, FWD: 2 });
+        }
+      }
+    };
+    verify();
+    await regenerateDraftTeamOptions({ supabase: fake.client as never, adminId: ADMIN_ID, organizationId: ORG_ID, matchId });
+    verify();
+    // Updated player preferences are read on every regeneration; a missing role never blocks it.
+    for (const player of fake.table("players")) player.preferred_position = "FWD";
+    await regenerateDraftTeamOptions({ supabase: fake.client as never, adminId: ADMIN_ID, organizationId: ORG_ID, matchId });
+    expect(fake.table("team_options")).toHaveLength(3);
+    expect(fake.table("team_option_players")).toHaveLength(54);
+    expect(fake.table("players").every((player) => player.current_rating === 1000)).toBe(true);
+  });
+});
 
 describe("match workflow", () => {
   it("reutiliza el requestId sin duplicar el borrador ni invitados", async () => {
