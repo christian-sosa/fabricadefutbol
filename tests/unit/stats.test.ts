@@ -17,6 +17,8 @@ function buildPlayer(overrides: Partial<PlayerRow> & Pick<PlayerRow, "id" | "ful
     id,
     initial_rank: 1,
     notes: null,
+    preferred_position: null,
+    secondary_position: null,
     organization_id: "org-1",
     skill_level: 3,
     updated_at: "2026-04-25T00:00:00.000Z",

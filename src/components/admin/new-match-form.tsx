@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
 import { MATCH_MODALITIES, MATCH_MODALITY_LABELS, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
+import { supportsPositionBalancing } from "@/lib/domain/player-positions";
 import {
   formatGuestSkillLevelLabel,
   formatRatingTrendBadgeLabel,
@@ -731,6 +732,7 @@ export function NewMatchForm({
         {!goalkeepersReady ? " Elegiste un arquero: marcá el segundo o desmarcá el actual." : ""}
       </p>
       <div className="flex flex-wrap items-center gap-2">
+        {supportsPositionBalancing(modality) ? <p className="text-sm text-slate-400">El armado automático equilibra el nivel y las posiciones guardadas en Jugadores. Si faltan perfiles, completa con quienes están disponibles.</p> : null}
         <FormSubmitButton aria-describedby={`${formId}-roster-status`} className="w-full sm:w-auto" disabled={!rosterComplete || !goalkeepersReady} name="creationMode" pendingLabel="Generando equipos..." value="auto">
           Crear partido y generar equipos
         </FormSubmitButton>

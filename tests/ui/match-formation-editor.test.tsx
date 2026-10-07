@@ -48,8 +48,11 @@ describe("MatchFormationEditor", () => {
     const action = vi.fn();
     render(<MatchFormationEditor {...base} action={action} initialFormation={null} />);
     const blue = within(screen.getByRole("region", { name: "Formación de Azul" }));
-    expect(screen.getByRole("button", { name: "Guardar formaciones" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Guardar formaciones" })).toBeEnabled();
     expect(blue.queryByRole("button", { name: "Rojo Jugador 1" })).not.toBeInTheDocument();
+    await user.click(blue.getByRole("button", { name: "Defensa 1: Azul Jugador 1" }));
+    await user.click(blue.getByRole("button", { name: "Quitar de esta posición" }));
+    expect(screen.getByRole("button", { name: "Guardar formaciones" })).toBeDisabled();
     await user.click(blue.getByRole("button", { name: "Azul Jugador 1" }));
     expect(blue.getByRole("button", { name: "Defensa 1: Azul Jugador 1" })).toBeInTheDocument();
     expect(blue.queryByRole("button", { name: "Azul Jugador 1" })).not.toBeInTheDocument();
@@ -63,6 +66,53 @@ describe("MatchFormationEditor", () => {
     expect(blue.getByText(/ya fue marcado como arquero/)).toBeInTheDocument();
     expect(blue.queryByRole("button", { name: "Quitar de esta posición" })).not.toBeInTheDocument();
     expect(action).not.toHaveBeenCalled();
+  });
+  it("advierte los puestos forzados cuando todos prefieren atacar y permite guardar la formación completa", async () => {
+    const user = userEvent.setup();
+    const forwardPlayers = (side: string): FormationPlayer[] => players(side).map((player) => ({ ...player, preferredPosition: "FWD" }));
+    const forwardTeams = { teamA: forwardPlayers("Azul"), teamB: forwardPlayers("Rojo") };
+    const action = vi.fn().mockResolvedValue({ ok: true, version: 1 });
+    render(<MatchFormationEditor {...base} action={action} initialFormation={null} teams={forwardTeams} />);
+
+    expect(screen.getAllByText("6 jugadores quedan fuera de sus posiciones preferidas. Revisá el armado si querés ajustar esos puestos.")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Guardar formaciones" })).toBeEnabled();
+    for (const label of ["Azul", "Rojo"]) {
+      const pitch = within(screen.getByRole("group", { name: `Cancha de ${label}` }));
+      expect(pitch.queryAllByRole("button", { name: /: Elegir jugador$/ })).toHaveLength(0);
+      expect(pitch.getByRole("button", { name: `Arco: ${label} Jugador 0` })).toBeVisible();
+    }
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Esquema de Azul" }), "4-3-1");
+    expect(screen.getByText("7 jugadores quedan fuera de sus posiciones preferidas. Revisá el armado si querés ajustar esos puestos.")).toHaveAttribute("role", "status");
+    expect(screen.getByText("6 jugadores quedan fuera de sus posiciones preferidas. Revisá el armado si querés ajustar esos puestos.")).toHaveAttribute("role", "status");
+    await user.click(screen.getByRole("button", { name: "Guardar formaciones" }));
+    await waitFor(() => expect(screen.getByText(/Formaciones guardadas/)).toBeInTheDocument());
+    expect(action).toHaveBeenCalledOnce();
+    const saved = JSON.parse(action.mock.calls[0][1]) as MatchFormation;
+    for (const key of ["teamA", "teamB"] as const) {
+      expect(new Set(saved[key].slots.map((slot) => slot.participantId)).size).toBe(9);
+      expect(saved[key].slots.map((slot) => slot.participantId)).not.toContain(null);
+    }
+  });
+  it("no advierte por posiciones secundarias, jugadores sin preferencia ni un arquero elegido para el partido", () => {
+    const preferredTeam = players("Azul");
+    preferredTeam[0].preferredPosition = "DEF";
+    for (const index of [1, 2, 3]) {
+      preferredTeam[index].preferredPosition = "FWD";
+      preferredTeam[index].secondaryPosition = "DEF";
+    }
+    for (const index of [4, 5, 6]) {
+      preferredTeam[index].preferredPosition = null;
+      preferredTeam[index].secondaryPosition = null;
+    }
+    for (const index of [7, 8]) preferredTeam[index].preferredPosition = "FWD";
+    render(<MatchFormationEditor {...base} action={vi.fn()} initialFormation={complete()} teams={{ teamA: preferredTeam, teamB: teams.teamB }} />);
+
+    expect(screen.queryAllByText(/fuera de sus posiciones preferidas/)).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Guardar formaciones" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Arco: Azul Jugador 0" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Defensa 1: Azul Jugador 1" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Mediocampo 1: Azul Jugador 4" })).toBeVisible();
   });
   it("keeps assignments when changing schemes and retains the draft after a network failure", async () => {
     const user = userEvent.setup();

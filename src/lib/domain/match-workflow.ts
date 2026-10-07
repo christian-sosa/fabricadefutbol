@@ -7,7 +7,7 @@ import {
 import { generateBalancedTeamOptions } from "@/lib/domain/team-generator";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizeTeamLabel } from "@/lib/team-labels";
-import type { MatchModality, MatchResultInput, SubstituteAssignment, TeamSide } from "@/types/domain";
+import type { MatchModality, MatchResultInput, PlayerPosition, PlayerRatingInput, SubstituteAssignment, TeamSide } from "@/types/domain";
 
 type DbClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
@@ -17,11 +17,7 @@ type DraftGuestInput = {
   rating: number;
 };
 
-type BalanceParticipant = {
-  id: string;
-  fullName: string;
-  rating: number;
-};
+type BalanceParticipant = PlayerRatingInput;
 
 type SelectedPlayerForBalance = {
   id: string;
@@ -30,6 +26,8 @@ type SelectedPlayerForBalance = {
   skill_level: number | null;
   current_rating: number;
   active: boolean;
+  preferred_position?: PlayerPosition | null;
+  secondary_position?: PlayerPosition | null;
 };
 
 type ManualTeamAssignmentInput = {
@@ -186,7 +184,7 @@ async function fetchSelectedPlayers(supabase: DbClient, organizationId: string, 
 
   const { data, error } = await supabase
     .from("players")
-    .select("id, full_name, initial_rank, skill_level, current_rating, display_order, active")
+    .select("id, full_name, initial_rank, skill_level, current_rating, display_order, active, preferred_position, secondary_position")
     .eq("organization_id", organizationId)
     .in("id", playerIds)
     .order("display_order", { ascending: true })
@@ -207,13 +205,17 @@ async function fetchSelectedPlayers(supabase: DbClient, organizationId: string, 
 
 function toBalancePlayers(
   registeredPlayers: SelectedPlayerForBalance[],
-  guests: Array<{ id: string; guest_name: string; guest_rating: number }>
+  guests: Array<{ id: string; guest_name: string; guest_rating: number }>,
+  goalkeeperPlayerIds: string[] = []
 ) {
   const totalRegisteredPlayers = registeredPlayers.length;
 
   const basePlayers: BalanceParticipant[] = registeredPlayers.map((player) => ({
     id: toPlayerParticipantId(player.id),
     fullName: player.full_name,
+    preferredPosition: player.preferred_position ?? null,
+    secondaryPosition: player.secondary_position ?? null,
+    isGoalkeeper: goalkeeperPlayerIds.includes(player.id),
     rating: calculateEffectiveSkillScore({
       skillLevel:
         player.skill_level ??
@@ -333,7 +335,8 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
   }));
   const participants = toBalancePlayers(
     players.filter((player) => !substitutesById.has(toPlayerParticipantId(player.id))),
-    guests.filter((guest) => !substitutesById.has(toGuestParticipantId(guest.key)))
+    guests.filter((guest) => !substitutesById.has(toGuestParticipantId(guest.key))),
+    goalkeeperPlayerIds
   );
 
   const options = teamCreationMode === "manual"
@@ -407,7 +410,7 @@ export async function regenerateDraftTeamOptions(params: {
   validatePlayerCount(match.modality, playerIds.length, starterGuests.length);
 
   const players = await fetchSelectedPlayers(supabase, match.organization_id, playerIds);
-  const participants = toBalancePlayers(players, starterGuests);
+  const participants = toBalancePlayers(players, starterGuests, match.goalkeeper_player_ids ?? []);
 
   const options = generateBalancedTeamOptions({
     players: participants,

@@ -6,11 +6,15 @@ export type MatchScorerInput = { participantId: string; goals: number };
 export type WinnerTeam = TeamSide | "DRAW";
 export type ResultAssignmentTeam = TeamSide | "OUT";
 export type PlayerRecentResult = "V" | "E" | "D";
+export type PlayerPosition = "GK" | "DEF" | "MID" | "FWD";
 
 export type PlayerRatingInput = {
   id: string;
   fullName: string;
   rating: number;
+  preferredPosition?: PlayerPosition | null;
+  secondaryPosition?: PlayerPosition | null;
+  isGoalkeeper?: boolean;
 };
 
 export type TeamOptionCandidate = {

@@ -4,9 +4,19 @@ import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffe
 import { useFormStatus } from "react-dom";
 
 import { Button } from "@/components/ui/button";
+import type { PlayerPosition } from "@/types/domain";
 
-type Player = { id: string; full_name: string; skill_level: number };
-type Draft = { name: string; level: string; originalName: string; originalLevel: string };
+type Player = { id: string; full_name: string; skill_level: number; preferred_position?: PlayerPosition | null; secondary_position?: PlayerPosition | null };
+type Draft = {
+  name: string;
+  level: string;
+  preferredPosition: string;
+  secondaryPosition: string;
+  originalName: string;
+  originalLevel: string;
+  originalPreferredPosition: string;
+  originalSecondaryPosition: string;
+};
 
 const RosterPendingContext = createContext<((pending: boolean) => void) | null>(null);
 
@@ -37,16 +47,26 @@ export function PlayersRosterGuard({ children, formId, organizationId, players }
     const row = rootRef.current?.querySelector<HTMLElement>(`[data-roster-player="${id}"]`);
     return {
       name: row?.querySelector<HTMLInputElement>('input[name="fullName"]'),
-      level: row?.querySelector<HTMLSelectElement>('select[name="skillLevel"]')
+      level: row?.querySelector<HTMLSelectElement>('select[name="skillLevel"]'),
+      preferredPosition: row?.querySelector<HTMLSelectElement>('select[name="preferredPosition"]'),
+      secondaryPosition: row?.querySelector<HTMLSelectElement>('select[name="secondaryPosition"]')
     };
   }, []);
 
   const recordChanges = useCallback(() => {
     const draft: Record<string, Draft> = {};
     for (const player of players) {
-      const { name, level } = fieldsFor(player.id);
-      if (!name || !level || (name.value === player.full_name && level.value === String(player.skill_level))) continue;
-      draft[player.id] = { name: name.value, level: level.value, originalName: player.full_name, originalLevel: String(player.skill_level) };
+      const { name, level, preferredPosition, secondaryPosition } = fieldsFor(player.id);
+      if (!name || !level) continue;
+      const originalPreferredPosition = player.preferred_position ?? "";
+      const originalSecondaryPosition = player.secondary_position ?? "";
+      const currentPreferredPosition = preferredPosition?.value ?? originalPreferredPosition;
+      const currentSecondaryPosition = secondaryPosition?.value ?? originalSecondaryPosition;
+      if (name.value === player.full_name && level.value === String(player.skill_level) && currentPreferredPosition === originalPreferredPosition && currentSecondaryPosition === originalSecondaryPosition) continue;
+      draft[player.id] = {
+        name: name.value, level: level.value, preferredPosition: currentPreferredPosition, secondaryPosition: currentSecondaryPosition,
+        originalName: player.full_name, originalLevel: String(player.skill_level), originalPreferredPosition, originalSecondaryPosition
+      };
     }
     const count = Object.keys(draft).length;
     setChangedCount(count);
@@ -64,10 +84,14 @@ export function PlayersRosterGuard({ children, formId, organizationId, players }
         for (const player of players) {
           const draft = (saved as Record<string, Partial<Draft>>)[player.id];
           // Never restore an older draft over a newly saved or concurrently edited row.
-          if (!draft || draft.originalName !== player.full_name || draft.originalLevel !== String(player.skill_level)) continue;
-          const { name, level } = fieldsFor(player.id);
+          if (!draft || draft.originalName !== player.full_name || draft.originalLevel !== String(player.skill_level) ||
+            (draft.originalPreferredPosition ?? "") !== (player.preferred_position ?? "") ||
+            (draft.originalSecondaryPosition ?? "") !== (player.secondary_position ?? "")) continue;
+          const { name, level, preferredPosition, secondaryPosition } = fieldsFor(player.id);
           if (name && typeof draft.name === "string") name.value = draft.name;
           if (level && typeof draft.level === "string" && Array.from(level.options).some((option) => option.value === draft.level)) level.value = draft.level;
+          if (preferredPosition && typeof draft.preferredPosition === "string" && Array.from(preferredPosition.options).some((option) => option.value === draft.preferredPosition)) preferredPosition.value = draft.preferredPosition;
+          if (secondaryPosition && typeof draft.secondaryPosition === "string" && Array.from(secondaryPosition.options).some((option) => option.value === draft.secondaryPosition)) secondaryPosition.value = draft.secondaryPosition;
         }
       }
     } catch { /* A missing or invalid draft must not prevent editing. */ }
@@ -101,9 +125,11 @@ export function PlayersRosterGuard({ children, formId, organizationId, players }
 
   const discard = () => {
     for (const player of players) {
-      const { name, level } = fieldsFor(player.id);
+      const { name, level, preferredPosition, secondaryPosition } = fieldsFor(player.id);
       if (name) name.value = player.full_name;
       if (level) level.value = String(player.skill_level);
+      if (preferredPosition) preferredPosition.value = player.preferred_position ?? "";
+      if (secondaryPosition) secondaryPosition.value = player.secondary_position ?? "";
     }
     recordChanges();
   };

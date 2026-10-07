@@ -17,6 +17,7 @@ import {
 } from "@/lib/player-photo-upload-limits";
 import { DEFAULT_SKILL_LEVEL, MAX_SKILL_LEVEL, MIN_SKILL_LEVEL, normalizeSkillLevel } from "@/lib/domain/skill-level";
 import { parsePlayerNameList } from "@/lib/domain/player-name-list";
+import { playerPositionSchema } from "@/lib/domain/player-positions";
 import {
   getOrganizationPlayerPhotoObjectPath,
   inferPlayerPhotoExtension,
@@ -27,6 +28,22 @@ import { refreshOrganizationPublicSnapshotSafe } from "@/lib/queries/public";
 import { REPLACEABLE_IMAGE_UPLOAD_CACHE_CONTROL } from "@/lib/storage-image-responses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+const positionFields = {
+  preferredPosition: z.preprocess((value) => value === "" ? null : value, playerPositionSchema),
+  secondaryPosition: z.preprocess((value) => value === "" ? null : value, playerPositionSchema)
+};
+
+function validatePositionPreferences(
+  value: { preferredPosition?: string | null; secondaryPosition?: string | null },
+  context: z.RefinementCtx
+) {
+  if (value.secondaryPosition && !value.preferredPosition) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["preferredPosition"], message: "Elegí una posición preferida antes de indicar una secundaria." });
+  } else if (value.secondaryPosition && value.secondaryPosition === value.preferredPosition) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["secondaryPosition"], message: "La posición secundaria debe ser distinta de la preferida." });
+  }
+}
+
 const createSchema = z.object({
   organizationId: z.string().uuid(),
   fullName: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
@@ -34,8 +51,9 @@ const createSchema = z.object({
     .number()
     .int()
     .min(MIN_SKILL_LEVEL, "El nivel debe estar entre 1 y 7.")
-    .max(MAX_SKILL_LEVEL, "El nivel debe estar entre 1 y 7.")
-});
+    .max(MAX_SKILL_LEVEL, "El nivel debe estar entre 1 y 7."),
+  ...positionFields
+}).superRefine(validatePositionPreferences);
 
 const deleteSchema = z.object({
   organizationId: z.string().uuid(),
@@ -58,8 +76,9 @@ const rowSchema = z.object({
     .number()
     .int()
     .min(MIN_SKILL_LEVEL, "El nivel debe estar entre 1 y 7.")
-    .max(MAX_SKILL_LEVEL, "El nivel debe estar entre 1 y 7.")
-});
+    .max(MAX_SKILL_LEVEL, "El nivel debe estar entre 1 y 7."),
+  ...positionFields
+}).superRefine(validatePositionPreferences);
 
 function withMessage(organizationId: string, error: string | null) {
   const basePath = withOrgQuery("/admin/players", organizationId);
@@ -155,7 +174,9 @@ export async function createPlayerAction(formData: FormData) {
     const parsed = createSchema.safeParse({
       organizationId: formData.get("organizationId"),
       fullName: formData.get("fullName"),
-      skillLevel: formData.get("skillLevel")
+      skillLevel: formData.get("skillLevel"),
+      preferredPosition: formData.get("preferredPosition"),
+      secondaryPosition: formData.get("secondaryPosition")
     });
 
     if (!parsed.success) {
@@ -201,6 +222,8 @@ export async function createPlayerAction(formData: FormData) {
         full_name: parsed.data.fullName,
         initial_rank: nextInitialRank,
         skill_level: normalizeSkillLevel(parsed.data.skillLevel),
+        preferred_position: parsed.data.preferredPosition ?? null,
+        secondary_position: parsed.data.secondaryPosition ?? null,
         display_order: nextDisplayOrder
       })
       .select("id")
@@ -294,11 +317,16 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
     const playerIds = formData.getAll("playerId").map((value) => String(value));
     const fullNames = formData.getAll("fullName").map((value) => String(value));
     const skillLevels = formData.getAll("skillLevel").map((value) => Number(value));
+    const preferredPositions = formData.getAll("preferredPosition");
+    const secondaryPositions = formData.getAll("secondaryPosition");
+    // Older open forms omit both fields: preserve saved preferences when they submit.
+    const includesPositions = preferredPositions.length > 0 || secondaryPositions.length > 0;
 
     if (
       !playerIds.length ||
       playerIds.length !== fullNames.length ||
-      playerIds.length !== skillLevels.length
+      playerIds.length !== skillLevels.length ||
+      (includesPositions && (playerIds.length !== preferredPositions.length || playerIds.length !== secondaryPositions.length))
     ) {
       redirect(withMessage(organizationQueryKey, "La planilla enviada es invalida o incompleta."));
     }
@@ -307,7 +335,9 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
       const parsedRow = rowSchema.safeParse({
         id,
         fullName: fullNames[index],
-        skillLevel: skillLevels[index]
+        skillLevel: skillLevels[index],
+        preferredPosition: includesPositions ? preferredPositions[index] : undefined,
+        secondaryPosition: includesPositions ? secondaryPositions[index] : undefined
       });
 
       if (!parsedRow.success) {
@@ -352,7 +382,8 @@ export async function bulkUpdatePlayersAction(formData: FormData) {
         .from("players")
         .update({
           full_name: row.fullName,
-          skill_level: normalizeSkillLevel(row.skillLevel)
+          skill_level: normalizeSkillLevel(row.skillLevel),
+          ...(includesPositions ? { preferred_position: row.preferredPosition ?? null, secondary_position: row.secondaryPosition ?? null } : {})
         })
         .eq("id", row.id)
         .eq("organization_id", organizationId);

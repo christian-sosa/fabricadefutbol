@@ -72,6 +72,29 @@ describe("admin players actions", () => {
     return form;
   }
 
+  function createPlayerForm(preferredPosition?: string, secondaryPosition?: string) {
+    const form = new FormData();
+    form.set("organizationId", organizationId);
+    form.set("fullName", "Ana Pérez");
+    form.set("skillLevel", "4");
+    if (preferredPosition !== undefined) form.set("preferredPosition", preferredPosition);
+    if (secondaryPosition !== undefined) form.set("secondaryPosition", secondaryPosition);
+    return form;
+  }
+
+  function rosterForm(rows: Array<{ id: string; preferredPosition?: string; secondaryPosition?: string }>) {
+    const form = new FormData();
+    form.set("organizationId", organizationId);
+    for (const row of rows) {
+      form.append("playerId", row.id);
+      form.append("fullName", "Nombre actualizado");
+      form.append("skillLevel", "6");
+      if (row.preferredPosition !== undefined) form.append("preferredPosition", row.preferredPosition);
+      if (row.secondaryPosition !== undefined) form.append("secondaryPosition", row.secondaryPosition);
+    }
+    return form;
+  }
+
   function photoForm() {
     const form = new FormData();
     form.set("organizationId", organizationId); form.set("playerId", playerId);
@@ -280,6 +303,8 @@ describe("admin players actions", () => {
           full_name: "Juan Perez",
           initial_rank: 1,
           skill_level: 3,
+          preferred_position: "DEF",
+          secondary_position: "MID",
           current_rating: 1175,
           created_at: "2026-04-01T00:00:00.000Z"
         }
@@ -300,8 +325,80 @@ describe("admin players actions", () => {
     expect(fake.find("players", (row) => row.id === playerId)).toMatchObject({
       full_name: "Juan Perez actualizado",
       skill_level: 7,
+      preferred_position: "DEF",
+      secondary_position: "MID",
       current_rating: 1175
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin/players");
+  });
+
+  it.each([
+    { preferredPosition: "GK", secondaryPosition: "DEF", expectedPreferred: "GK", expectedSecondary: "DEF" },
+    { preferredPosition: "MID", secondaryPosition: "", expectedPreferred: "MID", expectedSecondary: null },
+    { preferredPosition: "", secondaryPosition: "", expectedPreferred: null, expectedSecondary: null },
+    { preferredPosition: undefined, secondaryPosition: undefined, expectedPreferred: null, expectedSecondary: null }
+  ])("crea un jugador con preferencias opcionales $expectedPreferred / $expectedSecondary", async ({ preferredPosition, secondaryPosition, expectedPreferred, expectedSecondary }) => {
+    const fake = createFakeSupabase({ players: [] });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    await expect(createPlayerAction(createPlayerForm(preferredPosition, secondaryPosition))).rejects.toMatchObject({ digest: expect.stringContaining("success=") });
+    expect(fake.table("players")).toHaveLength(1);
+    expect(fake.table("players")[0]).toMatchObject({
+      organization_id: organizationId, full_name: "Ana Pérez", skill_level: 4,
+      preferred_position: expectedPreferred, secondary_position: expectedSecondary
+    });
+  });
+
+  it.each([
+    ["GK", "GK"], ["", "DEF"], [undefined, "MID"], ["winger", ""], ["DEF", "center"]
+  ])("rechaza preferencias inválidas al crear (%s / %s) antes de escribir", async (preferred, secondary) => {
+    const fake = createFakeSupabase({ players: [] });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    await expect(createPlayerAction(createPlayerForm(preferred, secondary))).rejects.toMatchObject({ digest: expect.stringContaining("error=") });
+    expect(fake.table("players")).toHaveLength(0);
+    expect(createSupabaseServerClientMock).not.toHaveBeenCalled();
+  });
+
+  it("guarda y quita posiciones en toda la planilla conservando puntos, lesión, foto y otros grupos", async () => {
+    const fake = createFakeSupabase({ players: [
+      { id: playerId, organization_id: organizationId, full_name: "Ana Pérez", skill_level: 3, current_rating: 1175, preferred_position: null, secondary_position: null, is_injured: true, photo_path: "ana.webp" },
+      { id: otherPlayerId, organization_id: organizationId, full_name: "Luz Díaz", skill_level: 4, current_rating: 1120, preferred_position: "FWD", secondary_position: "MID" },
+      { id: "other-group-player", organization_id: otherOrganizationId, full_name: "Otro grupo", skill_level: 2, preferred_position: "DEF", secondary_position: "GK" }
+    ] });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    await expect(bulkUpdatePlayersAction(rosterForm([
+      { id: playerId, preferredPosition: "DEF", secondaryPosition: "MID" },
+      { id: otherPlayerId, preferredPosition: "", secondaryPosition: "" }
+    ]))).rejects.toMatchObject({ digest: expect.stringContaining("success=") });
+    expect(fake.find("players", (row) => row.id === playerId)).toMatchObject({
+      full_name: "Nombre actualizado", skill_level: 6, current_rating: 1175,
+      preferred_position: "DEF", secondary_position: "MID", is_injured: true, photo_path: "ana.webp"
+    });
+    expect(fake.find("players", (row) => row.id === otherPlayerId)).toMatchObject({ current_rating: 1120, preferred_position: null, secondary_position: null });
+    expect(fake.find("players", (row) => row.id === "other-group-player")).toMatchObject({ full_name: "Otro grupo", skill_level: 2, preferred_position: "DEF", secondary_position: "GK" });
+  });
+
+  it.each([
+    ["MID", "MID"], ["", "FWD"], ["invalid", ""], ["DEF", "invalid"], ["DEF", undefined], [undefined, "MID"]
+  ])("valida todas las posiciones y columnas antes de modificar una fila (%s / %s)", async (preferred, secondary) => {
+    const fake = createFakeSupabase({ players: [
+      { id: playerId, organization_id: organizationId, full_name: "Ana Pérez", skill_level: 3, preferred_position: "DEF", secondary_position: "GK" },
+      { id: otherPlayerId, organization_id: organizationId, full_name: "Luz Díaz", skill_level: 4, preferred_position: "MID", secondary_position: null }
+    ] });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    await expect(bulkUpdatePlayersAction(rosterForm([
+      { id: playerId, preferredPosition: "FWD", secondaryPosition: "DEF" },
+      { id: otherPlayerId, preferredPosition: preferred, secondaryPosition: secondary }
+    ]))).rejects.toMatchObject({ digest: expect.stringContaining("error=") });
+    expect(fake.find("players", (row) => row.id === playerId)).toMatchObject({ full_name: "Ana Pérez", skill_level: 3, preferred_position: "DEF", secondary_position: "GK" });
+    expect(fake.find("players", (row) => row.id === otherPlayerId)).toMatchObject({ full_name: "Luz Díaz", preferred_position: "MID", secondary_position: null });
+    expect(refreshOrganizationPublicSnapshotSafe).not.toHaveBeenCalled();
+  });
+
+  it("rechaza una planilla de otro grupo antes de tocar posiciones", async () => {
+    const fake = createFakeSupabase({ players: [{ id: playerId, organization_id: otherOrganizationId, full_name: "Ana Pérez", preferred_position: "DEF", secondary_position: "MID" }] });
+    createSupabaseServerClientMock.mockResolvedValue(fake.client);
+    await expect(bulkUpdatePlayersAction(rosterForm([{ id: playerId, preferredPosition: "GK", secondaryPosition: "FWD" }]))).rejects.toMatchObject({ digest: expect.stringContaining("error=") });
+    expect(fake.find("players", (row) => row.id === playerId)).toMatchObject({ full_name: "Ana Pérez", preferred_position: "DEF", secondary_position: "MID" });
+    expect(refreshOrganizationPublicSnapshotSafe).not.toHaveBeenCalled();
   });
 });
