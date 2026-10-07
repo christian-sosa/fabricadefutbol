@@ -1,8 +1,10 @@
 import {
   getFormationPositions,
+  getFormationSlotPosition,
   type FormationPlayer,
   type TeamFormation
 } from "@/lib/domain/match-formation";
+import { getPlayerPositionFit } from "@/lib/domain/player-positions";
 import { cn } from "@/lib/utils";
 
 type FormationPitchProps = {
@@ -13,6 +15,7 @@ type FormationPitchProps = {
   selectedSlotId?: string;
   controlsId?: string;
   onSelectSlot?: (slotId: string) => void;
+  showPositionHints?: boolean;
 };
 
 function Shirt({ side, isGoalkeeper }: { side: "A" | "B"; isGoalkeeper: boolean }) {
@@ -65,7 +68,7 @@ function PitchLines() {
   );
 }
 
-export function FormationPitch({ teamLabel, side, formation, players, selectedSlotId, controlsId, onSelectSlot }: FormationPitchProps) {
+export function FormationPitch({ teamLabel, side, formation, players, selectedSlotId, controlsId, onSelectSlot, showPositionHints = false }: FormationPitchProps) {
   const positions = getFormationPositions(formation.formationId);
   const playersById = new Map(players.map((player) => [player.participantId, player]));
   const assignedPlayers = new Map(formation.slots.map((slot) => [slot.slotId, slot.participantId]));
@@ -94,6 +97,9 @@ export function FormationPitch({ teamLabel, side, formation, players, selectedSl
         {positions.map((position) => {
           const participantId = assignedPlayers.get(position.slotId);
           const player = participantId ? playersById.get(participantId) : undefined;
+          const role = getFormationSlotPosition(formation.formationId, position.slotId);
+          const outsidePreference = showPositionHints && player && role && getPlayerPositionFit(player, role) === "fallback";
+          const hintId = `${controlsId ?? side}-${position.slotId}-position-hint`;
           const lineSize = positions.filter((item) => item.y === position.y).length;
           const label = `${position.label}: ${player?.name ?? "Elegir jugador"}`;
           const className = cn(
@@ -105,6 +111,7 @@ export function FormationPitch({ teamLabel, side, formation, players, selectedSl
           const content = (
             <>
               <Shirt isGoalkeeper={position.slotId === "gk"} side={side} />
+              {outsidePreference ? <span className="absolute right-1 top-0 flex h-5 w-5 items-center justify-center rounded-full border border-amber-100 bg-amber-300 text-xs font-black text-amber-950" title="Fuera de sus posiciones habituales"><span aria-hidden="true">!</span><span className="sr-only" id={hintId}>Fuera de sus posiciones habituales</span></span> : null}
               <span className="line-clamp-2 w-full rounded bg-slate-950/85 px-1 py-0.5 text-[10px] font-semibold leading-[13px] text-white [overflow-wrap:anywhere] sm:text-xs sm:leading-4" title={player?.name}>
                 {player?.name ?? "Elegir"}
               </span>
@@ -114,6 +121,7 @@ export function FormationPitch({ teamLabel, side, formation, players, selectedSl
           return onSelectSlot ? (
             <button
               aria-label={label}
+              aria-describedby={outsidePreference ? hintId : undefined}
               aria-controls={controlsId}
               aria-pressed={selectedSlotId === position.slotId}
               className={className}
@@ -125,7 +133,7 @@ export function FormationPitch({ teamLabel, side, formation, players, selectedSl
               {content}
             </button>
           ) : (
-            <div aria-label={label} className={className} key={position.slotId} role="img" style={style}>
+            <div aria-describedby={outsidePreference ? hintId : undefined} aria-label={label} className={className} key={position.slotId} role="img" style={style}>
               {content}
             </div>
           );

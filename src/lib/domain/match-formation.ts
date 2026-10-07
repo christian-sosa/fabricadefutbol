@@ -43,6 +43,19 @@ export function getFormationSlotPosition(formationId: string, slotId: string): P
   return index < 0 ? null : getFormationRoles(formationId)[index] ?? null;
 }
 
+export function describeFormation(formationId: string): string {
+  if (!getFormationPositions(formationId).length) return "Esquema no válido";
+  const roles = getFormationRoles(formationId);
+  const labels: Array<[PlayerPosition, string, string]> = [
+    ["GK", "arquero", "arqueros"], ["DEF", "defensor", "defensores"],
+    ["MID", "mediocampista", "mediocampistas"], ["FWD", "delantero", "delanteros"]
+  ];
+  return labels.flatMap(([role, singular, plural]) => {
+    const count = roles.filter((position) => position === role).length;
+    return count ? [`${count} ${count === 1 ? singular : plural}`] : [];
+  }).join(" · ");
+}
+
 export function createTeamFormation(modality: FormationModality, players: FormationPlayer[], formationId: string = getDefaultPositionFormation(modality) ?? FORMATION_PRESETS[modality][0]): TeamFormation {
   const goalkeeper = players.find((player) => player.isGoalkeeper);
   const positions = getFormationPositions(formationId);
@@ -79,6 +92,42 @@ export function assignFormationPlayer(formation: TeamFormation, slotId: string, 
   if (!formation.slots.some((slot) => slot.slotId === slotId)) return formation;
   return { ...formation, slots: formation.slots.map((slot) => ({ ...slot,
     participantId: slot.slotId === slotId ? participantId : participantId && slot.participantId === participantId ? null : slot.participantId
+  })) };
+}
+
+/** Intercambia dos jugadores ubicados; un jugador del banco reemplaza al elegido. */
+export function swapFormationPlayer(formation: TeamFormation, slotId: string, participantId: string, players: FormationPlayer[]): TeamFormation {
+  const target = formation.slots.find((slot) => slot.slotId === slotId);
+  const player = players.find((candidate) => candidate.participantId === participantId);
+  if (!target || !player || !getFormationSlotPosition(formation.formationId, slotId)) return formation;
+  if (target.participantId === participantId) return formation;
+  const goalkeeper = players.find((candidate) => candidate.isGoalkeeper);
+  if ((player.isGoalkeeper && slotId !== "gk") || (slotId === "gk" && goalkeeper && participantId !== goalkeeper.participantId)) return formation;
+  const source = formation.slots.find((slot) => slot.participantId === participantId);
+  return { ...formation, slots: formation.slots.map((slot) => ({ ...slot,
+    participantId: slot.slotId === slotId ? participantId : slot.slotId === source?.slotId ? target.participantId : slot.participantId
+  })) };
+}
+
+/** Reubica sólo a quienes están en cancha: conserva suplentes elegidos y cantidad de huecos. */
+export function reassignFormationByPreferences(formation: TeamFormation, players: FormationPlayer[]): TeamFormation {
+  const positions = getFormationPositions(formation.formationId);
+  if (!positions.length || positions.length !== formation.slots.length ||
+    new Set(formation.slots.map((slot) => slot.slotId)).size !== positions.length ||
+    positions.some((position) => !formation.slots.some((slot) => slot.slotId === position.slotId))) return formation;
+  const playersById = new Map(players.map((player) => [player.participantId, player]));
+  const onPitch: FormationPlayer[] = [];
+  const used = new Set<string>();
+  for (const slot of formation.slots) {
+    if (!slot.participantId) continue;
+    const player = playersById.get(slot.participantId);
+    if (!player || used.has(player.participantId)) return formation;
+    used.add(player.participantId);
+    onPitch.push(player);
+  }
+  const { assignments } = assignPlayersToPositions(onPitch, getFormationRoles(formation.formationId));
+  return { ...formation, slots: positions.map(({ slotId }, index) => ({
+    slotId, participantId: assignments[index]?.participantId ?? null
   })) };
 }
 

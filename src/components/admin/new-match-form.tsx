@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { createMatchFormAction } from "@/app/admin/(panel)/form-actions";
 import { ActionForm } from "@/components/ui/action-form";
@@ -11,7 +13,8 @@ import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/ui/player-avatar";
 import { Select } from "@/components/ui/select";
 import { MATCH_MODALITIES, MATCH_MODALITY_LABELS, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
-import { supportsPositionBalancing } from "@/lib/domain/player-positions";
+import { PLAYER_POSITION_OPTIONS, supportsPositionBalancing } from "@/lib/domain/player-positions";
+import { withOrgQuery } from "@/lib/org";
 import {
   formatGuestSkillLevelLabel,
   formatRatingTrendBadgeLabel,
@@ -23,7 +26,7 @@ import {
 } from "@/lib/domain/skill-level";
 import { DEFAULT_TEAM_A_LABEL, DEFAULT_TEAM_B_LABEL, TEAM_LABEL_MAX_LENGTH } from "@/lib/team-labels";
 import { cn } from "@/lib/utils";
-import type { MatchModality, SubstituteAssignment, TeamSide } from "@/types/domain";
+import type { MatchModality, PlayerPosition, SubstituteAssignment, TeamSide } from "@/types/domain";
 
 type SelectablePlayer = {
   id: string;
@@ -34,6 +37,8 @@ type SelectablePlayer = {
   display_order?: number;
   photo_path?: string | null;
   photo_updated_at?: string | null;
+  preferred_position?: PlayerPosition | null;
+  secondary_position?: PlayerPosition | null;
 };
 
 type GuestRow = {
@@ -83,6 +88,18 @@ export function NewMatchForm({
   initialValues?: NewMatchDefaults;
   error?: string;
 }) {
+  const router = useRouter();
+  const refreshPositionsOnReturn = useRef(false);
+  useEffect(() => {
+    const refreshAfterEditingPositions = () => {
+      if (!refreshPositionsOnReturn.current) return;
+      refreshPositionsOnReturn.current = false;
+      router.refresh();
+    };
+    window.addEventListener("focus", refreshAfterEditingPositions);
+    return () => window.removeEventListener("focus", refreshAfterEditingPositions);
+  }, [router]);
+
   const [draftRequestId] = useState(() => requestId ?? crypto.randomUUID());
   const [modality, setModality] = useState<MatchModality>(initialValues?.modality ?? defaultModality);
   const [selectedPlayers, setSelectedPlayers] = useState<Record<string, boolean>>(() => Object.fromEntries((initialValues?.playerIds ?? []).map((id) => [id, true])));
@@ -157,6 +174,14 @@ export function NewMatchForm({
       ),
     [goalkeeperPlayers, selectedPlayers]
   );
+
+  const showPositions = supportsPositionBalancing(modality);
+  const starterGoalkeeperCount = selectedGoalkeeperIds.filter((id) => !substituteIds.has(`player:${id}`)).length;
+  const positionSummaryPlayers = selectedRosterPlayers.filter((player) =>
+    !substituteIds.has(`player:${player.id}`) && !selectedGoalkeeperIds.includes(player.id)
+  );
+  const startersWithoutPosition = positionSummaryPlayers.filter((player) => !player.preferred_position).length
+    + validGuests.filter((guest) => !substituteIds.has(`guest:${guest.key}`)).length;
 
   const manualParticipants = useMemo<ManualParticipant[]>(
     () => [
@@ -384,6 +409,33 @@ export function NewMatchForm({
         {supportsSubstitutes ? <p className="mt-2 rounded-lg border border-indigo-400/20 bg-indigo-500/10 p-3 text-sm text-indigo-200">
           Podés sumar suplentes y dejar su equipo para después. Al cargar la formación final, elegí el equipo de quienes jugaron para que también sumen o pierdan puntos.
         </p> : null}
+        {showPositions ? (
+          <section aria-labelledby={`${formId}-positions-title`} className="mt-3 rounded-lg border border-emerald-400/25 bg-emerald-500/5 p-3">
+            <h3 className="text-sm font-semibold text-emerald-200" id={`${formId}-positions-title`}>Armá equipos con nivel y posiciones</h3>
+            <p className="mt-1 text-sm text-slate-300">
+              El armado usa la posición preferida y, si hace falta, la secundaria. Si faltan perfiles, completa con los disponibles. Los arqueros que marques tienen prioridad.
+            </p>
+            <Link className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-300 underline underline-offset-4" href={withOrgQuery("/admin/players", organizationId)} target="_blank" rel="noopener noreferrer"
+              onClick={() => { refreshPositionsOnReturn.current = true; }}
+              onAuxClick={(event) => { if (event.button === 1) refreshPositionsOnReturn.current = true; }}>
+              Editar posiciones en Jugadores (otra pestaña)
+            </Link>
+            {starterCount > 0 ? (
+              <div aria-live="polite" className="mt-2 border-t border-emerald-400/15 pt-3">
+                <p className="text-xs font-semibold text-slate-200">Preferencias de los titulares</p>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-300">
+                  {starterGoalkeeperCount > 0 ? <span className="rounded border border-cyan-400/30 px-2 py-1">Arqueros marcados: {starterGoalkeeperCount}</span> : null}
+                  {PLAYER_POSITION_OPTIONS.map((position) => {
+                    const count = positionSummaryPlayers.filter((player) => player.preferred_position === position.value).length;
+                    return count > 0 ? <span className="rounded border border-slate-700 px-2 py-1" key={position.value}>Preferida · {position.label}: {count}</span> : null;
+                  })}
+                  {startersWithoutPosition > 0 ? <span className="rounded border border-slate-700 px-2 py-1">Sin posición guardada: {startersWithoutPosition}</span> : null}
+                </div>
+                <p className="mt-2 text-xs text-slate-400">Se muestran las preferidas de los titulares. Para armar los equipos también se consideran las secundarias.</p>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
             <label className="mb-1 block text-sm font-semibold" htmlFor={`${formId}-player-search`}>Buscar jugador</label>
@@ -438,6 +490,12 @@ export function NewMatchForm({
                         </span>
                       ) : null}
                     </span>
+                    {showPositions ? (
+                      <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-emerald-200">
+                        <span>{player.preferred_position ? `Preferida: ${PLAYER_POSITION_OPTIONS.find((position) => position.value === player.preferred_position)?.label}` : "Sin posición guardada"}</span>
+                        {player.secondary_position ? <span className="text-slate-400">Secundaria: {PLAYER_POSITION_OPTIONS.find((position) => position.value === player.secondary_position)?.label}</span> : null}
+                      </span>
+                    ) : null}
                   </span>
                 </span>
                 <span className="flex flex-wrap items-center gap-2 xl:shrink-0">
@@ -732,7 +790,6 @@ export function NewMatchForm({
         {!goalkeepersReady ? " Elegiste un arquero: marcá el segundo o desmarcá el actual." : ""}
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        {supportsPositionBalancing(modality) ? <p className="text-sm text-slate-400">El armado automático equilibra el nivel y las posiciones guardadas en Jugadores. Si faltan perfiles, completa con quienes están disponibles.</p> : null}
         <FormSubmitButton aria-describedby={`${formId}-roster-status`} className="w-full sm:w-auto" disabled={!rosterComplete || !goalkeepersReady} name="creationMode" pendingLabel="Generando equipos..." value="auto">
           Crear partido y generar equipos
         </FormSubmitButton>

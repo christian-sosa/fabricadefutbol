@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FORMATION_PRESETS, assignFormationPlayer, changeFormationPreset, createTeamFormation, getFormationPositions, getFormationSlotPosition, readMatchFormation, supportsMatchFormation, toFormationPlayers, validateMatchFormation, type FormationModality, type FormationPlayer, type MatchFormation } from "@/lib/domain/match-formation";
+import { FORMATION_PRESETS, assignFormationPlayer, changeFormationPreset, createTeamFormation, describeFormation, getFormationPositions, getFormationSlotPosition, readMatchFormation, reassignFormationByPreferences, supportsMatchFormation, swapFormationPlayer, toFormationPlayers, validateMatchFormation, type FormationModality, type FormationPlayer, type MatchFormation } from "@/lib/domain/match-formation";
 import { getPlayerPositionFit } from "@/lib/domain/player-positions";
 import { MATCH_MODALITIES, TEAM_SIZE_BY_MODALITY } from "@/lib/constants";
 
@@ -125,6 +125,79 @@ describe("match formation", () => {
     expect(changed.slots.find((slot) => slot.slotId === "line-0-0")?.participantId).toBeNull();
     expect(changed.slots.find((slot) => slot.slotId === "line-0-1")?.participantId).toBe("player:A-1");
     expect(assignFormationPlayer(changed, "line-0-1", null).slots.filter((slot) => slot.participantId === "player:A-1")).toHaveLength(0);
+  });
+  it("intercambia jugadores ubicados y deja una formación completa que se puede guardar", () => {
+    const original = formation();
+    const changed = swapFormationPlayer(original.teamA, "line-0-1", teams.teamA[1].participantId, teams.teamA);
+    expect(changed.slots.find((slot) => slot.slotId === "line-0-0")?.participantId).toBe(teams.teamA[2].participantId);
+    expect(changed.slots.find((slot) => slot.slotId === "line-0-1")?.participantId).toBe(teams.teamA[1].participantId);
+    expect(validateMatchFormation({ ...original, teamA: changed }, "9v9", teams)).toBeTruthy();
+    expect(original).toEqual(formation());
+  });
+  it("mueve a una posición vacía sin duplicar y permite reemplazar desde el banco", () => {
+    const empty = assignFormationPlayer(formation().teamA, "line-0-1", null);
+    const moved = swapFormationPlayer(empty, "line-0-1", teams.teamA[1].participantId, teams.teamA);
+    expect(moved.slots.find((slot) => slot.slotId === "line-0-0")?.participantId).toBeNull();
+    expect(moved.slots.filter((slot) => slot.participantId)).toHaveLength(8);
+    const substitute = { participantId: "guest:substitute", name: "Suplente" };
+    const roster = [...teams.teamA, substitute];
+    const replaced = swapFormationPlayer(formation().teamA, "line-0-1", substitute.participantId, roster);
+    expect(replaced.slots.some((slot) => slot.participantId === teams.teamA[2].participantId)).toBe(false);
+    expect(replaced.slots.find((slot) => slot.slotId === "line-0-1")?.participantId).toBe(substitute.participantId);
+    expect(validateMatchFormation({ ...formation(), teamA: replaced }, "9v9", { ...teams, teamA: roster })).toBeTruthy();
+  });
+  it("ignora IDs inválidos y no permite intercambiar al arquero confirmado", () => {
+    const original = formation().teamA;
+    for (const [slotId, participantId] of [
+      ["unknown", teams.teamA[1].participantId],
+      ["line-0-0", "player:outside-team"],
+      ["line-0-0", teams.teamA[0].participantId],
+      ["gk", teams.teamA[1].participantId],
+      ["line-0-0", teams.teamA[1].participantId]
+    ]) expect(swapFormationPlayer(original, slotId, participantId, teams.teamA)).toBe(original);
+  });
+  it("reacomoda el esquema actual usando una secundaria y conserva al suplente elegido", () => {
+    const roster: FormationPlayer[] = players("A", 9).map((player, index) => ({ ...player,
+      preferredPosition: index === 0 ? "FWD" : index <= 3 ? "DEF" : index <= 6 ? "MID" : "FWD"
+    }));
+    const substitute: FormationPlayer = { participantId: "guest:substitute", name: "Suplente", preferredPosition: "MID", secondaryPosition: "DEF" };
+    roster.push(substitute);
+    const selected = swapFormationPlayer(createTeamFormation("9v9", roster), "line-1-1", substitute.participantId, roster);
+    const changed = changeFormationPreset(selected, "4-2-2");
+    const refitted = reassignFormationByPreferences(changed, roster);
+    expect(refitted.formationId).toBe("4-2-2");
+    expect(new Set(refitted.slots.map((slot) => slot.participantId))).toEqual(new Set(changed.slots.map((slot) => slot.participantId)));
+    expect(refitted.slots.find((slot) => slot.slotId === "gk")?.participantId).toBe(roster[0].participantId);
+    const substituteSlot = refitted.slots.find((slot) => slot.participantId === substitute.participantId)!;
+    expect(getFormationSlotPosition(refitted.formationId, substituteSlot.slotId)).toBe("DEF");
+    for (const slot of refitted.slots) {
+      const player = roster.find((candidate) => candidate.participantId === slot.participantId)!;
+      expect(getPlayerPositionFit(player, getFormationSlotPosition(refitted.formationId, slot.slotId)!)).not.toBe("fallback");
+    }
+    expect(validateMatchFormation({ ...formation(), teamA: refitted }, "9v9", { ...teams, teamA: roster })).toBeTruthy();
+  });
+  it("reacomodar una cancha incompleta conserva sus jugadores y huecos sin agregar suplentes", () => {
+    const incomplete = assignFormationPlayer(formation().teamA, "line-0-1", null);
+    const substitute: FormationPlayer = { participantId: "guest:substitute", name: "Suplente", preferredPosition: "DEF" };
+    const refitted = reassignFormationByPreferences(incomplete, [...teams.teamA, substitute]);
+    expect(new Set(refitted.slots.map((slot) => slot.participantId))).toEqual(new Set(incomplete.slots.map((slot) => slot.participantId)));
+    expect(refitted.slots.filter((slot) => slot.participantId === null)).toHaveLength(1);
+    expect(refitted.slots.find((slot) => slot.slotId === "gk")?.participantId).toBe(teams.teamA[0].participantId);
+  });
+  it("no pierde jugadores desconocidos ni normaliza silenciosamente canchas inválidas al reacomodar", () => {
+    const unknownPlayer = assignFormationPlayer(formation().teamA, "line-0-0", "player:unknown");
+    expect(reassignFormationByPreferences(unknownPlayer, teams.teamA)).toBe(unknownPlayer);
+    const invalidScheme = { ...formation().teamA, formationId: "99-99" };
+    expect(reassignFormationByPreferences(invalidScheme, teams.teamA)).toBe(invalidScheme);
+  });
+  it.each([
+    ["3-3-2", "1 arquero · 3 defensores · 3 mediocampistas · 2 delanteros"],
+    ["4-2-3-1", "1 arquero · 4 defensores · 5 mediocampistas · 1 delantero"],
+    ["1-2-1", "1 arquero · 1 defensor · 2 mediocampistas · 1 delantero"],
+    ["2-2", "1 arquero · 2 defensores · 2 delanteros"],
+    ["unknown", "Esquema no válido"]
+  ])("explica el esquema %s con posiciones en español", (preset, expected) => {
+    expect(describeFormation(preset)).toBe(expected);
   });
   it("rejects incomplete, duplicated, foreign or invalid positions and goalkeeper changes", () => {
     for (const mutate of [

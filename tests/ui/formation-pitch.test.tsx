@@ -68,4 +68,22 @@ describe("FormationPitch", () => {
     expect(screen.getByRole("img", { name: "Defensa 2: Elegir jugador" })).toHaveTextContent("Elegir");
     expect(screen.queryByText("Jugador 2")).not.toBeInTheDocument();
   });
+  it("muestra avisos de posiciones sólo cuando el editor los solicita y conserva nombres accesibles", () => {
+    const { formation, players } = buildFormation("3-3-2");
+    players[0].preferredPosition = "FWD";
+    players[1].preferredPosition = "FWD";
+    players[2].preferredPosition = "FWD";
+    players[2].secondaryPosition = "DEF";
+    const props = { formation, players, side: "A" as const, teamLabel: "Azul" };
+    const { rerender } = render(<FormationPitch {...props} />);
+    expect(screen.queryByText("!")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fuera de sus posiciones habituales")).not.toBeInTheDocument();
+    rerender(<FormationPitch {...props} onSelectSlot={vi.fn()} showPositionHints />);
+    expect(screen.getAllByText("!")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Defensa 1: Jugador 1" })).toHaveAccessibleDescription("Fuera de sus posiciones habituales");
+    expect(screen.getByRole("button", { name: "Defensa 2: Jugador 2" })).not.toHaveAttribute("aria-describedby");
+    expect(screen.getByRole("button", { name: "Arco: Arquero del barrio" })).not.toHaveAttribute("aria-describedby");
+    rerender(<FormationPitch {...props} />);
+    expect(screen.queryByText("!")).not.toBeInTheDocument();
+  });
 });

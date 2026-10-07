@@ -15,7 +15,7 @@ describe("admin players UX source", () => {
     expect(source).toContain("const showEditRoster = !showCreateForm");
     expect(source).toContain('withOrgQuery("/admin/players?view=new"');
     expect(source).toContain('withOrgQuery("/admin/players?view=edit"');
-    expect(source).toContain("Gestion de jugadores");
+    expect(source).toContain("Gestión de jugadores");
   });
 
   it("no muestra rendimiento automatico en la planilla editable", () => {

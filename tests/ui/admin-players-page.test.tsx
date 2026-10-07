@@ -238,7 +238,10 @@ describe("planilla de jugadores", () => {
     expect(secondary).toHaveValue("");
     expect(preferred).not.toBeRequired();
     expect(secondary).not.toBeRequired();
+    expect(secondary).toBeDisabled();
     await user.selectOptions(preferred, "FWD");
+    expect(secondary).toBeEnabled();
+    expect(within(secondary).getByRole("option", { name: "Delantero" })).toBeDisabled();
     await user.selectOptions(secondary, "MID");
     await user.click(screen.getByRole("button", { name: "Crear jugador" }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
@@ -247,6 +250,103 @@ describe("planilla de jugadores", () => {
     expect(submitted.get("skillLevel")).toBe("5");
     expect(submitted.get("preferredPosition")).toBe("FWD");
     expect(submitted.get("secondaryPosition")).toBe("MID");
+  });
+
+  it("limpia la secundaria incompatible y envía una entrada por jugador incluso sin preferencia", async () => {
+    const user = userEvent.setup();
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    const preferred = screen.getByRole("combobox", { name: "Posición preferida de Ana Pérez" });
+    const secondary = screen.getByRole("combobox", { name: "Posición secundaria de Ana Pérez" });
+    const otherSecondary = screen.getByRole("combobox", { name: "Posición secundaria de Luz Díaz" });
+    expect(otherSecondary).toBeDisabled();
+    await user.selectOptions(preferred, "MID");
+    expect(secondary).toHaveValue("");
+    expect(within(secondary).getByRole("option", { name: "Mediocampista" })).toBeDisabled();
+    await user.selectOptions(secondary, "MID");
+    expect(secondary).toHaveValue("");
+    await user.selectOptions(secondary, "FWD");
+    await user.selectOptions(preferred, "");
+    expect(secondary).toHaveValue("");
+    expect(secondary).toBeDisabled();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Posición preferida de Luz Díaz" }), "GK");
+    await user.selectOptions(otherSecondary, "DEF");
+    await user.click(screen.getByRole("button", { name: "Guardar toda la planilla" }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledOnce());
+    const submitted = mocks.update.mock.calls[0][0] as FormData;
+    expect(submitted.getAll("preferredPosition")).toEqual(["", "GK"]);
+    expect(submitted.getAll("secondaryPosition")).toEqual(["", "DEF"]);
+  });
+
+  it("sincroniza campos dependientes y FormData al restaurar y descartar un borrador vacío", async () => {
+    const user = userEvent.setup();
+    const view = render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Posición preferida de Ana Pérez" }), "");
+    view.unmount();
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    const preferred = screen.getByRole("combobox", { name: "Posición preferida de Ana Pérez" });
+    const secondary = screen.getByRole("combobox", { name: "Posición secundaria de Ana Pérez" });
+    const form = screen.getByRole("button", { name: "Guardar toda la planilla" }).closest("form")!;
+    expect(preferred).toHaveValue("");
+    expect(secondary).toHaveValue("");
+    expect(secondary).toBeDisabled();
+    expect(new FormData(form).getAll("secondaryPosition")).toEqual(["", ""]);
+    await user.click(screen.getByRole("button", { name: "Descartar cambios" }));
+    expect(preferred).toHaveValue("DEF");
+    expect(secondary).toHaveValue("MID");
+    expect(secondary).toBeEnabled();
+    expect(within(secondary).getByRole("option", { name: "Defensor" })).toBeDisabled();
+    expect(new FormData(form).getAll("secondaryPosition")).toEqual(["MID", ""]);
+    expect(window.sessionStorage.getItem("fdf:players-draft:v1:org-1")).toBeNull();
+  });
+
+  it("restablece dependencias y borrador al resetear la planilla", async () => {
+    const user = userEvent.setup();
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Posición preferida de Ana Pérez" }), "");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Posición preferida de Luz Díaz" }), "FWD");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Posición secundaria de Luz Díaz" }), "GK");
+    const form = screen.getByRole("button", { name: "Guardar toda la planilla" }).closest("form")!;
+    await act(async () => { form.reset(); });
+    expect(screen.getByRole("combobox", { name: "Posición secundaria de Ana Pérez" })).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "Posición secundaria de Luz Díaz" })).toBeDisabled();
+    expect(new FormData(form).getAll("preferredPosition")).toEqual(["DEF", ""]);
+    expect(new FormData(form).getAll("secondaryPosition")).toEqual(["MID", ""]);
+    expect(window.sessionStorage.getItem("fdf:players-draft:v1:org-1")).toBeNull();
+    expect(screen.getByText("La planilla está guardada.")).toBeVisible();
+  });
+
+  it("habilita la secundaria de un borrador sobre un jugador sin posiciones y la deshabilita al descartar", async () => {
+    window.sessionStorage.setItem("fdf:players-draft:v1:org-1", JSON.stringify({ "player-2": {
+      name: "Luz Díaz", level: "4", preferredPosition: "GK", secondaryPosition: "FWD",
+      originalName: "Luz Díaz", originalLevel: "4", originalPreferredPosition: "", originalSecondaryPosition: ""
+    } }));
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    const secondary = screen.getByRole("combobox", { name: "Posición secundaria de Luz Díaz" });
+    const form = screen.getByRole("button", { name: "Guardar toda la planilla" }).closest("form")!;
+    expect(secondary).toHaveValue("FWD");
+    expect(secondary).toBeEnabled();
+    expect(within(secondary).getByRole("option", { name: "Arquero" })).toBeDisabled();
+    expect(new FormData(form).getAll("secondaryPosition")).toEqual(["MID", "FWD"]);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Descartar cambios" }));
+    expect(secondary).toHaveValue("");
+    expect(secondary).toBeDisabled();
+    expect(new FormData(form).getAll("secondaryPosition")).toEqual(["MID", ""]);
+  });
+
+  it("restablece la secundaria después de un alta exitosa", async () => {
+    const user = userEvent.setup();
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "new" }) }));
+    await user.type(screen.getByRole("textbox", { name: "Nombre completo del jugador" }), "Ana nueva");
+    const preferred = screen.getByRole("combobox", { name: "Posición preferida" });
+    const secondary = screen.getByRole("combobox", { name: "Posición secundaria" });
+    await user.selectOptions(preferred, "FWD");
+    await user.selectOptions(secondary, "MID");
+    await user.click(screen.getByRole("button", { name: "Crear jugador" }));
+    await waitFor(() => expect(preferred).toHaveValue(""));
+    expect(secondary).toHaveValue("");
+    expect(secondary).toBeDisabled();
+    const form = screen.getByRole("button", { name: "Crear jugador" }).closest("form")!;
+    expect(new FormData(form).getAll("secondaryPosition")).toEqual([""]);
   });
 
   it("considera las posiciones como cambios, protege acciones y navegación, y restaura o descarta el borrador", async () => {

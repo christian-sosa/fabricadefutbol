@@ -37,6 +37,12 @@ test("guarda posiciones opcionales en la planilla sin cambiar puntos a 320px", a
   await page.setViewportSize({ width: 320, height: 900 });
   await page.goto(`/admin/players?org=${ORG_SLUG}&view=edit`);
   const row = page.locator(`[data-roster-player="${E2E_PLAYER_IDS[0]}"]`);
+  await expect(row.locator('select[name="secondaryPosition"]')).toBeDisabled();
+  await row.locator('select[name="preferredPosition"]').selectOption("DEF");
+  await expect(row.locator('select[name="secondaryPosition"] option[value="DEF"]')).toHaveAttribute("disabled", "");
+  await row.locator('select[name="secondaryPosition"]').selectOption("MID");
+  await row.locator('select[name="preferredPosition"]').selectOption("MID");
+  await expect(row.locator('select[name="secondaryPosition"]')).toHaveValue("");
   await row.locator('select[name="preferredPosition"]').selectOption("DEF");
   await row.locator('select[name="secondaryPosition"]').selectOption("MID");
   await page.getByRole("button", { name: "Guardar toda la planilla", exact: true }).click();
@@ -65,9 +71,8 @@ async function placeTeamPlayers(region: Locator, teamLabel: string, expectedPlay
     const empty = emptySlots.first();
     const position = (await empty.getAttribute("aria-label"))!.replace(": Elegir jugador", "");
     await empty.click();
-    const pool = region.getByRole("searchbox", { name: `Jugadores disponibles de ${teamLabel}`, exact: true }).locator("..");
-    const available = pool.getByRole("button").first();
-    const playerName = (await available.innerText()).trim();
+    const available = region.locator('[data-formation-candidate]').first();
+    const playerName = (await available.getAttribute("aria-label"))!;
     await available.click();
     await expect(pitch.getByRole("button", { name: `${position}: ${playerName}`, exact: true })).toBeVisible();
   }
@@ -156,8 +161,29 @@ for (const scenario of [
 
     const regionA = page.getByRole("region", { name: `Formación de ${teamA}`, exact: true });
     const regionB = page.getByRole("region", { name: `Formación de ${teamB}`, exact: true });
-    const positionsA = await placeTeamPlayers(regionA, teamA, scenario.size, automaticallyFilled);
+    let positionsA = await placeTeamPlayers(regionA, teamA, scenario.size, automaticallyFilled);
     const positionsB = await placeTeamPlayers(regionB, teamB, scenario.size, automaticallyFilled);
+    if (automaticallyFilled) {
+      const pitch = regionA.getByRole("group", { name: `Cancha de ${teamA}`, exact: true });
+      const firstLabel = positionsA[1]!;
+      const secondLabel = positionsA[2]!;
+      const firstPosition = firstLabel.slice(0, firstLabel.indexOf(": "));
+      const secondPosition = secondLabel.slice(0, secondLabel.indexOf(": "));
+      const firstName = firstLabel.slice(firstLabel.indexOf(": ") + 2);
+      const secondName = secondLabel.slice(secondLabel.indexOf(": ") + 2);
+      await pitch.getByRole("button", { name: firstLabel, exact: true }).click();
+      await regionA.getByRole("button", { name: secondName, exact: true }).click();
+      await expect(pitch.getByRole("button", { name: `${firstPosition}: ${secondName}`, exact: true })).toBeVisible();
+      await expect(pitch.getByRole("button", { name: `${secondPosition}: ${firstName}`, exact: true })).toBeVisible();
+      await expect(pitch.getByRole("button", { name: /: Elegir jugador$/ })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Guardar formaciones", exact: true })).toBeEnabled();
+      await page.getByRole("button", { name: "Deshacer último cambio", exact: true }).click();
+      await expect(pitch.getByRole("button", { name: firstLabel, exact: true })).toBeVisible();
+      await expect(pitch.getByRole("button", { name: secondLabel, exact: true })).toBeVisible();
+      await pitch.getByRole("button", { name: firstLabel, exact: true }).click();
+      await regionA.getByRole("button", { name: secondName, exact: true }).click();
+      positionsA = await pitch.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
+    }
     await expectNoHorizontalOverflow(page);
     await page.getByRole("button", { name: "Guardar formaciones", exact: true }).click();
     await expect(page.getByRole("status").filter({ hasText: "Formaciones guardadas. El enlace compartido ya muestra las canchas." })).toBeVisible();
