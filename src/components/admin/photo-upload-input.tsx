@@ -24,7 +24,7 @@ export function PhotoUploadInput({ compact = false, hint, required = true }: Pho
         aria-describedby={`${id}-hint ${id}-status`}
         aria-invalid={Boolean(error)}
         aria-label="Foto del jugador"
-        className={compact ? "h-[38px] min-w-0 px-2 py-1.5 text-xs" : undefined}
+        className={compact ? "min-h-11 min-w-0 px-2 py-1.5 text-xs file:mr-2 file:rounded file:border-0 file:bg-slate-800 file:px-2 file:py-1 file:text-xs file:text-slate-200" : undefined}
         name="photo"
         onChange={async (event) => {
           const input = event.currentTarget;
@@ -61,7 +61,7 @@ export function PhotoUploadInput({ compact = false, hint, required = true }: Pho
       />
       <p className="mt-1 text-xs leading-4 text-slate-500" id={`${id}-hint`}>
         {hint ? `${hint} ` : "JPG, PNG o WEBP. "}
-        Original hasta {MAX_PLAYER_PHOTO_SOURCE_SIZE_MB} MB; se recorta al centro y comprime antes de subir. Máximo preparado: {MAX_PLAYER_PHOTO_SIZE_MB} MB.
+        {compact ? `Hasta ${MAX_PLAYER_PHOTO_SOURCE_SIZE_MB} MB. Se recorta y comprime automáticamente.` : `Original hasta ${MAX_PLAYER_PHOTO_SOURCE_SIZE_MB} MB; se recorta al centro y comprime antes de subir. Máximo preparado: ${MAX_PLAYER_PHOTO_SIZE_MB} MB.`}
       </p>
       <p aria-live="polite" className={`mt-1 text-xs ${error ? "text-danger" : "text-emerald-300"}`} id={`${id}-status`} role={error ? "alert" : "status"}>
         {error ?? status}
