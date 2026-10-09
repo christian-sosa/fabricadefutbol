@@ -21,7 +21,8 @@ describe("PhotoUploadInput", () => {
     const input = container.querySelector('input[type="file"]');
 
     expect(wrapper).toHaveClass("min-w-0");
-    expect(input).toHaveClass("h-[38px]");
+    expect(input).toHaveClass("min-h-11");
+    expect(screen.getByText(/Hasta 20 MB/)).toHaveTextContent("Foto Hasta 20 MB. Se recorta y comprime automáticamente.");
   });
 
   it("bloquea submit mientras prepara y reemplaza el original por el archivo comprimido", async () => {

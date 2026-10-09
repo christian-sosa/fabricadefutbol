@@ -11,6 +11,7 @@ import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-ca
 import { PhotoUploadInput } from "@/components/admin/photo-upload-input";
 import { PlayerInjuryForm } from "@/components/admin/player-injury-form";
 import { PlayerPositionFields } from "@/components/admin/player-position-fields";
+import { PlayerRosterActions } from "@/components/admin/player-roster-actions";
 import { PlayersRosterGuard, PlayersRosterPendingStatus } from "@/components/admin/players-roster-guard";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
@@ -31,7 +32,7 @@ const primaryActionLinkClass =
 const secondaryActionLinkClass = secondaryActionClass;
 
 const playersRosterGridColumns =
-  "lg:grid-cols-[minmax(180px,1.2fr)_minmax(160px,0.8fr)_minmax(280px,1.6fr)_minmax(150px,0.9fr)]";
+  "lg:grid-cols-[minmax(180px,1.2fr)_minmax(160px,0.8fr)_minmax(320px,1.6fr)_120px]";
 
 export default async function AdminPlayersPage({
   searchParams
@@ -163,27 +164,15 @@ export default async function AdminPlayersPage({
                  data-roster-player={player.id}
               >
                 <input form={bulkFormId} name="playerId" type="hidden" value={player.id} />
-                <div className="min-w-0 space-y-1.5">
+                <div className="min-w-0 space-y-1">
+                  <label className="flex h-4 items-center justify-between gap-2 text-xs leading-4 text-slate-300" htmlFor={`player-name-${player.id}`}>
+                    Nombre
+                    {player.is_injured ? <PlayerInjuryBadge className="h-4 shrink-0 border-0 bg-transparent p-0 leading-4" /> : null}
+                  </label>
                   <div className="flex items-center gap-2">
                     <PlayerAvatar hasPhoto={Boolean(player.photo_path)} name={player.full_name} photoUpdatedAt={player.photo_updated_at} playerId={player.id} size="sm" />
-                    <Input aria-label={`Nombre de ${player.full_name}`} className="min-w-0" defaultValue={player.full_name} form={bulkFormId} name="fullName" required />
+                    <Input aria-label={`Nombre de ${player.full_name}`} className="min-w-0" defaultValue={player.full_name} form={bulkFormId} id={`player-name-${player.id}`} name="fullName" required />
                   </div>
-                  <PlayerInjuryForm organizationId={selectedOrganization.id}>
-                    <PlayersRosterPendingStatus />
-                    <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-                    <input name="playerId" type="hidden" value={player.id} />
-                    <input name="isInjured" type="hidden" value={player.is_injured ? "false" : "true"} />
-                    {player.is_injured ? <PlayerInjuryBadge /> : null}
-                    <FormSubmitButton
-                      aria-describedby="player-injury-help"
-                      aria-label={`${player.is_injured ? "Marcar recuperado" : "Marcar lesionado"} a ${player.full_name}`}
-                      className="px-2 text-xs"
-                      pendingLabel="Guardando estado…"
-                      variant="ghost"
-                    >
-                      {player.is_injured ? "Marcar recuperado" : "Marcar lesionado"}
-                    </FormSubmitButton>
-                  </PlayerInjuryForm>
                 </div>
                 <label className="grid min-w-0 gap-1 text-xs text-slate-300">
                   Nivel de habilidad
@@ -202,31 +191,53 @@ export default async function AdminPlayersPage({
                   ))}
                 </Select>
                 </label>
-                <PlayerPositionFields describedBy="player-position-help" form={bulkFormId} playerName={player.full_name} preferredPosition={player.preferred_position} secondaryPosition={player.secondary_position} />
-                <details open={resolvedSearchParams.photoPlayer === player.id}>
-                  <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-slate-300">Foto y acciones de {player.full_name}</summary>
-                <ActionForm
-                  action={uploadPlayerPhotoFormAction}
-                  className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_112px] lg:items-start lg:self-start"
-                >
-                  <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-                  <input name="playerId" type="hidden" value={player.id} />
-                  <PhotoUploadInput compact hint="JPG, PNG o WEBP. Reemplaza la foto actual." />
-                  <FormSubmitButton className="w-full lg:w-auto" pendingLabel="Subiendo…" variant="secondary">
-                    Subir foto
-                  </FormSubmitButton>
-                </ActionForm>
-                <form action={deletePlayerAction} className="mt-3">
-                  <input name="organizationId" type="hidden" value={selectedOrganization.id} />
-                  <input name="deletePlayerId" type="hidden" value={player.id} />
-                  <ConfirmSubmitButton
-                    className="px-3 text-xs"
-                    confirmMessage={`Estas seguro de eliminar a ${player.full_name}?`}
-                    label="Eliminar"
-                    variant="danger"
-                  />
-                </form>
-                </details>
+                <PlayerPositionFields className="lg:grid-cols-2" describedBy="player-position-help" form={bulkFormId} playerName={player.full_name} preferredPosition={player.preferred_position} secondaryPosition={player.secondary_position} />
+                <PlayerRosterActions initiallyOpen={resolvedSearchParams.photoPlayer === player.id} playerName={player.full_name}>
+                  <div className="min-w-0">
+                    <p className="mb-2 text-xs font-semibold text-slate-300">Foto del jugador</p>
+                    <ActionForm
+                      action={uploadPlayerPhotoFormAction}
+                      className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start"
+                    >
+                      <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+                      <input name="playerId" type="hidden" value={player.id} />
+                      <PhotoUploadInput compact />
+                      <FormSubmitButton className="w-full sm:w-auto" pendingLabel="Subiendo…" variant="secondary">
+                        Subir foto
+                      </FormSubmitButton>
+                    </ActionForm>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="mb-2 text-xs font-semibold text-slate-300">Estado y plantel</p>
+                    <div className="flex flex-wrap items-start gap-2">
+                      <PlayerInjuryForm organizationId={selectedOrganization.id}>
+                        <PlayersRosterPendingStatus />
+                        <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+                        <input name="playerId" type="hidden" value={player.id} />
+                        <input name="isInjured" type="hidden" value={player.is_injured ? "false" : "true"} />
+                        <FormSubmitButton
+                          aria-describedby="player-injury-help"
+                          aria-label={`${player.is_injured ? "Marcar recuperado" : "Marcar lesionado"} a ${player.full_name}`}
+                          className="px-3 text-xs"
+                          pendingLabel="Guardando estado…"
+                          variant="ghost"
+                        >
+                          {player.is_injured ? "Marcar recuperado" : "Marcar lesionado"}
+                        </FormSubmitButton>
+                      </PlayerInjuryForm>
+                      <form action={deletePlayerAction}>
+                        <input name="organizationId" type="hidden" value={selectedOrganization.id} />
+                        <input name="deletePlayerId" type="hidden" value={player.id} />
+                        <ConfirmSubmitButton
+                          className="px-3 text-xs"
+                          confirmMessage={`Estas seguro de eliminar a ${player.full_name}?`}
+                          label="Eliminar"
+                          variant="danger"
+                        />
+                      </form>
+                    </div>
+                  </div>
+                </PlayerRosterActions>
               </div>
             ))}
 

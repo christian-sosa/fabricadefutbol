@@ -27,6 +27,13 @@ function render(element: ReactNode) {
   return renderUi(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>);
 }
 
+function actionsPanel(playerName: string) {
+  const button = screen.getByRole("button", { name: `Acciones de ${playerName}` });
+  const panel = document.getElementById(button.getAttribute("aria-controls")!);
+  if (!panel) throw new Error(`No se encontró el panel de acciones de ${playerName}.`);
+  return panel;
+}
+
 describe("planilla de jugadores", () => {
   it("refresca rankings recientes del grupo, incluida otra temporada, antes de terminar el guardado", async () => {
     const user = userEvent.setup();
@@ -44,6 +51,7 @@ describe("planilla de jugadores", () => {
     queryClient.setQueryDefaults(otherGroupKey, { queryFn: fetchOtherGroup });
     for (const key of [currentKey, historicalKey, otherGroupKey]) queryClient.setQueryData(key, previous);
     render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    await user.click(screen.getByRole("button", { name: "Acciones de Ana Pérez" }));
     const button = screen.getByRole("button", { name: "Marcar lesionado a Ana Pérez" });
     await user.click(button);
     await waitFor(() => expect(fetchCurrent).toHaveBeenCalledOnce());
@@ -57,24 +65,44 @@ describe("planilla de jugadores", () => {
     expect(queryClient.getQueryData(otherGroupKey)).toEqual(previous);
   });
 
-  it("muestra lesiones y permite marcarlas o quitarlas sin abrir las acciones secundarias", async () => {
+  it("mantiene la lesión visible y agrupa sus cambios con las acciones desplegables", async () => {
     const user = userEvent.setup();
     render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    const anaActions = screen.getByRole("button", { name: "Acciones de Ana Pérez" });
+    const luzActions = screen.getByRole("button", { name: "Acciones de Luz Díaz" });
+    expect(anaActions).toHaveAttribute("aria-expanded", "false");
+    expect(luzActions).toHaveAttribute("aria-expanded", "false");
+    expect(actionsPanel("Ana Pérez")).not.toBeVisible();
+    expect(actionsPanel("Luz Díaz")).not.toBeVisible();
+    expect(screen.queryByRole("button", { name: "Marcar lesionado a Ana Pérez" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Marcar recuperado a Luz Díaz" })).not.toBeInTheDocument();
+    const badge = screen.getByText("Lesionado");
+    expect(badge).toBeVisible();
+    expect(actionsPanel("Luz Díaz")).not.toContainElement(badge);
+    await user.click(anaActions);
+    expect(anaActions).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("region", { name: "Acciones de Ana Pérez" })).toBeVisible();
     const injuryButton = screen.getByRole("button", { name: "Marcar lesionado a Ana Pérez" });
-    const recoverButton = screen.getByRole("button", { name: "Marcar recuperado a Luz Díaz" });
     expect(injuryButton).toBeVisible();
-    expect(recoverButton).toBeVisible();
-    expect(screen.getByText("Lesionado")).toBeVisible();
     expect(injuryButton).toHaveAccessibleDescription(/no se cuentan como inactivos/);
     await user.click(injuryButton);
     await waitFor(() => expect(mocks.injury).toHaveBeenCalledOnce());
     const marked = mocks.injury.mock.calls[0][0] as FormData;
     expect(Array.from(marked.entries())).toEqual([["organizationId", "org-1"], ["playerId", "player-1"], ["isInjured", "true"]]);
+    await user.click(anaActions);
+    expect(anaActions).toHaveAttribute("aria-expanded", "false");
+    expect(injuryButton).not.toBeVisible();
+    await user.click(luzActions);
+    const recoverButton = screen.getByRole("button", { name: "Marcar recuperado a Luz Díaz" });
+    expect(recoverButton).toBeVisible();
     await user.click(recoverButton);
     await waitFor(() => expect(mocks.injury).toHaveBeenCalledTimes(2));
     const recovered = mocks.injury.mock.calls[1][0] as FormData;
     expect(recovered.get("playerId")).toBe("player-2");
     expect(recovered.get("isInjured")).toBe("false");
+    await user.click(luzActions);
+    expect(recoverButton).not.toBeVisible();
+    expect(badge).toBeVisible();
   });
 
   it("protege la planilla sin guardar al intentar cambiar una lesión", async () => {
@@ -83,6 +111,7 @@ describe("planilla de jugadores", () => {
     const name = screen.getByRole("textbox", { name: "Nombre de Ana Pérez" });
     await user.clear(name);
     await user.type(name, "Ana nueva");
+    await user.click(screen.getByRole("button", { name: "Acciones de Ana Pérez" }));
     await user.click(screen.getByRole("button", { name: "Marcar lesionado a Ana Pérez" }));
     expect(mocks.injury).not.toHaveBeenCalled();
     expect(name).toHaveValue("Ana nueva");
@@ -97,6 +126,7 @@ describe("planilla de jugadores", () => {
     let finishSave!: (result: { error: string | null }) => void;
     mocks.injury.mockImplementationOnce(() => new Promise((resolve) => { finishSave = resolve; }));
     render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit" }) }));
+    await user.click(screen.getByRole("button", { name: "Acciones de Ana Pérez" }));
     const injuryButton = screen.getByRole("button", { name: "Marcar lesionado a Ana Pérez" });
     const name = screen.getByRole("textbox", { name: "Nombre de Ana Pérez" });
     await user.click(injuryButton);
@@ -104,7 +134,7 @@ describe("planilla de jugadores", () => {
     expect(injuryButton).toBeDisabled();
     expect(name).toBeDisabled();
     expect(screen.getByRole("button", { name: "Guardar toda la planilla" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Marcar recuperado a Luz Díaz" })).toBeDisabled();
+    expect(within(actionsPanel("Luz Díaz")).getByLabelText("Marcar recuperado a Luz Díaz")).toBeDisabled();
     await act(async () => { finishSave({ error: "No se pudo guardar el estado de lesión." }); });
     expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo guardar el estado de lesión.");
     expect(injuryButton).toBeEnabled();
@@ -129,7 +159,7 @@ describe("planilla de jugadores", () => {
     await user.selectOptions(level, "6");
     await user.selectOptions(preferredPosition, "GK");
     await user.selectOptions(secondaryPosition, "DEF");
-    await user.click(screen.getByText("Foto y acciones de Ana Pérez"));
+    await user.click(screen.getByRole("button", { name: "Acciones de Ana Pérez" }));
     await user.click(screen.getByRole("button", { name: "Guardar toda la planilla" }));
 
     await waitFor(() => expect(mocks.update).toHaveBeenCalledOnce());
@@ -145,7 +175,7 @@ describe("planilla de jugadores", () => {
     expect(secondaryPosition).toBeDisabled();
     expect(screen.getByRole("button", { name: "Descartar cambios" })).toBeDisabled();
     for (const input of screen.getAllByLabelText("Foto del jugador")) expect(input).toBeDisabled();
-    for (const button of screen.getAllByRole("button", { name: "Eliminar" })) expect(button).toBeDisabled();
+    for (const button of screen.getAllByText("Eliminar")) expect(button).toBeDisabled();
     await user.type(name, " segunda edición");
     await user.click(screen.getByRole("button", { name: "Descartar cambios" }));
     expect(name).toHaveValue("Ana nueva");
@@ -175,8 +205,9 @@ describe("planilla de jugadores", () => {
     await user.clear(name);
     await user.type(name, "Ana nueva");
     expect(screen.getByText("1 jugador con cambios sin guardar.")).toBeVisible();
-    const details = screen.getByText("Foto y acciones de Ana Pérez").closest("details")!;
-    fireEvent.submit(details.querySelector("form")!);
+    const panel = actionsPanel("Ana Pérez");
+    expect(panel).not.toBeVisible();
+    fireEvent.submit(within(panel).getByLabelText("Foto del jugador").closest("form")!);
     expect(mocks.upload).not.toHaveBeenCalled();
     expect(screen.getByText(/Guardá o descartá la planilla/)).toBeVisible();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
@@ -206,24 +237,26 @@ describe("planilla de jugadores", () => {
     await user.clear(name); await user.type(name, "Ana Pérez nueva");
     await user.selectOptions(screen.getByRole("combobox", { name: "Nivel de habilidad de Ana Pérez" }), "6");
     for (const input of screen.getAllByLabelText("Foto del jugador")) expect(input).not.toBeVisible();
-    for (const button of screen.getAllByRole("button", { name: "Eliminar" })) expect(button).not.toBeVisible();
+    for (const button of screen.getAllByText("Eliminar")) expect(button).not.toBeVisible();
     await user.click(screen.getByRole("button", { name: "Guardar toda la planilla" }));
     const data = mocks.update.mock.calls[0][0] as FormData;
     expect(data.getAll("playerId")).toEqual(["player-1", "player-2"]);
     expect(data.getAll("fullName")).toEqual(["Ana Pérez nueva", "Luz Díaz"]);
     expect(data.getAll("skillLevel")).toEqual(["6", "4"]);
     expect(data.has("currentRating")).toBe(false);
-    await user.click(screen.getByText("Foto y acciones de Ana Pérez"));
-    const details = screen.getByText("Foto y acciones de Ana Pérez").closest("details")!;
-    expect(within(details).getByLabelText("Foto del jugador")).toBeVisible();
-    expect(within(details).getByRole("button", { name: "Subir foto" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Acciones de Ana Pérez" }));
+    const panel = screen.getByRole("region", { name: "Acciones de Ana Pérez" });
+    expect(within(panel).getByLabelText("Foto del jugador")).toBeVisible();
+    expect(within(panel).getByRole("button", { name: "Subir foto" })).toBeVisible();
   });
   it("abre la fila correcta para recuperar una foto fallida sin ofrecer otro alta", async () => {
     render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "edit", photoPlayer: "player-2", notice: "Jugador creado. Revisá la foto." }) }));
     expect(screen.getByText("Jugador creado. Revisá la foto.")).toHaveAttribute("role", "status");
-    const details = screen.getByText("Foto y acciones de Luz Díaz").closest("details")!;
-    expect(within(details).getByLabelText("Foto del jugador")).toBeVisible();
-    const form = within(details).getByRole("button", { name: "Subir foto" }).closest("form")!;
+    expect(screen.getByRole("button", { name: "Acciones de Luz Díaz" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Acciones de Ana Pérez" })).toHaveAttribute("aria-expanded", "false");
+    const panel = screen.getByRole("region", { name: "Acciones de Luz Díaz" });
+    expect(within(panel).getByLabelText("Foto del jugador")).toBeVisible();
+    const form = within(panel).getByRole("button", { name: "Subir foto" }).closest("form")!;
     expect(new FormData(form).get("playerId")).toBe("player-2");
     expect(screen.queryByRole("button", { name: "Crear jugador" })).not.toBeInTheDocument();
   });
@@ -361,10 +394,11 @@ describe("planilla de jugadores", () => {
     await user.selectOptions(preferred, "GK");
     await user.selectOptions(secondary, "FWD");
     expect(screen.getByText("1 jugador con cambios sin guardar.")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Acciones de Ana Pérez" }));
     await user.click(screen.getByRole("button", { name: "Marcar lesionado a Ana Pérez" }));
     expect(mocks.injury).not.toHaveBeenCalled();
-    const details = screen.getByText("Foto y acciones de Ana Pérez").closest("details")!;
-    fireEvent.submit(details.querySelector("form")!);
+    const panel = screen.getByRole("region", { name: "Acciones de Ana Pérez" });
+    fireEvent.submit(within(panel).getByLabelText("Foto del jugador").closest("form")!);
     expect(mocks.upload).not.toHaveBeenCalled();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     await user.click(screen.getByRole("link", { name: "Alta de jugador" }));

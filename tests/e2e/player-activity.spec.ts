@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 
 import { E2E_ORGANIZATION_ID, E2E_PLAYER_IDS } from "./test-data";
 
@@ -23,6 +23,29 @@ async function followNavigationLink(page: Page, label: string) {
   }
   await expect(link).toBeVisible();
   await link.click();
+}
+
+async function openPlayerActions(playerRow: Locator, playerName: string) {
+  const button = playerRow.getByRole("button", { name: `Acciones de ${playerName}`, exact: true });
+  await expect(button).toBeVisible();
+  if (await button.getAttribute("aria-expanded") === "false") await button.click();
+  await expect(button).toHaveAttribute("aria-expanded", "true");
+  await expect(playerRow.getByRole("region", { name: `Acciones de ${playerName}`, exact: true })).toBeVisible();
+}
+
+async function screenshotRosterRows(page: Page, path: string) {
+  const rows = page.locator("[data-roster-player]");
+  await rows.first().scrollIntoViewIfNeeded();
+  const first = await rows.first().boundingBox();
+  const second = await rows.nth(1).boundingBox();
+  if (!first || !second) throw new Error("No se encontraron las primeras filas del plantel.");
+  const scroll = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }));
+  await page.screenshot({
+    path,
+    animations: "disabled",
+    fullPage: true,
+    clip: { x: first.x + scroll.x, y: first.y + scroll.y, width: first.width, height: second.y + second.height - first.y }
+  });
 }
 
 test("la lesión se muestra en el ranking público y exime de inactividad sin alterar puntos", async ({ browser, page, request: anonymousRequest, isMobile }, testInfo) => {
@@ -61,6 +84,32 @@ test("la lesión se muestra en el ranking público y exime de inactividad sin al
   await page.goBack();
   await expect(page).toHaveURL((url) => url.pathname === "/admin/players" && url.searchParams.get("org") === ORG_SLUG);
   await expect(playerRow).toBeVisible();
+  const originalViewport = page.viewportSize()!;
+  await page.setViewportSize({ width: isMobile ? 320 : 1024, height: originalViewport.height });
+  const actions = playerRow.getByRole("button", { name: `Acciones de ${playerName}`, exact: true });
+  await expect(actions).toHaveAttribute("aria-expanded", "false");
+  await expect(playerRow.getByRole("button", { name: `Marcar lesionado a ${playerName}`, exact: true })).toBeHidden();
+  const compactSize = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+  expect(compactSize.width).toBeLessThanOrEqual(compactSize.viewport + 1);
+  if (!isMobile) {
+    const controls = [
+      playerRow.locator('input[name="fullName"]'),
+      playerRow.getByRole("combobox", { name: `Nivel de habilidad de ${playerName}`, exact: true }),
+      playerRow.getByRole("combobox", { name: `Posición preferida de ${playerName}`, exact: true }),
+      playerRow.getByRole("combobox", { name: `Posición secundaria de ${playerName}`, exact: true }),
+      actions
+    ];
+    const boxes = await Promise.all(controls.map((control) => control.boundingBox()));
+    expect(boxes.every(Boolean)).toBe(true);
+    const top = boxes[0]!.y;
+    for (const box of boxes) {
+      expect(Math.abs(box!.y - top)).toBeLessThanOrEqual(1);
+      expect(Math.abs(box!.height - boxes[0]!.height)).toBeLessThanOrEqual(1);
+    }
+  }
+  const compactScreenshot = testInfo.outputPath("planilla-compacta.png");
+  await screenshotRosterRows(page, compactScreenshot);
+  await testInfo.attach("planilla-compacta", { path: compactScreenshot, contentType: "image/png" });
 
   const anonymousContext = await browser.newContext({ viewport: page.viewportSize() ?? undefined });
   try {
@@ -73,8 +122,20 @@ test("la lesión se muestra en el ranking público y exime de inactividad sin al
     await expect(anonymousRankingRow.getByText("Lesionado", { exact: true })).toHaveCount(0);
 
     try {
+      await openPlayerActions(playerRow, playerName);
+      const expandedSize = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+      expect(expandedSize.width).toBeLessThanOrEqual(expandedSize.viewport + 1);
+      const expandedScreenshot = testInfo.outputPath("planilla-acciones.png");
+      await screenshotRosterRows(page, expandedScreenshot);
+      await testInfo.attach("planilla-acciones", { path: expandedScreenshot, contentType: "image/png" });
+      await page.setViewportSize(originalViewport);
       await playerRow.getByRole("button", { name: `Marcar lesionado a ${playerName}`, exact: true }).click();
+      await expect(playerRow.getByText("Lesionado", { exact: true })).toBeVisible();
+      await openPlayerActions(playerRow, playerName);
       await expect(playerRow.getByRole("button", { name: `Marcar recuperado a ${playerName}`, exact: true })).toBeVisible();
+      await actions.click();
+      await expect(actions).toHaveAttribute("aria-expanded", "false");
+      await expect(playerRow.getByRole("button", { name: `Marcar recuperado a ${playerName}`, exact: true })).toBeHidden();
       await expect(playerRow.getByText("Lesionado", { exact: true })).toBeVisible();
       const injured = await standingsFor(page.request);
       expect(injured.find((player) => player.playerId === PLAYER_ID)).toMatchObject({ isInjured: true, isAbsent: false });
@@ -109,10 +170,13 @@ test("la lesión se muestra en el ranking público y exime de inactividad sin al
       // This state belongs only to the accredited disposable fixture in app_dev.
       await page.goto(adminPath);
       await expect(playerRow).toBeVisible();
+      await openPlayerActions(playerRow, playerName);
       const recover = playerRow.getByRole("button", { name: `Marcar recuperado a ${playerName}`, exact: true });
       if (await recover.isVisible()) {
         await recover.click();
       }
+      await expect(playerRow.getByText("Lesionado", { exact: true })).toHaveCount(0);
+      await openPlayerActions(playerRow, playerName);
       await expect(playerRow.getByRole("button", { name: `Marcar lesionado a ${playerName}`, exact: true })).toBeVisible();
     }
 
