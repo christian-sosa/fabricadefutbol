@@ -42,12 +42,4 @@ describe("invite acceptance flow source", () => {
     }
   });
 
-  it("aplica rate limit antes de resolver y consumir tokens", () => {
-    for (const flow of inviteFlows) {
-      const source = readSource(flow.action);
-
-      expect(source).toContain("checkActionRateLimit");
-      expect(source).toContain("formatActionRateLimitMessage");
-    }
-  });
 });

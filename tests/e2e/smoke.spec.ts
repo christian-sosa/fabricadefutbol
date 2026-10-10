@@ -54,6 +54,28 @@ async function standingsFor(page: Page) {
 }
 const points = (standings: Standing[]) => Object.fromEntries(standings.map((row) => [row.playerId, row.currentRating]));
 
+async function confirmedPlayerTeams(page: Page) {
+  const payload = page.locator('input[name="lineupPayload"]');
+  await expect(payload).toHaveValue(/"assignments"/);
+  const { assignments } = JSON.parse(await payload.inputValue()) as {
+    assignments: Array<{ participantId: string; team: string }>;
+  };
+  expect(assignments.map(({ participantId }) => participantId).sort())
+    .toEqual(E2E_PLAYER_IDS.map((id) => `player:${id}`).sort());
+  expect(assignments.filter(({ team }) => team === "A")).toHaveLength(5);
+  expect(assignments.filter(({ team }) => team === "B")).toHaveLength(5);
+  return Object.fromEntries(assignments.map(({ participantId, team }) => {
+    if (team !== "A" && team !== "B") throw new Error("El fixture debe confirmar cinco jugadores por equipo.");
+    return [participantId.slice("player:".length), team];
+  })) as Record<string, "A" | "B">;
+}
+
+// The business rule is independent of the returned rankings: winners gain 10,
+// losers lose 10, and an MVP never changes either delta.
+function expectedPointsAfterWin(teams: Record<string, "A" | "B">, winner: "A" | "B", before: Record<string, number>) {
+  return Object.fromEntries(E2E_PLAYER_IDS.map((id) => [id, before[id] + (teams[id] === winner ? 10 : -10)]));
+}
+
 async function expectNoHorizontalOverflow(page: Page) {
   const documentSize = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: window.innerWidth }));
   expect(documentSize.width).toBeLessThanOrEqual(documentSize.viewport + 1);
@@ -142,6 +164,10 @@ test("login, resultado, reintento, edicion concurrente y correccion historica co
 
   await page.goto(`/admin/matches/${matchId}/result?org=${ORG_SLUG}`);
   await expect(page.getByText(/Cargar resultado|Corregir resultado/)).toBeVisible();
+  const firstTeams = await confirmedPlayerTeams(page);
+  const initialPoints = Object.fromEntries(E2E_PLAYER_IDS.map((id) => [id, 1000]));
+  expect(points(await standingsFor(page))).toEqual(initialPoints);
+  const expectedFirstPoints = expectedPointsAfterWin(firstTeams, "A", initialPoints);
   await page.setViewportSize({ width: 768, height: 1024 });
 
   await page.locator('input[name="scoreA"]').fill("3");
@@ -200,7 +226,7 @@ test("login, resultado, reintento, edicion concurrente y correccion historica co
     standings: Array<{ playerId: string; currentRating: number; mvpCount: number }>;
   };
   expect(standings).toHaveLength(10);
-  expect(standings.every((player) => [990, 1010].includes(player.currentRating))).toBe(true);
+  expect(points(standings)).toEqual(expectedFirstPoints);
   const mvp = standings.find((player) => player.playerId === E2E_PLAYER_IDS[0]);
   expect(mvp?.mvpCount).toBe(1);
   expect(standings.filter((player) => player.currentRating === mvp?.currentRating)[0]?.playerId).toBe(E2E_PLAYER_IDS[0]);
@@ -217,10 +243,10 @@ test("login, resultado, reintento, edicion concurrente y correccion historica co
   await expect(page.locator("form").getByRole("alert")).toContainText("temporalmente");
   await expect(page.locator('textarea[name="notes"]')).toHaveValue("Acta corregida sin cambiar el marcador");
   await expect(page.locator('input[name="scoreA"]')).toHaveValue("3");
-  expect(points(await standingsFor(page))).toEqual(points(standings));
+  expect(points(await standingsFor(page))).toEqual(expectedFirstPoints);
   await page.getByRole("button", {name: "Guardar correccion", exact: true}).click();
   await expect(page.getByText("Resultado guardado.", {exact: true})).toBeVisible();
-  expect(points(await standingsFor(page))).toEqual(points(standings));
+  expect(points(await standingsFor(page))).toEqual(expectedFirstPoints);
 
   await otherTab.locator('input[name="scoreA"]').fill("0");
   const staleResponse = otherTab.waitForResponse((response) => response.url().endsWith(`/matches/${matchId}/result`) && response.request().method() === "PATCH");
@@ -228,12 +254,15 @@ test("login, resultado, reintento, edicion concurrente y correccion historica co
   expect((await staleResponse).status()).toBe(409);
   await expect(otherTab.locator("form").getByRole("alert")).toBeVisible();
   await expect(otherTab.locator('input[name="scoreA"]')).toHaveValue("0");
-  expect(points(await standingsFor(page))).toEqual(points(standings));
+  expect(points(await standingsFor(page))).toEqual(expectedFirstPoints);
   await otherTab.reload();
   await otherTab.getByLabel("MVP del partido").selectOption(`player:${E2E_PLAYER_IDS[1]}`);
   await otherTab.getByRole("button", {name: "Guardar correccion", exact: true}).click();
   await expect(otherTab.getByText("Resultado guardado.", {exact: true})).toBeVisible();
-  expect(points(await standingsFor(page))).toEqual(points(standings));
+  const afterMvpCorrection = await standingsFor(page);
+  expect(points(afterMvpCorrection)).toEqual(expectedFirstPoints);
+  expect(afterMvpCorrection.find(({ playerId }) => playerId === E2E_PLAYER_IDS[0])?.mvpCount).toBe(0);
+  expect(afterMvpCorrection.find(({ playerId }) => playerId === E2E_PLAYER_IDS[1])?.mvpCount).toBe(1);
   await otherTab.close();
 
   await page.goto(`/admin/matches/new?repeat=${matchId}&org=${ORG_SLUG}`);
@@ -247,17 +276,20 @@ test("login, resultado, reintento, edicion concurrente y correccion historica co
   await page.getByRole("button", {name: "Confirmar esta opcion"}).first().click();
   await expectGroupPath(page, `/matches/${laterMatchId}`);
   await page.goto(`/admin/matches/${laterMatchId}/result?org=${ORG_SLUG}`);
+  const laterTeams = await confirmedPlayerTeams(page);
+  const expectedLaterPoints = expectedPointsAfterWin(laterTeams, "A", expectedFirstPoints);
   await page.locator('input[name="scoreA"]').fill("2");
   await page.locator('input[name="scoreB"]').fill("0");
   await page.getByRole("button", {name: "Guardar resultado y finalizar", exact: true}).click();
   await expect(page.getByText("Resultado guardado.", {exact: true})).toBeVisible();
-  const laterPoints = points(await standingsFor(page));
+  expect(points(await standingsFor(page))).toEqual(expectedLaterPoints);
   await page.goto(resultUrl);
   await page.locator('input[name="scoreA"]').fill("0");
   await page.getByRole("button", {name: "Guardar correccion", exact: true}).click();
   await expect(page.getByText("Resultado guardado.", {exact: true})).toBeVisible();
-  const corrected = points(await standingsFor(page));
-  for (const prior of standings) expect(corrected[prior.playerId]).toBe(laterPoints[prior.playerId] - 2 * (prior.currentRating - 1000));
+  const correctedFirstPoints = expectedPointsAfterWin(firstTeams, "B", initialPoints);
+  const expectedCorrectedPoints = expectedPointsAfterWin(laterTeams, "A", correctedFirstPoints);
+  expect(points(await standingsFor(page))).toEqual(expectedCorrectedPoints);
   await page.goto(`/matches/${laterMatchId}?org=${ORG_SLUG}`);
   await expect(page.getByRole("group", { name: "Negro 2, Blanco 0", exact: true })).toBeVisible();
 });

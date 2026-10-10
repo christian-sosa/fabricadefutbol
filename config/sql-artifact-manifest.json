@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
-  "revision": "player-position-preferences-20261007",
-  "sha256": "7b52adf61d67e9e979c6a79d04871defafed2dd443dee4bed852f10491b5341e",
+  "revision": "groups-test-contract-20261010",
+  "sha256": "3bcb0aa0018cf6b93dc0a5f981d7da32f525e259bb915ec86e5e22bcd02e1a46",
   "bucket": "groups-sql-artifacts",
-  "object": "7b52adf61d67e9e979c6a79d04871defafed2dd443dee4bed852f10491b5341e.json.gz"
+  "object": "3bcb0aa0018cf6b93dc0a5f981d7da32f525e259bb915ec86e5e22bcd02e1a46.json.gz"
 }

@@ -60,9 +60,11 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     await sql(`update APP.players set is_injured=true where id='${id(100)}';`);
     expect(await rows(`select is_injured from APP.players where id='${id(100)}'`)).toEqual([{ is_injured: true }]);
     expect(await snapshots()).toEqual([{ organization_id: id(11) }]);
+    await sql("reset role;");
     expect(await rows("select id,current_rating,active,created_at from APP.players order by id")).toEqual(before);
     expect(await rows("select * from APP.organization_season_player_ratings")).toEqual(seasonBefore);
     expect(await rows("select * from APP.rating_history")).toEqual([]);
+    await login();
     await sql(`select APP.write_group_public_snapshot('${id(10)}',(select sporting_revision from APP.organizations where id='${id(10)}'),'{"summary":{},"standings":[],"matchHistory":[]}');
       update APP.players set is_injured=false where id='${id(100)}';`);
     expect(await snapshots()).toEqual([{ organization_id: id(11) }]);
@@ -89,6 +91,8 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
   it("denies injury edits by an administrator from another group", async () => {
     await login(2);
     expect(await rows(`update APP.players set is_injured=true where id='${id(100)}' returning id`)).toEqual([]);
+    expect(await rows(`select is_injured from APP.players where id='${id(100)}'`)).toEqual([]);
+    await sql("reset role;");
     expect(await rows(`select is_injured from APP.players where id='${id(100)}'`)).toEqual([{ is_injured: false }]);
     expect(await snapshots()).toEqual([{ organization_id: id(10) }, { organization_id: id(11) }]);
   });

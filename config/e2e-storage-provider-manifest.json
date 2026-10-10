@@ -1,0 +1,25 @@
+{
+  "formatVersion": 1,
+  "provider": "supabase/storage",
+  "sourceCommit": "f31599e188d7c9c854b1daa76a11b41c6d179462",
+  "verifiedAt": "2026-10-09",
+  "verification": "Official migrations reproduced these exact trigger/function fingerprints in PGlite PostgreSQL 18 and matched read-only PostgreSQL 17 metadata from the DEV project. Provider updates require explicit baseline review.",
+  "triggers": [
+    {
+      "name": "protect_objects_delete",
+      "definition": "CREATE TRIGGER protect_objects_delete BEFORE DELETE ON storage.objects FOR EACH STATEMENT EXECUTE FUNCTION storage.protect_delete()",
+      "enabled": "O",
+      "functionSha256": "60b634ed07bf3c08749b31168c62d598f2a9d10f8cef4ee8251bde93909cd30b",
+      "sha256": "65bb6794a4693e58bff21b8dba1aaf0fbf310bf439d4c22831ff23f72a6b144b",
+      "source": "https://github.com/supabase/storage/blob/f31599e188d7c9c854b1daa76a11b41c6d179462/migrations/tenant/0055-prevent-direct-deletes.sql"
+    },
+    {
+      "name": "update_objects_updated_at",
+      "definition": "CREATE TRIGGER update_objects_updated_at BEFORE UPDATE ON storage.objects FOR EACH ROW EXECUTE FUNCTION storage.update_updated_at_column()",
+      "enabled": "O",
+      "functionSha256": "5b3d8ac75beaf9d1532159c055aa927297f5611ad2ea82c27dbadf76887bb25e",
+      "sha256": "e4d2cb31d05512b3c0a519000fe749ff4665d9d3a2557b3f63993b6e052c4794",
+      "source": "https://github.com/supabase/storage/blob/f31599e188d7c9c854b1daa76a11b41c6d179462/migrations/tenant/0011-add-trigger-to-auto-update-updated_at-column.sql"
+    }
+  ]
+}

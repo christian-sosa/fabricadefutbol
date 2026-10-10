@@ -14,6 +14,7 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   outputDir: `test-results/${reportProject}`,
+  snapshotPathTemplate: "{testDir}/visual-baselines/{testFilePath}/{projectName}/{arg}{ext}",
   timeout: 60_000,
   expect: {
     timeout: 15_000

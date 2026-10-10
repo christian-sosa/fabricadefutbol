@@ -72,6 +72,26 @@ describe.skipIf(!privateSqlAvailable(source))("groups database and RLS", () => {
     await expect(db.exec(`insert into app_prod.players(organization_id,full_name,initial_rank) values ('${id(10)}','Repeat',1)`)).rejects.toThrow();
     expect((await db.query(`select current_rating from app_prod.players where id='${id(20)}'`)).rows[0]).toEqual({ current_rating: "1000.00" });
   });
+  it("converges the creation default to five without remapping existing skill values", async () => {
+    await db.exec(`update app_prod.players set skill_level=3 where id='${id(20)}';
+      alter table app_prod.players alter column skill_level set default 3;`);
+    await executePrivateSql(db, readFileSync(source,"utf8").replace("create extension if not exists pgcrypto;",""), "current schema over existing skill default");
+    await executePrivateSql(db, readFileSync("supabase/generated/policies.app_prod.sql","utf8"), "current policies after schema reapply");
+    await db.exec(`insert into app_prod.players(id,organization_id,full_name,initial_rank) values('${id(22)}','${id(10)}','New',2);`);
+    expect((await db.query(`select id,skill_level from app_prod.players where id in ('${id(20)}','${id(22)}') order by id`)).rows).toEqual([
+      {id:id(20),skill_level:3},{id:id(22),skill_level:5}
+    ]);
+  });
+  it("limits active rosters to thirty, frees a retired slot and rejects reactivation over capacity", async () => {
+    await db.exec(`insert into app_prod.players(id,organization_id,full_name,initial_rank) values ${Array.from({length:29},(_,n)=>`('${id(100+n)}','${id(10)}','Extra ${n}',${n+2})`).join(",")};
+      insert into app_prod.players(id,organization_id,full_name,initial_rank,active) values('${id(200)}','${id(10)}','Retired',31,false);
+      select set_config('test.uid','${id(1)}',false); set role authenticated;`);
+    await expect(db.exec(`insert into app_prod.players(organization_id,full_name,initial_rank) values('${id(10)}','Over capacity',32)`)).rejects.toThrow(/30/);
+    await expect(db.exec(`update app_prod.players set active=true where id='${id(200)}'`)).rejects.toThrow(/30/);
+    await db.exec(`update app_prod.players set active=false where id='${id(20)}'; update app_prod.players set active=true where id='${id(200)}'; reset role;`);
+    expect((await db.query(`select count(*)::int as active_count from app_prod.players where organization_id='${id(10)}' and active`)).rows).toEqual([{active_count:30}]);
+    expect((await db.query(`select count(*)::int as active_count from app_prod.players where organization_id='${id(11)}' and active`)).rows).toEqual([{active_count:1}]);
+  });
   it("supports an inclusive year end and a single active season", async () => {
     await db.exec(`insert into app_prod.organization_seasons(organization_id,label,duration_months,starts_at,ends_at) values ('${id(10)}','2026',12,'2026-12-31','2026-12-31')`);
     await expect(db.exec(`insert into app_prod.organization_seasons(organization_id,label,duration_months,starts_at,ends_at) values ('${id(10)}','2027',12,'2027-01-01','2027-12-31')`)).rejects.toThrow();

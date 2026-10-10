@@ -94,6 +94,13 @@ describe("generateBalancedTeamOptions", () => {
     const requiredSeparatedPairs: Array<[string, string]> = players.slice(1, 12).map((player) => [players[0].id, player.id]);
     const options = generateBalancedTeamOptions({ modality: "11v11", players, requiredSeparatedPairs, seed: 9 });
     expect(options).toHaveLength(1);
+    const option = options[0];
+    const sumA = option.teamA.reduce((sum, player) => sum + player.rating, 0);
+    const sumB = option.teamB.reduce((sum, player) => sum + player.rating, 0);
+    expect([sumA, sumB].sort((a, b) => a - b)).toEqual([660, 1056]);
+    expect(option.ratingSumA).toBe(sumA);
+    expect(option.ratingSumB).toBe(sumB);
+    expect(option.ratingDiff).toBe(396);
     const teamA = new Set(options[0].teamA.map((player) => player.id));
     for (const [first, second] of requiredSeparatedPairs) expect(teamA.has(first)).not.toBe(teamA.has(second));
     expect(generateBalancedTeamOptions({ modality: "11v11", players, requiredSeparatedPairs, seed: 9 })).toEqual(options);
@@ -113,6 +120,11 @@ describe("generateBalancedTeamOptions", () => {
     for (const option of options) {
       expect(option.teamA).toHaveLength(size);
       expect(option.teamB).toHaveLength(size);
+      const sumA = option.teamA.reduce((sum, player) => sum + player.rating, 0);
+      const sumB = option.teamB.reduce((sum, player) => sum + player.rating, 0);
+      expect(option.ratingSumA).toBe(sumA);
+      expect(option.ratingSumB).toBe(sumB);
+      expect(option.ratingDiff).toBe(Math.abs(sumA - sumB));
       expect(new Set([...option.teamA, ...option.teamB].map((player) => player.id)))
         .toEqual(new Set(players.map((player) => player.id)));
       expect(option.teamA.some((player) => player.id === players[0].id))

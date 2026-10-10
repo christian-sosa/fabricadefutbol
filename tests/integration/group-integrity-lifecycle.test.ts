@@ -25,6 +25,7 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
       alter table storage.objects enable row level security;
       grant usage on schema auth,storage to anon,authenticated,service_role;
       grant select on storage.objects to anon,authenticated;`);
+    await db.exec("grant insert on storage.objects to authenticated;");
     for (const file of [`schema.${schema}.sql`, `policies.${schema}.sql`, "policies.storage.sql"]) {
       const source = readFileSync(`supabase/generated/${file}`, "utf8").replace("create extension if not exists pgcrypto;", "");
       await executePrivateSql(db, source, file);
@@ -254,9 +255,15 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     expect(await rows("select id from APP.players")).toHaveLength(10);
     expect(await rows("select id from APP_PRIVATE.media_cleanup_jobs")).toHaveLength(0);
   });
-  it("protects player history and atomically queues deletion of an unused player's photo", async () => {
+  it("archives players with history and atomically queues deletion of an unused player's photo", async () => {
     await finish();
-    await expect(sql(`select APP.delete_group_player('${id(20)}','${id(10)}')`)).rejects.toThrow(/historial/);
+    const history = await rows("select * from APP.rating_history order by id");
+    const appearances = await rows("select * from APP.match_players order by player_id");
+    expect(await rows(`select APP.delete_group_player('${id(20)}','${id(10)}') result`)).toEqual([{result:{disposition:"archived",playerId:id(20),alreadyRemoved:false}}]);
+    expect(await rows(`select active from APP.players where id='${id(20)}'`)).toEqual([{active:false}]);
+    expect(await rows("select * from APP.rating_history order by id")).toEqual(history);
+    expect(await rows("select * from APP.match_players order by player_id")).toEqual(appearances);
+    expect(await rows(`select APP.delete_group_player('${id(20)}','${id(10)}') result`)).toEqual([{result:{disposition:"archived",playerId:id(20),alreadyRemoved:true}}]);
     await sql(`reset role; insert into APP.players(id,organization_id,full_name,initial_rank,photo_path) values('${id(70)}','${id(10)}','Unused',11,'${schema}/${id(10)}/${id(70)}/${id(90)}.webp')`);
     await login();
     await sql(`select APP.delete_group_player('${id(70)}','${id(10)}'); reset role`);
@@ -264,15 +271,22 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     expect(await rows(`select id from APP_PRIVATE.media_cleanup_jobs where object_path='${schema}/${id(10)}/${id(70)}/${id(90)}.webp'`)).toHaveLength(1);
   });
   it("reserves orphan cleanup before upload and refuses reattachment after retirement", async () => {
-    await sql(`set role service_role; select APP.enqueue_media_cleanup('${bucket}','${photo}',true); reset role;`);
     await login();
-    await sql(`update APP.players set photo_path='${photo}' where id='${id(20)}'; reset role; set role service_role`);
+    const reservation = (await rows(`select APP.reserve_group_player_photo('${id(10)}','${id(20)}','${id(90)}') result`))[0].result as {reservation_id:string;path:string};
+    expect(reservation.path).toBe(photo);
+    await sql("reset role;");
+    expect(await rows(`select object_path from APP_PRIVATE.media_cleanup_jobs where object_path='${photo}'`)).toEqual([{object_path:photo}]);
+    await login();
+    await sql(`insert into storage.objects(bucket_id,name,owner) values('${bucket}','${photo}','${id(1)}');
+      select APP.finalize_group_player_photo('${id(10)}','${id(20)}','${reservation.reservation_id}'); reset role; set role service_role`);
     expect((await rows("select APP.claim_media_cleanup() jobs"))[0]).toEqual({ jobs: [] });
     await sql(`reset role; update APP.players set photo_path=null where id='${id(20)}'; set role service_role;`);
     const jobs = (await rows("select APP.claim_media_cleanup() jobs"))[0].jobs as unknown[];
     expect(jobs).toHaveLength(1);
     await login();
-    await expect(sql(`update APP.players set photo_path='${photo}' where id='${id(20)}'`)).rejects.toThrow(/retirada/);
+    await expect(sql(`select APP.reserve_group_player_photo('${id(10)}','${id(20)}','${id(90)}')`)).rejects.toThrow(/La reserva ya no esta vigente/);
+    await expect(sql(`update APP.players set photo_path='${photo}' where id='${id(20)}'`)).rejects.toThrow(/reserva/);
+    expect(await rows(`select photo_path from APP.players where id='${id(20)}'`)).toEqual([{photo_path:null}]);
   });
   it("ignores stale retention versions and retains archived media", async () => {
     await sql(`update APP.players set photo_path='${photo}' where id='${id(20)}'; set role service_role`);
