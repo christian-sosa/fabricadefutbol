@@ -21,7 +21,9 @@ export function validateManifest(manifest) {
 }
 export function decodeArtifact(gzip, manifest) {
   validateManifest(manifest);
-  const source = JSON.parse(gunzipSync(gzip, { maxOutputLength: MAX_SQL_BYTES }).toString("utf8"));
+  let source;
+  try { source = JSON.parse(gunzipSync(gzip, { maxOutputLength: MAX_SQL_BYTES }).toString("utf8")); }
+  catch { throw new Error("Artefacto SQL privado ilegible; contenido omitido."); }
   const normalized = encodeSources(source);
   if (normalized.sha256 !== manifest.sha256) throw new Error("El artefacto SQL no coincide con el hash de esta revision.");
   return JSON.parse(normalized.bytes.toString("utf8"));

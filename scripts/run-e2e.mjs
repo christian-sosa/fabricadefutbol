@@ -7,6 +7,8 @@ import { createConnection } from "node:net";
 import { existsSync } from "node:fs";
 import { readE2eEnvironment, validateE2eEnvironment } from "./lib/e2e-env.mjs";
 import { fixtureLeaseRpc, startLeaseHeartbeat } from "./lib/e2e-lease.mjs";
+import { checkE2eSqlContract } from "./lib/e2e-sql-contract.mjs";
+import { E2eProcessExitError, runE2eProjects } from "./lib/e2e-projects.mjs";
 
 const env = validateE2eEnvironment(readE2eEnvironment());
 const lockKey = createHash("sha256").update(`${env.NEXT_PUBLIC_SUPABASE_URL_DEV}:fdf-e2e`).digest("hex").slice(0, 16);
@@ -42,7 +44,11 @@ async function run(script, parameters) {
     const child = spawn(process.execPath, [script, ...parameters], {env, stdio: "inherit", windowsHide: true, signal: abort.signal});
     // AbortError fires before the child has exited. Keep the shared lease until exit.
     child.once("error", (error) => { if (error.name !== "AbortError") reject(error); });
-    child.once("exit", (code, signal) => code === 0 && !leaseFailure ? resolve() : reject(leaseFailure ?? new Error(`La validacion termino con ${signal || code}.`)));
+    child.once("exit", (code, signal) => code === 0 && !leaseFailure ? resolve() : reject(leaseFailure ?? (
+      signal ? new Error(`La validación fue interrumpida por ${signal}.`)
+        : typeof code === "number" ? new E2eProcessExitError(code)
+          : new Error("El proceso E2E termino sin un codigo de salida valido.")
+    )));
   });
 }
 try {
@@ -56,6 +62,7 @@ try {
     socket.once("error", () => resolve(false));
   });
   if (occupied) throw new Error("El puerto E2E esta ocupado. Cierra el servidor anterior antes de validar la version compilada.");
+  await checkE2eSqlContract({ env });
   leaseHeld = await fixtureLeaseRpc("acquire", token, env);
   if (!leaseHeld) throw new Error("Otra ejecucion local o CI esta usando el fixture compartido. Reintenta al terminar.");
   stopHeartbeat = startLeaseHeartbeat(() => fixtureLeaseRpc("heartbeat", token, env), (error) => {
@@ -64,15 +71,27 @@ try {
   });
   await mkdir("tmp/e2e", {recursive: true});
   await run("node_modules/next/dist/bin/next", ["build"]);
-  for (const project of projects) {
-    env.E2E_REPORT_PROJECT = project;
-    await run("node_modules/@playwright/test/cli.js", ["test", `--project=${project}`, ...forwarded]);
-    const identityPath = `tmp/e2e/identity-${token}.json`;
-    try {
-      const identity = JSON.parse(await readFile(identityPath, "utf8"));
-      if (identity.token === token && identity.userId) env.E2E_ADMIN_USER_ID = identity.userId;
-    } catch { /* Existing accredited identities require no handoff. */ }
-  }
+  await runE2eProjects({
+    projects,
+    assertSafe: async () => {
+      if (leaseFailure) throw leaseFailure;
+      const cleanupFailurePath = `tmp/e2e/abort-${token}.json`;
+      if (existsSync(cleanupFailurePath)) throw new Error("Se detuvo E2E por una limpieza incompleta del fixture descartable. Revisá los recursos de esta ejecución.");
+      if (!await fixtureLeaseRpc("heartbeat", token, env)) throw new Error("Se perdió la reserva compartida del fixture E2E.");
+    },
+    runProject: async (project) => {
+      env.E2E_REPORT_PROJECT = project;
+      await run("node_modules/@playwright/test/cli.js", ["test", `--project=${project}`, ...forwarded]);
+    },
+    afterProject: async () => {
+      const identityPath = `tmp/e2e/identity-${token}.json`;
+      try {
+        const identity = JSON.parse(await readFile(identityPath, "utf8"));
+        if (identity.token === token && identity.userId) env.E2E_ADMIN_USER_ID = identity.userId;
+      } catch { /* Existing accredited identities require no handoff. */ }
+    },
+    reportFailure: (project) => console.error(`Falló ${project}; se conserva el error mientras se recopilan los diagnósticos solicitados.`)
+  });
 } finally {
   try {
     await stopHeartbeat?.();

@@ -1,0 +1,74 @@
+{
+  "formatVersion": 1,
+  "artifactKind": "sql-upgrades",
+  "revision": "groups-upgrades-audit-positions-20261009",
+  "sha256": "cae17e5a59acae29bf56c1e54bafdd06a2abfb96c3b22fea65e4bea413a3f6c7",
+  "bucket": "groups-sql-artifacts",
+  "object": "cae17e5a59acae29bf56c1e54bafdd06a2abfb96c3b22fea65e4bea413a3f6c7.json.gz",
+  "fileSha256": {
+    "audit-baseline/group-match-workflow.sql": "a9c6c9827663d613d456df54f4fc0b9d4d6938d3b4232a45110a67880f51dcc9",
+    "audit-baseline/policies.sql": "11883051ff561125c3874d4a69add2b8cfefd5bb4194add3575faf049d9e422a",
+    "audit-baseline/schema.sql": "392c8c958ed019bca21c30976191be4e60bec441fc2153c337b095f9ef840b3f",
+    "audit-migrations/dev-activation.sql": "77dd7cbbe1a3d4b8713d55253edb96ff2df33f44987eca0a39ee91d34c9f4dab",
+    "audit-migrations/dev-additive.sql": "3e9260a3b4f03fc03f899c48b8757b17f60811ff08880ec82c34a18072acd375",
+    "audit-migrations/prod-activation.sql": "1836c0884fd4bc822fcd310bfb759022ac35d73962d554c6cb24135efc643feb",
+    "audit-migrations/prod-additive.sql": "8b1a5f182e1f0d5947361740397705aeee5becafce3891f4bc7de83137989fc3",
+    "positions-baseline/group-match-workflow.sql": "0b1d28e54c3c40b1fa4faf656cacb013d603dcae0705d5d43fe838fb1054dca3",
+    "positions-baseline/policies.sql": "3348af825734ca18cd9b2eeb8f6ed9414d0117b11eb198f8ac5c652cee047e27",
+    "positions-baseline/schema.sql": "d2b5fec11ad8d1aab97ea215283a161877eda3cf916ce97df6b5ef219b7c05a3",
+    "positions-migrations/app_dev.sql": "96b6f1eb8842a1616d4d701e179a2ad3bbceffb9cdb9e5c8971ea5ed9540cdba",
+    "positions-migrations/app_prod.sql": "eaf0c01c822871dc3cdf21f3c54cd487f05a328d1e6c0387d2016e73c8eaddbc",
+    "positions-prerequisites/app_dev.sql": "d357e9a37008c834ced9cf1759ab8ec813b875e877b3deaecf8d57047b94a532",
+    "positions-prerequisites/app_prod.sql": "696ea7c5d6378385268982dae2e70f3e7f8abc9afa5f51ecc753393be47d187d"
+  },
+  "baselines": {
+    "audit": {
+      "formatVersion": 1,
+      "revision": "substitutes-private-scorers-20260925",
+      "sha256": "06445373beef58ca8dfe1102b5ff8f46183a92a187716ee43d6390f0805a1f6b",
+      "bucket": "groups-sql-artifacts",
+      "object": "06445373beef58ca8dfe1102b5ff8f46183a92a187716ee43d6390f0805a1f6b.json.gz"
+    },
+    "positions": {
+      "formatVersion": 1,
+      "revision": "restore-injury-ranking-20261002",
+      "sha256": "6cdc3998e1f6a00d96140ccfb8c5d7383b03444ec8101879711842ed9096e145",
+      "bucket": "groups-sql-artifacts",
+      "object": "6cdc3998e1f6a00d96140ccfb8c5d7383b03444ec8101879711842ed9096e145.json.gz"
+    }
+  },
+  "migrations": {
+    "auditDevAdditive": {
+      "version": "20260930150949",
+      "name": "groups_audit_dev_additive_20260930"
+    },
+    "auditDevActivation": {
+      "version": "20260930151029",
+      "name": "groups_audit_dev_activation_20260930"
+    },
+    "auditProdAdditive": {
+      "version": "20260930155348",
+      "name": "groups_audit_prod_additive_20260930"
+    },
+    "auditProdActivation": {
+      "version": "20260930162909",
+      "name": "groups_audit_prod_activation_20260930"
+    },
+    "positionsDev": {
+      "version": "20261007154147",
+      "name": "player_positions_app_dev"
+    },
+    "positionsProd": {
+      "version": "20261007160820",
+      "name": "player_positions_app_prod"
+    },
+    "positionsPrerequisiteDev": {
+      "version": "20261005135427",
+      "name": "group_player_capacity_and_roster_removal_app_dev_20261005"
+    },
+    "positionsPrerequisiteProd": {
+      "version": "20261005135742",
+      "name": "group_player_capacity_and_roster_removal_app_prod_20261005"
+    }
+  }
+}

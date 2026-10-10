@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import path from "node:path";
 
 import { getCurrentMatchDateInput } from "../../src/lib/match-datetime";
 import { E2E_ORGANIZATION_ID, E2E_PLAYER_IDS } from "./test-data";
@@ -225,9 +226,23 @@ for (const scenario of [
       expect(await publicPositionsA.getByRole("img").evaluateAll((slots) => slots.map((slot) => slot.getAttribute("aria-label")))).toEqual(positionsA);
       expect(await publicPositionsB.getByRole("img").evaluateAll((slots) => slots.map((slot) => slot.getAttribute("aria-label")))).toEqual(positionsB);
       await expectNoHorizontalOverflow(publicPage);
+      await publicPositionsA.scrollIntoViewIfNeeded();
+      await expect.poll(() => publicPositionsA.evaluate((pitch) => {
+        const bounds = pitch.getBoundingClientRect();
+        return bounds.top >= 0 && bounds.bottom <= window.innerHeight;
+      })).toBe(true);
       const screenshot = testInfo.outputPath(`${scenario.modality}-cancha-320px.png`);
       await publicPositionsA.screenshot({ path: screenshot, animations: "disabled" });
       await testInfo.attach(`${scenario.modality}-cancha-320px`, { path: screenshot, contentType: "image/png" });
+      if (scenario.modality === "5v5" || scenario.modality === "11v11") {
+        // Compare the pitch, shirts and slot geometry across Windows and Linux.
+        // Names are asserted above; fixed transparent name boxes remove platform
+        // font rasterization from the visual oracle without masking the players.
+        await expect(publicPositionsA).toHaveScreenshot(`${scenario.modality}-pitch-320px.png`, {
+          animations: "disabled", scale: "css", threshold: 0.15, maxDiffPixels: 32,
+          stylePath: path.resolve("tests/e2e/visual-pitch.css")
+        });
+      }
       await publicPage.setViewportSize(originalViewport);
       await publicPage.reload();
       await expect(publicTeams.getByRole("group", { name: /^Cancha de / })).toHaveCount(2);

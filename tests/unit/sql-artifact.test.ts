@@ -27,6 +27,16 @@ describe("immutable private SQL artifacts", () => {
   it.each([{bucket: "public"}, {object: "../schema.sql"}, {sha256: "unverified"}, {revision: "../release"}, {formatVersion: 2}])("rejects malformed manifest %j", (change) => {
     expect(() => validateManifest({...manifest, ...change})).toThrow("Manifiesto");
   });
+  it("omits malformed private content from decoding errors", () => {
+    const privateSql = "PRIVATE SQL SOURCE MUST NOT APPEAR";
+    try { decodeArtifact(gzipSync(Buffer.from(privateSql)), manifest); }
+    catch (error) {
+      expect(String(error)).not.toContain(privateSql);
+      expect(error).not.toHaveProperty("cause");
+      return;
+    }
+    throw new Error("Expected malformed artifact rejection");
+  });
   it("downloads a private exact-hash object and refuses redirects and failed responses", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(new Uint8Array(artifact.gzip)));
     expect(await downloadArtifact(manifest, env, fetcher)).toEqual(artifact.gzip);

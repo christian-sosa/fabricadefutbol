@@ -14,6 +14,30 @@
       "npm run verify"
     ]
   },
+  "testing": {
+    "full_validation": "npm run verify:smoke",
+    "partial_validation": "npm run test:fast (explicitly skips private SQL; cannot certify a release)",
+    "runtime": "Node from .nvmrc; full validation requires hash-verified canonical SQL and exact historical upgrade artifacts.",
+    "principles": [
+      "Before adding a test, identify the observable behavior, relevant input/state classes and a realistic regression it must detect. Reuse existing coverage where possible.",
+      "Prefer integration tests with real PostgreSQL/RLS and real transport contracts. Use pure unit tests for deterministic algorithms and UI tests for interactions.",
+      "Keep doubles at external boundaries or to provoke difficult failures. Do not mock the behavior being tested or reproduce the implementation in the expected result.",
+      "Use independent expected values for points, partitions and preservation of historical data. Test source strings only for explicit architecture or privacy constraints.",
+      "For important bugs, demonstrate failure without the fix and success with it. For critical test additions, run a targeted valid mutation and require an assertion failure.",
+      "Review tests independently for surviving regressions, vacuous assertions, own-module mocks and reductions in include, thresholds, assertions or executed suites.",
+      "Report executed and omitted suites, selected coverage denominator, runtime and meaningful limitations. Fewer tests can improve quality when duplicates or implementation checks are removed.",
+      "E2E must verify DEV SQL against this commit's artifact before fixture writes, use accredited disposable identities and preserve the shared lease throughout execution and cleanup.",
+      "Never run dev/typegen/build simultaneously against .next, publish private SQL or credentials to Git, or modify production identities to prepare tests."
+    ],
+    "examples": [
+      "tests/ui/admin-players-page.test.tsx",
+      "tests/integration/group-security-rollout.test.ts",
+      "tests/unit/team-generator.test.ts",
+      "tests/e2e/smoke.spec.ts"
+    ],
+    "regression_probe": "npm run test:mutations",
+    "postgres_concurrency": "npm run test:postgres requires PostgreSQL 17 on loopback and an empty, dedicated fdf_test_concurrency database via TEST_DATABASE_URL. CI provides an isolated service; no production or shared DEV connection is accepted."
+  },
   "orientation": {
     "public_app": [
       "src/app/(public)",

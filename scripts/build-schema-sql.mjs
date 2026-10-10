@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { buildSchemaSources } from "./lib/schema-sql.mjs";
 
 const schemaName = (process.argv[2] || process.env.APP_SCHEMA || "").trim();
 
@@ -19,29 +20,6 @@ const policiesSqlPath = path.join(root, "supabase", "policies.sql");
 const matchWorkflowSqlPath = path.join(root, "supabase", "group-match-workflow.sql");
 const outputDir = path.join(root, "supabase", "generated");
 
-function replacePublicSchema(sql, targetSchema) {
-  return sql
-    .replace(/\bpublic_private\b/g, `${targetSchema}_private`)
-    .replace(/\bcreate schema if not exists public\b/gi, `create schema if not exists ${targetSchema}`)
-    .replace(/'public\//g, `'${targetSchema}/`)
-    .replace(/set search_path = public\b/g, `set search_path = ${targetSchema}, public`)
-    .replace(/\bgrant usage on schema public\b/g, `grant usage on schema ${targetSchema}`)
-    .replace(/\bpublic\./g, `${targetSchema}.`)
-    .replace(/'public'/g, `'${targetSchema}'`);
-}
-
-function splitStoragePolicies(sql) {
-  const marker = "-- STORAGE POLICIES (GLOBAL)";
-  const markerIndex = sql.indexOf(marker);
-  if (markerIndex < 0) {
-    return { core: sql, storage: "" };
-  }
-  return {
-    core: sql.slice(0, markerIndex).trimEnd() + "\n",
-    storage: sql.slice(markerIndex).trimStart()
-  };
-}
-
 async function main() {
   const [schemaSqlRaw, policiesSqlRaw, matchWorkflowSqlRaw] = await Promise.all([
     readFile(schemaSqlPath, "utf8"),
@@ -49,9 +27,7 @@ async function main() {
     readFile(matchWorkflowSqlPath, "utf8")
   ]);
 
-  const { core: policiesCoreRaw, storage: storagePoliciesRaw } = splitStoragePolicies(policiesSqlRaw);
-  const transformedSchema = replacePublicSchema(`${schemaSqlRaw}\n${matchWorkflowSqlRaw}`, schemaName);
-  const transformedPolicies = replacePublicSchema(policiesCoreRaw, schemaName);
+  const generated = buildSchemaSources({ "schema.sql": schemaSqlRaw, "policies.sql": policiesSqlRaw, "group-match-workflow.sql": matchWorkflowSqlRaw }, schemaName);
 
   await mkdir(outputDir, { recursive: true });
 
@@ -60,9 +36,9 @@ async function main() {
   const outStoragePoliciesPath = path.join(outputDir, "policies.storage.sql");
 
   await Promise.all([
-    writeFile(outSchemaPath, transformedSchema, "utf8"),
-    writeFile(outPoliciesPath, transformedPolicies, "utf8"),
-    writeFile(outStoragePoliciesPath, storagePoliciesRaw, "utf8")
+    writeFile(outSchemaPath, generated[`schema.${schemaName}.sql`], "utf8"),
+    writeFile(outPoliciesPath, generated[`policies.${schemaName}.sql`], "utf8"),
+    writeFile(outStoragePoliciesPath, generated["policies.storage.sql"], "utf8")
   ]);
 
   console.log(`Generado: ${path.relative(root, outSchemaPath)}`);
