@@ -5,3 +5,5 @@ export function localConcurrencyDatabase(env?: Record<string, string | undefined
 };
 export class PrivatePostgresError extends Error { code: string; label: string; constructor(label: string, error: unknown); }
 export function assertLoopbackSocket(address: unknown): void;
+export function rollbackThenReset(client: { query(query: string, values?: unknown[]): Promise<unknown> }): Promise<void>;
+export function preserveFailureDuringCleanup<T>(operation: () => Promise<T>, cleanup: () => Promise<void>): Promise<T>;

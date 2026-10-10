@@ -48,6 +48,33 @@ export async function privateQuery(client, text, values = [], label = "Consulta 
   catch (error) { throw new PrivatePostgresError(label, error); }
 }
 
+/** Recovery must be its own command: an aborted transaction rejects RESET. */
+export async function rollbackThenReset(client) {
+  await privateQuery(client, "rollback", [], "Rollback de transaccion sintetica");
+  await privateQuery(client, "reset role", [], "Restaurar rol sintetico");
+}
+
+// Only this module creates this class, exclusively from already sanitized
+// diagnostic messages. Nested recovery must preserve those earlier SQLSTATEs.
+class CombinedPrivateFailure extends Error {}
+
+export async function preserveFailureDuringCleanup(operation, cleanup) {
+  let value, primary, failed = false;
+  try { value = await operation(); }
+  catch (error) { primary = error; failed = true; }
+  try { await cleanup(); }
+  catch (cleanupError) {
+    if (!failed) throw cleanupError;
+    const safe = (error) => error instanceof PrivatePostgresError || error instanceof CombinedPrivateFailure
+      ? error.message : "Error no SQL; diagnostico omitido.";
+    // Keep both SQLSTATE/operation labels without attaching raw errors, query
+    // bodies, cause or provider diagnostics to the combined exception.
+    throw new CombinedPrivateFailure(`Fallo original: ${safe(primary)} Cleanup adicional: ${safe(cleanupError)}`);
+  }
+  if (failed) throw primary;
+  return value;
+}
+
 export async function connectPrivate(client) {
   let connected = false;
   try {
@@ -99,6 +126,7 @@ export const syntheticBootstrap = `
   grant usage on schema auth,storage to anon,authenticated,service_role;
   grant select on storage.objects to anon,authenticated;
   grant insert,update,delete on storage.objects to authenticated;
+  grant select,insert,update on storage.objects to service_role;
 `;
 
 export async function authenticate(client, userId, role = "authenticated") {
@@ -132,7 +160,8 @@ export async function waitForDatabaseLock(controller, controllerPid, workerPid, 
 
 /** Only callable after the empty-database guard and a committed bootstrap. */
 export async function cleanupSyntheticDatabase(client) {
-  await privateQuery(client, "reset role; rollback; set statement_timeout='5000ms'; set lock_timeout='2000ms'", [], "Preparar cleanup sintetico");
+  await rollbackThenReset(client);
+  await privateQuery(client, "set statement_timeout='5000ms'; set lock_timeout='2000ms'", [], "Preparar cleanup sintetico");
   await privateQuery(client, `begin;
     drop schema if exists app_dev_private,app_dev,auth,storage_private,storage cascade;
     drop extension if exists pgcrypto cascade;

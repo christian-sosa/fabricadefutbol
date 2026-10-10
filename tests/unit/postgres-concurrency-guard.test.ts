@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertLoopbackSocket, localConcurrencyDatabase, PrivatePostgresError } from "../../scripts/lib/postgres-concurrency.mjs";
+import { assertLoopbackSocket, localConcurrencyDatabase, preserveFailureDuringCleanup, PrivatePostgresError } from "../../scripts/lib/postgres-concurrency.mjs";
 
 describe("isolated PostgreSQL concurrency boundary", () => {
   it.each(["127.0.0.1", "localhost", "[::1]"])("accepts only the named local synthetic database on %s", (host) => {
@@ -37,5 +37,33 @@ describe("isolated PostgreSQL concurrency boundary", () => {
     expect(error.message).toBe("Carrera sintetica fallo (SQLSTATE 42501); consulta y fuente privadas omitidas.");
     expect(error).not.toHaveProperty("cause");
     expect(new PrivatePostgresError("Conexion", { code: "SECRET-TOKEN" }).code).toBe("unknown");
+  });
+  it("preserves the original failure when recovery succeeds", async () => {
+    const original = new PrivatePostgresError("Guardar resultado", { code: "42501", message: "PRIVATE SOURCE" });
+    let recovered = false;
+    await expect(preserveFailureDuringCleanup(async () => { throw original; }, async () => { recovered = true; })).rejects.toBe(original);
+    expect(recovered).toBe(true);
+  });
+  it("reports both sanitized SQL failures when recovery also fails", async () => {
+    const original = new PrivatePostgresError("Guardar resultado", { code: "42501", message: "PRIVATE SOURCE" });
+    const cleanup = new PrivatePostgresError("Rollback sintetico", { code: "57014", query: "PRIVATE QUERY" });
+    const failure = await preserveFailureDuringCleanup(async () => { throw original; }, async () => { throw cleanup; }).catch((error: Error) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toContain("Guardar resultado fallo (SQLSTATE 42501)");
+    expect((failure as Error).message).toContain("Rollback sintetico fallo (SQLSTATE 57014)");
+    expect((failure as Error).message).not.toContain("PRIVATE");
+    expect(failure).not.toHaveProperty("cause");
+  });
+  it("retains each sanitized SQLSTATE across nested recovery failures", async () => {
+    const primary = new PrivatePostgresError("Guardar resultado", { code: "42501", message: "PRIVATE SOURCE" });
+    const inner = new PrivatePostgresError("Rollback carrera", { code: "57014", query: "PRIVATE QUERY" });
+    const outer = new PrivatePostgresError("Cleanup base", { code: "08006", detail: "PRIVATE DETAIL" });
+    const failure = await preserveFailureDuringCleanup(
+      () => preserveFailureDuringCleanup(async () => { throw primary; }, async () => { throw inner; }),
+      async () => { throw outer; }
+    ).catch((error: Error) => error);
+    for (const code of ["42501", "57014", "08006"]) expect((failure as Error).message).toContain(`SQLSTATE ${code}`);
+    expect((failure as Error).message).not.toContain("PRIVATE");
+    expect(failure).not.toHaveProperty("cause");
   });
 });

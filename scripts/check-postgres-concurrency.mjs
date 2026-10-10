@@ -7,7 +7,7 @@ import { buildSchemaSources } from "./lib/schema-sql.mjs";
 import {
   localConcurrencyDatabase, PrivatePostgresError, privateQuery, connectPrivate, claimEmptyDatabase,
   syntheticBootstrap, authenticate, observeQuery, waitForDatabaseLock,
-  cleanupSyntheticDatabase
+  cleanupSyntheticDatabase, rollbackThenReset, preserveFailureDuringCleanup
 } from "./lib/postgres-concurrency.mjs";
 
 const id = (number) => `00000000-0000-4000-8000-${String(number).padStart(12, "0")}`;
@@ -32,7 +32,11 @@ async function seedFixtures(controller) {
   }
   await privateQuery(controller, `insert into app_dev.players(id,organization_id,full_name,initial_rank,photo_path,photo_updated_at,created_at,updated_at)
     values($1,$2,'Synthetic photo player',1,$3,'2000-01-01','2000-01-01','2000-01-01')`, [photoPlayer, photoGroup, oldPhoto]);
-  await privateQuery(controller, "insert into storage.objects(bucket_id,name,owner,created_at,updated_at) values($1,$2,$3,'2000-01-01','2000-01-01')", [bucket, oldPhoto, owner]);
+  // Legacy metadata is restored by Storage's trusted maintenance role. Keep
+  // reservation enforcement on; only the subsequent user upload consumes quota.
+  await authenticate(controller, null, "service_role");
+  await privateQuery(controller, "insert into storage.objects(bucket_id,name,owner,created_at,updated_at) values($1,$2,$3,'2000-01-01','2000-01-01')", [bucket, oldPhoto, owner], "Restaurar metadata legacy sintetica con rol confiable");
+  await privateQuery(controller, "reset role");
   await privateQuery(controller, "insert into app_dev.matches(id,organization_id,created_by,modality,scheduled_at) values($1,$2,$3,'5v5','2026-09-01T20:00:00Z')", [matchId, sportingGroup, owner]);
   await privateQuery(controller, `insert into app_dev.team_options(id,match_id,option_number,rating_sum_a,rating_sum_b,rating_diff,created_by)
     values($1,$2,1,5000,5000,0,$3)`, [optionId, matchId, owner]);
@@ -43,6 +47,10 @@ async function seedFixtures(controller) {
   await authenticate(controller, owner);
   await privateQuery(controller, "select app_dev.confirm_group_match_option($1,$2,$3)", [matchId, sportingGroup, optionId], "Confirmar equipos sinteticos");
   await privateQuery(controller, "reset role; select app_dev_private.activate_group_security_controls()");
+  const settings = await privateQuery(controller,
+    "select enforce_reservations from app_dev_private.photo_upload_settings", [], "Acreditar controles activos antes de las carreras");
+  assert.deepEqual(settings.rows, [{ enforce_reservations: true }],
+    "Las carreras deben empezar con reservas de foto obligatorias.");
 }
 
 async function sportingState(controller) {
@@ -76,7 +84,7 @@ async function revokeWhileWaiting(controller, worker, pids) {
     "El miembro debe poder guardar antes de la revocacion.");
   const input = JSON.stringify({ scoreA: 2, scoreB: 0, mvpParticipantId: `player:${id(20)}` });
   let pending;
-  try {
+  await preserveFailureDuringCleanup(async () => {
     await holdGroup(controller, sportingGroup);
     pending = observeQuery(privateQuery(worker, "select app_dev.save_group_match_result($1,$2,$3,$4::jsonb) as result",
       [matchId, sportingGroup, version, input], "Guardar resultado durante revocacion"));
@@ -103,11 +111,11 @@ async function revokeWhileWaiting(controller, worker, pids) {
     assert.deepEqual(finished.players.map((player) => Number(player.current_rating)), [...Array(5).fill(1010), ...Array(5).fill(990)]);
     assert.equal(finished.result.length, 1);
     assert.equal(finished.result[0].mvp_player_id, id(20));
-  } finally {
-    await privateQuery(controller, "reset role; rollback");
+  }, async () => {
+    await rollbackThenReset(controller);
     if (pending) await pending.promise;
-    await privateQuery(worker, "reset role");
-  }
+    await rollbackThenReset(worker);
+  });
   console.log("PostgreSQL 17: permiso revocado durante lock real rechazado sin escrituras parciales; control positivo valido.");
 }
 
@@ -126,7 +134,7 @@ async function newPhotoWhileRetiring(controller, worker, pids) {
   assert.deepEqual(candidate, { photo_path: oldPhoto, inactive: true }, "La foto vieja debe ser elegible antes de la carrera.");
   await authenticate(worker, null, "service_role");
   let pending;
-  try {
+  await preserveFailureDuringCleanup(async () => {
     await holdGroup(controller, photoGroup);
     pending = observeQuery(privateQuery(worker, "select app_dev.retire_group_player_photo($1,$2,$3,$4::timestamptz) as retired",
       [photoPlayer, photoGroup, oldPhoto, cutoff], "Retirar foto durante finalizacion"));
@@ -160,11 +168,11 @@ async function newPhotoWhileRetiring(controller, worker, pids) {
     assert.equal((await privateQuery(controller, "select photo_path from app_dev.players where id=$1", [photoPlayer])).rows[0].photo_path, null);
     assert.deepEqual((await privateQuery(controller, "select completed_at is not null as completed,last_error from app_dev_private.media_cleanup_jobs where object_path=$1", [reservation.path])).rows,
       [{ completed: false, last_error: null }]);
-  } finally {
-    await privateQuery(controller, "reset role; rollback");
+  }, async () => {
+    await rollbackThenReset(controller);
     if (pending) await pending.promise;
-    await privateQuery(worker, "reset role");
-  }
+    await rollbackThenReset(worker);
+  });
   console.log("PostgreSQL 17: foto finalizada durante lock real conserva metadata, reserva y cuota; retencion obsoleta pierde y control positivo retira.");
 }
 
@@ -173,7 +181,7 @@ async function runSyntheticScenario(config, sources, failAfterSchema) {
   let ownedResourcesCreated = false, controllerConnected = false, workerConnected = false;
   // Never print driver notices/errors containing private query bodies.
   controller.on("error", () => {}); worker.on("error", () => {});
-  try {
+  await preserveFailureDuringCleanup(async () => {
     await connectPrivate(controller); controllerConnected = true;
     await claimEmptyDatabase(controller);
     await privateQuery(controller, "begin");
@@ -185,7 +193,9 @@ async function runSyntheticScenario(config, sources, failAfterSchema) {
       await privateQuery(controller, sources[name], [], `Aplicar ${name} acreditado`);
       if (failAfterSchema && name === "schema.app_dev.sql") {
         // This canonical source has already executed its own COMMIT. A real
-        // PostgreSQL error here must clean even those committed DDL resources.
+        // error inside a new BEGIN must recover the aborted transaction AND
+        // clean even those already committed DDL resources.
+        await privateQuery(controller, "begin");
         await privateQuery(controller, "select 1/0", [], CLEANUP_SENTINEL);
       }
     }
@@ -200,7 +210,7 @@ async function runSyntheticScenario(config, sources, failAfterSchema) {
     assert.notEqual(pids.controller, pids.worker, "Las carreras requieren dos conexiones PostgreSQL independientes.");
     await revokeWhileWaiting(controller, worker, pids);
     await newPhotoWhileRetiring(controller, worker, pids);
-  } finally {
+  }, async () => {
     // Teardown must still run if closing the second connection fails.
     let shutdownFailure;
     if (workerConnected) {
@@ -209,7 +219,7 @@ async function runSyntheticScenario(config, sources, failAfterSchema) {
     }
     try {
       if (ownedResourcesCreated) await cleanupSyntheticDatabase(controller);
-      else if (controllerConnected) await privateQuery(controller, "reset role; rollback");
+      else if (controllerConnected) await rollbackThenReset(controller);
     } finally {
       if (controllerConnected) {
         try { await controller.end(); }
@@ -217,24 +227,24 @@ async function runSyntheticScenario(config, sources, failAfterSchema) {
       }
     }
     if (shutdownFailure) throw shutdownFailure;
-  }
+  });
 }
 
 async function assertFreshFromNewConnection(config) {
   const verifier = new pg.Client(config);
   verifier.on("error", () => {});
   let connected = false;
-  try {
+  await preserveFailureDuringCleanup(async () => {
     await connectPrivate(verifier); connected = true;
     // A new session checks committed schemas, roles, functions and the advisory
     // lock after teardown; the previous session cannot hide uncommitted work.
     await claimEmptyDatabase(verifier);
-  } finally {
+  }, async () => {
     if (connected) {
       try { await verifier.end(); }
       catch { throw new Error("No se pudo cerrar la conexion verificadora sintetica; diagnostico privado omitido."); }
     }
-  }
+  });
 }
 
 export async function checkPostgresConcurrency({ env = process.env, root = process.cwd() } = {}) {
@@ -243,11 +253,14 @@ export async function checkPostgresConcurrency({ env = process.env, root = proce
   let inducedFailure;
   try { await runSyntheticScenario(config, sources, true); }
   catch (error) { inducedFailure = error; }
+  // Do not hide the original SQLSTATE behind a generic sentinel assertion.
+  if (inducedFailure && (!(inducedFailure instanceof PrivatePostgresError)
+    || inducedFailure.label !== CLEANUP_SENTINEL || inducedFailure.code !== "22012")) throw inducedFailure;
   assert.ok(inducedFailure instanceof PrivatePostgresError, "El control negativo debe provocar un error PostgreSQL real.");
   assert.equal(inducedFailure.label, CLEANUP_SENTINEL, "Una falla incidental de bootstrap o cleanup no acredita el control negativo.");
   assert.equal(inducedFailure.code, "22012", "El control negativo debe fallar exactamente por division por cero.");
   await assertFreshFromNewConnection(config);
-  console.log("PostgreSQL 17: error real 22012 despues de schema confirmado; cleanup verificado desde una conexion nueva.");
+  console.log("PostgreSQL 17: error real 22012 dentro de BEGIN despues de schema confirmado; rollback y cleanup verificados desde una conexion nueva.");
   await runSyntheticScenario(config, sources, false);
   await assertFreshFromNewConnection(config);
   console.log("PostgreSQL 17: cleanup normal verificado desde una conexion nueva; base sintetica lista para repetir.");
