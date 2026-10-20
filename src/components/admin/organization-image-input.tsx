@@ -2,7 +2,6 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { prepareOrganizationImage } from "@/lib/prepare-organization-image";
 
 export function OrganizationImageInput() {
   const id = useId();
@@ -21,6 +20,8 @@ export function OrganizationImageInput() {
       setBusy(true); setStatus("Preparando portada…");
       input.setCustomValidity("Esperá a que termine de prepararse la portada.");
       try {
+        const { prepareOrganizationImage } = await import("@/lib/prepare-organization-image");
+        if (sequence.current !== currentSequence) return;
         const prepared = await prepareOrganizationImage(file);
         if (sequence.current !== currentSequence) return;
         const transfer = new DataTransfer();

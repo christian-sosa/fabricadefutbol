@@ -9,7 +9,7 @@ describe("player photo dialog", () => {
     const { container } = render(<><button>Otra acción</button><PlayerPhotoModalTrigger hasPhoto={false} playerName="Ana" /></>);
     const trigger = screen.getByRole("button", { name: "Ver foto de Ana" });
     await user.click(trigger);
-    const dialog = screen.getByRole("dialog", { name: "Foto de Ana" });
+    const dialog = await screen.findByRole("dialog", { name: "Foto de Ana" });
     const close = within(dialog).getByRole("button", { name: "Cerrar" });
     expect(close).toHaveFocus();
     expect(container.inert).toBe(true);

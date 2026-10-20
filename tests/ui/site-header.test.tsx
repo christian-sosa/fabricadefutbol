@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
   signOut: vi.fn(),
   getSession: vi.fn(),
+  onAuthStateChange: vi.fn(),
+  from: vi.fn(),
   unsubscribe: vi.fn(),
   unavailable: false
 }));
@@ -22,10 +24,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/supabase/client", () => ({
   createSupabaseBrowserClient: () => {
     if (mocks.unavailable) throw new Error("unavailable");
-    return { auth: {
+    return { from: mocks.from, auth: {
       getSession: mocks.getSession,
       signOut: mocks.signOut,
-      onAuthStateChange: () => ({data: {subscription: {unsubscribe: mocks.unsubscribe}}})
+      onAuthStateChange: mocks.onAuthStateChange
     }};
   }
 }));
@@ -38,6 +40,31 @@ describe("SiteHeader", () => {
     mocks.unavailable = false;
     mocks.getSession.mockResolvedValue({data: {session: {user: {id: "fixture"}}}});
     mocks.signOut.mockResolvedValue({error: null});
+    mocks.onAuthStateChange.mockReturnValue({data: {subscription: {unsubscribe: mocks.unsubscribe}}});
+  });
+
+  it("conserva los cambios externos de sesión y libera la suscripción al desmontar", async () => {
+    mocks.getSession.mockResolvedValue({data: {session: null}});
+    const { unmount } = render(<SiteHeader />);
+    await waitFor(() => expect(mocks.onAuthStateChange).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("link", {name: "Ingresar / Registro"})).toBeVisible();
+    const onAuthChange = mocks.onAuthStateChange.mock.calls[0][0];
+    act(() => onAuthChange("SIGNED_IN", {user: {id: "fixture"}}));
+    expect(screen.getByRole("link", {name: "Panel"})).toBeVisible();
+    act(() => onAuthChange("SIGNED_OUT", null));
+    expect(screen.getByRole("link", {name: "Ingresar / Registro"})).toBeVisible();
+    unmount();
+    expect(mocks.unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("no inicia suscripciones ni consultas del grupo si se desmonta mientras se carga el cliente", async () => {
+    mocks.searchParams = new URLSearchParams("org=grupo-anterior");
+    const { unmount } = render(<SiteHeader />);
+    unmount();
+    await act(async () => vi.dynamicImportSettled());
+    expect(mocks.getSession).not.toHaveBeenCalled();
+    expect(mocks.onAuthStateChange).not.toHaveBeenCalled();
+    expect(mocks.from).not.toHaveBeenCalled();
   });
 
   it("cierra el menú con Escape y devuelve el foco a su disparador", async () => {

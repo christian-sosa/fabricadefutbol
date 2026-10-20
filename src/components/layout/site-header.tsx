@@ -9,7 +9,6 @@ import { OrganizationPublicNav } from "@/components/layout/organization-public-n
 import { PRIMARY_PUBLIC_NAV_ITEMS } from "@/lib/constants";
 import { withPublicQuery } from "@/lib/org";
 import { cn } from "@/lib/utils";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type SiteHeaderProps = {
   initialIsAuthenticated?: boolean;
@@ -71,8 +70,9 @@ function MenuToggleIcon({ open }: { open: boolean }) {
 }
 
 
-function tryCreateSupabaseBrowserClient() {
+async function tryCreateSupabaseBrowserClient() {
   try {
+    const { createSupabaseBrowserClient } = await import("@/lib/supabase/client");
     return createSupabaseBrowserClient();
   } catch {
     return null;
@@ -118,33 +118,38 @@ export function SiteHeader({
 
 
   useEffect(() => {
-    const supabase = tryCreateSupabaseBrowserClient();
-    if (!supabase) {
-      setIsAuthenticated(false);
-      return;
-    }
-
     let active = true;
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!active) return;
-        setIsAuthenticated(Boolean(data.session?.user));
-      })
-      .catch(() => {
-        if (!active) return;
-        setIsAuthenticated(false);
-      });
+    let unsubscribe: (() => void) | undefined;
 
-    const {
-      data: { subscription }
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(Boolean(session?.user));
+    void tryCreateSupabaseBrowserClient().then((supabase) => {
+      if (!active) return;
+      if (!supabase) {
+        setIsAuthenticated(false);
+        return;
+      }
+      supabase.auth
+        .getSession()
+        .then(({ data }) => {
+          if (!active) return;
+          setIsAuthenticated(Boolean(data.session?.user));
+        })
+        .catch(() => {
+          if (!active) return;
+          setIsAuthenticated(false);
+        });
+
+      const {
+        data: { subscription }
+      } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!active) return;
+        setIsAuthenticated(Boolean(session?.user));
+      });
+      unsubscribe = () => subscription.unsubscribe();
     });
 
     return () => {
       active = false;
-      subscription.unsubscribe();
+      unsubscribe?.();
     };
   }, []);
 
@@ -174,7 +179,8 @@ export function SiteHeader({
       }
 
       setCurrentOrganizationName(null);
-      const supabase = tryCreateSupabaseBrowserClient();
+      const supabase = await tryCreateSupabaseBrowserClient();
+      if (cancelled) return;
       const normalizedKey = organizationKey.trim();
 
       if (!supabase) {
@@ -223,7 +229,7 @@ export function SiteHeader({
     setIsSigningOut(true);
     setSignOutError(null);
     try {
-      const supabase = tryCreateSupabaseBrowserClient();
+      const supabase = await tryCreateSupabaseBrowserClient();
       if (!supabase) throw new Error("Cliente de sesión no disponible");
       const { error } = await supabase.auth.signOut();
       if (error) throw error;

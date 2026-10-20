@@ -207,14 +207,14 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
   if (matchError) throw new Error(matchError.message);
   if (!match) return null;
 
-  const { data: options, error: optionsError } = await readAllRows((from, to) => supabase
-    .from("team_options")
-    .select("*", { count: "exact" })
-    .eq("match_id", matchId)
-    .order("option_number", { ascending: true })
-    .order("id", { ascending: true })
-    .range(from, to));
+  const [{ data: options, error: optionsError }, { data: result, error: resultError }] = await Promise.all([
+    readAllRows((from, to) => supabase.from("team_options")
+      .select("*", { count: "exact" }).eq("match_id", matchId)
+      .order("option_number", { ascending: true }).order("id", { ascending: true }).range(from, to)),
+    supabase.from("match_result").select("*").eq("match_id", matchId).maybeSingle()
+  ]);
   if (optionsError) throw new Error(optionsError.message);
+  if (resultError) throw new Error(resultError.message);
 
   const optionIds = (options ?? []).map((option) => option.id);
   const [optionPlayers, safeOptionGuests] = await Promise.all([
@@ -300,13 +300,6 @@ export async function getAdminMatchDetails(matchId: string, organizationId: stri
         teamB
       };
     }) ?? [];
-
-  const { data: result, error: resultError } = await supabase
-    .from("match_result")
-    .select("*")
-    .eq("match_id", matchId)
-    .maybeSingle();
-  if (resultError) throw new Error(resultError.message);
 
   return {
     match,

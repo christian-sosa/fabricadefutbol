@@ -401,14 +401,24 @@ async function fetchMatchTeams(matchIds: string[], existingMatches?: MatchRow[])
 
   const supabase = createSupabasePublicClient();
 
-  const [matches, results, confirmedOptions] = await Promise.all([
-    existingMatches ? Promise.resolve(existingMatches) : readRowsByIds(matchIds, (ids, from, to) => supabase.from("matches").select("*").in("id", ids).order("id").range(from, to)),
+  const matches = existingMatches ?? await readRowsByIds(matchIds, (ids, from, to) => supabase.from("matches")
+    .select("*").in("id", ids).order("id").range(from, to));
+  // The match already identifies its final option. Resolve only legacy missing pointers.
+  // The ownership foreign key guarantees that a non-null option belongs to this match.
+  const [results, { confirmedOptions, optionPlayers }] = await Promise.all([
     readRowsByIds(matchIds, (ids, from, to) => supabase.from("match_result").select("*").in("match_id", ids).order("id").range(from, to)),
-    readRowsByIds(matchIds, (ids, from, to) => supabase.from("team_options").select("id, match_id").in("match_id", ids).eq("is_confirmed", true).order("id").range(from, to))
+    (async () => {
+      const legacyOptions = await readRowsByIds(matches.filter((match) => !match.confirmed_option_id).map((match) => match.id), (ids, from, to) => supabase.from("team_options")
+        .select("id, match_id").in("match_id", ids).eq("is_confirmed", true).order("id").range(from, to));
+      const confirmedOptions = [
+        ...matches.flatMap((match) => match.confirmed_option_id ? [{ id: match.confirmed_option_id, match_id: match.id }] : []),
+        ...legacyOptions
+      ];
+      const optionPlayers = await readRowsByIds(confirmedOptions.map((option) => option.id), (ids, from, to) => supabase.from("team_option_players")
+        .select("team_option_id, player_id, team").in("team_option_id", ids).order("id").range(from, to));
+      return { confirmedOptions, optionPlayers };
+    })()
   ]);
-  const optionIds = confirmedOptions.map((option) => option.id);
-  const optionPlayers = await readRowsByIds(optionIds, (ids, from, to) => supabase.from("team_option_players")
-    .select("team_option_id, player_id, team").in("team_option_id", ids).order("id").range(from, to));
 
   const matchesById = indexBy(matches ?? []);
   const resultByMatchId = new Map((results ?? []).map((result) => [result.match_id, result]));
@@ -545,19 +555,26 @@ async function getPlayersWithStatsLive(
   if (!organizationId) return [];
 
   const supabase = createSupabasePublicClient();
-  const seasonFilter = await resolveSeasonFilter(supabase, organizationId, options?.season);
-  const players = await readAllRows((from, to) => supabase.from("public_players").select("*")
-    .eq("organization_id", organizationId).eq("active", true).order("current_rating", { ascending: false })
-    .order("skill_level").order("display_order").order("full_name").order("id").range(from, to));
-
-  const matchesQuery = supabase
-    .from("matches")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .eq("status", "finished")
-    .order("scheduled_at", { ascending: true }).order("id");
-  const finishedMatches = await readAllRows((from, to) => matchesQuery.range(from, to));
-  const allFinishedWithTeams = await fetchMatchTeams(finishedMatches.map((match) => match.id), finishedMatches);
+  const [seasonFilter, players, finishedMatches] = await Promise.all([
+    resolveSeasonFilter(supabase, organizationId, options?.season),
+    readAllRows((from, to) => supabase.from("public_players").select("*")
+      .eq("organization_id", organizationId).eq("active", true).order("current_rating", { ascending: false })
+      .order("skill_level").order("display_order").order("full_name").order("id").range(from, to)),
+    readAllRows((from, to) => supabase.from("matches").select("*")
+      .eq("organization_id", organizationId).eq("status", "finished")
+      .order("scheduled_at", { ascending: true }).order("id").range(from, to))
+  ]);
+  const matchIds = finishedMatches.filter((match) => seasonFilter.mode === "all"
+    || (seasonFilter.mode === "season" && match.season_id === seasonFilter.season.id)).map((match) => match.id);
+  const [allFinishedWithTeams, seasonRatings, matchPlayerStats] = await Promise.all([
+    fetchMatchTeams(finishedMatches.map((match) => match.id), finishedMatches),
+    seasonFilter.mode === "season"
+      ? readAllRows((from, to) => supabase.from("organization_season_player_ratings")
+        .select("player_id, current_rating").eq("season_id", seasonFilter.season.id).order("player_id").range(from, to))
+      : Promise.resolve([]),
+    readRowsByIds(matchIds, (ids, from, to) => supabase.from("match_player_stats")
+      .select("*").in("match_id", ids).order("id").range(from, to))
+  ]);
   const activityByPlayer = calculatePlayerActivity(players, allFinishedWithTeams);
 
   if (seasonFilter.mode === "empty") {
@@ -568,22 +585,14 @@ async function getPlayersWithStatsLive(
   const finishedWithTeams = seasonFilter.mode === "season"
     ? allFinishedWithTeams.filter((item) => item.match.season_id === seasonFilter.season.id)
     : allFinishedWithTeams;
-  const matchIds = finishedWithTeams.map((item) => item.match.id);
-
   let playersForStats = players ?? [];
   if (seasonFilter.mode === "season") {
-    const seasonRatings = await readAllRows((from, to) => supabase.from("organization_season_player_ratings")
-      .select("player_id, current_rating").eq("season_id", seasonFilter.season.id).order("player_id").range(from, to));
-
     const ratingsByPlayerId = new Map((seasonRatings ?? []).map((row) => [row.player_id, Number(row.current_rating)]));
     playersForStats = playersForStats.map((player) => ({
       ...player,
       current_rating: ratingsByPlayerId.get(player.id) ?? 1000
     }));
   }
-
-  const matchPlayerStats = await readRowsByIds(matchIds, (ids, from, to) => supabase.from("match_player_stats")
-    .select("*").in("match_id", ids).order("id").range(from, to));
 
   return calculatePlayerStats({
     players: playersForStats,
@@ -641,16 +650,14 @@ export async function getPlayerDetails(playerId: string, organizationKey?: strin
   if (playerError) throw new Error(playerError.message);
   if (!player) return null;
 
-  const allStats = await getPlayersWithStats(player.organization_id);
-  const playerStats = allStats.find((item) => item.playerId === playerId);
-
-  const { data: ratingHistory, error: ratingHistoryError } = await supabase
-    .from("rating_history")
-    .select("id, match_id, rating_before, rating_after, delta, created_at")
-    .eq("player_id", playerId)
-    .order("created_at", { ascending: false })
-    .limit(12);
+  const [allStats, { data: ratingHistory, error: ratingHistoryError }] = await Promise.all([
+    getPlayersWithStats(player.organization_id),
+    supabase.from("rating_history")
+      .select("id, match_id, rating_before, rating_after, delta, created_at")
+      .eq("player_id", playerId).order("created_at", { ascending: false }).limit(12)
+  ]);
   if (ratingHistoryError) throw new Error(ratingHistoryError.message);
+  const playerStats = allStats.find((item) => item.playerId === playerId);
 
   return {
     player,

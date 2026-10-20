@@ -34,6 +34,7 @@ describe("PhotoUploadInput", () => {
     fireEvent.change(input, { target: { files: [original] } });
     expect(input.checkValidity()).toBe(false);
     expect(screen.getByRole("status")).toHaveTextContent("Preparando foto");
+    await waitFor(() => expect(mocks.prepare).toHaveBeenCalledWith(original));
     const prepared = new File([new Uint8Array(4000)], "large.webp", { type: "image/webp" });
     await act(async () => finish(prepared));
     expect(input.files?.[0]).toBe(prepared);
@@ -60,6 +61,7 @@ describe("PhotoUploadInput", () => {
     render(<PhotoUploadInput />);
     const input = screen.getByLabelText("Foto del jugador") as HTMLInputElement;
     fireEvent.change(input, { target: { files: [new File(["old"], "old.jpg")] } });
+    await waitFor(() => expect(mocks.prepare).toHaveBeenCalledTimes(1));
     fireEvent.change(input, { target: { files: [fresh] } });
     await waitFor(() => expect(input.files?.[0]).toBe(fresh));
     await act(async () => finishOld(new File(["old"], "old.webp")));

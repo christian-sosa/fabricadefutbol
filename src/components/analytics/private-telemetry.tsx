@@ -1,9 +1,11 @@
 "use client";
 import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import { sanitizeAnalyticsPath } from "@/lib/analytics/events";
 import { GoogleAnalytics } from "@/components/analytics/google-analytics";
+
+const SpeedInsights = dynamic(() => import("@vercel/speed-insights/next").then((module) => module.SpeedInsights), { ssr: false });
 
 function beforeSend<T extends { url: string }>(event: T): T | null {
   const path = sanitizeAnalyticsPath(event.url);

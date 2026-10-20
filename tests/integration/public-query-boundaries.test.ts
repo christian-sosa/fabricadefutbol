@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 
 const { publicClient, authenticatedClient, cookies } = vi.hoisted(() => ({
   publicClient: vi.fn(), authenticatedClient: vi.fn(), cookies: vi.fn()
@@ -211,5 +213,90 @@ describe("public query boundaries", () => {
     expect(details?.teamAPlayers).toHaveLength(1207); expect(details?.teamBPlayers).toHaveLength(1207);
     expect(reads.tables.filter((table) => table === "matches")).toHaveLength(1);
     expect(authenticatedClient).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])("loads public teams with the canonical option pointer=%s and only resolves legacy missing pointers", async (hasPointer) => {
+    const requests: URL[] = [];
+    const tables: Record<string, Record<string, unknown>[]> = {
+      matches: [match("next", annual.id, { confirmed_option_id: hasPointer ? "next-option" : null })],
+      match_result: [{ id: "result", match_id: "next", score_a: 2, score_b: 1, winner_team: "A" }],
+      team_options: [{ id: "next-option", match_id: "next" }],
+      team_option_players: [{ team_option_id: "next-option", player_id: player.id, team: "A" }],
+      public_players: [{ ...player, photo_path: "players/current.webp", photo_updated_at: "2026-12-30T00:00:00Z" }],
+      team_option_guests: [{ team_option_id: "next-option", guest_id: "guest", team: "B" }],
+      match_guests: [{ id: "guest", guest_name: "Invitado", guest_rating: 4 }]
+    };
+    const client = createClient<Database>("https://fixture.supabase.co", "test-public-key", {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      global: { fetch: async (input) => {
+        const url = new URL(String(input));
+        requests.push(url);
+        const table = url.pathname.split("/").at(-1)!;
+        const rows = tables[table];
+        if (!rows) throw new Error(`Unexpected public read: ${table}`);
+        const columns = url.searchParams.get("select")!;
+        const projected = rows.map((row) => columns === "*" ? row : Object.fromEntries(columns.split(",").map((column) => [column, row[column]])));
+        return Response.json(table === "matches" ? projected[0] : projected);
+      } }
+    });
+    publicClient.mockReturnValue(client);
+
+    const details = await getMatchDetails("next");
+
+    expect(details?.result).toMatchObject({ score_a: 2, score_b: 1 });
+    expect(details?.teamAPlayers).toEqual([expect.objectContaining({ id: player.id, full_name: "Jugador", photo_path: "players/current.webp", is_guest: false })]);
+    expect(details?.teamBPlayers).toEqual(hasPointer ? [expect.objectContaining({ id: "guest-guest", full_name: "Invitado", is_guest: true })] : []);
+    expect(requests.filter((url) => url.pathname.endsWith("/team_options"))).toHaveLength(hasPointer ? 0 : 1);
+    expect(requests).toHaveLength(hasPointer ? 6 : 5);
+    const membersRequest = requests.find((url) => url.pathname.endsWith("/team_option_players"))!;
+    expect(membersRequest.searchParams.get("team_option_id")).toBe("in.(next-option)");
+    expect(requests.find((url) => url.pathname.endsWith("/public_players"))?.searchParams.get("organization_id")).toBe(`eq.${ORG_ID}`);
+  });
+
+  it("starts independent standings reads while season and result requests are still pending", async () => {
+    vi.useRealTimers();
+    const requested: string[] = [];
+    let releaseSeason!: () => void;
+    let releaseResult!: () => void;
+    const seasonGate = new Promise<void>((resolve) => { releaseSeason = resolve; });
+    const resultGate = new Promise<void>((resolve) => { releaseResult = resolve; });
+    const tables: Record<string, unknown[]> = {
+      organization_seasons: [{ ...annual, duration_months: 12 }],
+      public_players: [{ ...player, skill_level: 3, display_order: 1, created_at: "2026-01-01T00:00:00Z" }],
+      matches: [match("played", annual.id, { confirmed_option_id: "final-option" })],
+      match_result: [{ id: "result", match_id: "played", winner_team: "A", mvp_player_id: player.id }],
+      team_option_players: [{ team_option_id: "final-option", player_id: player.id, team: "A" }],
+      organization_season_player_ratings: [{ player_id: player.id, current_rating: 1080 }],
+      match_player_stats: [{ id: "stats", match_id: "played", player_id: player.id, goals: 2, assists: 1 }]
+    };
+    const client = createClient<Database>("https://fixture.supabase.co", "test-public-key", {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      global: { fetch: async (input) => {
+        const table = new URL(String(input)).pathname.split("/").at(-1)!;
+        requested.push(table);
+        if (table === "organization_seasons") await seasonGate;
+        if (table === "match_result") await resultGate;
+        const rows = tables[table];
+        if (!rows) throw new Error(`Unexpected standings read: ${table}`);
+        return Response.json(table === "organization_seasons" ? rows[0] : rows);
+      } }
+    });
+    publicClient.mockReturnValue(client);
+    const pending = getPlayersWithStats(ORG_ID, { season: annual.id });
+    try {
+      await vi.waitFor(() => expect([...requested]).toEqual(expect.arrayContaining(["organization_seasons", "public_players", "matches"])));
+      releaseSeason();
+      await vi.waitFor(() => expect([...requested]).toEqual(expect.arrayContaining([
+        "match_result", "team_option_players", "organization_season_player_ratings", "match_player_stats"
+      ])));
+    } finally {
+      releaseSeason();
+      releaseResult();
+      await pending;
+    }
+    expect(await pending).toEqual([expect.objectContaining({
+      playerId: player.id, currentRating: 1080, matchesPlayed: 1, wins: 1,
+      goals: 2, assists: 1, mvpCount: 1, lastPlayedAt: "2026-12-20T20:00:00Z", isInjured: true
+    })]);
   });
 });
