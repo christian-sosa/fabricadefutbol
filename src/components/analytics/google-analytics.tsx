@@ -45,5 +45,5 @@ export function GoogleAnalytics() {
   </aside>;
   const preferences = pathname === "/privacy" ? <div className="mx-auto max-w-6xl px-4 pb-6"><button className="min-h-11 text-sm font-semibold text-accent underline" onClick={() => setGoogleAnalyticsConsent(null)} type="button">Cambiar preferencia de medición</button></div> : null;
   if (consent !== "accepted") return preferences;
-  return <>{preferences}<Script id="fdf-google-tag" src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`} strategy="afterInteractive" /></>;
+  return <>{preferences}<Script id="fdf-google-tag" src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`} strategy="lazyOnload" /></>;
 }

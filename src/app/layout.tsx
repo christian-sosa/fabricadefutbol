@@ -6,7 +6,6 @@ import "@/app/globals.css";
 import { GrowthEventTracker } from "@/components/analytics/growth-event-tracker";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
-import { ReactQueryProvider } from "@/components/providers/react-query-provider";
 import { shouldRenderSpeedInsights } from "@/lib/env";
 import { getPublicAppUrl } from "@/lib/public-url";
 import { HOME_DESCRIPTION, HOME_TITLE, SITE_NAME } from "@/lib/seo";
@@ -68,22 +67,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es">
       <body>
-        <ReactQueryProvider>
-          <a className="skip-link" href="#contenido-principal">
-            Saltar al contenido
-          </a>
-              <Suspense fallback={<div className="sticky top-0 z-30 h-[57px] border-b border-slate-800 bg-slate-950/85" />}>
-                <SiteHeader
-                  initialIsAuthenticated={false}
-                />
-              </Suspense>
-              <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8" id="contenido-principal">
-                {children}
-              </main>
-              <Suspense fallback={<div className="h-[280px] border-t border-slate-800 bg-slate-950/80" />}>
-                <SiteFooter />
-              </Suspense>
-        </ReactQueryProvider>
+        <a className="skip-link" href="#contenido-principal">
+          Saltar al contenido
+        </a>
+        <Suspense fallback={<div className="sticky top-0 z-30 h-[57px] border-b border-slate-800 bg-slate-950/85" />}>
+          <SiteHeader initialIsAuthenticated={false} />
+        </Suspense>
+        <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8" id="contenido-principal">
+          {children}
+        </main>
+        <Suspense fallback={<div className="h-[280px] border-t border-slate-800 bg-slate-950/80" />}>
+          <SiteFooter />
+        </Suspense>
         <Suspense fallback={null}>
           <GrowthEventTracker />
         </Suspense>

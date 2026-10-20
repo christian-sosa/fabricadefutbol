@@ -18,11 +18,12 @@ async function parseApiError(response: Response) {
   return fallbackMessage;
 }
 
-export async function fetchOrganizationStandings(organizationId: string, season = "current") {
+export async function fetchOrganizationStandings(organizationId: string, season = "current", signal?: AbortSignal) {
   const params = new URLSearchParams();
   params.set("season", season);
   const response = await fetch(`/api/organizations/${organizationId}/standings?${params.toString()}`, {
     method: "GET",
+    signal,
     headers: {
       "content-type": "application/json"
     }
@@ -36,7 +37,7 @@ export async function fetchOrganizationStandings(organizationId: string, season 
   return data.standings;
 }
 
-export async function fetchOrganizationMatches(params: { organizationId: string; page: number; pageSize: number; season?: string }) {
+export async function fetchOrganizationMatches(params: { organizationId: string; page: number; pageSize: number; season?: string }, signal?: AbortSignal) {
   const { organizationId, page, pageSize, season = "current" } = params;
   const searchParams = new URLSearchParams();
   searchParams.set("page", String(page));
@@ -44,6 +45,7 @@ export async function fetchOrganizationMatches(params: { organizationId: string;
   searchParams.set("season", season);
   const response = await fetch(`/api/organizations/${organizationId}/matches?${searchParams.toString()}`, {
     method: "GET",
+    signal,
     headers: {
       "content-type": "application/json"
     }

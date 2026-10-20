@@ -1,15 +1,17 @@
-import { existsSync,readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { describe,expect,it } from "vitest";
-import { executePrivateSql } from "../helpers/private-sql";
+import { executePrivateSql, privateSqlAvailable } from "../helpers/private-sql";
+import { readUpgradeSources } from "../../scripts/lib/sql-upgrade-artifact.mjs";
+import { buildSchemaSources } from "../../scripts/lib/schema-sql.mjs";
 
 const id=(n:number)=>`00000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
-// The immutable previous release and deployment scripts are local private inputs,
-// separate from the current private SQL bundle restored by normal CI.
-describe.skipIf(!existsSync("tmp/migrations/baseline-schema.app_prod.sql"))("incremental private SQL release upgrade",()=>{
+const upgradeSources = privateSqlAvailable("supabase/upgrade-artifacts/audit-baseline/schema.sql") ? readUpgradeSources() : undefined;
+describe.skipIf(!upgradeSources)("recorded incremental private SQL release upgrade",()=>{
   it("preserves sporting data and old PROD uploads while only DEV is migrated, then activates both safely",async()=>{
     const db=new PGlite();
-    const apply=async(file:string)=>executePrivateSql(db,readFileSync(file,"utf8").replace("create extension if not exists pgcrypto;",""),file);
+    const baseline = Object.fromEntries(["schema.sql", "policies.sql", "group-match-workflow.sql"].map((name) => [name, upgradeSources![`audit-baseline/${name}`]]));
+    const generated = { ...buildSchemaSources(baseline, "app_dev"), ...buildSchemaSources(baseline, "app_prod") };
+    const apply=async(file:string)=>executePrivateSql(db,(generated[file] ?? upgradeSources![file]).replace("create extension if not exists pgcrypto;",""),file);
     const rows=async(query:string)=>(await db.query<Record<string,unknown>>(query)).rows;
     const login=()=>db.exec(`reset role;select set_config('test.uid','${id(1)}',false);select set_config('test.aal','aal1',false);set role authenticated;`);
     try {
@@ -25,8 +27,8 @@ describe.skipIf(!existsSync("tmp/migrations/baseline-schema.app_prod.sql"))("inc
         grant select on storage.objects to anon,authenticated;grant insert,update,delete on storage.objects to authenticated;
         insert into auth.users values('${id(1)}','owner@example.test');`);
       for(const schema of ["app_dev","app_prod"]){
-        await apply(`tmp/migrations/baseline-schema.${schema}.sql`);
-        await apply(`tmp/migrations/baseline-policies.${schema}.sql`);
+        await apply(`schema.${schema}.sql`);
+        await apply(`policies.${schema}.sql`);
         await db.exec(`insert into ${schema}.admins(id,display_name) values('${id(1)}','Owner');
           insert into ${schema}.organizations(id,name,slug,created_by) values('${id(10)}','Group','group','${id(1)}');
           insert into ${schema}.players(id,organization_id,full_name,initial_rank) values ${Array.from({length:10},(_,n)=>`('${id(20+n)}','${id(10)}','Player ${n}',${n+1})`).join(",")};
@@ -38,13 +40,13 @@ describe.skipIf(!existsSync("tmp/migrations/baseline-schema.app_prod.sql"))("inc
         await db.exec(`select ${schema}.confirm_group_match_option('${id(40)}','${id(10)}','${id(50)}');select ${schema}.save_group_match_result('${id(40)}','${id(10)}',1,'{"scoreA":1,"scoreB":0}');reset role;`);
         await db.exec(`insert into ${schema}.organization_public_snapshots(organization_id,standings) values('${id(10)}','[{"isInjured":true}]');`);
       }
-      await apply("tmp/migrations/baseline-policies.storage.sql");
+      await apply("policies.storage.sql");
       const sporting=async(schema:string)=>({players:await rows(`select id,current_rating from ${schema}.players order by id`),
         ledger:await rows(`select * from ${schema}.rating_history order by id`),
         seasons:await rows(`select * from ${schema}.organization_season_player_ratings order by player_id`),
         matches:await rows(`select id,result_version,lineup_snapshot,status from ${schema}.matches order by id`)});
       const beforeDev=await sporting("app_dev"),beforeProd=await sporting("app_prod");
-      await apply("tmp/migrations/dev-audit-additive.sql");
+      await apply("audit-migrations/dev-additive.sql");
       await login();
       for(const [schema,bucket] of [["app_dev","player-photos-dev"],["app_prod","player-photos"]]){
         await db.exec(`insert into storage.objects(bucket_id,name,owner) values('${bucket}','${schema}/${id(10)}/${id(20)}/${id(90)}.webp','${id(1)}')`);
@@ -52,12 +54,12 @@ describe.skipIf(!existsSync("tmp/migrations/baseline-schema.app_prod.sql"))("inc
       await expect(db.exec(`insert into storage.objects(bucket_id,name,owner) values('player-photos','app_dev/${id(10)}/${id(20)}/${id(91)}.webp','${id(1)}')`)).rejects.toMatchObject({code:"42501"});
       await db.exec("reset role");
       expect(await sporting("app_dev")).toEqual(beforeDev);expect(await sporting("app_prod")).toEqual(beforeProd);
-      await apply("tmp/migrations/dev-audit-additive.sql");
-      await apply("tmp/migrations/prod-audit-additive.sql");
-      await apply("tmp/migrations/prod-audit-additive.sql");
+      await apply("audit-migrations/dev-additive.sql");
+      await apply("audit-migrations/prod-additive.sql");
+      await apply("audit-migrations/prod-additive.sql");
       expect(await sporting("app_dev")).toEqual(beforeDev);expect(await sporting("app_prod")).toEqual(beforeProd);
       for(const [label,schema,bucket] of [["dev","app_dev","player-photos-dev"],["prod","app_prod","player-photos"]]){
-        await apply(`tmp/migrations/${label}-audit-activation.sql`);
+        await apply(`audit-migrations/${label}-activation.sql`);
         expect(await rows(`select * from ${schema}.organization_public_snapshots`)).toEqual([]);
         await login();
         await expect(db.exec(`insert into storage.objects(bucket_id,name,owner) values('${bucket}','${schema}/${id(10)}/${id(20)}/${id(92)}.webp','${id(1)}')`)).rejects.toMatchObject({code:"42501"});

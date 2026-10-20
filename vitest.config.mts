@@ -16,6 +16,8 @@ const sharedCoverage = {
     "src/lib/org.ts",
     "src/lib/errors.ts",
     "src/lib/queries/public.ts",
+    "src/lib/queries/admin.ts",
+    "src/app/invite/[token]/actions.ts",
     "src/lib/domain/match-workflow.ts",
     "src/lib/domain/organization-workflow.ts",
     "src/lib/domain/organization-photo-retention.ts",

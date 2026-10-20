@@ -1,0 +1,10 @@
+/* Names are asserted by the test; preserve the pitch and player geometry. */
+[role="img"] > span {
+  color: transparent !important;
+  text-shadow: none !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  max-height: 26px !important;
+  line-height: 13px !important;
+  white-space: nowrap !important;
+}

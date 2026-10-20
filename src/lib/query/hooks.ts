@@ -19,7 +19,7 @@ export function useOrganizationStandingsQuery(params: {
 
   return useQuery({
     queryKey: organizationId ? organizationQueryKeys.standings(organizationId, season) : ["organizations", "none", "standings", season],
-    queryFn: () => fetchOrganizationStandings(organizationId as string, season),
+    queryFn: ({ signal }) => fetchOrganizationStandings(organizationId as string, season, signal),
     enabled: Boolean(organizationId),
     initialData: params.initialData,
     staleTime: ORGANIZATION_QUERY_STALE_TIME,
@@ -45,13 +45,13 @@ export function useOrganizationMatchesQuery(params: {
     queryKey: organizationId
       ? organizationQueryKeys.matchesPage(organizationId, page, pageSize, season)
       : ["organizations", "none", "matches", page, pageSize, season],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       fetchOrganizationMatches({
         organizationId: organizationId as string,
         page,
         pageSize,
         season
-      }),
+      }, signal),
     enabled: Boolean(organizationId),
     initialData: params.initialData,
     staleTime: ORGANIZATION_QUERY_STALE_TIME,
@@ -80,18 +80,11 @@ export function useUpdateMatchResultMutation(params: { organizationId: string; m
         payload
       }),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: organizationQueryKeys.matches(organizationId)
-        }),
-        queryClient.invalidateQueries({
-          queryKey: organizationQueryKeys.byId(organizationId)
-        }),
-        queryClient.invalidateQueries({
-          queryKey: organizationQueryKeys.matchDetail(organizationId, matchId),
-          exact: true
-        })
-      ]);
+      // This prefix includes standings, history pages and match details. Overlapping
+      // invalidations cancel and restart the same active reads multiple times.
+      await queryClient.invalidateQueries({
+        queryKey: organizationQueryKeys.byId(organizationId)
+      });
     }
   });
 }

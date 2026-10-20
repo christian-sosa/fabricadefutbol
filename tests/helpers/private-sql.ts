@@ -9,8 +9,10 @@ export async function executePrivateSql(db: {exec: (source: string) => Promise<u
 }
 import { existsSync } from "node:fs";
 
-export function privateSqlAvailable(file: string, ci = Boolean(process.env.CI)) {
+export function privateSqlAvailable(file: string, mode = process.env.FDF_TEST_MODE) {
+  if (mode && mode !== "full" && mode !== "fast") throw new Error("Unknown private SQL test mode.");
+  if (mode === "fast") return false;
   const present = existsSync(file);
-  if (!present && ci) throw new Error(`Missing mandatory private SQL artifact: ${file}. Restore this revision's verified bundle before tests.`);
+  if (!present) throw new Error(`Missing mandatory private SQL artifact: ${file}. Restore this revision's verified bundle before complete tests; use test:fast only for explicit partial validation.`);
   return present;
 }

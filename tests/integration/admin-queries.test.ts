@@ -1,4 +1,6 @@
+import { createClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Database } from "@/types/database";
 
 const { createSupabaseServerClientMock } = vi.hoisted(() => ({
   createSupabaseServerClientMock: vi.fn()
@@ -96,7 +98,55 @@ describe("admin player queries", () => {
     const players = await getSelectablePlayers(ORG_ID);
 
     expect(players.map((player) => player.id)).toEqual(["player-level-2", "player-level-4"]);
-    expect(players[0]).toMatchObject({ preferred_position: "DEF", secondary_position: "MID" });
+  });
+
+  it("devuelve las posiciones guardadas con el SELECT que envía el cliente Supabase real", async () => {
+    const storedPlayer = {
+      id: "player-defender",
+      organization_id: ORG_ID,
+      full_name: "Ana Pérez",
+      current_rating: 1000,
+      initial_rank: 1,
+      skill_level: 3,
+      display_order: 1,
+      active: true,
+      photo_path: null,
+      photo_updated_at: null,
+      preferred_position: "DEF",
+      secondary_position: "MID"
+    };
+    const requests: URL[] = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      requests.push(url);
+      if (url.pathname !== "/rest/v1/players" || (init?.method ?? "GET") !== "GET") {
+        throw new Error(`Solicitud inesperada del fixture: ${url.pathname}`);
+      }
+
+      // PostgREST returns only selected columns; the generic fake returns the whole row.
+      const selected = url.searchParams.get("select");
+      if (!selected) throw new Error("El fixture requiere una proyección explícita.");
+      const columns = selected === "*" ? Object.keys(storedPlayer) : selected.split(",");
+      const projected = Object.fromEntries(columns.map((column) => [
+        column, storedPlayer[column as keyof typeof storedPlayer]
+      ]));
+      return Response.json([projected], { headers: { "content-range": "0-0/1" } });
+    });
+    const client = createClient<Database>("https://fixture.supabase.co", "test-public-key", {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      global: { fetch: fetcher }
+    });
+    createSupabaseServerClientMock.mockResolvedValue(client);
+
+    const players = await getSelectablePlayers(ORG_ID);
+
+    expect(players).toHaveLength(1);
+    expect(players[0]).toMatchObject({
+      id: "player-defender", full_name: "Ana Pérez", preferred_position: "DEF", secondary_position: "MID"
+    });
+    expect(requests).toHaveLength(1);
+    expect(requests[0].searchParams.get("organization_id")).toBe(`eq.${ORG_ID}`);
+    expect(requests[0].searchParams.get("active")).toBe("eq.true");
   });
 
   it("devuelve conteos de onboarding y partidos del dashboard admin", async () => {

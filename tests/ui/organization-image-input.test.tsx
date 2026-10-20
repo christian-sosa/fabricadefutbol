@@ -18,6 +18,7 @@ describe("cover input", () => {
     fireEvent.change(input, { target: { files: [new File(["old"], "old.jpg", { type: "image/jpeg" })] } });
     expect(input.checkValidity()).toBe(false);
     expect(screen.getByRole("status")).toHaveTextContent("Preparando portada");
+    await waitFor(() => expect(mocks.prepare).toHaveBeenCalledTimes(1));
     fireEvent.change(input, { target: { files: [new File(["new"], "new.jpg", { type: "image/jpeg" })] } });
     await waitFor(() => expect(input.files?.[0]).toBe(prepared));
     await act(async () => finish(new File(["old"], "old.webp", { type: "image/webp" })));

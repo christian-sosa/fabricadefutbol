@@ -330,7 +330,6 @@ export default async function AdminDashboardPage({
           <OrganizationImage
             alt={`Imagen de ${selectedOrganization.name}`}
             className="aspect-[16/9] min-h-[220px]"
-            priority
             src={organizationImageSrc}
           />
 

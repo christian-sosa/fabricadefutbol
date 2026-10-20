@@ -31,6 +31,8 @@ type ReplacementPlayerOption = {
   rating: number;
 };
 
+const EMPTY_AVAILABLE_PLAYERS: ReplacementPlayerOption[] = [];
+
 type ReplacementPlayerDraft = {
   playerId: string;
   team: TeamSide;
@@ -70,7 +72,7 @@ export function MatchResultEditor({
   action,
   onSubmit,
   existingParticipants,
-  availablePlayers = [],
+  availablePlayers = EMPTY_AVAILABLE_PLAYERS,
   expectedVersion = 0,
   defaultAbsencePenaltyParticipantIds = [],
   defaultHandicapTeam = null,
@@ -95,7 +97,7 @@ export function MatchResultEditor({
   const [newGuests, setNewGuests] = useState<GuestDraft[]>([]);
   const [replacementPlayers, setReplacementPlayers] = useState<ReplacementPlayerDraft[]>([]);
   const [absencePenalties, setAbsencePenalties] = useState<Set<string>>(() => new Set(defaultAbsencePenaltyParticipantIds));
-  const [selectedReplacementPlayerId, setSelectedReplacementPlayerId] = useState("");
+  const [preferredReplacementPlayerId, setPreferredReplacementPlayerId] = useState("");
   const [selectedReplacementTeam, setSelectedReplacementTeam] = useState<TeamSide>("A");
   const [handicapEnabled, setHandicapEnabled] = useState(Boolean(defaultHandicapTeam));
   const [handicapTeam, setHandicapTeam] = useState<TeamSide>(defaultHandicapTeam ?? "A");
@@ -131,15 +133,9 @@ export function MatchResultEditor({
     [availablePlayers, existingPlayerIds, replacementPlayerIds]
   );
 
-  useEffect(() => {
-    if (
-      selectedReplacementPlayerId &&
-      availableReplacementPlayers.some((player) => player.id === selectedReplacementPlayerId)
-    ) {
-      return;
-    }
-    setSelectedReplacementPlayerId(availableReplacementPlayers[0]?.id ?? "");
-  }, [availableReplacementPlayers, selectedReplacementPlayerId]);
+  const selectedReplacementPlayerId = availableReplacementPlayers.some((player) => player.id === preferredReplacementPlayerId)
+    ? preferredReplacementPlayerId
+    : availableReplacementPlayers[0]?.id ?? "";
 
   const playersById = useMemo(
     () => new Map(availablePlayers.map((player) => [player.id, player])),
@@ -538,7 +534,7 @@ export function MatchResultEditor({
           <Select
             aria-label="Jugador de reemplazo"
             disabled={!availableReplacementPlayers.length}
-            onChange={(event) => setSelectedReplacementPlayerId(event.target.value)}
+            onChange={(event) => setPreferredReplacementPlayerId(event.target.value)}
             value={selectedReplacementPlayerId}
           >
             {!availableReplacementPlayers.length ? (
@@ -566,6 +562,7 @@ export function MatchResultEditor({
                 ...current,
                 { playerId: selectedReplacementPlayerId, team: selectedReplacementTeam }
               ]);
+              setPreferredReplacementPlayerId(availableReplacementPlayers.find((player) => player.id !== selectedReplacementPlayerId)?.id ?? "");
             }}
             type="button"
             variant="ghost"

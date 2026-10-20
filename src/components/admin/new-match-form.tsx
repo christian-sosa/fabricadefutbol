@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -40,6 +40,97 @@ type SelectablePlayer = {
   preferred_position?: PlayerPosition | null;
   secondary_position?: PlayerPosition | null;
 };
+
+const NewMatchPlayerRow = memo(function NewMatchPlayerRow({
+  player,
+  selected,
+  goalkeeperSelected,
+  goalkeeperDisabled,
+  visible,
+  showPositions,
+  onSelectionChange,
+  onGoalkeeperChange
+}: {
+  player: SelectablePlayer;
+  selected: boolean;
+  goalkeeperSelected: boolean;
+  goalkeeperDisabled: boolean;
+  visible: boolean;
+  showPositions: boolean;
+  onSelectionChange: (playerId: string, checked: boolean) => void;
+  onGoalkeeperChange: (playerId: string, checked: boolean) => void;
+}) {
+  const ratingTrendLabel = formatRatingTrendLabel(player.current_rating);
+  const shouldShowRatingTrend = ratingTrendLabel !== "Parejo";
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-3 rounded-lg border bg-slate-950 px-3 py-2 text-sm transition hover:border-slate-600 xl:flex-row xl:items-center xl:justify-between",
+        selected ? "border-emerald-500/50" : "border-slate-800",
+        !visible && "hidden"
+      )}
+      hidden={!visible}
+    >
+      <span className="flex min-w-0 items-center gap-3">
+        <PlayerAvatar name={player.full_name} playerId={player.id} hasPhoto={Boolean(player.photo_path)} photoUpdatedAt={player.photo_updated_at} size="sm" />
+        <span className="min-w-0">
+          <span className="block break-words font-semibold text-slate-100">{player.full_name}</span>
+          <span className="mt-1 flex flex-wrap gap-1.5">
+            <span className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-slate-300">
+              {formatSkillLevelLabel(player.skill_level)}
+            </span>
+            {shouldShowRatingTrend ? (
+              <span
+                className={cn(
+                  "rounded border px-2 py-0.5 text-[11px] font-semibold",
+                  ratingTrendLabel === "Viene bien"
+                    ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+                    : "border-amber-400/40 bg-amber-500/10 text-amber-200"
+                )}
+              >
+                {formatRatingTrendBadgeLabel(player.current_rating)}
+              </span>
+            ) : null}
+          </span>
+          {showPositions ? (
+            <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-emerald-200">
+              <span>{player.preferred_position ? `Preferida: ${PLAYER_POSITION_OPTIONS.find((position) => position.value === player.preferred_position)?.label}` : "Sin posición guardada"}</span>
+              {player.secondary_position ? <span className="text-slate-400">Secundaria: {PLAYER_POSITION_OPTIONS.find((position) => position.value === player.secondary_position)?.label}</span> : null}
+            </span>
+          ) : null}
+        </span>
+      </span>
+      <span className="flex flex-wrap items-center gap-2 xl:shrink-0">
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-700 px-2 py-1">
+          <span className="text-[11px] font-semibold uppercase text-slate-300">Juega</span>
+          <input
+            checked={selected}
+            aria-label={`Juega ${player.full_name}`}
+            className="h-4 w-4 accent-emerald-400"
+            name="playerIds"
+            onChange={(event) => onSelectionChange(player.id, event.target.checked)}
+            type="checkbox"
+            value={player.id}
+          />
+        </label>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-cyan-500/30 px-2 py-1">
+          <span className="text-[11px] font-semibold uppercase text-cyan-200">Arquero</span>
+          <input
+            checked={goalkeeperSelected}
+            aria-label={`Arquero ${player.full_name}`}
+            className="h-4 w-4 accent-cyan-400"
+            disabled={goalkeeperDisabled}
+            name="goalkeeperPlayerIds"
+            onChange={(event) => onGoalkeeperChange(player.id, event.target.checked)}
+            type="checkbox"
+            value={player.id}
+          />
+        </label>
+      </span>
+    </div>
+  );
+});
 
 type GuestRow = {
   key: number;
@@ -115,10 +206,13 @@ export function NewMatchForm({
   const [onlySelected, setOnlySelected] = useState(false);
   const formId = useId();
   const normalizedSearch = playerSearch.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").trim();
-  const visiblePlayerIds = new Set(players.filter((player) =>
-    (!onlySelected || selectedPlayers[player.id]) &&
-    player.full_name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").includes(normalizedSearch)
-  ).map((player) => player.id));
+  const searchablePlayers = useMemo(() => players.map((player) => ({
+    id: player.id,
+    name: player.full_name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es")
+  })), [players]);
+  const visiblePlayerIds = useMemo(() => new Set(searchablePlayers.filter((player) =>
+    (!onlySelected || selectedPlayers[player.id]) && player.name.includes(normalizedSearch)
+  ).map((player) => player.id)), [searchablePlayers, onlySelected, selectedPlayers, normalizedSearch]);
 
   const expected = EXPECTED_PLAYERS[modality];
   const teamSize = expected / 2;
@@ -287,18 +381,18 @@ export function NewMatchForm({
     ]);
   };
 
-  const removeGuest = (guestKey: number) => {
-    setGuestRows((current) => current.filter((guest) => guest.key !== guestKey));
-    updateParticipantRole(`guest:${guestKey}`, "starter");
-  };
-
-  const updateParticipantRole = (participantId: string, value: string) => {
+  const updateParticipantRole = useCallback((participantId: string, value: string) => {
     setSubstituteAssignments((current) => {
       const next = { ...current };
       if (value === "starter") delete next[participantId];
       else next[participantId] = value === "A" || value === "B" ? value : null;
       return next;
     });
+  }, []);
+
+  const removeGuest = (guestKey: number) => {
+    setGuestRows((current) => current.filter((guest) => guest.key !== guestKey));
+    updateParticipantRole(`guest:${guestKey}`, "starter");
   };
 
   const updateGuest = (guestKey: number, field: "name" | "rating", value: string) => {
@@ -307,7 +401,7 @@ export function NewMatchForm({
     );
   };
 
-  const togglePlayerSelection = (playerId: string, checked: boolean) => {
+  const togglePlayerSelection = useCallback((playerId: string, checked: boolean) => {
     setSelectedPlayers((current) => ({
       ...current,
       [playerId]: checked
@@ -322,9 +416,9 @@ export function NewMatchForm({
         return next;
       });
     }
-  };
+  }, [updateParticipantRole]);
 
-  const toggleGoalkeeperSelection = (playerId: string, checked: boolean) => {
+  const toggleGoalkeeperSelection = useCallback((playerId: string, checked: boolean) => {
     setGoalkeeperPlayers((current) => {
       if (!checked) {
         if (!current[playerId]) return current;
@@ -342,7 +436,7 @@ export function NewMatchForm({
         [playerId]: true
       };
     });
-  };
+  }, [selectedPlayers]);
 
   return (
     <ActionForm action={createMatchFormAction} className="mt-4 space-y-4" onSubmit={(event) => {
@@ -455,83 +549,23 @@ export function NewMatchForm({
         </div>
         <p aria-live="polite" className="mt-2 text-xs text-slate-400">{visiblePlayerIds.size ? `${visiblePlayerIds.size} jugadores en esta vista` : "No hay jugadores que coincidan con el filtro."}</p>
         <div className="mt-3 grid gap-2 md:grid-cols-2">
-          {players.map((player) => {
-            const ratingTrendLabel = formatRatingTrendLabel(player.current_rating);
-            const shouldShowRatingTrend = ratingTrendLabel !== "Parejo";
-
-            return (
-              <div
-                className={cn(
-                  "flex flex-col gap-3 rounded-lg border bg-slate-950 px-3 py-2 text-sm transition hover:border-slate-600 xl:flex-row xl:items-center xl:justify-between",
-                  selectedPlayers[player.id] ? "border-emerald-500/50" : "border-slate-800",
-                  !visiblePlayerIds.has(player.id) && "hidden"
-                )}
-                hidden={!visiblePlayerIds.has(player.id)}
-                key={player.id}
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  <PlayerAvatar name={player.full_name} playerId={player.id} hasPhoto={Boolean(player.photo_path)} photoUpdatedAt={player.photo_updated_at} size="sm" />
-                  <span className="min-w-0">
-                    <span className="block break-words font-semibold text-slate-100">{player.full_name}</span>
-                    <span className="mt-1 flex flex-wrap gap-1.5">
-                      <span className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-slate-300">
-                        {formatSkillLevelLabel(player.skill_level)}
-                      </span>
-                      {shouldShowRatingTrend ? (
-                        <span
-                          className={cn(
-                            "rounded border px-2 py-0.5 text-[11px] font-semibold",
-                            ratingTrendLabel === "Viene bien"
-                              ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
-                              : "border-amber-400/40 bg-amber-500/10 text-amber-200"
-                          )}
-                        >
-                          {formatRatingTrendBadgeLabel(player.current_rating)}
-                        </span>
-                      ) : null}
-                    </span>
-                    {showPositions ? (
-                      <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-emerald-200">
-                        <span>{player.preferred_position ? `Preferida: ${PLAYER_POSITION_OPTIONS.find((position) => position.value === player.preferred_position)?.label}` : "Sin posición guardada"}</span>
-                        {player.secondary_position ? <span className="text-slate-400">Secundaria: {PLAYER_POSITION_OPTIONS.find((position) => position.value === player.secondary_position)?.label}</span> : null}
-                      </span>
-                    ) : null}
-                  </span>
-                </span>
-                <span className="flex flex-wrap items-center gap-2 xl:shrink-0">
-                  <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-700 px-2 py-1">
-                    <span className="text-[11px] font-semibold uppercase text-slate-300">Juega</span>
-                    <input
-                      checked={Boolean(selectedPlayers[player.id])}
-                      aria-label={`Juega ${player.full_name}`}
-                      className="h-4 w-4 accent-emerald-400"
-                      name="playerIds"
-                      onChange={(event) => togglePlayerSelection(player.id, event.target.checked)}
-                      type="checkbox"
-                      value={player.id}
-                    />
-                  </label>
-                  <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-cyan-500/30 px-2 py-1">
-                    <span className="text-[11px] font-semibold uppercase text-cyan-200">Arquero</span>
-                    <input
-                      checked={Boolean(goalkeeperPlayers[player.id]) && Boolean(selectedPlayers[player.id])}
-                      aria-label={`Arquero ${player.full_name}`}
-                      className="h-4 w-4 accent-cyan-400"
-                      disabled={
-                        !selectedPlayers[player.id] ||
-                        substituteIds.has(`player:${player.id}`) ||
-                        (!goalkeeperPlayers[player.id] && selectedGoalkeeperIds.length >= 2)
-                      }
-                      name="goalkeeperPlayerIds"
-                      onChange={(event) => toggleGoalkeeperSelection(player.id, event.target.checked)}
-                      type="checkbox"
-                      value={player.id}
-                    />
-                  </label>
-                </span>
-              </div>
-            );
-          })}
+          {players.map((player) => (
+            <NewMatchPlayerRow
+              goalkeeperDisabled={
+                !selectedPlayers[player.id] ||
+                substituteIds.has(`player:${player.id}`) ||
+                (!goalkeeperPlayers[player.id] && selectedGoalkeeperIds.length >= 2)
+              }
+              goalkeeperSelected={Boolean(goalkeeperPlayers[player.id]) && Boolean(selectedPlayers[player.id])}
+              key={player.id}
+              onGoalkeeperChange={toggleGoalkeeperSelection}
+              onSelectionChange={togglePlayerSelection}
+              player={player}
+              selected={Boolean(selectedPlayers[player.id])}
+              showPositions={showPositions}
+              visible={visiblePlayerIds.has(player.id)}
+            />
+          ))}
         </div>
         {!goalkeepersReady ? (
           <p className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-200">

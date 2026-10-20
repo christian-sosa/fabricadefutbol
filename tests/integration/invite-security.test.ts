@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
-const { factory, requiresMfa, accept, audit } = vi.hoisted(() => ({
-  factory: vi.fn(), requiresMfa: vi.fn(), accept: vi.fn(), audit: vi.fn()
+const { factory, requiresMfa, accept, audit, limit } = vi.hoisted(() => ({
+  factory: vi.fn(), requiresMfa: vi.fn(), accept: vi.fn(), audit: vi.fn(), limit: vi.fn()
 }));
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: factory }));
 vi.mock("@/lib/supabase/admin", () => ({ createSupabaseAdminClient: factory }));
 vi.mock("@/lib/auth/mfa", () => ({ requiresMfaVerification: requiresMfa }));
 vi.mock("@/lib/auth/admin", () => ({ getOrganizationQueryKeyById: async () => "grupo" }));
-vi.mock("@/lib/action-rate-limit", () => ({ ACTION_RATE_LIMITS: { acceptInvite: {} }, checkActionRateLimit: async () => ({ allowed: true }), formatActionRateLimitMessage: () => "Esperá" }));
+vi.mock("@/lib/action-rate-limit", () => ({ ACTION_RATE_LIMITS: { acceptInvite: {} }, checkActionRateLimit: limit, formatActionRateLimitMessage: () => "Esperá" }));
 vi.mock("@/lib/domain/organization-workflow", () => ({ acceptOrganizationInvite: accept }));
 vi.mock("@/lib/domain/organization-audit", () => ({ recordOrganizationAuditEvent: audit }));
 vi.mock("next/navigation", () => ({ redirect: (path: string) => { throw new Error(`redirect:${path}`); } }));
@@ -27,7 +27,30 @@ function fixture(archived = false) {
 }
 
 describe("invitaciones con sesión y cliente privilegiado", () => {
-  beforeEach(() => { vi.clearAllMocks(); requiresMfa.mockResolvedValue(false); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requiresMfa.mockResolvedValue(false);
+    limit.mockReset().mockResolvedValue({ allowed: true });
+  });
+
+  it("rechaza una invitación limitada antes de leer datos o modificar perfiles", async () => {
+    const { fake, form } = fixture();
+    const read = vi.spyOn(fake.client, "from");
+    limit.mockResolvedValue({ allowed: false, retryAfterMs: 60_000 });
+
+    await expect(acceptInviteAction(form)).rejects.toThrow(
+      `redirect:/invite/${token}?error=${encodeURIComponent("Esperá")}`
+    );
+
+    expect(factory).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+    expect(requiresMfa).not.toHaveBeenCalled();
+    expect(accept).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+    expect(fake.table("admins")).toEqual([]);
+    expect(fake.table("organization_admins")).toEqual([]);
+    expect(fake.table("organization_invites")[0].status).toBe("pending");
+  });
   it("no escribe perfiles ni consume la invitación con MFA pendiente", async () => {
     const { fake, form } = fixture(); requiresMfa.mockResolvedValue(true);
     await expect(acceptInviteAction(form)).rejects.toThrow("redirect:/admin/security");

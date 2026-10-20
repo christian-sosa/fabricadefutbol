@@ -1,12 +1,13 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider, focusManager, onlineManager } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, focusManager, onlineManager, useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { useOrganizationMatchesQuery, useOrganizationStandingsQuery } from "@/lib/query/hooks";
+import { useOrganizationMatchesQuery, useOrganizationStandingsQuery, useUpdateMatchResultMutation } from "@/lib/query/hooks";
 import { organizationQueryKeys } from "@/lib/query/keys";
 import type { OrganizationMatchesResponse } from "@/lib/query/types";
 import type { PlayerComputedStats } from "@/types/domain";
+import { ReactQueryProvider } from "@/components/providers/react-query-provider";
 
 const clients: QueryClient[] = [];
 function setup() {
@@ -24,6 +25,72 @@ function matches(organizationId = "group-1"): OrganizationMatchesResponse {
 afterEach(() => { clients.forEach((client) => client.clear()); clients.length = 0; onlineManager.setOnline(true); focusManager.setFocused(undefined); });
 
 describe("public query lifecycle", () => {
+  it("reuses fresh browser data when moving between layouts with separate providers", () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    const firstVisit = renderHook(() => useOrganizationStandingsQuery({
+      organizationId: "group-navigation", initialData: players
+    }), { wrapper: ReactQueryProvider });
+    expect(firstVisit.result.current.data).toEqual(players);
+    firstVisit.unmount();
+
+    const returnVisit = renderHook(() => useOrganizationStandingsQuery({
+      organizationId: "group-navigation"
+    }), { wrapper: ReactQueryProvider });
+    expect(returnVisit.result.current.data).toEqual(players);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each(["standings", "matches"] as const)("cancels an unused %s request after its scope changes", async (kind) => {
+    const { wrapper } = setup();
+    const signals: AbortSignal[] = [];
+    const fetcher = vi.fn((_url: string, options: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      const signal = options.signal as AbortSignal;
+      signals.push(signal);
+      signal?.addEventListener("abort", () => reject(new DOMException("Cancelled", "AbortError")));
+    }));
+    vi.stubGlobal("fetch", fetcher);
+    const { rerender, unmount } = renderHook(({ season }: { season: string }) => {
+      const standings = useOrganizationStandingsQuery({ organizationId: kind === "standings" ? "group-1" : null, season });
+      const history = useOrganizationMatchesQuery({ organizationId: kind === "matches" ? "group-1" : null, page: 1, season });
+      return kind === "standings" ? standings : history;
+    }, { wrapper, initialProps: { season: "current" } });
+    await waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+    rerender({ season: "all" });
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[1]?.aborted).toBe(false);
+    unmount();
+    expect(signals[1]?.aborted).toBe(true);
+  });
+
+  it("refreshes each active group query once after saving a result and leaves other groups fresh", async () => {
+    const { client, wrapper } = setup();
+    const reads = Array.from({ length: 4 }, () => vi.fn(async () => "updated"));
+    const keys = [
+      organizationQueryKeys.matchesPage("group-1", 1, 10),
+      organizationQueryKeys.matchDetail("group-1", "match-1"),
+      organizationQueryKeys.standings("group-1"),
+      organizationQueryKeys.standings("group-2")
+    ];
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ success: true })));
+    const { result } = renderHook(() => {
+      useQuery({ queryKey: keys[0], queryFn: reads[0], initialData: "original", staleTime: Infinity });
+      useQuery({ queryKey: keys[1], queryFn: reads[1], initialData: "original", staleTime: Infinity });
+      useQuery({ queryKey: keys[2], queryFn: reads[2], initialData: "original", staleTime: Infinity });
+      useQuery({ queryKey: keys[3], queryFn: reads[3], initialData: "original", staleTime: Infinity });
+      return useUpdateMatchResultMutation({ organizationId: "group-1", matchId: "match-1" });
+    }, { wrapper });
+    await act(async () => { await result.current.mutateAsync({ scoreA: 2, scoreB: 1, expectedVersion: 3 }); });
+    for (let index = 0; index < 3; index++) {
+      expect(reads[index]).toHaveBeenCalledOnce();
+      expect(client.getQueryData(keys[index])).toBe("updated");
+    }
+    expect(reads[3]).not.toHaveBeenCalled();
+    expect(client.getQueryState(keys[3])?.isInvalidated).toBe(false);
+    expect(client.getQueryData(keys[3])).toBe("original");
+  });
+
   it("revalidates an old ranking on return even when the cache already has initial data", async () => {
     const { client, wrapper } = setup();
     client.setQueryData(organizationQueryKeys.standings("group-1"), players, { updatedAt: Date.now() - 120_000 });

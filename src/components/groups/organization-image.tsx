@@ -20,7 +20,7 @@ export function OrganizationImage({
         className
       )}
     >
-      <Image alt={alt} className="object-cover" fill priority={priority} sizes="(max-width: 1024px) 100vw, 60vw" src={src} unoptimized />
+      <Image alt={alt} className="object-cover" fill preload={priority} sizes="(max-width: 1024px) 100vw, 60vw" src={src} unoptimized />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/25 to-transparent" />
     </div>
   );

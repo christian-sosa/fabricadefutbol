@@ -35,6 +35,34 @@ function actionsPanel(playerName: string) {
 }
 
 describe("planilla de jugadores", () => {
+  it("abre la planilla por defecto con navegación al alta y niveles editables del 1 al 7", async () => {
+    const user = userEvent.setup();
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("heading", { name: "Gestión de jugadores" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Editar planilla de jugadores" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Alta de jugador" })).toHaveAttribute("href", "/admin/players?view=new&org=viernes");
+    expect(screen.getByRole("link", { name: "Editar planilla" })).toHaveAttribute("href", "/admin/players?view=edit&org=viernes");
+    expect(screen.queryByRole("button", { name: "Crear jugador" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Rendimiento")).not.toBeInTheDocument();
+
+    const level = screen.getByRole("combobox", { name: "Nivel de habilidad de Ana Pérez" });
+    expect(within(level).getAllByRole("option").map((option) => (option as HTMLOptionElement).value))
+      .toEqual(["1", "2", "3", "4", "5", "6", "7"]);
+    await user.click(screen.getByText("Ayuda sobre niveles, posiciones y lesiones"));
+    expect(screen.getByText(/La planilla se ordena de Nivel 1 a Nivel 7/)).toBeVisible();
+  });
+
+  it("abre el alta explícita sin la planilla y conserva el acceso al grupo", async () => {
+    render(await AdminPlayersPage({ searchParams: Promise.resolve({ view: "new" }) }));
+
+    expect(screen.getByRole("textbox", { name: "Nombre completo del jugador" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Crear jugador" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Guardar toda la planilla" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Editar planilla" })).toHaveAttribute("href", "/admin/players?view=edit&org=viernes");
+    expect(screen.getByRole("combobox", { name: "Nivel de habilidad" })).toHaveValue("5");
+  });
+
   it("refresca rankings recientes del grupo, incluida otra temporada, antes de terminar el guardado", async () => {
     const user = userEvent.setup();
     const currentKey = organizationQueryKeys.standings("org-1");

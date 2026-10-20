@@ -4,7 +4,6 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { MAX_PLAYER_PHOTO_SIZE_MB, MAX_PLAYER_PHOTO_SOURCE_SIZE_MB } from "@/lib/photo-constraints";
-import { preparePlayerPhoto } from "@/lib/prepare-player-photo";
 
 type PhotoUploadInputProps = { compact?: boolean; hint?: string; required?: boolean };
 
@@ -38,6 +37,8 @@ export function PhotoUploadInput({ compact = false, hint, required = true }: Pho
           setStatus("Preparando foto…");
           input.setCustomValidity("Esperá a que termine de prepararse la foto.");
           try {
+            const { preparePlayerPhoto } = await import("@/lib/prepare-player-photo");
+            if (sequence.current !== currentSequence) return;
             const prepared = await preparePlayerPhoto(file);
             if (sequence.current !== currentSequence) return;
             const transfer = new DataTransfer();

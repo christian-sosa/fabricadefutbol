@@ -2,6 +2,8 @@ name: tests
 
 on:
   push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -11,6 +13,20 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: fdf-test-ci-only
+          POSTGRES_DB: fdf_test_concurrency
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fdf_test_concurrency"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout
@@ -27,13 +43,16 @@ jobs:
 
       - name: Restore private SQL validation artifact
         env:
-          GROUPS_SQL_BUNDLE_GZIP_BASE64: ${{ secrets.GROUPS_SQL_BUNDLE_GZIP_BASE64 }}
           NEXT_PUBLIC_SUPABASE_URL_DEV: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL_DEV }}
           SUPABASE_SERVICE_ROLE_KEY_DEV: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_DEV }}
         run: |
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL_DEV" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY_DEV" ]; then
+            echo "::error::Complete SQL validation requires this repository's private artifact credentials. Public fork runs cannot substitute missing SQL or skip mandatory suites."
+            exit 1
+          fi
           node scripts/restore-ci-sql.mjs
-          npm run sql:build-schema -- app_dev
-          npm run sql:build-schema -- app_prod
+          node scripts/restore-ci-sql-upgrades.mjs
+          npm run sql:verify
 
       - name: Guardrails
         run: npm run guardrails
@@ -46,6 +65,14 @@ jobs:
 
       - name: Test coverage
         run: npm run test:coverage
+
+      - name: Verify races with independent PostgreSQL clients
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:fdf-test-ci-only@127.0.0.1:5432/fdf_test_concurrency
+        run: npm run test:postgres
+
+      - name: Verify tests reject known regressions
+        run: node scripts/check-test-mutations.mjs
 
       - name: Build
         run: npm run build
@@ -93,6 +120,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Restore and verify this commit's canonical SQL
+        run: |
+          node scripts/restore-ci-sql.mjs
+          node scripts/check-private-sql.mjs --canonical-only
 
       - name: Validate mandatory E2E configuration
         run: npm run test:e2e:preflight
