@@ -10,18 +10,18 @@ const baselineManifest = (release: string) => {
   const encoded=encodeSources(canonical);
   return {formatVersion:1 as const,revision:`previous-${release}-release`,sha256:encoded.sha256,bucket:"groups-sql-artifacts" as const,object:`${encoded.sha256}.json.gz`};
 };
-const manifest:SqlUpgradeManifest = {formatVersion:1,artifactKind:"sql-upgrades",revision:"recorded-upgrade-fixture",sha256:artifact.sha256,bucket:"groups-sql-artifacts",object:`${artifact.sha256}.json.gz`,fileSha256:artifact.fileSha256,baselines:{audit:baselineManifest("audit"),positions:baselineManifest("positions")},migrations:Object.fromEntries(Object.keys(UPGRADE_MIGRATIONS).map((key)=>[key,{version:"20261007154147",name:`recorded_${key.toLowerCase()}`}]))};
+const manifest:SqlUpgradeManifest = {formatVersion:1,artifactKind:"sql-upgrades",revision:"recorded-upgrade-fixture",sha256:artifact.sha256,bucket:"groups-sql-artifacts",object:`${artifact.sha256}.json.gz`,fileSha256:artifact.fileSha256,baselines:{audit:baselineManifest("audit"),positions:baselineManifest("positions"),"team-read":baselineManifest("team-read")},migrations:Object.fromEntries(Object.keys(UPGRADE_MIGRATIONS).map((key)=>[key,{version:"20261007154147",name:`recorded_${key.toLowerCase()}`}]))};
 const env={NEXT_PUBLIC_SUPABASE_URL_DEV:"https://testing.supabase.co",SUPABASE_SERVICE_ROLE_KEY_DEV:"test-service-key"};
 describe("private recorded upgrade artifacts",()=>{
-  it("binds every previous source and deployed migration to the revision",()=>{
+  it.each(["positions-migrations/app_prod.sql", "team-read-migrations/app_dev.sql", "team-read-migrations/app_prod.sql"])("binds every previous source and deployed migration to the revision: %s",(migrationPath)=>{
     expect(decodeUpgradeArtifact(artifact.gzip,manifest)).toEqual(sources);
-    const changed=encodeUpgradeSources({...sources,"positions-migrations/app_prod.sql":sources["positions-migrations/app_prod.sql"]+"-- changed"});
+    const changed=encodeUpgradeSources({...sources,[migrationPath]:sources[migrationPath]+"-- changed"});
     expect(()=>decodeUpgradeArtifact(changed.gzip,manifest)).toThrow("hashes");
-    expect(()=>decodeUpgradeArtifact(artifact.gzip,{...manifest,fileSha256:{...manifest.fileSha256,"positions-migrations/app_prod.sql":"0".repeat(64)}})).toThrow("hashes");
+    expect(()=>decodeUpgradeArtifact(artifact.gzip,{...manifest,fileSha256:{...manifest.fileSha256,[migrationPath]:"0".repeat(64)}})).toThrow("hashes");
   });
-  it("rejects substituting another released baseline even when payload hashes match",()=>{
+  it.each(["positions", "team-read"] as const)("rejects substituting another released baseline even when payload hashes match: %s",(release)=>{
     const other=baselineManifest("audit");
-    expect(()=>decodeUpgradeArtifact(artifact.gzip,{...manifest,baselines:{...manifest.baselines,positions:other}})).toThrow("Baseline historico");
+    expect(()=>decodeUpgradeArtifact(artifact.gzip,{...manifest,baselines:{...manifest.baselines,[release]:other}})).toThrow("Baseline historico");
   });
   it("rejects missing migrations, unexpected paths and incomplete provenance",()=>{
     const missing={...sources};delete missing["positions-migrations/app_dev.sql"];

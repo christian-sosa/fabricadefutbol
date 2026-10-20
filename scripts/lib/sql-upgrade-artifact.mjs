@@ -12,10 +12,13 @@ export const UPGRADE_MIGRATIONS = {
   positionsPrerequisiteDev: "positions-prerequisites/app_dev.sql",
   positionsPrerequisiteProd: "positions-prerequisites/app_prod.sql",
   positionsDev: "positions-migrations/app_dev.sql",
-  positionsProd: "positions-migrations/app_prod.sql"
+  positionsProd: "positions-migrations/app_prod.sql",
+  teamReadDev: "team-read-migrations/app_dev.sql",
+  teamReadProd: "team-read-migrations/app_prod.sql"
 };
+const BASELINE_RELEASES = ["audit", "positions", "team-read"];
 export const UPGRADE_FILES = [
-  ...["audit", "positions"].flatMap((release) => SQL_FILES.map((name) => `${release}-baseline/${name}`)),
+  ...BASELINE_RELEASES.flatMap((release) => SQL_FILES.map((name) => `${release}-baseline/${name}`)),
   ...Object.values(UPGRADE_MIGRATIONS)
 ].sort();
 export const MAX_UPGRADE_BYTES = 2_000_000;
@@ -36,7 +39,7 @@ export function encodeUpgradeSources(sources) {
 export function validateUpgradeManifest(manifest) {
   validateManifest(manifest);
   if (manifest.artifactKind !== "sql-upgrades" || !sameKeys(manifest.fileSha256, UPGRADE_FILES) || Object.values(manifest.fileSha256).some((value) => !/^[a-f0-9]{64}$/.test(value))) throw new Error("Manifiesto de upgrades invalido.");
-  if (!sameKeys(manifest.baselines, ["audit", "positions"]) || !sameKeys(manifest.migrations, Object.keys(UPGRADE_MIGRATIONS))) throw new Error("Proveniencia de upgrades incompleta.");
+  if (!sameKeys(manifest.baselines, BASELINE_RELEASES) || !sameKeys(manifest.migrations, Object.keys(UPGRADE_MIGRATIONS))) throw new Error("Proveniencia de upgrades incompleta.");
   for (const baseline of Object.values(manifest.baselines)) validateManifest(baseline);
   for (const migration of Object.values(manifest.migrations)) {
     if (!/^\d{14}$/.test(migration.version ?? "") || !/^[a-z0-9_]{5,100}$/.test(migration.name ?? "")) throw new Error("Historia de migracion invalida.");
@@ -48,7 +51,7 @@ export function verifyUpgradeSources(sources, manifest) {
   validateUpgradeManifest(manifest);
   const encoded = encodeUpgradeSources(sources);
   if (encoded.sha256 !== manifest.sha256 || UPGRADE_FILES.some((name) => encoded.fileSha256[name] !== manifest.fileSha256[name])) throw new Error("El upgrade no coincide con los hashes de esta revision.");
-  for (const release of ["audit", "positions"]) {
+  for (const release of BASELINE_RELEASES) {
     const baseline = Object.fromEntries(SQL_FILES.map((name) => [name, sources[`${release}-baseline/${name}`]]));
     if (encodeSources(baseline).sha256 !== manifest.baselines[release].sha256) throw new Error(`Baseline historico incorrecto: ${release}`);
   }

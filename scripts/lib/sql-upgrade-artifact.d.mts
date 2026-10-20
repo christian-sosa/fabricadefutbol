@@ -5,7 +5,7 @@ export const MAX_UPGRADE_BYTES: number;
 export interface SqlUpgradeManifest extends SqlManifest {
   artifactKind: "sql-upgrades";
   fileSha256: Record<string, string>;
-  baselines: Record<"audit" | "positions", SqlManifest>;
+  baselines: Record<"audit" | "positions" | "team-read", SqlManifest>;
   migrations: Record<string, {version: string; name: string}>;
 }
 export function encodeUpgradeSources(sources: Record<string, string>): {bytes: Buffer; gzip: Buffer; sha256: string; fileSha256: Record<string, string>};

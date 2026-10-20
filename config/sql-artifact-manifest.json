@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
-  "revision": "groups-test-contract-20261010",
-  "sha256": "3bcb0aa0018cf6b93dc0a5f981d7da32f525e259bb915ec86e5e22bcd02e1a46",
+  "revision": "groups-team-read-performance-20261020",
+  "sha256": "ef16cb140ca484e317b10f1b63f044222b3c0eb5b94fcf2e6155284108890b82",
   "bucket": "groups-sql-artifacts",
-  "object": "3bcb0aa0018cf6b93dc0a5f981d7da32f525e259bb915ec86e5e22bcd02e1a46.json.gz"
+  "object": "ef16cb140ca484e317b10f1b63f044222b3c0eb5b94fcf2e6155284108890b82.json.gz"
 }
