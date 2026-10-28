@@ -246,15 +246,15 @@ describe("resolvePublicOrganization", () => {
         })
       ],
       topPlayers: [
-        expect.objectContaining({ id: "player-1", current_rating: 1000 }),
-        expect.objectContaining({ id: "player-2", current_rating: 1000 }),
-        expect.objectContaining({ id: "player-3", current_rating: 1000 }),
-        expect.objectContaining({ id: "player-4", current_rating: 1000 })
+        expect.objectContaining({ id: "player-1", current_rating: 1000, matches_played: 0 }),
+        expect.objectContaining({ id: "player-2", current_rating: 1000, matches_played: 0 }),
+        expect.objectContaining({ id: "player-3", current_rating: 1000, matches_played: 0 }),
+        expect.objectContaining({ id: "player-4", current_rating: 1000, matches_played: 0 })
       ]
     });
   });
 
-  it("ordena el top del grupo con los mismos desempates que ranking", async () => {
+  it("ordena el top del grupo con los mismos desempates y partidos de la temporada que ranking", async () => {
     const fake = createFakeSupabase({
       organization_seasons: [{ id: "annual", organization_id: ORG_ID, starts_at: "2026-01-01", ends_at: "2026-12-31", label: "2026" }],
       organization_season_player_ratings: [{ season_id: "annual", player_id: "player-lucas", current_rating: 1030 }, { season_id: "annual", player_id: "player-gonza", current_rating: 1030 }],
@@ -287,6 +287,13 @@ describe("resolvePublicOrganization", () => {
           scheduled_at: "2026-04-18T20:00:00.000Z",
           modality: "5v5",
           status: "finished", season_id: "annual"
+        },
+        {
+          id: "match-historical",
+          organization_id: ORG_ID,
+          scheduled_at: "2025-04-18T20:00:00.000Z",
+          modality: "5v5",
+          status: "finished", season_id: "previous"
         }
       ],
       team_options: [
@@ -299,13 +306,22 @@ describe("resolvePublicOrganization", () => {
           rating_sum_b: 10,
           rating_diff: 0,
           created_by: "admin-1"
+        },
+        {
+          id: "option-historical",
+          match_id: "match-historical",
+          is_confirmed: true
         }
       ],
       team_option_players: [
         { team_option_id: "option-1", player_id: "player-lucas", team: "A" },
-        { team_option_id: "option-1", player_id: "player-gonza", team: "B" }
+        { team_option_id: "option-1", player_id: "player-gonza", team: "B" },
+        { team_option_id: "option-historical", player_id: "player-lucas", team: "A" }
       ],
-      match_result: [{ match_id: "match-1", score_a: 1, score_b: 0, winner_team: "A", mvp_player_id: "player-gonza", created_by: "admin-1" }]
+      match_result: [
+        { match_id: "match-1", score_a: 1, score_b: 0, winner_team: "A", mvp_player_id: "player-gonza", created_by: "admin-1" },
+        { match_id: "match-historical", score_a: 1, score_b: 0, winner_team: "A", mvp_player_id: "player-lucas", created_by: "admin-1" }
+      ]
     });
 
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
@@ -315,6 +331,7 @@ describe("resolvePublicOrganization", () => {
     const summary = await getHomeSummary(ORG_ID);
 
     expect(summary.topPlayers.map((player) => player.id)).toEqual(["player-gonza", "player-lucas"]);
+    expect(summary.topPlayers.map((player) => [player.current_rating, player.matches_played])).toEqual([[1030, 1], [1030, 1]]);
   });
 
   it("rebuilds the current-year top instead of reusing historical snapshot standings", async () => {
@@ -333,12 +350,14 @@ describe("resolvePublicOrganization", () => {
                 id: "player-gonza",
                 full_name: "GonzaMastro",
                 current_rating: 1030,
+                matches_played: 4,
                 initial_rank: 1
               },
               {
                 id: "player-lucas",
                 full_name: "LucasDias",
                 current_rating: 1030,
+                matches_played: 7,
                 initial_rank: 2
               }
             ]
@@ -389,7 +408,9 @@ describe("resolvePublicOrganization", () => {
     const summary = await getHomeSummary(ORG_ID);
 
     expect(summary.totalPlayers).toBe(2);
-    expect(summary.topPlayers.map((player) => [player.id, player.current_rating])).toEqual([["player-lucas", 1000], ["player-gonza", 1000]]);
+    // This count exists only in the accepted snapshot; the live fixture is empty.
+    expect(summary.totalFinishedMatches).toBe(1);
+    expect(summary.topPlayers.map((player) => [player.id, player.current_rating, player.matches_played])).toEqual([["player-lucas", 1000, 0], ["player-gonza", 1000, 0]]);
   });
 
   it("recalcula el acumulado cuando el snapshot todavia no tiene la forma reciente", async () => {

@@ -46,7 +46,7 @@ test("mantiene la organizacion al navegar por la parte publica", async ({ page }
   await expectGroupPath(page, "/matches");
 });
 
-type Standing = { playerId: string; currentRating: number; mvpCount: number };
+type Standing = { playerId: string; playerName: string; currentRating: number; mvpCount: number; matchesPlayed: number };
 async function standingsFor(page: Page) {
   const response = await page.request.get(`/api/organizations/${E2E_ORGANIZATION_ID}/standings?season=current`);
   expect(response.ok()).toBe(true);
@@ -220,16 +220,42 @@ test("login, resultado, reintento, edicion concurrente y correccion historica co
   await expect(page.getByText("Ganó Negro")).toBeVisible();
   await expect(page.getByText("Figura del partido: E2E Jugador 1", { exact: true })).toBeVisible();
 
-  const response = await page.request.get(`/api/organizations/${E2E_ORGANIZATION_ID}/standings?season=current`);
-  expect(response.ok()).toBe(true);
-  const { standings } = await response.json() as {
-    standings: Array<{ playerId: string; currentRating: number; mvpCount: number }>;
-  };
+  const standings = await standingsFor(page);
   expect(standings).toHaveLength(10);
   expect(points(standings)).toEqual(expectedFirstPoints);
   const mvp = standings.find((player) => player.playerId === E2E_PLAYER_IDS[0]);
   expect(mvp?.mvpCount).toBe(1);
   expect(standings.filter((player) => player.currentRating === mvp?.currentRating)[0]?.playerId).toBe(E2E_PLAYER_IDS[0]);
+
+  await page.setViewportSize({ width: 320, height: originalViewport.height });
+  await page.goto(`/groups?org=${ORG_SLUG}`);
+  const groupRanking = page.getByRole("heading", { name: "Ranking actual", exact: true })
+    .locator("..").locator("..").locator("..");
+  await expect(groupRanking.getByText("Top 5 de la temporada actual.", { exact: true })).toBeVisible();
+  for (const column of ["Jugador", "Puntos", "PJ"]) {
+    await expect(groupRanking.getByText(column, { exact: true })).toBeVisible();
+  }
+  const groupRankingRows = groupRanking.getByRole("listitem");
+  await expect(groupRankingRows).toHaveCount(5);
+  for (const [index, leader] of standings.slice(0, 5).entries()) {
+    expect(leader.matchesPlayed).toBe(1);
+    const link = groupRankingRows.nth(index).getByRole("link");
+    await expect(link).toHaveAccessibleName(`Ver ranking de ${leader.playerName}: ${expectedFirstPoints[leader.playerId]} puntos, 1 partido jugado`);
+    const columns = link.locator(":scope > span");
+    await expect(columns.nth(0)).toContainText(leader.playerName);
+    await expect(columns.nth(1)).toHaveText(String(expectedFirstPoints[leader.playerId]));
+    await expect(columns.nth(2)).toHaveText("1");
+  }
+  await groupRanking.scrollIntoViewIfNeeded();
+  await expectNoHorizontalOverflow(page);
+  const rankingBounds = await groupRanking.boundingBox();
+  expect(rankingBounds).not.toBeNull();
+  expect(rankingBounds!.x).toBeGreaterThanOrEqual(0);
+  expect(rankingBounds!.x + rankingBounds!.width).toBeLessThanOrEqual(320);
+  const groupRankingScreenshot = testInfo.outputPath("group-top-five-320px.png");
+  await groupRanking.screenshot({ path: groupRankingScreenshot, animations: "disabled" });
+  await testInfo.attach("group-top-five-320px", { path: groupRankingScreenshot, contentType: "image/png" });
+  await page.setViewportSize(originalViewport);
 
   const resultUrl = `/admin/matches/${matchId}/result?org=${ORG_SLUG}`;
   const resultApi = `**/api/admin/organizations/${E2E_ORGANIZATION_ID}/matches/${matchId}/result`;

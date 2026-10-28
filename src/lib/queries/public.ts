@@ -182,6 +182,7 @@ function buildTopPlayersFromStandings(standings: PlayerComputedStats[], limit = 
     photo_path: player.photoPath,
     photo_updated_at: player.photoUpdatedAt,
     current_rating: player.currentRating,
+    matches_played: player.matchesPlayed,
     initial_rank: player.initialRank,
     display_order: player.currentRank
   }));

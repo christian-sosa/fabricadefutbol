@@ -3,6 +3,7 @@ import Link from "next/link";
 import { GroupShareActions } from "@/components/groups/group-share-actions";
 import { OrganizationImage } from "@/components/groups/organization-image";
 import { PublicGroupGrowthCta } from "@/components/groups/public-group-growth-cta";
+import { SeasonClosingCountdown } from "@/components/groups/season-closing-countdown";
 import { OrganizationPublicNav } from "@/components/layout/organization-public-nav";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { MatchDateTime } from "@/components/matches/match-date-time";
@@ -111,20 +112,25 @@ export default async function GroupsPage({ searchParams }: {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <CardTitle>Ranking actual</CardTitle>
-                  <CardDescription className="mt-1">Los primeros del grupo.</CardDescription>
+                  <CardDescription className="mt-1">Top 5 de la temporada actual.</CardDescription>
                 </div>
                 <Link className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-emerald-300 hover:underline" href={withOrgQuery("/ranking", selectedOrganization.slug)}>Ver ranking</Link>
               </div>
-              <ol className="mt-3 divide-y divide-slate-800">
+              <SeasonClosingCountdown initialNow={new Date().toISOString()} />
+              <div className="mt-4 grid grid-cols-[minmax(0,1fr)_4rem_2rem] gap-3 text-xs text-slate-400 lg:pr-3" aria-hidden="true">
+                <span>Jugador</span><span className="text-right">Puntos</span><span className="text-right">PJ</span>
+              </div>
+              <ol className="mt-1 divide-y divide-slate-800">
                 {summary.topPlayers.map((player, index) => (
                   <li key={player.id}>
-                    <Link aria-label={`Ver ranking de ${player.full_name}`} className="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg py-2 text-sm transition hover:bg-slate-800 lg:pr-3" href={withOrgQuery("/ranking", selectedOrganization.slug)}>
+                    <Link aria-label={`Ver ranking de ${player.full_name}: ${formatRendimiento(player.current_rating)} puntos, ${player.matches_played === 1 ? "1 partido jugado" : `${player.matches_played} partidos jugados`}`} className="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_4rem_2rem] items-center gap-3 rounded-lg py-2 text-sm transition hover:bg-slate-800 lg:pr-3" href={withOrgQuery("/ranking", selectedOrganization.slug)}>
                       <span className="flex min-w-0 items-center gap-3">
                         <span className="w-4 shrink-0 text-center text-xs text-slate-400">{index + 1}</span>
                         <PlayerAvatar hasPhoto={player.photo_path === undefined ? undefined : Boolean(player.photo_path)} name={player.full_name} photoUpdatedAt={player.photo_updated_at} playerId={player.id} size="sm" />
                         <span className="truncate font-medium">{player.full_name}</span>
                       </span>
-                      <span className="min-w-12 text-right font-semibold tabular-nums text-emerald-300">{formatRendimiento(player.current_rating)}</span>
+                      <span className="text-right font-semibold tabular-nums text-emerald-300">{formatRendimiento(player.current_rating)}</span>
+                      <span className="text-right tabular-nums text-slate-300">{player.matches_played}</span>
                     </Link>
                   </li>
                 ))}
