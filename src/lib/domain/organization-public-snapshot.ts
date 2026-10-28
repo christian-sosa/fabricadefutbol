@@ -20,6 +20,7 @@ export type OrganizationPublicSummary = {
     photo_path?: string | null;
     photo_updated_at?: string | null;
     current_rating: number;
+    matches_played: number;
     initial_rank: number;
     skill_level?: number;
     display_order?: number;
@@ -70,7 +71,9 @@ function normalizeSummary(value: unknown): OrganizationPublicSummary | null {
     typeof candidate.totalPlayers !== "number" ||
     typeof candidate.totalFinishedMatches !== "number" ||
     !Array.isArray(candidate.upcomingMatches) ||
-    !Array.isArray(candidate.topPlayers)
+    !Array.isArray(candidate.topPlayers) ||
+    candidate.topPlayers.some((player) => !player || typeof player !== "object"
+      || !Number.isSafeInteger(player.matches_played) || player.matches_played < 0)
   ) {
     return null;
   }

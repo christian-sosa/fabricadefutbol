@@ -61,6 +61,7 @@ const payload: OrganizationPublicSnapshotPayload = {
         id: "player-1",
         full_name: "Nico Perez",
         current_rating: 1140,
+        matches_played: 2,
         initial_rank: 1
       }
     ]
@@ -186,6 +187,15 @@ describe("organization public snapshot helpers", () => {
 
   it("ignores incomplete summary rows", async () => {
     const fake = snapshotFixture({ summary: {} });
+    await expect(readOrganizationPublicSummarySnapshot(fake.client, "org-1")).resolves.toBeNull();
+    await expect(readOrganizationPublicSnapshot(fake.client, "org-1")).resolves.toBeNull();
+  });
+
+  it.each([undefined, -1, 1.5, "2"])("ignores cached summaries with missing or invalid matches played %s", async (matches_played) => {
+    const fake = snapshotFixture({ summary: {
+      ...payload.summary,
+      topPlayers: [{ ...payload.summary.topPlayers[0], matches_played }]
+    } });
     await expect(readOrganizationPublicSummarySnapshot(fake.client, "org-1")).resolves.toBeNull();
     await expect(readOrganizationPublicSnapshot(fake.client, "org-1")).resolves.toBeNull();
   });
