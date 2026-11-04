@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({ client: vi.fn(), details: vi.fn(), form: vi.fn
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const pastId = "22222222-2222-4222-8222-222222222222";
 const futureId = "33333333-3333-4333-8333-333333333333";
+const activeVenueId = "44444444-4444-4444-8444-444444444441";
+const archivedVenueId = "44444444-4444-4444-8444-444444444442";
 vi.mock("@/lib/auth/admin", () => ({
   requireAdminOrganization: async () => ({ admin: {}, selectedOrganization: { id: organizationId, slug: "viernes" } }),
   getOrganizationWriteAccess: async () => ({ canWrite: true })
@@ -29,13 +31,22 @@ describe("repetir el último partido", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("elige una fecha pasada del grupo y prepara la próxima semana con convocados vigentes", async () => {
+  it.each([
+    { kind: "activa", venueId: activeVenueId, selectedVenueId: activeVenueId },
+    { kind: "archivada", venueId: archivedVenueId, selectedVenueId: undefined },
+    { kind: "guardada como texto", venueId: null, selectedVenueId: undefined }
+  ])("prepara la próxima semana con una cancha $kind en el partido anterior", async ({ venueId, selectedVenueId }) => {
     const db = createFakeSupabase({
       matches: [
         { id: pastId, organization_id: organizationId, status: "finished", scheduled_at: "2026-08-28T21:00:00Z" },
         { id: futureId, organization_id: organizationId, status: "confirmed", scheduled_at: "2026-10-09T21:00:00Z" },
         { id: "44444444-4444-4444-8444-444444444444", organization_id: organizationId, status: "draft", scheduled_at: "2026-09-25T21:00:00Z" },
         { id: "55555555-5555-4555-8555-555555555555", organization_id: "another-group", status: "finished", scheduled_at: "2026-09-29T21:00:00Z" }
+      ],
+      organization_venues: [
+        { id: activeVenueId, organization_id: organizationId, name: "Cancha del barrio", archived_at: null },
+        { id: archivedVenueId, organization_id: organizationId, name: "Club del parque", archived_at: "2026-09-30T10:00:00Z" },
+        { id: "other-venue", organization_id: "another-group", name: "Cancha de otro grupo", archived_at: null }
       ],
       match_players: [
         { match_id: pastId, player_id: "player-2", is_substitute: true, substitute_team: "B" },
@@ -45,7 +56,7 @@ describe("repetir el último partido", () => {
     });
     mocks.client.mockResolvedValue(db.client);
     mocks.details.mockResolvedValue({
-      match: { scheduled_at: "2026-08-28T21:00:00Z", modality: "5v5", location: "Cancha del barrio", goalkeeper_player_ids: ["player-1", "player-2"] },
+      match: { scheduled_at: "2026-08-28T21:00:00Z", modality: "5v5", venue_id: venueId, location: "Cancha del barrio", goalkeeper_player_ids: ["player-1", "player-2"] },
       options: [{ is_confirmed: true, teamA: [{ id: "player-1", is_guest: false }, { id: "inactive", is_guest: false }], teamB: [{ id: "guest-1", is_guest: true }] }]
     });
 
@@ -56,8 +67,9 @@ describe("repetir el último partido", () => {
     expect(mocks.form.mock.calls[0][0]).toMatchObject({
       defaultScheduledDate: "2026-10-02",
       requestId: expect.stringMatching(/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/),
+      venues: [{ id: activeVenueId, name: "Cancha del barrio" }],
       initialValues: {
-        modality: "5v5", location: "Cancha del barrio", scheduledTime: "21:00",
+        modality: "5v5", venueId: selectedVenueId, scheduledTime: "21:00",
         playerIds: ["player-1", "player-2"], goalkeeperPlayerIds: ["player-1", "player-2"],
         guests: [{ name: "Invitado", rating: 1100 }],
         substituteAssignments: [{ participantId: "player:player-2", team: "B" }]

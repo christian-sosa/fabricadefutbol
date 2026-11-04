@@ -77,6 +77,17 @@ describe("AdminSubnav", () => {
     expect(screen.queryByRole("link", { name: "Nuevo partido" })).not.toBeInTheDocument();
   });
 
+  it("mantiene Canchas activo y conserva el grupo al administrar sus canchas", () => {
+    navigationState.pathname = "/admin/venues";
+    navigationState.searchParams = new URLSearchParams({ org: "grupo-a" });
+
+    render(<AdminSubnav />);
+
+    expect(screen.getByRole("link", { name: "Canchas" })).toHaveAttribute("href", "/admin/venues?org=grupo-a");
+    expect(screen.getByRole("link", { name: "Canchas" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Partidos" })).not.toHaveAttribute("aria-current");
+  });
+
   it("mantiene Goleadores activo y conserva el grupo en su historial privado", () => {
     navigationState.pathname = "/admin/scorers";
     navigationState.searchParams = new URLSearchParams({ org: "grupo-a" });

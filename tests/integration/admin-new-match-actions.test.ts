@@ -55,6 +55,7 @@ import { createMatchAction } from "@/app/admin/(panel)/matches/new/actions";
 import { createFakeSupabase } from "../helpers/fake-supabase";
 
 const ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001";
+const VENUE_ID = "00000000-0000-4000-8000-000000000010";
 
 function buildPlayers(count: number) {
   return Array.from({ length: count }, (_, index) => ({
@@ -76,7 +77,7 @@ function buildManualMatchForm(playerIds: string[], modality: "5v5" | "10v10" = "
   formData.set("scheduledDate", "2026-05-20");
   formData.set("scheduledTime", "20:00");
   formData.set("modality", modality);
-  formData.set("location", "Saturno");
+  formData.set("venueId", VENUE_ID);
   formData.set("creationMode", "manual");
   formData.set("teamALabel", "Los Pibes");
   formData.set("teamBLabel", "Veteranos");
@@ -124,6 +125,7 @@ describe("admin new match actions", () => {
       organizations: [{ id: ORGANIZATION_ID, name: "La Banda", slug: "la-banda" }],
       players
     });
+    const rpc = vi.spyOn(fake.client, "rpc");
     createSupabaseServerClientMock.mockResolvedValue(fake.client);
 
     await expect(createMatchAction(buildManualMatchForm(players.map((player) => player.id), modality))).rejects.toMatchObject({
@@ -147,6 +149,10 @@ describe("admin new match actions", () => {
     expect(redirectUrl.searchParams.has("ff_event")).toBe(false);
     expect(String(redirectedTo)).not.toContain("/admin/matches");
     expect(refreshOrganizationPublicSnapshotSafeMock).toHaveBeenCalledWith(ORGANIZATION_ID);
+    expect(rpc).toHaveBeenCalledWith("create_group_match_draft", expect.objectContaining({
+      p_organization_id: ORGANIZATION_ID,
+      p_input: expect.objectContaining({ venueId: VENUE_ID })
+    }));
   });
 
   it("crea F10 manual con suplente sin equipo y conserva exactamente diez titulares por lado", async () => {

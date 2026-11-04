@@ -110,6 +110,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      organization_venues: {
+        Row: {
+          archived_at: string | null;
+          active_slot: number | null;
+          id: string;
+          name: string;
+          organization_id: string;
+        };
+        Insert: {
+          archived_at?: string | null;
+          active_slot?: number | null;
+          id?: string;
+          name: string;
+          organization_id: string;
+        };
+        Update: {
+          archived_at?: string | null;
+          name?: string;
+        };
+        Relationships: [];
+      };
       players: {
         Row: {
           active: boolean;
@@ -252,6 +273,7 @@ export type Database = {
           lineup_snapshot: Json;
           id: string;
           location: string | null;
+          venue_id: string | null;
           modality: "5v5" | "6v6" | "7v7" | "9v9" | "10v10" | "11v11";
           organization_id: string;
           scheduled_at: string;
@@ -273,6 +295,7 @@ export type Database = {
           lineup_snapshot?: Json;
           id?: string;
           location?: string | null;
+          venue_id?: string | null;
           modality: "5v5" | "6v6" | "7v7" | "9v9" | "10v10" | "11v11";
           organization_id: string;
           scheduled_at: string;
@@ -294,6 +317,7 @@ export type Database = {
           lineup_snapshot?: Json;
           id?: string;
           location?: string | null;
+          venue_id?: string | null;
           modality?: "5v5" | "6v6" | "7v7" | "9v9" | "10v10" | "11v11";
           organization_id?: string;
           scheduled_at?: string;

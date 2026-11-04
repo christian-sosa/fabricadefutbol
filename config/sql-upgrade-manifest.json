@@ -1,10 +1,10 @@
 {
   "formatVersion": 1,
   "artifactKind": "sql-upgrades",
-  "revision": "groups-team-read-upgrades-20261020",
-  "sha256": "e362f138f4187d0789ba6644d7457a76b90da0bbea86be8c18dd922b654a72bd",
+  "revision": "group-venues-upgrades-20261104",
+  "sha256": "6cdf516bd3a2b771f16a35d38b964d8996a96255e7008a22e014879ea04c3d37",
   "bucket": "groups-sql-artifacts",
-  "object": "e362f138f4187d0789ba6644d7457a76b90da0bbea86be8c18dd922b654a72bd.json.gz",
+  "object": "6cdf516bd3a2b771f16a35d38b964d8996a96255e7008a22e014879ea04c3d37.json.gz",
   "fileSha256": {
     "audit-baseline/group-match-workflow.sql": "a9c6c9827663d613d456df54f4fc0b9d4d6938d3b4232a45110a67880f51dcc9",
     "audit-baseline/policies.sql": "11883051ff561125c3874d4a69add2b8cfefd5bb4194add3575faf049d9e422a",
@@ -24,7 +24,14 @@
     "team-read-baseline/policies.sql": "c432a78ed8dc10ff7b1b2e0195067a85004f08a13fb9f41c5ea0cc615d2eaf43",
     "team-read-baseline/schema.sql": "b4b0b73f9c88e57a1f9519f6ff8d4c0983aa581c1a80d2986540f44a417e886f",
     "team-read-migrations/app_dev.sql": "70bc0a1ae5fcadea071402ba626323e19f08234d87f4dea357c986468f1d557b",
-    "team-read-migrations/app_prod.sql": "7d98ed2c07cfe220327d9c053b5247a58a3309cf9e5cc4c7ee04dc0febfc804a"
+    "team-read-migrations/app_prod.sql": "7d98ed2c07cfe220327d9c053b5247a58a3309cf9e5cc4c7ee04dc0febfc804a",
+    "venues-baseline/group-match-workflow.sql": "93233c2fd2b98e685149a15811ff9cceee8329f8ee550fcacc82f5965ff8db8b",
+    "venues-baseline/policies.sql": "dc773489f6d510716130edccfc29382c1deff30940ef555b11aa1306f6e9a4d9",
+    "venues-baseline/schema.sql": "b4b0b73f9c88e57a1f9519f6ff8d4c0983aa581c1a80d2986540f44a417e886f",
+    "venues-migrations/app_dev-permissions.sql": "2415df5a6b74890e0fb447a16431f58225189cf8d8d4468f4da7d240c6a903c5",
+    "venues-migrations/app_dev.sql": "a7ed9523489faf70ce1cfa3d51198a21491ec69f87a9f4ad794e867884717ce5",
+    "venues-migrations/app_prod-permissions.sql": "4ec0a0e4826fb62e756112713abdbd38af0f57d9ab6c173f856f7166bbb86fb4",
+    "venues-migrations/app_prod.sql": "275c1e6987354624fd7a7b996771dd978808943519f4548264b28a6f2c49422f"
   },
   "baselines": {
     "audit": {
@@ -47,6 +54,13 @@
       "sha256": "3bcb0aa0018cf6b93dc0a5f981d7da32f525e259bb915ec86e5e22bcd02e1a46",
       "bucket": "groups-sql-artifacts",
       "object": "3bcb0aa0018cf6b93dc0a5f981d7da32f525e259bb915ec86e5e22bcd02e1a46.json.gz"
+    },
+    "venues": {
+      "formatVersion": 1,
+      "revision": "groups-team-read-performance-20261020",
+      "sha256": "ef16cb140ca484e317b10f1b63f044222b3c0eb5b94fcf2e6155284108890b82",
+      "bucket": "groups-sql-artifacts",
+      "object": "ef16cb140ca484e317b10f1b63f044222b3c0eb5b94fcf2e6155284108890b82.json.gz"
     }
   },
   "migrations": {
@@ -89,6 +103,22 @@
     "teamReadProd": {
       "version": "20261020155649",
       "name": "team_option_players_command_policies_app_prod"
+    },
+    "venuesDev": {
+      "version": "20261104133311",
+      "name": "app_dev_group_venues"
+    },
+    "venuesProd": {
+      "version": "20261104133701",
+      "name": "app_prod_group_venues"
+    },
+    "venuesPermissionsDev": {
+      "version": "20261104134011",
+      "name": "app_dev_group_venues_recheck_permissions"
+    },
+    "venuesPermissionsProd": {
+      "version": "20261104134036",
+      "name": "app_prod_group_venues_recheck_permissions"
     }
   }
 }

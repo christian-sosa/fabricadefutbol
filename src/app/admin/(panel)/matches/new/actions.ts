@@ -25,7 +25,7 @@ const schema = z.object({
   scheduledDate: z.string().optional(),
   scheduledTime: z.string().min(1, "La hora es obligatoria."),
   modality: z.enum(MATCH_MODALITIES),
-  location: z.string().optional(),
+  venueId: z.string().uuid("Elegí una cancha válida.").optional(),
   teamALabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del primer equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),
   teamBLabel: z.string().max(TEAM_LABEL_MAX_LENGTH, `El nombre del segundo equipo no puede superar ${TEAM_LABEL_MAX_LENGTH} caracteres.`).optional(),
   playerIds: z.array(z.string().uuid())
@@ -166,7 +166,7 @@ export async function createMatchAction(formData: FormData) {
       scheduledDate: String(formData.get("scheduledDate") ?? ""),
       scheduledTime: String(formData.get("scheduledTime") ?? ""),
       modality: formData.get("modality"),
-      location: formData.get("location"),
+      venueId: formData.get("venueId") || undefined,
       teamALabel: String(formData.get("teamALabel") ?? ""),
       teamBLabel: String(formData.get("teamBLabel") ?? ""),
       playerIds: formData.getAll("playerIds")
@@ -269,7 +269,7 @@ export async function createMatchAction(formData: FormData) {
       requestId: parsed.data.requestId,
       scheduledAt: matchDateAndTimeToIso(parsed.data.scheduledDate, parsed.data.scheduledTime),
       modality: parsed.data.modality,
-      location: parsed.data.location ?? "",
+      venueId: parsed.data.venueId,
       selectedPlayerIds: parsed.data.playerIds,
       invitedGuests,
       teamCreationMode: creationMode,

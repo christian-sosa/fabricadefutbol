@@ -38,12 +38,13 @@ function getCheckbox(container: HTMLElement, name: string, value: string) {
 }
 
 describe("NewMatchForm", () => {
-  it("actualiza posiciones una vez al volver de Jugadores y conserva el borrador", async () => {
+  it("actualiza canchas y posiciones al volver de su administración y conserva el borrador", async () => {
     router.refresh.mockClear();
     const user = userEvent.setup();
     const players = buildPlayers(3).map((player) => ({ ...player, preferred_position: "DEF" as const }));
     const props = {
       defaultScheduledDate: DEFAULT_SCHEDULED_DATE, organizationId: "org-1", players, requestId: "original-request",
+      venues: [{ id: "venue-1", name: "Cancha nueva" }],
       initialValues: { modality: "9v9" as const, playerIds: ["player-1", "player-2"], goalkeeperPlayerIds: [], guests: [],
         substituteAssignments: [{ participantId: "player:player-2", team: null }] }
     };
@@ -52,7 +53,7 @@ describe("NewMatchForm", () => {
     await user.click(screen.getByRole("checkbox", { name: "Juega Jugador 3" }));
     await user.click(screen.getByRole("checkbox", { name: "Arquero Jugador 1" }));
     await user.selectOptions(screen.getByRole("combobox", { name: "Rol de Jugador 2" }), "B");
-    await user.type(screen.getByLabelText("Ubicacion"), "Cancha nueva");
+    await user.selectOptions(screen.getByLabelText("Cancha"), "venue-1");
     fireEvent.change(screen.getByLabelText("Fecha"), { target: { value: "2026-11-05" } });
     fireEvent.change(screen.getByLabelText("Hora"), { target: { value: "21:30" } });
     await user.click(screen.getByRole("button", { name: "Agregar invitado" }));
@@ -62,7 +63,9 @@ describe("NewMatchForm", () => {
 
     fireEvent.focus(window);
     expect(router.refresh).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("link", { name: "Editar posiciones en Jugadores (otra pestaña)" }));
+    const venueManagementLink = screen.getByRole("link", { name: "Administrar canchas (otra pestaña)" });
+    expect(venueManagementLink).toHaveAttribute("href", "/admin/venues?org=org-1");
+    await user.click(venueManagementLink);
     expect(router.refresh).not.toHaveBeenCalled();
     fireEvent.focus(window);
     expect(router.refresh).toHaveBeenCalledTimes(1);
@@ -70,7 +73,9 @@ describe("NewMatchForm", () => {
     expect(router.refresh).toHaveBeenCalledTimes(1);
 
     rerender(<NewMatchForm {...props} requestId="refreshed-request" defaultScheduledDate="2026-11-01"
+      venues={[...props.venues, { id: "venue-2", name: "Cancha del parque" }]}
       players={players.map((player) => player.id === "player-3" ? { ...player, preferred_position: "MID", secondary_position: "FWD" } : player)} />);
+    expect(screen.getByRole("option", { name: "Cancha del parque" })).toBeInTheDocument();
     expect(screen.getByText("Preferida: Mediocampista")).toBeInTheDocument();
     expect(screen.getByText("Secundaria: Delantero")).toBeInTheDocument();
     expect(screen.getByText("Preferida · Mediocampista: 1")).toBeInTheDocument();
@@ -337,9 +342,10 @@ describe("NewMatchForm", () => {
   it("precarga el partido anterior y permite revisar la nueva fecha", () => {
     const players = buildPlayers(10);
     const { container } = render(<NewMatchForm defaultScheduledDate="2026-09-20" organizationId="org-1" players={players}
-      initialValues={{ modality: "5v5", location: "Cancha del barrio", scheduledTime: "21:30", playerIds: players.map((p) => p.id), goalkeeperPlayerIds: ["player-1", "player-10"], guests: [] }} />);
+      venues={[{ id: "venue-1", name: "Cancha del barrio" }]}
+      initialValues={{ modality: "5v5", venueId: "venue-1", scheduledTime: "21:30", playerIds: players.map((p) => p.id), goalkeeperPlayerIds: ["player-1", "player-10"], guests: [] }} />);
     expect(screen.getByLabelText("Modalidad")).toHaveValue("5v5");
-    expect(screen.getByLabelText("Ubicacion")).toHaveValue("Cancha del barrio");
+    expect(screen.getByLabelText("Cancha")).toHaveValue("venue-1");
     expect(screen.getByLabelText("Hora")).toHaveValue("21:30");
     expect(screen.getByLabelText("Fecha")).toHaveValue("2026-09-20");
     expect(getCheckbox(container, "playerIds", "player-10")).toBeChecked();

@@ -11,19 +11,20 @@ import {
 import { AdminCurrentGroupCard } from "@/components/admin/admin-current-group-card";
 import { MatchDateTimeFields } from "@/components/admin/match-date-time-fields";
 import { MatchTeamLabelsShareForm } from "@/components/admin/match-team-labels-share-form";
+import { MatchVenueSelect } from "@/components/admin/match-venue-select";
 import { TeamOptionsList } from "@/components/matches/team-options-list";
 import { MatchFormationEditor } from "@/components/admin/match-formation-editor";
 import { saveMatchFormationAction } from "@/app/admin/(panel)/matches/[id]/formation-actions";
 import { readMatchFormation, supportsMatchFormation, toFormationPlayers } from "@/lib/domain/match-formation";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
 import { matchIsoToDateInput, matchIsoToTimeInput } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getAdminMatchDetails } from "@/lib/queries/admin";
 import { getAdminMatchSubstitutes } from "@/lib/queries/admin-match-extras";
+import { getActiveMatchVenues } from "@/lib/queries/match-venues";
 import { supportsMatchExtras } from "@/lib/domain/match-scorers";
 import { supportsPositionBalancing } from "@/lib/domain/player-positions";
 import { resolveMatchTeamLabels } from "@/lib/team-labels";
@@ -45,7 +46,14 @@ export default async function AdminMatchDetailPage({
   }
   const details = await getAdminMatchDetails(id, selectedOrganization.id);
   if (!details) notFound();
-  const substitutes = supportsMatchExtras(details.match.modality) ? await getAdminMatchSubstitutes(id, selectedOrganization.id) : [];
+  const [substitutes, venues] = await Promise.all([
+    supportsMatchExtras(details.match.modality) ? getAdminMatchSubstitutes(id, selectedOrganization.id) : [],
+    getActiveMatchVenues(selectedOrganization.id)
+  ]);
+  const activeVenue = venues.find((venue) => venue.id === details.match.venue_id);
+  const currentVenueLabel = activeVenue?.name ?? (details.match.location
+    ? `${details.match.location} (${details.match.venue_id ? "archivada" : "ubicación anterior"})`
+    : null);
 
   const confirmAction = confirmOptionAction.bind(null, id, selectedOrganization.id);
   const regenerateAction = regenerateOptionsAction.bind(null, id, selectedOrganization.id);
@@ -164,12 +172,8 @@ export default async function AdminMatchDetailPage({
             requiredTime
             timeName="scheduledTime"
           />
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="location">
-              Ubicacion
-            </label>
-            <Input defaultValue={details.match.location ?? ""} id="location" name="location" />
-          </div>
+          <MatchVenueSelect currentVenue={{ id: details.match.venue_id, label: currentVenueLabel }}
+            key={`${details.match.venue_id}:${currentVenueLabel}`} venues={venues} />
           <div className="flex items-end">
             <Button className="w-full" type="submit" variant="secondary">
               Guardar cambios

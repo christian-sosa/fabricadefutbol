@@ -145,11 +145,11 @@ describe("admin match result actions", () => {
     return fake;
   }
 
-  async function changeMatchDate(date: string) {
+  async function changeMatchDate(date: string, venueId = "keep") {
     const formData = new FormData();
     formData.set("scheduledDate", date);
     formData.set("scheduledTime", "01:30");
-    formData.set("location", "Cancha nueva");
+    formData.set("venueId", venueId);
     await expect(updateMatchAction("match-1", "org-1", formData)).rejects.toMatchObject({
       digest: expect.stringContaining("NEXT_REDIRECT")
     });
@@ -168,7 +168,14 @@ describe("admin match result actions", () => {
     const fake = matchDateFixture();
     const url = await changeMatchDate(date);
     expect(url.searchParams.has("error")).toBe(false);
-    expect(fake.table("matches")[0]).toMatchObject({scheduled_at: `${date}T01:30:00.000Z`, location: "Cancha nueva", season_id: "season-1"});
+    expect(fake.table("matches")[0]).toMatchObject({scheduled_at: `${date}T01:30:00.000Z`, location: "Cancha vieja", season_id: "season-1"});
+  });
+
+  it.each(["00000000-0000-4000-8000-000000000010", ""])("envía la selección %j sin reutilizar la etiqueta anterior", async (venueId) => {
+    const fake = matchDateFixture();
+    const url = await changeMatchDate("", venueId);
+    expect(url.searchParams.has("error")).toBe(false);
+    expect(fake.table("matches")[0]).toMatchObject({ venue_id: venueId || null, location: null });
   });
 
   it("conserva la fecha al cambiar solo la hora y protege el año de partidos antiguos sin temporada", async () => {

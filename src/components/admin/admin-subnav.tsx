@@ -33,6 +33,11 @@ function buildOrganizationItems(pathname: string, organizationKey: string | null
       active: isMatchArea
     },
     {
+      href: withOrgQuery("/admin/venues", organizationKey),
+      label: "Canchas",
+      active: pathname === "/admin/venues"
+    },
+    {
       href: withOrgQuery("/admin/scorers", organizationKey),
       label: "Goleadores",
       active: pathname === "/admin/scorers"
