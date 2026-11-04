@@ -113,7 +113,9 @@ const lineupAdjustmentSchema = z.object({
 const updateMatchSchema = z.object({
   scheduledDate: z.string().optional(),
   scheduledTime: z.string().min(1, "La hora es obligatoria."),
-  location: z.string().optional()
+  venueId: z.union([z.string().uuid(), z.literal(""), z.literal("keep")], {
+    errorMap: () => ({ message: "Elegí una cancha válida." })
+  }).optional()
 });
 
 const updateTeamLabelsSchema = z.object({
@@ -352,7 +354,7 @@ export async function updateMatchAction(matchId: string, organizationId: string,
     const parsed = updateMatchSchema.safeParse({
       scheduledDate: String(formData.get("scheduledDate") ?? ""),
       scheduledTime: String(formData.get("scheduledTime") ?? ""),
-      location: formData.get("location")
+      venueId: formData.get("venueId") ?? undefined
     });
 
     if (!parsed.success) {
@@ -362,7 +364,7 @@ export async function updateMatchAction(matchId: string, organizationId: string,
     const supabase = await createSupabaseServerClient();
     const { data: match, error: matchError } = await supabase
       .from("matches")
-      .select("id, status, season_id, scheduled_at, result_version")
+      .select("id, status, season_id, scheduled_at, result_version, venue_id")
       .eq("id", matchId)
       .eq("organization_id", organizationId)
       .maybeSingle();
@@ -370,12 +372,11 @@ export async function updateMatchAction(matchId: string, organizationId: string,
     if (!match) throw new Error("No se encontro el partido para el grupo seleccionado.");
 
     const previousDate = matchIsoToDateInput(match.scheduled_at);
-    const payload: {
-      scheduled_at: string;
-      location: string | null;
-    } = {
+    const { venueId } = parsed.data;
+    const changeVenue = venueId !== undefined && venueId !== "keep" && venueId !== match.venue_id;
+    const payload = {
       scheduled_at: matchDateAndTimeToIso(parsed.data.scheduledDate, parsed.data.scheduledTime, previousDate),
-      location: parsed.data.location || null
+      ...(changeVenue ? { venue_id: venueId || null, location: null } : {})
     };
 
     if (match.status === "finished") {
@@ -393,15 +394,15 @@ export async function updateMatchAction(matchId: string, organizationId: string,
       }
     }
 
-    const { data: updated, error } = await supabase
+    let update = supabase
       .from("matches")
       .update(payload)
       .eq("id", matchId)
       .eq("organization_id", organizationId)
       .eq("status", match.status)
-      .eq("result_version", match.result_version)
-      .select("id")
-      .maybeSingle();
+      .eq("result_version", match.result_version);
+    if (changeVenue) update = match.venue_id ? update.eq("venue_id", match.venue_id) : update.is("venue_id", null);
+    const { data: updated, error } = await update.select("id").maybeSingle();
     if (error) {
       redirect(buildPath(matchId, organizationQueryKey, error.message));
     }

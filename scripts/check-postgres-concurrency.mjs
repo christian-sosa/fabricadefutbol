@@ -176,6 +176,118 @@ async function newPhotoWhileRetiring(controller, worker, pids) {
   console.log("PostgreSQL 17: foto finalizada durante lock real conserva metadata, reserva y cuota; retencion obsoleta pierde y control positivo retira.");
 }
 
+async function venuesRespectGroupAndCapacity(controller, worker, pids) {
+  const addVenue = (client, group, name) => privateQuery(client,
+    "insert into app_dev.organization_venues(organization_id,name) values($1,$2) returning id,name", [group, name], "Crear cancha sintetica");
+  const updateVenue = (query, values) => privateQuery(controller, query, values, "Editar cancha sintetica");
+  const matchVenue = async () => (await privateQuery(controller,
+    "select venue_id,location from app_dev.matches where id=$1", [matchId])).rows[0];
+  await authenticate(controller, owner);
+  const historic = (await addVenue(controller, sportingGroup, "  Cancha\t Norte  ")).rows[0];
+  const other = (await addVenue(controller, photoGroup, "Cancha Norte")).rows[0];
+  assert.equal(historic.name, "Cancha Norte");
+  await assert.rejects(addVenue(controller, sportingGroup, "CANCHA  NORTE"), { code: "23505" });
+
+  const changeMatchVenue = (venue) => privateQuery(controller,
+    "update app_dev.matches set venue_id=$2,location=null where id=$1", [matchId, venue], "Seleccionar cancha del partido");
+  await assert.rejects(changeMatchVenue(other.id), { code: "23514" });
+  const baseline = await sportingState(controller);
+  await privateQuery(controller, "update app_dev.matches set location='Nombre histórico' where id=$1", [matchId]);
+  await privateQuery(controller, "update app_dev.matches set venue_id=$2 where id=$1", [matchId, historic.id]);
+  await updateVenue("update app_dev.organization_venues set name='Cancha Nueva',archived_at=now() where id=$1", [historic.id]);
+  assert.deepEqual(await matchVenue(), { venue_id: historic.id, location: "Nombre histórico" });
+  await assert.rejects(addVenue(controller, sportingGroup, "cancha nueva"), { code: "23505" });
+  await changeMatchVenue(null);
+  await assert.rejects(changeMatchVenue(historic.id), { code: "23514" });
+  assert.deepEqual(await matchVenue(), { venue_id: null, location: null });
+  await updateVenue("update app_dev.organization_venues set archived_at=null where id=$1", [historic.id]);
+  await changeMatchVenue(historic.id);
+  assert.deepEqual(await matchVenue(), { venue_id: historic.id, location: "Cancha Nueva" });
+  assert.deepEqual(await sportingState(controller), baseline, "Cambiar la cancha conserva el acta, la version y los puntos.");
+
+  const archiving = (await addVenue(controller, sportingGroup, "Cancha a archivar")).rows[0];
+  await authenticate(worker, owner);
+  let assignment;
+  await preserveFailureDuringCleanup(async () => {
+    await privateQuery(controller, "begin");
+    await updateVenue("update app_dev.organization_venues set archived_at=now() where id=$1", [archiving.id]);
+    await privateQuery(controller, "reset role");
+    assignment = observeQuery(privateQuery(worker,
+      "update app_dev.matches set venue_id=$2,location=null where id=$1", [matchId, archiving.id], "Asignar cancha durante archivado"));
+    await waitForDatabaseLock(controller, pids.controller, pids.worker, assignment);
+    await privateQuery(controller, "commit");
+    const outcome = await assignment.promise;
+    assert.equal(outcome.ok, false, "Una cancha archivada durante la asignacion no puede quedar elegida.");
+    assert.equal(outcome.error.code, "23514");
+    assert.deepEqual(await matchVenue(), { venue_id: historic.id, location: "Cancha Nueva" });
+  }, async () => {
+    await rollbackThenReset(controller);
+    if (assignment) await assignment.promise;
+    await rollbackThenReset(worker);
+  });
+
+  for (const { hold, write } of [
+    {
+      hold: () => addVenue(controller, sportingGroup, "Cancha que toma el cupo"),
+      write: () => addVenue(worker, sportingGroup, "Cancha de admin revocado")
+    },
+    {
+      hold: () => updateVenue("update app_dev.organization_venues set name='Cancha renombrada' where id=$1", [historic.id]),
+      write: () => privateQuery(worker, "update app_dev.matches set venue_id=$2,location=null where id=$1", [matchId, historic.id], "Elegir cancha durante revocacion")
+    }
+  ]) {
+    await privateQuery(controller, "update app_dev.matches set venue_id=null,location=null where id=$1", [matchId]);
+    await privateQuery(controller, "insert into app_dev.organization_admins(organization_id,admin_id,created_by) values($1,$2,$3)", [sportingGroup, member, owner]);
+    await authenticate(worker, member);
+    let waiting;
+    await preserveFailureDuringCleanup(async () => {
+      await privateQuery(controller, "begin");
+      await hold();
+      waiting = observeQuery(write());
+      await waitForDatabaseLock(controller, pids.controller, pids.worker, waiting);
+      await privateQuery(controller, "delete from app_dev.organization_admins where organization_id=$1 and admin_id=$2", [sportingGroup, member]);
+      await privateQuery(controller, "commit");
+      const outcome = await waiting.promise;
+      assert.equal(outcome.ok, false, "Un permiso revocado durante el lock no puede escribir canchas.");
+      assert.equal(outcome.error.code, "42501");
+    }, async () => {
+      await rollbackThenReset(controller);
+      if (waiting) await waiting.promise;
+      await rollbackThenReset(worker);
+    });
+  }
+
+  await authenticate(controller, member);
+  assert.equal((await privateQuery(controller, "select id from app_dev.organization_venues")).rowCount, 0);
+  await assert.rejects(addVenue(controller, photoGroup, "Cancha ajena"), { code: "42501" });
+  await authenticate(controller, owner);
+  for (let index = 2; index <= 9; index++) await addVenue(controller, photoGroup, `Cancha ${index}`);
+  await authenticate(worker, owner);
+  let pending;
+  await preserveFailureDuringCleanup(async () => {
+    await privateQuery(controller, "begin");
+    await addVenue(controller, photoGroup, "Cancha 10");
+    await privateQuery(controller, "reset role");
+    pending = observeQuery(addVenue(worker, photoGroup, "Cancha 11"));
+    await waitForDatabaseLock(controller, pids.controller, pids.worker, pending);
+    await privateQuery(controller, "commit");
+    const outcome = await pending.promise;
+    assert.equal(outcome.ok, false, "Dos altas simultaneas no pueden superar el cupo.");
+    assert.equal(outcome.error.code, "23514");
+    await authenticate(controller, owner);
+    await updateVenue("update app_dev.organization_venues set archived_at=now() where id=$1", [other.id]);
+    await addVenue(controller, photoGroup, "Cancha 11");
+    await assert.rejects(updateVenue("update app_dev.organization_venues set archived_at=null where id=$1", [other.id]), { code: "23514" });
+    assert.equal((await privateQuery(controller,
+      "select id from app_dev.organization_venues where organization_id=$1 and archived_at is null", [photoGroup])).rowCount, 10);
+  }, async () => {
+    await rollbackThenReset(controller);
+    if (pending) await pending.promise;
+    await rollbackThenReset(worker);
+  });
+  console.log("PostgreSQL 17: cupo de canchas bajo concurrencia, archivado, aislamiento por grupo e historial deportivo verificados.");
+}
+
 async function runSyntheticScenario(config, sources, failAfterSchema) {
   const controller = new pg.Client(config), worker = new pg.Client(config);
   let ownedResourcesCreated = false, controllerConnected = false, workerConnected = false;
@@ -210,6 +322,7 @@ async function runSyntheticScenario(config, sources, failAfterSchema) {
     assert.notEqual(pids.controller, pids.worker, "Las carreras requieren dos conexiones PostgreSQL independientes.");
     await revokeWhileWaiting(controller, worker, pids);
     await newPhotoWhileRetiring(controller, worker, pids);
+    await venuesRespectGroupAndCapacity(controller, worker, pids);
   }, async () => {
     // Teardown must still run if closing the second connection fails.
     let shutdownFailure;

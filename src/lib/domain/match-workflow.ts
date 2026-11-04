@@ -42,7 +42,7 @@ type CreateDraftInput = {
   organizationId: string;
   scheduledAt: string;
   modality: MatchModality;
-  location?: string;
+  venueId?: string;
   selectedPlayerIds: string[];
   invitedGuests: DraftGuestInput[];
   teamCreationMode?: "auto" | "manual";
@@ -307,7 +307,7 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
     organizationId,
     scheduledAt,
     modality,
-    location,
+    venueId,
     selectedPlayerIds,
     invitedGuests,
     teamCreationMode = "auto",
@@ -359,7 +359,7 @@ export async function createDraftMatchWithOptions(input: CreateDraftInput) {
     p_organization_id: organizationId,
     p_request_id: input.requestId ?? crypto.randomUUID(),
     p_input: {
-      scheduledAt, modality, location: location || null,
+      scheduledAt, modality, venueId: venueId ?? null,
       selectedPlayerIds, invitedGuests, substituteAssignments, goalkeeperPlayerIds,
       teamALabel: normalizeTeamLabel(teamALabel), teamBLabel: normalizeTeamLabel(teamBLabel),
       teamCreationMode, options

@@ -102,7 +102,7 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
   const draftInput = () => ({scheduledAt:'2026-10-01T20:00:00Z',modality:'5v5',location:'Cancha',selectedPlayerIds:Array.from({length:9},(_,n)=>id(20+n)),
     invitedGuests:[{key:'visitor',name:'Visita',rating:5}],substituteAssignments:[],goalkeeperPlayerIds:[id(20),id(25)],teamALabel:'Azul',teamBLabel:'Rojo',teamCreationMode:'manual',
     options:[{teamA:Array.from({length:5},(_,n)=>({id:`player:${id(20+n)}`})),teamB:[...Array.from({length:4},(_,n)=>({id:`player:${id(25+n)}`})),{id:'guest:visitor'}],ratingSumA:25,ratingSumB:25,ratingDiff:0}]});
-  const createDraft = async (request: number,input=draftInput()) => (await rows(`select APP.create_group_match_draft('${id(10)}','${id(request)}','${JSON.stringify(input)}') result`))[0].result;
+  const createDraft = async (request: number,input: ReturnType<typeof draftInput> & { venueId?: string | null } = draftInput()) => (await rows(`select APP.create_group_match_draft('${id(10)}','${id(request)}','${JSON.stringify(input)}') result`))[0].result;
   it('creates the complete manual draft atomically and reuses the stable request after finishing', async () => {
     await login();
     expect(await createDraft(70)).toEqual({match_id:id(70),result_version:2,reused:false});
@@ -119,6 +119,22 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     expect(await rows(`select id from APP.match_guests where match_id='${id(71)}'`)).toEqual([]);
     await sql(`reset role; insert into APP.players(id,organization_id,full_name,initial_rank) values('${id(60)}','${id(11)}','Foreign',1)`); await login();
     await expect(createDraft(72,{...draftInput(),selectedPlayerIds:[id(60),...draftInput().selectedPlayerIds.slice(1)],goalkeeperPlayerIds:[id(60),id(25)]})).rejects.toThrow(/activos del grupo/);
+  });
+  it('stores the selected venue and rejects an archived selection without a partial draft', async () => {
+    await login();
+    const [{ id: venueId }] = await rows(`insert into APP.organization_venues(organization_id,name)
+      values('${id(10)}','Cancha Norte') returning id`) as [{ id: string }];
+    const draftVenue = (match: number) => rows(`select venue_id,location from APP.matches where id='${id(match)}'`);
+    const input = { ...draftInput(), venueId };
+    expect(await createDraft(74, input)).toMatchObject({ reused: false });
+    expect(await draftVenue(74)).toEqual([{ venue_id: venueId, location: 'Cancha Norte' }]);
+
+    await sql(`update APP.organization_venues set archived_at=now() where id='${venueId}'`);
+    await expect(createDraft(75, input)).rejects.toThrow(/cancha activa de este grupo/);
+    expect(await draftVenue(75)).toEqual([]);
+    expect(await createDraft(74, input)).toMatchObject({ reused: true });
+    await createDraft(75, { ...draftInput(), venueId: null });
+    expect(await draftVenue(75)).toEqual([{ venue_id: null, location: null }]);
   });
   it('keeps legacy frontend writes during additive rollout and enforces exact reservations only after activation', async () => {
     await login(); await sql(`insert into storage.objects(bucket_id,name,owner) values('${bucket}','${photo}','${id(1)}')`);

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { createMatchFormAction } from "@/app/admin/(panel)/form-actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { MatchDateTimeFields } from "@/components/admin/match-date-time-fields";
+import { MatchVenueSelect, type MatchVenueOption } from "@/components/admin/match-venue-select";
 import { Button } from "@/components/ui/button";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
@@ -154,7 +155,7 @@ const EXPECTED_PLAYERS: Record<MatchModality, number> = Object.fromEntries(
 
 export type NewMatchDefaults = {
   modality: MatchModality;
-  location?: string;
+  venueId?: string;
   scheduledTime?: string;
   playerIds: string[];
   goalkeeperPlayerIds: string[];
@@ -167,6 +168,7 @@ export function NewMatchForm({
   defaultScheduledDate,
   organizationId,
   players,
+  venues = [],
   initialValues,
   defaultModality = "6v6",
   error
@@ -175,20 +177,22 @@ export function NewMatchForm({
   defaultScheduledDate: string;
   organizationId: string;
   players: SelectablePlayer[];
+  venues?: MatchVenueOption[];
   defaultModality?: MatchModality;
   initialValues?: NewMatchDefaults;
   error?: string;
 }) {
   const router = useRouter();
-  const refreshPositionsOnReturn = useRef(false);
+  const refreshOnReturn = useRef(false);
+  const refreshAfterEditing = useCallback(() => { refreshOnReturn.current = true; }, []);
   useEffect(() => {
-    const refreshAfterEditingPositions = () => {
-      if (!refreshPositionsOnReturn.current) return;
-      refreshPositionsOnReturn.current = false;
+    const refreshAfterFocus = () => {
+      if (!refreshOnReturn.current) return;
+      refreshOnReturn.current = false;
       router.refresh();
     };
-    window.addEventListener("focus", refreshAfterEditingPositions);
-    return () => window.removeEventListener("focus", refreshAfterEditingPositions);
+    window.addEventListener("focus", refreshAfterFocus);
+    return () => window.removeEventListener("focus", refreshAfterFocus);
   }, [router]);
 
   const [draftRequestId] = useState(() => requestId ?? crypto.randomUUID());
@@ -478,10 +482,12 @@ export function NewMatchForm({
           </Select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-semibold text-slate-200" htmlFor="location">
-            Ubicacion
-          </label>
-          <Input defaultValue={initialValues?.location} id="location" name="location" placeholder="Cancha / barrio" />
+          <MatchVenueSelect defaultVenueId={initialValues?.venueId} venues={venues} />
+          <Link className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-300 underline underline-offset-4"
+            href={withOrgQuery("/admin/venues", organizationId)} onClick={refreshAfterEditing}
+            onAuxClick={(event) => { if (event.button === 1) refreshAfterEditing(); }} rel="noopener noreferrer" target="_blank">
+            Administrar canchas (otra pestaña)
+          </Link>
         </div>
       </div>
 
@@ -510,8 +516,8 @@ export function NewMatchForm({
               El armado usa la posición preferida y, si hace falta, la secundaria. Si faltan perfiles, completa con los disponibles. Los arqueros que marques tienen prioridad.
             </p>
             <Link className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-300 underline underline-offset-4" href={withOrgQuery("/admin/players", organizationId)} target="_blank" rel="noopener noreferrer"
-              onClick={() => { refreshPositionsOnReturn.current = true; }}
-              onAuxClick={(event) => { if (event.button === 1) refreshPositionsOnReturn.current = true; }}>
+              onClick={refreshAfterEditing}
+              onAuxClick={(event) => { if (event.button === 1) refreshAfterEditing(); }}>
               Editar posiciones en Jugadores (otra pestaña)
             </Link>
             {starterCount > 0 ? (

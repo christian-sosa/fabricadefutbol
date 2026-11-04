@@ -12,6 +12,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { MatchModality, SubstituteAssignment } from "@/types/domain";
 import { withOrgQuery } from "@/lib/org";
 import { getAdminMatchDetails, getSelectablePlayers } from "@/lib/queries/admin";
+import { getActiveMatchVenues } from "@/lib/queries/match-venues";
 
 export default async function NewMatchPage({
   searchParams
@@ -26,7 +27,10 @@ export default async function NewMatchPage({
     const separator = target.includes("?") ? "&" : "?";
     redirect(`${target}${separator}error=${encodeURIComponent(writeAccess.reason ?? "No tienes permisos para editar este grupo.")}`);
   }
-  const players = await getSelectablePlayers(selectedOrganization.id);
+  const [players, venues] = await Promise.all([
+    getSelectablePlayers(selectedOrganization.id),
+    getActiveMatchVenues(selectedOrganization.id)
+  ]);
   const defaultModality = resolvedSearchParams.modality && Object.hasOwn(TEAM_SIZE_BY_MODALITY, resolvedSearchParams.modality)
     ? resolvedSearchParams.modality as MatchModality : "6v6";
   let initialValues: NewMatchDefaults | undefined;
@@ -68,7 +72,8 @@ export default async function NewMatchPage({
           ...copiedGuests.flatMap((guest, index) => guest.is_substitute ? [{ participantId: `guest:${index + 1}`, team: guest.substitute_team }] : [])
         ];
         initialValues = {
-          modality: template.match.modality, location: template.match.location ?? "",
+          modality: template.match.modality,
+          venueId: venues.find((venue) => venue.id === template.match.venue_id)?.id,
           scheduledTime: matchIsoToTimeInput(template.match.scheduled_at), playerIds,
           goalkeeperPlayerIds: goalkeeperIds.length === 2 ? goalkeeperIds : [],
           guests: copiedGuests.map((guest) => ({ name: guest.guest_name, rating: Number(guest.guest_rating) })),
@@ -90,7 +95,7 @@ export default async function NewMatchPage({
           arma equipos manuales.
         </CardDescription>
 
-        {initialValues ? <p className="mt-3 text-sm text-emerald-300">Copiamos convocados, invitados, cancha y hora. Proponemos la próxima fecha semanal futura; revisala y ajustá quiénes juegan. Los equipos y el resultado se cargan de nuevo.</p> : null}
+        {initialValues ? <p className="mt-3 text-sm text-emerald-300">Copiamos convocados, invitados y hora. {initialValues.venueId ? "Preseleccionamos la misma cancha." : "Podés elegir una cancha para este partido."} Proponemos la próxima fecha semanal futura. Revisala y ajustá quiénes juegan. Los equipos y el resultado se cargan de nuevo.</p> : null}
 
         <NewMatchForm
           requestId={randomUUID()}
@@ -100,6 +105,7 @@ export default async function NewMatchPage({
           error={error}
           organizationId={selectedOrganization.id}
           players={players}
+          venues={venues}
         />
       </Card>
     </div>
