@@ -498,10 +498,26 @@ export function MatchResultEditor({
             {(["A", "B"] as const).map((team) => <section key={team} className="rounded-xl border border-slate-800 p-3">
               <h3 className="text-sm font-bold text-slate-100">{team === "A" ? teamALabel : teamBLabel}</h3>
               <p className="mt-1 text-xs text-slate-400">{goalsForTeam(team)} de {team === "A" ? scoreAValue || "0" : scoreBValue || "0"} goles asignados</p>
-              <div className="mt-3 space-y-2">{scorerOptions.filter((participant) => participant.team === team).map((participant) => <label key={participant.participantId} className="flex items-center justify-between gap-3 text-sm text-slate-200">
-                <span className="min-w-0 break-words">{participant.name}</span>
-                <Input aria-label={`Goles de ${participant.name}`} className="w-20 shrink-0" type="number" min={0} max={999} step={1} inputMode="numeric" value={scorerGoals[participant.participantId] ?? ""} placeholder="0" onChange={(event) => setScorerGoals((current) => ({ ...current, [participant.participantId]: event.target.value }))} />
-              </label>)}</div>
+              <div className="mt-3 space-y-2">
+                {scorerOptions.filter((participant) => participant.team === team).map((participant) => (
+                  <label key={participant.participantId} className="grid grid-cols-[minmax(0,1fr)_5rem] items-center gap-3 text-sm text-slate-200">
+                    <span className="min-w-0 break-words">{participant.name}</span>
+                    <span className="grid">
+                      <Input
+                        aria-label={`Goles de ${participant.name}`}
+                        type="number"
+                        min={0}
+                        max={999}
+                        step={1}
+                        inputMode="numeric"
+                        value={scorerGoals[participant.participantId] ?? ""}
+                        placeholder="0"
+                        onChange={(event) => setScorerGoals((current) => ({ ...current, [participant.participantId]: event.target.value }))}
+                      />
+                    </span>
+                  </label>
+                ))}
+              </div>
             </section>)}
           </div>
           {scorerOptions.filter((participant) => participant.team === "OUT" && Number(scorerGoals[participant.participantId]) > 0).map((participant) => <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-amber-200" key={participant.participantId}>
