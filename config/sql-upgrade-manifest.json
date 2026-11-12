@@ -1,10 +1,10 @@
 {
   "formatVersion": 1,
   "artifactKind": "sql-upgrades",
-  "revision": "group-venues-upgrades-20261104",
-  "sha256": "6cdf516bd3a2b771f16a35d38b964d8996a96255e7008a22e014879ea04c3d37",
+  "revision": "delete-finished-group-match-upgrades-20261112",
+  "sha256": "c8b841f0a9de71813bc7dc19fbbb7fb28a8d8e5fc66e8bcbc05bbe7dd7511c90",
   "bucket": "groups-sql-artifacts",
-  "object": "6cdf516bd3a2b771f16a35d38b964d8996a96255e7008a22e014879ea04c3d37.json.gz",
+  "object": "c8b841f0a9de71813bc7dc19fbbb7fb28a8d8e5fc66e8bcbc05bbe7dd7511c90.json.gz",
   "fileSha256": {
     "audit-baseline/group-match-workflow.sql": "a9c6c9827663d613d456df54f4fc0b9d4d6938d3b4232a45110a67880f51dcc9",
     "audit-baseline/policies.sql": "11883051ff561125c3874d4a69add2b8cfefd5bb4194add3575faf049d9e422a",
@@ -13,6 +13,11 @@
     "audit-migrations/dev-additive.sql": "3e9260a3b4f03fc03f899c48b8757b17f60811ff08880ec82c34a18072acd375",
     "audit-migrations/prod-activation.sql": "1836c0884fd4bc822fcd310bfb759022ac35d73962d554c6cb24135efc643feb",
     "audit-migrations/prod-additive.sql": "8b1a5f182e1f0d5947361740397705aeee5becafce3891f4bc7de83137989fc3",
+    "match-delete-baseline/group-match-workflow.sql": "771458a5cc2586b98ad986343e897aad215b335a736f56e7b829802352e76d67",
+    "match-delete-baseline/policies.sql": "b005e776bdcf36e9659edc9b74d29fbaa4c1ab11138da98e9d6caeb1f898cf29",
+    "match-delete-baseline/schema.sql": "4916f8f8edfd893040aff50d9fbda949a498df6a559f3d1a67e36763a37365a6",
+    "match-delete-migrations/app_dev.sql": "d7d1c76a876c4fe1d494d142690fd370dab857d20b6e559587a291e4bdedd9f8",
+    "match-delete-migrations/app_prod.sql": "07ae6bb4e17dcc70121ff62f166eacf244ff5a71d5599c718a1b0095a74396ee",
     "positions-baseline/group-match-workflow.sql": "0b1d28e54c3c40b1fa4faf656cacb013d603dcae0705d5d43fe838fb1054dca3",
     "positions-baseline/policies.sql": "3348af825734ca18cd9b2eeb8f6ed9414d0117b11eb198f8ac5c652cee047e27",
     "positions-baseline/schema.sql": "d2b5fec11ad8d1aab97ea215283a161877eda3cf916ce97df6b5ef219b7c05a3",
@@ -61,6 +66,13 @@
       "sha256": "ef16cb140ca484e317b10f1b63f044222b3c0eb5b94fcf2e6155284108890b82",
       "bucket": "groups-sql-artifacts",
       "object": "ef16cb140ca484e317b10f1b63f044222b3c0eb5b94fcf2e6155284108890b82.json.gz"
+    },
+    "match-delete": {
+      "formatVersion": 1,
+      "revision": "group-venues-20261104",
+      "sha256": "fe662ffcc2b62c33f45f9e630ebe79dbb8163058d3b205e1ca17366f1f011ed4",
+      "bucket": "groups-sql-artifacts",
+      "object": "fe662ffcc2b62c33f45f9e630ebe79dbb8163058d3b205e1ca17366f1f011ed4.json.gz"
     }
   },
   "migrations": {
@@ -119,6 +131,14 @@
     "venuesPermissionsProd": {
       "version": "20261104134036",
       "name": "app_prod_group_venues_recheck_permissions"
+    },
+    "matchDeleteDev": {
+      "version": "20261112131548",
+      "name": "app_dev_delete_group_match"
+    },
+    "matchDeleteProd": {
+      "version": "20261112131612",
+      "name": "app_prod_delete_group_match"
     }
   }
 }

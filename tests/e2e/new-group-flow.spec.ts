@@ -123,6 +123,34 @@ test("crea grupo y plantel desde la UI; dos clientes compiten por el mismo resul
     await expect(page.getByRole("group", { name: `Negro ${accepted.scoreA}, Blanco ${accepted.scoreB}`, exact: true })).toBeVisible();
     await page.reload();
     await expect(page.getByText(`Figura del partido: ${names[winningIndex]}`, { exact: true })).toBeVisible();
+
+    await page.goto(`/admin/matches/${matchId}?org=${group.slug}`);
+    await page.getByRole("link", { name: "Eliminar partido", exact: true }).click();
+    const deleteButton = page.getByRole("button", { name: "Borrar partido", exact: true });
+    await expect(deleteButton).toBeVisible();
+    const [confirmation] = await Promise.all([
+      page.waitForEvent("dialog", { timeout: 10_000 }).then(async (dialog) => {
+        const message = dialog.message();
+        await dialog.dismiss();
+        return message;
+      }),
+      deleteButton.click()
+    ]);
+    expect(confirmation).toContain("5v5");
+    expect((await client.from("matches").select("status").eq("id", matchId).single().throwOnError()).data).toEqual({ status: "finished" });
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await deleteButton.click();
+    await expect(page).toHaveURL((url) => url.pathname === "/admin/matches" && url.searchParams.get("org") === group.slug);
+    await expect(page.getByRole("status").filter({ hasText: "Partido eliminado." })).toBeVisible();
+    expect((await client.from("matches").select("id").eq("id", matchId).maybeSingle().throwOnError()).data).toBeNull();
+    const updatedResponse = await page.request.get(`/api/organizations/${group.id}/standings?season=current`);
+    expect(updatedResponse.ok()).toBe(true);
+    const updated = await updatedResponse.json() as OrganizationStandingsResponse;
+    expect(Object.fromEntries(updated.standings.map(({ playerId, currentRating }) => [playerId, currentRating]))).toEqual(
+      Object.fromEntries(roster.data!.map(({ id, current_rating }) => [id, Number(current_rating)]))
+    );
+    expect(updated.standings.reduce((total, player) => total + (player.mvpCount ?? 0), 0)).toBe(0);
   } finally {
     await Promise.all([firstClient.dispose(), secondClient.dispose()]);
   }

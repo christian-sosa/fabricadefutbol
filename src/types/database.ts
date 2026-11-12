@@ -738,6 +738,10 @@ export type Database = {
         Args: { p_match_id: string; p_organization_id: string; p_expected_version: number; p_input: Json; p_finish?: boolean };
         Returns: Json;
       };
+      delete_group_match: {
+        Args: { p_match_id: string; p_organization_id: string; p_expected_version: number };
+        Returns: Json;
+      };
       confirm_group_match_option: {
         Args: { p_match_id: string; p_organization_id: string; p_option_id: string; p_team_a_label?: string | null; p_team_b_label?: string | null };
         Returns: Json;

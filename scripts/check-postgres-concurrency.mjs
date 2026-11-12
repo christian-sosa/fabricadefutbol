@@ -288,6 +288,66 @@ async function venuesRespectGroupAndCapacity(controller, worker, pids) {
   console.log("PostgreSQL 17: cupo de canchas bajo concurrencia, archivado, aislamiento por grupo e historial deportivo verificados.");
 }
 
+async function deleteFinishedMatchWhileWaiting(controller, worker, pids) {
+  const baseline = await sportingState(controller);
+  assert.equal(baseline.match[0].status, "finished");
+  assert.equal(baseline.history.length, 10);
+  const version = baseline.match[0].result_version;
+  const remove = (client) => privateQuery(client, "select app_dev.delete_group_match($1,$2,$3) as deleted",
+    [matchId, sportingGroup, version], "Borrar partido finalizado");
+
+  await authenticate(controller, owner);
+  await privateQuery(controller, "insert into app_dev.organization_admins(organization_id,admin_id,created_by) values($1,$2,$3)",
+    [sportingGroup, member, owner]);
+  await authenticate(worker, member);
+  assert.equal((await privateQuery(worker, "select app_dev.can_write_org($1) as allowed", [sportingGroup])).rows[0].allowed, true);
+  let pending;
+  await preserveFailureDuringCleanup(async () => {
+    await holdGroup(controller, sportingGroup);
+    pending = observeQuery(remove(worker));
+    await waitForDatabaseLock(controller, pids.controller, pids.worker, pending);
+    await authenticate(controller, owner);
+    const removed = await privateQuery(controller, "delete from app_dev.organization_admins where organization_id=$1 and admin_id=$2 returning admin_id",
+      [sportingGroup, member]);
+    assert.equal(removed.rowCount, 1);
+    await privateQuery(controller, "reset role; commit");
+    const denied = await pending.promise;
+    assert.equal(denied.ok, false, "La revocacion durante el lock debe impedir el borrado.");
+    assert.equal(denied.error.code, "42501");
+    assert.deepEqual(await sportingState(controller), baseline, "El borrado rechazado conserva el acta y los puntos.");
+  }, async () => {
+    await rollbackThenReset(controller);
+    if (pending) await pending.promise;
+    await rollbackThenReset(worker);
+  });
+
+  await authenticate(worker, owner);
+  pending = undefined;
+  await preserveFailureDuringCleanup(async () => {
+    await holdGroup(controller, sportingGroup);
+    pending = observeQuery(remove(worker));
+    await waitForDatabaseLock(controller, pids.controller, pids.worker, pending);
+    await authenticate(controller, owner);
+    const removed = await remove(controller);
+    assert.deepEqual(removed.rows[0].deleted, { deleted_match_id: matchId });
+    await privateQuery(controller, "reset role; commit");
+    const retry = await pending.promise;
+    assert.equal(retry.ok, false, "Solo uno de dos borrados concurrentes puede completar.");
+    assert.equal(retry.error.code, "PT409");
+    const state = await sportingState(controller);
+    assert.deepEqual(state.match, []);
+    assert.deepEqual(state.result, []);
+    assert.deepEqual(state.history, []);
+    assert.deepEqual(state.players.map((player) => Number(player.current_rating)), Array(10).fill(1000));
+    assert.deepEqual(state.seasonRatings.map((player) => Number(player.current_rating)), Array(10).fill(1000));
+  }, async () => {
+    await rollbackThenReset(controller);
+    if (pending) await pending.promise;
+    await rollbackThenReset(worker);
+  });
+  console.log("PostgreSQL 17: permiso revocado durante el borrado rechazado y dos borrados concurrentes revierten los puntos una sola vez.");
+}
+
 async function runSyntheticScenario(config, sources, failAfterSchema) {
   const controller = new pg.Client(config), worker = new pg.Client(config);
   let ownedResourcesCreated = false, controllerConnected = false, workerConnected = false;
@@ -323,6 +383,7 @@ async function runSyntheticScenario(config, sources, failAfterSchema) {
     await revokeWhileWaiting(controller, worker, pids);
     await newPhotoWhileRetiring(controller, worker, pids);
     await venuesRespectGroupAndCapacity(controller, worker, pids);
+    await deleteFinishedMatchWhileWaiting(controller, worker, pids);
   }, async () => {
     // Teardown must still run if closing the second connection fails.
     let shutdownFailure;

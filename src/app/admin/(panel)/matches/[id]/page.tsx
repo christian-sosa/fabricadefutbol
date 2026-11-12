@@ -18,8 +18,9 @@ import { saveMatchFormationAction } from "@/app/admin/(panel)/matches/[id]/forma
 import { readMatchFormation, supportsMatchFormation, toFormationPlayers } from "@/lib/domain/match-formation";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { getOrganizationWriteAccess, requireAdminOrganization } from "@/lib/auth/admin";
-import { matchIsoToDateInput, matchIsoToTimeInput } from "@/lib/match-datetime";
+import { formatMatchDateTime, matchIsoToDateInput, matchIsoToTimeInput } from "@/lib/match-datetime";
 import { withOrgQuery } from "@/lib/org";
 import { buildAbsolutePublicUrl } from "@/lib/public-url";
 import { getAdminMatchDetails } from "@/lib/queries/admin";
@@ -59,16 +60,19 @@ export default async function AdminMatchDetailPage({
   const regenerateAction = regenerateOptionsAction.bind(null, id, selectedOrganization.id);
   const matchUpdateAction = updateMatchAction.bind(null, id, selectedOrganization.id);
   const teamLabelsUpdateAction = updateMatchTeamLabelsAction.bind(null, id, selectedOrganization.id);
-  const deleteAction = deleteMatchAction.bind(null, id, selectedOrganization.id);
+  const isFinished = details.match.status === "finished";
+  const deleteAction = deleteMatchAction.bind(null, id, selectedOrganization.id, isFinished ? details.match.result_version : undefined);
   const canDeleteMatch =
     details.match.status === "draft" ||
-    (details.match.status === "confirmed" && !details.result);
+    (details.match.status === "confirmed" && !details.result) ||
+    isFinished;
+  const matchLabel = `${details.match.modality} del ${formatMatchDateTime(details.match.scheduled_at)}`;
   const confirmedOption = details.options.find((option) => option.is_confirmed) ?? null;
   const visibleOptions = confirmedOption ? [confirmedOption] : details.options;
   const publicMatchUrl = buildAbsolutePublicUrl(withOrgQuery(`/matches/${id}`, selectedOrganization.slug));
   const resultHref = withOrgQuery(`/admin/matches/${id}/result`, selectedOrganization.slug);
   const teamLabels = resolveMatchTeamLabels(details.match);
-  const canManageResult = details.match.status === "confirmed" || details.match.status === "finished";
+  const canManageResult = details.match.status === "confirmed" || isFinished;
   const formationTeams = confirmedOption ? {
     teamA: toFormationPlayers(confirmedOption.teamA, details.match.goalkeeper_player_ids),
     teamB: toFormationPlayers(confirmedOption.teamB, details.match.goalkeeper_player_ids)
@@ -94,6 +98,11 @@ export default async function AdminMatchDetailPage({
             {details.result ? "Repetir este partido" : confirmedOption ? "Compartir equipos" : "Ver opciones de equipos"}
           </Link>
           {canManageResult ? <Link className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold" href={resultHref}>{details.result ? "Modificar resultado" : "Cargar resultado"}</Link> : null}
+          {isFinished ? (
+            <Link className="inline-flex min-h-11 items-center px-2 text-sm font-semibold text-slate-300 hover:underline" href="#eliminar-partido">
+              Eliminar partido
+            </Link>
+          ) : null}
         </div>
       </Card>
 
@@ -183,15 +192,24 @@ export default async function AdminMatchDetailPage({
       </details>
 
       {canDeleteMatch ? (
-        <Card>
+        <Card id={isFinished ? "eliminar-partido" : undefined} className={isFinished ? "scroll-mt-4" : undefined}>
           <CardTitle>Eliminar partido</CardTitle>
           <CardDescription>
-            Disponible solo para partidos en borrador o confirmados que todavia no tengan resultado.
+            {isFinished
+              ? `Al borrar el partido ${matchLabel}, también se eliminarán su resultado y sus estadísticas, y se actualizará el ranking.`
+              : "Disponible solo para partidos en borrador o confirmados que todavia no tengan resultado."}
           </CardDescription>
           <form action={deleteAction} className="mt-4">
-            <Button type="submit" variant="danger">
-              Borrar partido
-            </Button>
+            {isFinished ? (
+              <ConfirmSubmitButton
+                confirmMessage={`¿Borrar definitivamente el partido ${matchLabel}?`}
+                label="Borrar partido"
+              />
+            ) : (
+              <Button type="submit" variant="danger">
+                Borrar partido
+              </Button>
+            )}
           </form>
         </Card>
       ) : null}
