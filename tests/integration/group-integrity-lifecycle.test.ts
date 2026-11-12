@@ -172,15 +172,63 @@ describe.skipIf(!privateSqlAvailable("supabase/generated/schema.app_prod.sql")).
     expect(await rows("select * from APP.team_options order by id")).toEqual(previousOptions);
     expect(await rows("select * from APP.team_option_players order by player_id")).toEqual(previousMembers);
   });
-  const seedSecondMatch = async (date: string) => {
+  const seedSecondMatch = async (date: string, score = { scoreA: 3, scoreB: 1 }) => {
     await sql(`reset role;
       insert into APP.matches(id,organization_id,created_by,modality,scheduled_at) values('${id(41)}','${id(10)}','${id(1)}','5v5','${date}');
       insert into APP.team_options(id,match_id,option_number,rating_sum_a,rating_sum_b,rating_diff,created_by) values('${id(51)}','${id(41)}',1,5000,5000,0,'${id(1)}');
       insert into APP.match_players(match_id,player_id) select '${id(41)}',id from APP.players where organization_id='${id(10)}';
       insert into APP.team_option_players(team_option_id,player_id,team) select '${id(51)}',id,case when initial_rank<=5 then 'A'::APP.team_side else 'B'::APP.team_side end from APP.players where organization_id='${id(10)}';`);
     await login();
-    await sql(`select APP.confirm_group_match_option('${id(41)}','${id(10)}','${id(51)}'); select APP.save_group_match_result('${id(41)}','${id(10)}',1,'{"scoreA":3,"scoreB":1}')`);
+    await sql(`select APP.confirm_group_match_option('${id(41)}','${id(10)}','${id(51)}'); select APP.save_group_match_result('${id(41)}','${id(10)}',1,'${JSON.stringify(score)}')`);
   };
+  it("deletes only the selected finished match and its points after checking group and version", async () => {
+    await finish();
+    await seedSecondMatch("2026-09-01");
+    await sql(`select APP.write_group_public_snapshot(id,sporting_revision,'{"summary":{},"standings":[],"matchHistory":[{},{}]}')
+      from APP.organizations where id='${id(10)}'`);
+    const deleteMatch = (version: number, group = id(10)) => rows(`select APP.delete_group_match('${id(40)}','${group}',${version}) result`);
+    const ledger = () => rows("select * from APP.rating_history order by id");
+    const previous = await ledger();
+    const retained = previous.filter((row) => row.match_id === id(41));
+    await expect(deleteMatch(1)).rejects.toMatchObject({ code: "PT409" });
+    await login(2);
+    await expect(deleteMatch(2)).rejects.toMatchObject({ code: "42501" });
+    await expect(deleteMatch(2, id(11))).rejects.toMatchObject({ code: "PT409" });
+    await login();
+    expect(await ledger()).toEqual(previous);
+    expect(await rows("select id from APP.matches order by id")).toEqual([{ id: id(40) }, { id: id(41) }]);
+    expect(await rows("select organization_id from APP.organization_public_snapshots")).toEqual([{ organization_id: id(10) }]);
+
+    expect(await deleteMatch(2)).toEqual([{ result: { deleted_match_id: id(40) } }]);
+    await expect(deleteMatch(2)).rejects.toMatchObject({ code: "PT409" });
+    expect(await rows("select id from APP.matches order by id")).toEqual([{ id: id(41) }]);
+    expect(await rows("select match_id,score_a,score_b from APP.match_result")).toEqual([{ match_id: id(41), score_a: 3, score_b: 1 }]);
+    expect(await rows("select distinct match_id from APP.match_players")).toEqual([{ match_id: id(41) }]);
+    expect(await rows("select match_id from APP.team_options")).toEqual([{ match_id: id(41) }]);
+    expect(await rows("select organization_id from APP.organization_public_snapshots")).toEqual([]);
+    expect(await ledger()).toEqual(retained);
+    for (const table of ["players", "organization_season_player_ratings"]) {
+      const playerKey = table === "players" ? "id" : "player_id";
+      expect(await rows(`select current_rating from APP.${table} where ${playerKey} in ('${id(20)}','${id(25)}') order by ${playerKey}`))
+        .toEqual([{ current_rating: "1010.00" }, { current_rating: "990.00" }]);
+    }
+  });
+  it("caps only the affected account at the floor without creating points on a later deletion", async () => {
+    await sql(`update APP.players set current_rating=1 where id='${id(20)}'`);
+    await finish();
+    await seedSecondMatch("2026-09-02", { scoreA: 1, scoreB: 3 });
+    const ratings = () => rows(`select p.current_rating global_rating,r.current_rating season_rating
+      from APP.players p join APP.organization_season_player_ratings r on r.player_id=p.id where p.id='${id(20)}'`);
+    expect(await ratings()).toEqual([{ global_rating: "1.00", season_rating: "1000.00" }]);
+
+    await sql(`select APP.delete_group_match('${id(40)}','${id(10)}',2)`);
+    expect(await ratings()).toEqual([{ global_rating: "1.00", season_rating: "990.00" }]);
+    expect(await rows(`select rating_before,rating_after,delta,season_delta from APP.rating_history where player_id='${id(20)}'`))
+      .toEqual([{ rating_before: "1.00", rating_after: "1.00", delta: "0.00", season_delta: "-10.00" }]);
+
+    await sql(`select APP.delete_group_match('${id(41)}','${id(10)}',2)`);
+    expect(await ratings()).toEqual([{ global_rating: "1.00", season_rating: "1000.00" }]);
+  });
   it("corrects an older score while preserving later contributions and metadata-only ledger identity", async () => {
     await finish();
     await seedSecondMatch("2026-10-01");

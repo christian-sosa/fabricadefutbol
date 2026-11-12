@@ -145,6 +145,7 @@ function revalidateMatchPaths(matchId: string) {
   revalidatePath("/admin");
   revalidatePath("/admin/matches");
   revalidatePath(`/admin/matches/${matchId}`);
+  revalidatePath(`/admin/matches/${matchId}/result`);
   revalidatePath("/matches");
   revalidatePath(`/matches/${matchId}`);
   revalidatePath("/upcoming");
@@ -470,12 +471,25 @@ export async function updateMatchTeamLabelsAction(matchId: string, organizationI
   }
 }
 
-export async function deleteMatchAction(matchId: string, organizationId: string) {
+export async function deleteMatchAction(matchId: string, organizationId: string, expectedVersion?: number) {
   const organizationQueryKey = await getOrganizationQueryKeyById(organizationId);
   try {
     await assertOrganizationAdminAction(organizationId);
 
     const supabase = await createSupabaseServerClient();
+    if (expectedVersion !== undefined) {
+      const { error } = await supabase.rpc("delete_group_match", {
+        p_match_id: matchId,
+        p_organization_id: organizationId,
+        p_expected_version: expectedVersion
+      });
+      if (error) throw new Error(error.message);
+
+      await refreshOrganizationPublicSnapshotSafe(organizationId);
+      revalidateMatchPaths(matchId);
+      redirect(buildAdminMatchesPath(organizationQueryKey, "Partido eliminado."));
+    }
+
     const { data: match, error: matchError } = await supabase
       .from("matches")
       .select("id, status")

@@ -16,7 +16,7 @@ describe.skipIf(!privateSqlAvailable(sqlPath))("group match transactions (real P
   beforeAll(async () => {
     db = new PGlite();
     await db.exec(`
-      create role anon; create role authenticated;
+      create role anon; create role authenticated; create role service_role;
       create schema auth;
       create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.admin', true), '')::uuid $$;
       create type public.team_side as enum ('A', 'B');

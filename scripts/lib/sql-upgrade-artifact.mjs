@@ -18,9 +18,11 @@ export const UPGRADE_MIGRATIONS = {
   venuesDev: "venues-migrations/app_dev.sql",
   venuesProd: "venues-migrations/app_prod.sql",
   venuesPermissionsDev: "venues-migrations/app_dev-permissions.sql",
-  venuesPermissionsProd: "venues-migrations/app_prod-permissions.sql"
+  venuesPermissionsProd: "venues-migrations/app_prod-permissions.sql",
+  matchDeleteDev: "match-delete-migrations/app_dev.sql",
+  matchDeleteProd: "match-delete-migrations/app_prod.sql"
 };
-const BASELINE_RELEASES = ["audit", "positions", "team-read", "venues"];
+const BASELINE_RELEASES = ["audit", "positions", "team-read", "venues", "match-delete"];
 export const UPGRADE_FILES = [
   ...BASELINE_RELEASES.flatMap((release) => SQL_FILES.map((name) => `${release}-baseline/${name}`)),
   ...Object.values(UPGRADE_MIGRATIONS)

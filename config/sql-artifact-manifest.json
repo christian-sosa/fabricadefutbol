@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
-  "revision": "group-venues-20261104",
-  "sha256": "fe662ffcc2b62c33f45f9e630ebe79dbb8163058d3b205e1ca17366f1f011ed4",
+  "revision": "delete-finished-group-match-20261112",
+  "sha256": "a21f271c87a6d462cc14da88b350d6da0b29d1d9be5202d0c319644cd1c8a80b",
   "bucket": "groups-sql-artifacts",
-  "object": "fe662ffcc2b62c33f45f9e630ebe79dbb8163058d3b205e1ca17366f1f011ed4.json.gz"
+  "object": "a21f271c87a6d462cc14da88b350d6da0b29d1d9be5202d0c319644cd1c8a80b.json.gz"
 }
