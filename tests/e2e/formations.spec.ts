@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import path from "node:path";
 
 import { getCurrentMatchDateInput } from "../../src/lib/match-datetime";
@@ -7,6 +7,7 @@ import { E2E_ORGANIZATION_ID, E2E_PLAYER_IDS } from "./test-data";
 const ORG_SLUG = process.env.E2E_ORG_SLUG ?? "e2e-fabrica";
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL!;
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD!;
+let adminSessionCookies: Awaited<ReturnType<BrowserContext["cookies"]>> | undefined;
 
 test.describe.configure({ mode: "serial" });
 
@@ -15,13 +16,20 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(size.width).toBeLessThanOrEqual(size.viewport + 1);
 }
 
-async function login(page: Page) {
+async function ensureAdminSession(page: Page) {
+  const context = page.context();
+  if (adminSessionCookies) {
+    await context.addCookies(adminSessionCookies);
+    return;
+  }
+
   await page.goto(`/admin/login?next=${encodeURIComponent(`/admin?org=${ORG_SLUG}`)}`);
   const form = page.locator("form").filter({ has: page.getByRole("button", { name: "Ingresar con email", exact: true }) });
   await form.getByLabel("Email", { exact: true }).fill(ADMIN_EMAIL);
   await form.getByLabel("Contraseña", { exact: true }).fill(ADMIN_PASSWORD);
   await form.getByRole("button", { name: "Ingresar con email", exact: true }).click();
   await expect(page).toHaveURL((url) => url.pathname === "/admin" && url.searchParams.get("org") === ORG_SLUG);
+  adminSessionCookies = await context.cookies(page.url());
 }
 
 async function currentPoints(page: Page) {
@@ -33,7 +41,7 @@ async function currentPoints(page: Page) {
 }
 
 test("guarda posiciones opcionales en la planilla sin cambiar puntos a 320px", async ({ page }) => {
-  await login(page);
+  await ensureAdminSession(page);
   const pointsBefore = await currentPoints(page);
   await page.setViewportSize({ width: 320, height: 900 });
   await page.goto(`/admin/players?org=${ORG_SLUG}&view=edit`);
@@ -109,7 +117,7 @@ for (const scenario of [
   test(`${scenario.modality}: oculta niveles, arma las canchas y comparte una formación persistente a 320px`, async ({ page, browser }, testInfo) => {
     test.setTimeout(240_000);
     const originalViewport = page.viewportSize()!;
-    await login(page);
+    await ensureAdminSession(page);
     const pointsBefore = await currentPoints(page);
     await page.setViewportSize({ width: 320, height: 900 });
     await page.goto(`/admin/matches/new?org=${ORG_SLUG}`);
@@ -212,6 +220,7 @@ for (const scenario of [
 
     const publicContext = await browser.newContext({ viewport: { width: 320, height: 900 } });
     try {
+      expect((await publicContext.cookies()).length).toBe(0);
       const publicPage = await publicContext.newPage();
       await publicPage.goto(sharedUrl.toString());
       const publicTeams = publicPage.getByRole("heading", { name: "Equipos confirmados", exact: true }).locator("..");
