@@ -1,93 +1,15 @@
 name: tests
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  quality:
+  formation-auth-ab:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: fdf-test-ci-only
-          POSTGRES_DB: fdf_test_concurrency
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d fdf_test_concurrency"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Restore private SQL validation artifact
-        env:
-          NEXT_PUBLIC_SUPABASE_URL_DEV: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL_DEV }}
-          SUPABASE_SERVICE_ROLE_KEY_DEV: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_DEV }}
-        run: |
-          if [ -z "$NEXT_PUBLIC_SUPABASE_URL_DEV" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY_DEV" ]; then
-            echo "::error::Complete SQL validation requires this repository's private artifact credentials. Public fork runs cannot substitute missing SQL or skip mandatory suites."
-            exit 1
-          fi
-          node scripts/restore-ci-sql.mjs
-          node scripts/restore-ci-sql-upgrades.mjs
-          npm run sql:verify
-
-      - name: Guardrails
-        run: npm run guardrails
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test coverage
-        run: npm run test:coverage
-
-      - name: Verify races with independent PostgreSQL clients
-        env:
-          TEST_DATABASE_URL: postgresql://postgres:fdf-test-ci-only@127.0.0.1:5432/fdf_test_concurrency
-        run: npm run test:postgres
-
-      - name: Verify tests reject known regressions
-        run: node scripts/check-test-mutations.mjs
-
-      - name: Build
-        run: npm run build
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: coverage
-          if-no-files-found: warn
-
-  e2e-smoke:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 65
     concurrency:
       group: groups-shared-app-dev-e2e
       cancel-in-progress: false
@@ -110,6 +32,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -131,15 +55,31 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: Build and test desktop and mobile
-        run: npm run test:e2e
 
-      # This repository is public. Traces/HTML may contain the fixture's login or cookies.
-      - name: Upload visual evidence without credentials
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-screenshots
-          path: |
-            test-results/**/*.png
-          if-no-files-found: warn
+      - name: Fetch the exact benchmark revisions
+        run: |
+          git fetch --no-tags --depth=1 origin refs/heads/main refs/pull/29/head
+          git cat-file -e 'cdec0df373aac409d95aff5f2084a603eef66083^{commit}'
+          git cat-file -e '35fb929d2026c856f210283b5083ef76ac8cf078^{commit}'
+          git diff --exit-code cdec0df373aac409d95aff5f2084a603eef66083 HEAD -- . ':!.github/workflows/tests.yml' ':!scripts/benchmark-formation-auth.mjs'
+
+      - name: A - Full E2E with main login
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf -- .next
+          node scripts/benchmark-formation-auth.mjs prepare main
+          npm run test:e2e -- --update-snapshots=none 2>&1 | tee "$RUNNER_TEMP/fdf-ab-main.log"
+          git diff --exit-code HEAD -- tests/e2e/visual-baselines
+
+      - name: B - Full E2E with PR 29 session reuse
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf -- .next
+          node scripts/benchmark-formation-auth.mjs prepare pr
+          npm run test:e2e -- --update-snapshots=none 2>&1 | tee "$RUNNER_TEMP/fdf-ab-pr.log"
+          git diff --exit-code HEAD -- tests/e2e/visual-baselines
+
+      - name: Verify case and snapshot parity and compare login timings
+        run: node scripts/benchmark-formation-auth.mjs compare "$RUNNER_TEMP/fdf-ab-main.log" "$RUNNER_TEMP/fdf-ab-pr.log"
