@@ -63,15 +63,6 @@ jobs:
           git cat-file -e '35fb929d2026c856f210283b5083ef76ac8cf078^{commit}'
           git diff --exit-code cdec0df373aac409d95aff5f2084a603eef66083 HEAD -- . ':!.github/workflows/tests.yml' ':!scripts/benchmark-formation-auth.mjs'
 
-      - name: A - Full E2E with main login
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf -- .next
-          node scripts/benchmark-formation-auth.mjs prepare main
-          npm run test:e2e -- --update-snapshots=none 2>&1 | tee "$RUNNER_TEMP/fdf-ab-main.log"
-          git diff --exit-code HEAD -- tests/e2e/visual-baselines
-
       - name: B - Full E2E with PR 29 session reuse
         shell: bash
         run: |
@@ -79,6 +70,15 @@ jobs:
           rm -rf -- .next
           node scripts/benchmark-formation-auth.mjs prepare pr
           npm run test:e2e -- --update-snapshots=none 2>&1 | tee "$RUNNER_TEMP/fdf-ab-pr.log"
+          git diff --exit-code HEAD -- tests/e2e/visual-baselines
+
+      - name: A - Full E2E with main login
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf -- .next
+          node scripts/benchmark-formation-auth.mjs prepare main
+          npm run test:e2e -- --update-snapshots=none 2>&1 | tee "$RUNNER_TEMP/fdf-ab-main.log"
           git diff --exit-code HEAD -- tests/e2e/visual-baselines
 
       - name: Verify case and snapshot parity and compare login timings
